@@ -1,0 +1,206 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  firstName      String
+  lastName       String
+  email          String   @unique
+  password       String
+  role           String @default("STUDENT")
+  profilePicture String?
+  xp             Int      @default(0)
+  level          Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  skills              Skill[]
+  tasks               Task[]
+  wellnessEntries     Wellness[]
+  interviews          Interview[]
+  portfolios          Portfolio[]
+  userBadges          UserBadge[]
+  challengeAttempts   ChallengeAttempt[]
+  projectApplications ProjectApplication[]
+  notifications       Notification[]
+  lectureUploads      LectureUpload[]
+}
+
+model Skill {
+  id        String   @id @default(cuid())
+  userId    String
+  skillName String
+  level     Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillName])
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  status      String @default("TODO")
+  dueDate     DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Wellness {
+  id          String   @id @default(cuid())
+  userId      String
+  stressLevel Int
+  mood        Int
+  energyLevel Int
+  notes       String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Challenge {
+  id          String              @id @default(cuid())
+  title       String
+  difficulty  String
+  description String
+  language    String?
+  starterCode String?
+  solution    String?
+  xpReward    Int                 @default(50)
+  createdAt   DateTime            @default(now())
+
+  attempts ChallengeAttempt[]
+}
+
+model ChallengeAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  challengeId String
+  code        String
+  passed      Boolean  @default(false)
+  xpEarned    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id           String          @id @default(cuid())
+  title        String
+  category     String
+  location     String?
+  organization String
+  description  String
+  requirements String?
+  xpReward     Int             @default(200)
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  applications ProjectApplication[]
+}
+
+model ProjectApplication {
+  id          String   @id @default(cuid())
+  projectId   String
+  userId      String
+  status      String   @default("PENDING")
+  deliverable String?
+  rating      Int?
+  feedback    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
+
+model Interview {
+  id        String   @id @default(cuid())
+  userId    String
+  topic     String
+  score     Int?
+  feedback  String?
+  weakAreas Json?
+  questions Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Badge {
+  id          String @id @default(cuid())
+  name        String @unique
+  description String
+  icon        String?
+  xpRequired  Int    @default(0)
+
+  userBadges UserBadge[]
+}
+
+model UserBadge {
+  id       String   @id @default(cuid())
+  userId   String
+  badgeId  String
+  earnedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+}
+
+model Portfolio {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  projectLink String?
+  githubLink  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LectureUpload {
+  id        String   @id @default(cuid())
+  userId    String
+  fileName  String
+  fileType  String
+  content   String?
+  summary   String?
+  flashcards Json?
+  quiz      Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  type      String   @default("info")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
