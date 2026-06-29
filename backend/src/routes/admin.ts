@@ -14,20 +14,29 @@ router.get('/overview', async (_req, res) => {
   const [
     totalUsers,
     activeUsers,
+    dailyLogins,
     challengesCompleted,
     projectApplications,
     avgInterviewScore,
-    wellnessEntries,
+    wellnessStats,
+    wellnessTrend,
     recentUsers,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { updatedAt: { gte: weekAgo } } }),
+    prisma.user.count({ where: { updatedAt: { gte: dayAgo } } }),
     prisma.challengeAttempt.count({ where: { passed: true } }),
     prisma.projectApplication.count(),
     prisma.interview.aggregate({ _avg: { score: true }, where: { score: { not: null } } }),
+    prisma.wellness.aggregate({
+      _avg: { stressLevel: true, mood: true, energyLevel: true },
+      where: { date: { gte: weekAgo } },
+    }),
     prisma.wellness.findMany({
       where: { date: { gte: weekAgo } },
       select: { stressLevel: true, mood: true, energyLevel: true, date: true },
+      orderBy: { date: 'desc' },
+      take: 100,
     }),
     prisma.user.findMany({
       select: { firstName: true, lastName: true, email: true, role: true, createdAt: true },
@@ -36,20 +45,17 @@ router.get('/overview', async (_req, res) => {
     }),
   ]);
 
-  const avgStress =
-    wellnessEntries.length > 0
-      ? wellnessEntries.reduce((s, e) => s + e.stressLevel, 0) / wellnessEntries.length
-      : 0;
-
   res.json({
     totalUsers,
     activeUsers,
-    dailyLogins: await prisma.user.count({ where: { updatedAt: { gte: dayAgo } } }),
+    dailyLogins,
     challengesCompleted,
     projectApplications,
     avgInterviewScore: avgInterviewScore._avg.score || 0,
-    avgStressLevel: avgStress,
-    wellnessTrend: wellnessEntries,
+    avgStressLevel: wellnessStats._avg.stressLevel || 0,
+    avgMood: wellnessStats._avg.mood || 0,
+    avgEnergy: wellnessStats._avg.energyLevel || 0,
+    wellnessTrend: wellnessTrend.reverse(),
     recentUsers,
   });
 });

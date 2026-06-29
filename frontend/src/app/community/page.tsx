@@ -75,22 +75,24 @@ const categoryLabels: Record<string, string> = {
 };
 
 export default function CommunityPage() {
-  const [projects, setProjects] = useState<Project[]>(demoProjects);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [applied, setApplied] = useState<Set<string>>(new Set());
+  const [error, setError] = useState('');
 
   useEffect(() => {
     api<Project[]>('/projects')
-      .then((items) => setProjects(items.length ? items : demoProjects))
-      .catch(() => setProjects(demoProjects));
+      .then(setProjects)
+      .catch(() => setError('Could not load community projects from the backend.'));
   }, []);
 
   async function apply(projectId: string) {
     try {
+      setError('');
       await api(`/projects/${projectId}/apply`, { method: 'POST', body: JSON.stringify({}) });
+      setApplied((prev) => new Set(prev).add(projectId));
     } catch {
-      // Keep the optimistic UI for demo mode.
+      setError('Could not apply to this project. Please try again.');
     }
-    setApplied((prev) => new Set(prev).add(projectId));
   }
 
   return (
@@ -106,6 +108,10 @@ export default function CommunityPage() {
           <Button variant="secondary" size="sm"><Filter className="h-4 w-4" />All Categories</Button>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

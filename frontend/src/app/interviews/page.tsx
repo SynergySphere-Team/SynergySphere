@@ -34,10 +34,12 @@ export default function InterviewsPage() {
   const [result, setResult] = useState<Interview | null>(null);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(0);
+  const [error, setError] = useState('');
 
   async function startInterview(topic: string) {
     setLoading(true);
     setResult(null);
+    setError('');
     try {
       const data = await api<Interview>('/ai/interview/start', {
         method: 'POST',
@@ -47,9 +49,7 @@ export default function InterviewsPage() {
       setAnswers(new Array(data.questions.length).fill(''));
       setStep(0);
     } catch {
-      setInterview({ ...demoInterview, topic });
-      setAnswers(new Array(demoInterview.questions.length).fill(''));
-      setStep(0);
+      setError('Could not start the interview. Please check the backend or AI configuration and try again.');
     } finally {
       setLoading(false);
     }
@@ -58,6 +58,7 @@ export default function InterviewsPage() {
   async function submitAnswers() {
     if (!interview) return;
     setLoading(true);
+    setError('');
     try {
       const data = await api<Interview>('/ai/interview/evaluate', {
         method: 'POST',
@@ -66,13 +67,7 @@ export default function InterviewsPage() {
       setResult(data);
       setInterview(null);
     } catch {
-      setResult({
-        ...interview,
-        score: 82,
-        feedback: 'Strong structure and good technical language. Add more detail around trade-offs and edge cases.',
-        weakAreas: ['System design depth', 'Database optimization'],
-      });
-      setInterview(null);
+      setError('Could not evaluate this interview. Your answers are still here; please try again.');
     } finally {
       setLoading(false);
     }
@@ -91,6 +86,10 @@ export default function InterviewsPage() {
           End Interview
         </Button>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[0.85fr_1fr_0.85fr]">
         <Card>

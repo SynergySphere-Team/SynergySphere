@@ -49,7 +49,7 @@ export default function AIAssistantPage() {
         ...prev,
         {
           role: 'assistant',
-          content: 'This loop runs in O(n^2) because the inner loop grows with each outer iteration. If you only need a count, track the total directly instead of printing every item.',
+          content: 'I could not reach the AI service. Please check the backend connection or AI configuration and try again.',
         },
       ]);
     } finally {

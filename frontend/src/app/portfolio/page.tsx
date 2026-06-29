@@ -34,24 +34,26 @@ const skills = [
 
 export default function PortfolioPage() {
   const { user } = useAuth();
-  const [items, setItems] = useState<PortfolioItem[]>(demoItems);
+  const [items, setItems] = useState<PortfolioItem[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: '', description: '', projectLink: '', githubLink: '' });
+  const [error, setError] = useState('');
 
   useEffect(() => {
     api<PortfolioItem[]>('/portfolio')
-      .then((data) => setItems(data.length ? data : demoItems))
-      .catch(() => setItems(demoItems));
+      .then(setItems)
+      .catch(() => setError('Could not load portfolio items from the backend.'));
   }, []);
 
   async function addItem() {
     if (!form.title.trim()) return;
     try {
+      setError('');
       await api('/portfolio', { method: 'POST', body: JSON.stringify(form) });
       const data = await api<PortfolioItem[]>('/portfolio');
-      setItems(data.length ? data : demoItems);
+      setItems(data);
     } catch {
-      setItems((prev) => [{ id: crypto.randomUUID(), ...form }, ...prev]);
+      setError('Could not save this project. Please try again.');
     }
     setForm({ title: '', description: '', projectLink: '', githubLink: '' });
     setShowForm(false);
@@ -62,7 +64,7 @@ export default function PortfolioPage() {
       await api(`/portfolio/${id}`, { method: 'DELETE' });
       setItems((prev) => prev.filter((item) => item.id !== id));
     } catch {
-      setItems((prev) => prev.filter((item) => item.id !== id));
+      setError('Could not delete this project. Please try again.');
     }
   }
 
@@ -79,6 +81,10 @@ export default function PortfolioPage() {
           <Button onClick={() => setShowForm(!showForm)} size="sm"><Plus className="h-4 w-4" />Add Project</Button>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      )}
 
       {showForm && (
         <Card className="mb-4">

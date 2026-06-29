@@ -30,6 +30,10 @@ npm-debug.log*
 
 # Prisma
 backend/prisma/migrations/**/migration_lock.toml
+*.db
+*.sqlite
+*.sqlite3
+backend/prisma/dev.db
 
 # Testing
 coverage/

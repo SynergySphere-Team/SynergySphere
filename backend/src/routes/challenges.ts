@@ -8,25 +8,40 @@ import { awardXp } from '../services/gamification.js';
 
 const router = Router();
 
+const challengeSelect = {
+  id: true,
+  title: true,
+  difficulty: true,
+  description: true,
+  language: true,
+  starterCode: true,
+  xpReward: true,
+  createdAt: true,
+} as const;
+
 router.get('/', authenticate, async (_req, res) => {
   const challenges = await prisma.challenge.findMany({
-    orderBy: { difficulty: 'asc' },
+    select: challengeSelect,
+    orderBy: [{ difficulty: 'asc' }, { title: 'asc' }],
+    take: 100,
   });
   res.json(challenges);
 });
 
 router.get('/:id', authenticate, async (req, res) => {
-  const challenge = await prisma.challenge.findUnique({ where: { id: paramId(req) } });
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: paramId(req) },
+    select: challengeSelect,
+  });
   if (!challenge) {
     res.status(404).json({ error: 'Challenge not found' });
     return;
   }
-  const { solution, ...safe } = challenge;
-  res.json(safe);
+  res.json(challenge);
 });
 
 const attemptSchema = z.object({
-  code: z.string().min(1),
+  code: z.string().min(1).max(50000),
 });
 
 router.post('/:id/submit', authenticate, validateBody(attemptSchema), async (req: AuthRequest, res) => {
@@ -37,7 +52,11 @@ router.post('/:id/submit', authenticate, validateBody(attemptSchema), async (req
   }
 
   const passed = evaluateCode(req.body.code, challenge.solution || '');
-  const xpEarned = passed ? challenge.xpReward : 0;
+  const alreadyPassed = await prisma.challengeAttempt.findFirst({
+    where: { userId: req.user!.userId, challengeId: challenge.id, passed: true },
+    select: { id: true },
+  });
+  const xpEarned = passed && !alreadyPassed ? challenge.xpReward : 0;
 
   const attempt = await prisma.challengeAttempt.create({
     data: {
@@ -49,17 +68,20 @@ router.post('/:id/submit', authenticate, validateBody(attemptSchema), async (req
     },
   });
 
-  if (passed) {
-    await awardXp(req.user!.userId, xpEarned, `Completed challenge: ${challenge.title}`);
+  if (xpEarned > 0) {
+    await awardXp(req.user!.userId, xpEarned, 'Completed challenge: ' + challenge.title);
     await updateSkill(req.user!.userId, challenge.language || 'General');
   }
 
-  res.json({ attempt, passed, xpEarned });
+  res.json({ attempt, passed, xpEarned, alreadyPassed: Boolean(alreadyPassed) });
 });
 
 function evaluateCode(submitted: string, solution: string): boolean {
+  if (!solution.trim()) return false;
   const normalize = (s: string) => s.replace(/\s+/g, '').toLowerCase();
-  return normalize(submitted).includes(normalize(solution).slice(0, 20)) || normalize(submitted) === normalize(solution);
+  const normalizedSubmitted = normalize(submitted);
+  const normalizedSolution = normalize(solution);
+  return normalizedSubmitted.includes(normalizedSolution) || normalizedSubmitted === normalizedSolution;
 }
 
 async function updateSkill(userId: string, skillName: string) {

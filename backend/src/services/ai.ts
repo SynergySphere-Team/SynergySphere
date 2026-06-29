@@ -3,16 +3,22 @@
  * Supports OpenAI, with fallback to rule-based responses when no API key is set.
  */
 
+const AI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS) || 20000;
+
 export async function generateAiResponse(systemPrompt: string, userMessage: string): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (apiKey) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: 'Bearer ' + apiKey,
         },
         body: JSON.stringify({
           model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
@@ -21,16 +27,20 @@ export async function generateAiResponse(systemPrompt: string, userMessage: stri
             { role: 'user', content: userMessage },
           ],
           temperature: 0.7,
-          max_tokens: 2000,
+          max_tokens: 1200,
         }),
       });
 
-      if (response.ok) {
-        const data = await response.json() as { choices: Array<{ message: { content: string } }> };
-        return data.choices[0]?.message?.content || fallbackResponse(userMessage);
+      if (!response.ok) {
+        throw new Error('OpenAI request failed with status ' + response.status);
       }
+
+      const data = await response.json() as { choices: Array<{ message: { content: string } }> };
+      return data.choices[0]?.message?.content || fallbackResponse(userMessage);
     } catch (error) {
       console.error('OpenAI API error:', error);
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
@@ -60,7 +70,7 @@ function fallbackResponse(message: string): string {
 
   if (lower.includes('flashcard') || lower.includes('lecture') || lower.includes('summary')) {
     return JSON.stringify({
-      summary: 'This lecture covers fundamental programming concepts including variables, control flow, functions, and data structures. Key takeaways include understanding how to break problems into smaller parts and applying iterative development practices.',
+      summary: 'This lecture covers fundamental programming concepts including variables, control flow, functions, and data structures.',
       flashcards: [
         { front: 'What is a variable?', back: 'A named storage location for data in memory.' },
         { front: 'What is a function?', back: 'A reusable block of code that performs a specific task.' },
@@ -82,19 +92,8 @@ function fallbackResponse(message: string): string {
   }
 
   if (lower.includes('debug') || lower.includes('error')) {
-    return 'I can help debug your code! Common issues to check:\n\n1. **Syntax errors** - Missing semicolons, brackets, or quotes\n2. **Type mismatches** - Comparing strings to numbers\n3. **Undefined variables** - Check variable scope\n4. **Off-by-one errors** - In loops and array indexing\n\nShare your code and error message for specific help. (Set OPENAI_API_KEY for full AI assistance)';
+    return 'I can help debug your code. Share the code and exact error message so I can give a specific answer. Demo mode is active unless OPENAI_API_KEY is set.';
   }
 
-  return `I'm the SynergySphere AI Assistant. I can help with:
-
-- **Coding**: Debug, explain, and improve your code
-- **Interviews**: Practice technical questions
-- **Study**: Convert lectures to flashcards and quizzes
-- **Wellness**: Study schedule recommendations
-
-*Note: Running in demo mode. Set \`OPENAI_API_KEY\` in your .env for full AI capabilities.*
-
-Your question: "${message.slice(0, 200)}"
-
-For coding help, try pasting your code with the error message. For study help, upload your lecture notes in LectureToLife.`;
+  return 'I am the SynergySphere AI Assistant. I can help with coding, interviews, study material, and wellness planning. Demo mode is active unless OPENAI_API_KEY is set.';
 }

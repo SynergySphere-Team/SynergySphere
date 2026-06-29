@@ -34,28 +34,30 @@ const columns = [
 ];
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>(demoTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [title, setTitle] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => { loadTasks(); }, []);
 
   async function loadTasks() {
     try {
       const data = await api<Task[]>('/tasks');
-      setTasks(data.length ? data : demoTasks);
+      setTasks(data);
     } catch {
-      setTasks(demoTasks);
+      setError('Could not load tasks from the backend.');
     }
   }
 
   async function addTask() {
     if (!title.trim()) return;
     try {
+      setError('');
       await api('/tasks', { method: 'POST', body: JSON.stringify({ title }) });
       await loadTasks();
     } catch {
-      setTasks((prev) => [{ id: crypto.randomUUID(), title, description: 'New task', status: 'TODO', dueDate: null }, ...prev]);
+      setError('Could not add this task. Please try again.');
     }
     setTitle('');
     setShowForm(false);
@@ -65,19 +67,21 @@ export default function TasksPage() {
     const flow = ['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE'];
     const next = flow[(flow.indexOf(task.status) + 1) % flow.length];
     try {
+      setError('');
       await api(`/tasks/${task.id}`, { method: 'PATCH', body: JSON.stringify({ status: next }) });
       await loadTasks();
     } catch {
-      setTasks((prev) => prev.map((item) => item.id === task.id ? { ...item, status: next } : item));
+      setError('Could not update this task. Please try again.');
     }
   }
 
   async function deleteTask(id: string) {
     try {
+      setError('');
       await api(`/tasks/${id}`, { method: 'DELETE' });
       await loadTasks();
     } catch {
-      setTasks((prev) => prev.filter((item) => item.id !== id));
+      setError('Could not delete this task. Please try again.');
     }
   }
 
@@ -91,6 +95,10 @@ export default function TasksPage() {
         </div>
         <Button onClick={() => setShowForm(!showForm)}><Plus className="h-4 w-4" />Add Task</Button>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      )}
 
       {showForm && (
         <Card className="mb-4">

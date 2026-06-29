@@ -7,12 +7,12 @@ async function main() {
   console.log('Seeding database...');
 
   const badges = [
-    { name: 'First Steps', description: 'Complete your first challenge', xpRequired: 0, icon: '🎯' },
-    { name: 'Java Master', description: 'Reach level 5 in Java', xpRequired: 200, icon: '☕' },
-    { name: 'SQL Expert', description: 'Complete 5 SQL challenges', xpRequired: 300, icon: '🗄️' },
-    { name: 'Wellness Champion', description: 'Log wellness for 7 consecutive days', xpRequired: 100, icon: '🧘' },
-    { name: 'Community Hero', description: 'Complete a community project', xpRequired: 500, icon: '🌍' },
-    { name: 'Interview Pro', description: 'Score 80+ on a mock interview', xpRequired: 400, icon: '🎤' },
+    { name: 'First Steps', description: 'Complete your first challenge', xpRequired: 0, icon: 'target' },
+    { name: 'Java Master', description: 'Reach level 5 in Java', xpRequired: 200, icon: 'java' },
+    { name: 'SQL Expert', description: 'Complete 5 SQL challenges', xpRequired: 300, icon: 'database' },
+    { name: 'Wellness Champion', description: 'Log wellness for 7 consecutive days', xpRequired: 100, icon: 'wellness' },
+    { name: 'Community Hero', description: 'Complete a community project', xpRequired: 500, icon: 'community' },
+    { name: 'Interview Pro', description: 'Score 80+ on a mock interview', xpRequired: 400, icon: 'interview' },
   ];
 
   for (const badge of badges) {
@@ -26,7 +26,7 @@ async function main() {
   const challenges = [
     {
       title: 'Hello World',
-      difficulty: 'EASY' as const,
+      difficulty: 'EASY',
       description: 'Write a function that returns "Hello, SynergySphere!"',
       language: 'JavaScript',
       starterCode: 'function greet() {\n  // Your code here\n}',
@@ -35,7 +35,7 @@ async function main() {
     },
     {
       title: 'Sum Array',
-      difficulty: 'EASY' as const,
+      difficulty: 'EASY',
       description: 'Write a function that returns the sum of all numbers in an array.',
       language: 'JavaScript',
       starterCode: 'function sumArray(arr) {\n  // Your code here\n}',
@@ -44,7 +44,7 @@ async function main() {
     },
     {
       title: 'FizzBuzz',
-      difficulty: 'MEDIUM' as const,
+      difficulty: 'MEDIUM',
       description: 'Return "Fizz" for multiples of 3, "Buzz" for 5, "FizzBuzz" for both.',
       language: 'JavaScript',
       starterCode: 'function fizzBuzz(n) {\n  // Your code here\n}',
@@ -53,7 +53,7 @@ async function main() {
     },
     {
       title: 'SQL: Top Students',
-      difficulty: 'MEDIUM' as const,
+      difficulty: 'MEDIUM',
       description: 'Write a SQL query to find students with GPA above 3.5.',
       language: 'SQL',
       starterCode: 'SELECT * FROM students WHERE',
@@ -62,7 +62,7 @@ async function main() {
     },
     {
       title: 'Binary Search',
-      difficulty: 'HARD' as const,
+      difficulty: 'HARD',
       description: 'Implement binary search on a sorted array.',
       language: 'JavaScript',
       starterCode: 'function binarySearch(arr, target) {\n  // Your code here\n}',
@@ -72,16 +72,17 @@ async function main() {
   ];
 
   for (const challenge of challenges) {
-    const existing = await prisma.challenge.findFirst({ where: { title: challenge.title } });
-    if (!existing) {
-      await prisma.challenge.create({ data: challenge });
-    }
+    await prisma.challenge.upsert({
+      where: { title: challenge.title },
+      update: challenge,
+      create: challenge,
+    });
   }
 
   const projects = [
     {
       title: 'Campus Recycling Dashboard',
-      category: 'RECYCLING' as const,
+      category: 'RECYCLING',
       location: 'University Campus',
       organization: 'Green Earth NGO',
       description: 'Build a web dashboard to track recycling rates across campus buildings.',
@@ -90,7 +91,7 @@ async function main() {
     },
     {
       title: 'Eco-Tourism Booking Platform',
-      category: 'ECO_TOURISM' as const,
+      category: 'ECO_TOURISM',
       location: 'Coastal Region',
       organization: 'Sustainable Travel Foundation',
       description: 'Create a booking platform for eco-friendly tourism experiences.',
@@ -99,7 +100,7 @@ async function main() {
     },
     {
       title: 'Green Infrastructure Monitor',
-      category: 'GREEN_INFRASTRUCTURE' as const,
+      category: 'GREEN_INFRASTRUCTURE',
       location: 'Urban District',
       organization: 'City Sustainability Office',
       description: 'Develop IoT dashboard for monitoring green roof and rain garden performance.',
@@ -109,10 +110,11 @@ async function main() {
   ];
 
   for (const project of projects) {
-    const existing = await prisma.project.findFirst({ where: { title: project.title } });
-    if (!existing) {
-      await prisma.project.create({ data: project });
-    }
+    await prisma.project.upsert({
+      where: { title: project.title },
+      update: project,
+      create: project,
+    });
   }
 
   const adminPassword = await bcrypt.hash('admin123456', 12);

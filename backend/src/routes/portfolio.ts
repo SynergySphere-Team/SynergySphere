@@ -10,16 +10,18 @@ const router = Router();
 router.use(authenticate);
 
 const portfolioSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().optional(),
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
   projectLink: z.string().url().optional().or(z.literal('')),
   githubLink: z.string().url().optional().or(z.literal('')),
 });
 
 router.get('/', async (req: AuthRequest, res) => {
+  const take = Math.min(Number(req.query.take) || 100, 200);
   const items = await prisma.portfolio.findMany({
     where: { userId: req.user!.userId },
     orderBy: { createdAt: 'desc' },
+    take,
   });
   res.json(items);
 });

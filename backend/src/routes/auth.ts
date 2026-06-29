@@ -1,8 +1,15 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { signToken, authenticate, AuthRequest } from '../middleware/auth.js';
+import {
+  AUTH_COOKIE_NAME,
+  AuthRequest,
+  authCookieOptions,
+  authenticate,
+  clearAuthCookieOptions,
+  signToken,
+} from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 
 const router = Router();
@@ -12,13 +19,29 @@ const registerSchema = z.object({
   lastName: z.string().min(1).max(50),
   email: z.string().email(),
   password: z.string().min(8).max(100),
-  role: z.enum(['STUDENT', 'ORGANIZATION', 'ADMIN']).optional(),
+  role: z.enum(['STUDENT', 'ORGANIZATION']).optional(),
 });
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
+
+const userSelect = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  email: true,
+  role: true,
+  profilePicture: true,
+  xp: true,
+  level: true,
+  createdAt: true,
+} as const;
+
+function setSessionCookie(res: Response, token: string) {
+  res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions());
+}
 
 router.post('/register', validateBody(registerSchema), async (req, res) => {
   try {
@@ -39,20 +62,11 @@ router.post('/register', validateBody(registerSchema), async (req, res) => {
         password: hashedPassword,
         role: role || 'STUDENT',
       },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        role: true,
-        profilePicture: true,
-        xp: true,
-        level: true,
-        createdAt: true,
-      },
+      select: userSelect,
     });
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
+    setSessionCookie(res, token);
 
     await prisma.notification.create({
       data: {
@@ -63,7 +77,7 @@ router.post('/register', validateBody(registerSchema), async (req, res) => {
       },
     });
 
-    res.status(201).json({ user, token });
+    res.status(201).json({ user });
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({ error: 'Registration failed' });
@@ -87,13 +101,19 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
     }
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
+    setSessionCookie(res, token);
 
-    const { password: _, ...safeUser } = user;
-    res.json({ user: safeUser, token });
+    const { password: _password, ...safeUser } = user;
+    res.json({ user: safeUser });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
   }
+});
+
+router.post('/logout', (_req, res) => {
+  res.clearCookie(AUTH_COOKIE_NAME, clearAuthCookieOptions());
+  res.status(204).send();
 });
 
 router.get('/me', authenticate, async (req: AuthRequest, res) => {
@@ -101,15 +121,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId },
       select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        role: true,
-        profilePicture: true,
-        xp: true,
-        level: true,
-        createdAt: true,
+        ...userSelect,
         skills: true,
         userBadges: { include: { badge: true } },
       },

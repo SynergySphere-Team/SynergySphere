@@ -11,22 +11,20 @@ router.use(authenticate);
 
 const chatSchema = z.object({
   message: z.string().min(1).max(4000),
-  context: z.string().optional(),
+  context: z.string().max(12000).optional(),
 });
 
 router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => {
-  const systemPrompt = `You are SynergySphere AI Coding Assistant. Help students with:
-- Debugging code
-- Explaining code concepts
-- Suggesting improvements
-- Generating code snippets
-- Explaining errors
-Be concise, educational, and encouraging.`;
+  const systemPrompt = [
+    'You are SynergySphere AI Coding Assistant.',
+    'Help students debug code, explain concepts, suggest improvements, generate snippets, and explain errors.',
+    'Be concise, educational, and encouraging.',
+  ].join('\n');
 
-  const response = await generateAiResponse(
-    systemPrompt,
-    req.body.context ? `Context:\n${req.body.context}\n\nQuestion: ${req.body.message}` : req.body.message
-  );
+  const prompt = req.body.context
+    ? 'Context:\n' + req.body.context + '\n\nQuestion: ' + req.body.message
+    : req.body.message;
+  const response = await generateAiResponse(systemPrompt, prompt);
 
   res.json({ response });
 });
@@ -36,8 +34,7 @@ const interviewSchema = z.object({
 });
 
 router.post('/interview/start', validateBody(interviewSchema), async (req: AuthRequest, res) => {
-  const prompt = `Generate 5 technical interview questions for ${req.body.topic}. 
-Return JSON array: [{"question": "...", "difficulty": "easy|medium|hard"}]`;
+  const prompt = 'Generate 5 technical interview questions for ' + req.body.topic + '. Return JSON array: [{"question":"...","difficulty":"easy|medium|hard"}]';
 
   const raw = await generateAiResponse('You are a technical interviewer.', prompt);
   let questions;
@@ -61,7 +58,7 @@ Return JSON array: [{"question": "...", "difficulty": "easy|medium|hard"}]`;
 
 const answerSchema = z.object({
   interviewId: z.string(),
-  answers: z.array(z.string()),
+  answers: z.array(z.string().max(4000)).max(10),
 });
 
 router.post('/interview/evaluate', validateBody(answerSchema), async (req: AuthRequest, res) => {
@@ -73,10 +70,12 @@ router.post('/interview/evaluate', validateBody(answerSchema), async (req: AuthR
     return;
   }
 
-  const prompt = `Evaluate these interview answers for ${interview.topic}.
-Questions: ${JSON.stringify(interview.questions)}
-Answers: ${JSON.stringify(req.body.answers)}
-Return JSON: {"score": 0-100, "feedback": "...", "weakAreas": ["..."]}`;
+  const prompt = [
+    'Evaluate these interview answers for ' + interview.topic + '.',
+    'Questions: ' + JSON.stringify(interview.questions),
+    'Answers: ' + JSON.stringify(req.body.answers),
+    'Return JSON: {"score":0-100,"feedback":"...","weakAreas":["..."]}',
+  ].join('\n');
 
   const raw = await generateAiResponse('You are a technical interviewer evaluator.', prompt);
   let evaluation = { score: 70, feedback: 'Good effort!', weakAreas: ['Practice more'] };
@@ -94,27 +93,28 @@ Return JSON: {"score": 0-100, "feedback": "...", "weakAreas": ["..."]}`;
     },
   });
 
-  await awardXp(req.user!.userId, 100, `Completed mock interview: ${interview.topic}`);
+  const alreadyScored = interview.score !== null;
+  if (!alreadyScored) {
+    await awardXp(req.user!.userId, 100, 'Completed mock interview: ' + interview.topic);
+  }
   res.json(updated);
 });
 
 const lectureSchema = z.object({
-  fileName: z.string(),
-  fileType: z.string(),
-  content: z.string().min(1),
+  fileName: z.string().min(1).max(255),
+  fileType: z.string().min(1).max(100),
+  content: z.string().min(1).max(20000),
 });
 
 router.post('/lecture-to-life', validateBody(lectureSchema), async (req: AuthRequest, res) => {
-  const prompt = `Convert this lecture content into study materials.
-Return JSON: {
-  "summary": "...",
-  "flashcards": [{"front": "...", "back": "..."}],
-  "quiz": [{"question": "...", "options": ["a","b","c","d"], "answer": 0}]
-}
-Content: ${req.body.content.slice(0, 8000)}`;
+  const prompt = [
+    'Convert this lecture content into study materials.',
+    'Return JSON: {"summary":"...","flashcards":[{"front":"...","back":"..."}],"quiz":[{"question":"...","options":["a","b","c","d"],"answer":0}]}',
+    'Content: ' + req.body.content.slice(0, 8000),
+  ].join('\n');
 
   const raw = await generateAiResponse('You are an educational content transformer.', prompt);
-  let materials = {
+  let materials: { summary: string; flashcards: unknown[]; quiz: unknown[] } = {
     summary: 'Summary generated from your lecture notes.',
     flashcards: [],
     quiz: [],
@@ -129,7 +129,6 @@ Content: ${req.body.content.slice(0, 8000)}`;
       userId: req.user!.userId,
       fileName: req.body.fileName,
       fileType: req.body.fileType,
-      content: req.body.content,
       summary: materials.summary,
       flashcards: materials.flashcards,
       quiz: materials.quiz,
@@ -143,7 +142,17 @@ Content: ${req.body.content.slice(0, 8000)}`;
 router.get('/lecture-to-life', async (req: AuthRequest, res) => {
   const uploads = await prisma.lectureUpload.findMany({
     where: { userId: req.user!.userId },
+    select: {
+      id: true,
+      fileName: true,
+      fileType: true,
+      summary: true,
+      flashcards: true,
+      quiz: true,
+      createdAt: true,
+    },
     orderBy: { createdAt: 'desc' },
+    take: 20,
   });
   res.json(uploads);
 });

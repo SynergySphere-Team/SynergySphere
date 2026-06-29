@@ -1,159 +1,129 @@
 # SynergySphere
 
-**Learn. Build. Thrive.**
+Learn. Build. Thrive.
 
-SynergySphere is a comprehensive university capstone platform combining:
+SynergySphere is a university capstone platform combining:
 
-- **Learning Management System (LMS)** — Coding challenges, skill tracking
-- **AI Coding Assistant** — Debug, explain, and improve code
-- **Productivity & Wellness Platform** — Task management and wellness tracking
-- **Community Project Marketplace** — NGO sustainability projects
-- **Career Development** — Mock interviews and portfolio builder
-- **Gamified Learning** — XP, levels, badges, and leaderboards
+- Learning management workflows for coding challenges and skill tracking
+- AI study and coding assistance
+- Productivity and wellness tracking
+- Community sustainability project matching
+- Mock interviews, portfolio tooling, XP, levels, badges, and leaderboards
 
 ## Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS, Framer Motion |
-| Backend | Node.js, Express, Prisma ORM, JWT Auth |
-| Database | PostgreSQL (Supabase recommended) |
-| AI | OpenAI GPT (with demo fallback) |
-| Hosting | Vercel (frontend), Railway (backend), Supabase (DB) |
+| --- | --- |
+| Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS |
+| Backend | Node.js, Express, Prisma ORM, JWT auth via http-only cookie |
+| Database | PostgreSQL locally, Supabase-compatible PostgreSQL in production |
+| AI | OpenAI-compatible chat endpoint with demo fallback |
+| Mobile | Android WebView wrapper for deployed HTTPS frontend |
 
 ## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
-- Docker (for local PostgreSQL) or a Supabase project
+- Docker for local PostgreSQL, or a Supabase PostgreSQL project
 
-### 1. Clone and Install
+### 1. Install
 
-```bash
-cd SynergySphere
+~~~bash
 npm install
-```
+~~~
 
-### 2. Start Database
+### 2. Start Local Database
 
-**Option A: Local Docker**
-```bash
+~~~bash
 docker compose up -d
-```
-
-**Option B: Supabase**
-Create a project at [supabase.com](https://supabase.com) and copy the connection string.
+~~~
 
 ### 3. Configure Environment
 
-```bash
+~~~bash
 cp backend/.env.example backend/.env
 cp frontend/.env.local.example frontend/.env.local
-```
+~~~
 
-Edit `backend/.env`:
-```
+Edit backend/.env and set a strong unique JWT_SECRET:
+
+~~~env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/synergysphere?schema=public"
-JWT_SECRET="your-secure-random-string"
-```
+JWT_SECRET="replace-with-a-long-random-secret"
+PORT=4000
+FRONTEND_URL="http://localhost:3000"
+~~~
 
-Optionally add `OPENAI_API_KEY` for full AI features.
+Optionally add OPENAI_API_KEY and OPENAI_MODEL for full AI behavior.
 
 ### 4. Setup Database
 
-```bash
+~~~bash
 npm run db:push
 npm run db:seed
-```
+~~~
 
 ### 5. Run Development Servers
 
-```bash
+~~~bash
 npm run dev
-```
+~~~
 
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:4000
 
-### Demo Accounts
+## Demo Accounts
 
 | Role | Email | Password |
-|------|-------|----------|
+| --- | --- | --- |
 | Student | student@synergysphere.com | student123 |
 | Admin | admin@synergysphere.com | admin123456 |
 
+Admin users are created by the seed script only. Public registration allows Student and Organization accounts.
+
 ## Project Structure
 
-```
+~~~text
 SynergySphere/
-├── frontend/          # Next.js app
-│   └── src/
-│       ├── app/       # Pages (dashboard, coding, AI, etc.)
-│       ├── components/# UI components and layout
-│       ├── context/   # Auth context
-│       └── lib/       # Utilities and API client
-├── backend/           # Express API
-│   ├── prisma/        # Database schema and seed
-│   └── src/
-│       ├── routes/    # API endpoints
-│       ├── services/  # AI and gamification logic
-│       └── middleware/# Auth, validation
-├── supabase/          # Supabase migration reference
-└── docker-compose.yml # Local PostgreSQL
-```
+  frontend/          Next.js app
+  backend/           Express API and Prisma schema
+  supabase/          SQL migration for Supabase/PostgreSQL setup
+  android/           Android WebView shell for deployed frontend
+  docker-compose.yml Local PostgreSQL
+~~~
 
-## API Endpoints
+## Useful Commands
 
-| Module | Endpoint | Description |
-|--------|----------|-------------|
-| Auth | `POST /api/auth/register` | Register user |
-| Auth | `POST /api/auth/login` | Login |
-| Auth | `GET /api/auth/me` | Current user profile |
-| Dashboard | `GET /api/dashboard/stats` | Dashboard analytics |
-| Challenges | `GET /api/challenges` | List coding challenges |
-| Challenges | `POST /api/challenges/:id/submit` | Submit solution |
-| AI | `POST /api/ai/chat` | AI coding assistant |
-| AI | `POST /api/ai/interview/start` | Start mock interview |
-| AI | `POST /api/ai/lecture-to-life` | Convert lectures |
-| Wellness | `GET/POST /api/wellness` | Wellness tracking |
-| Tasks | `CRUD /api/tasks` | Task management |
-| Projects | `GET/POST /api/projects` | Community projects |
-| Portfolio | `CRUD /api/portfolio` | Portfolio items |
-| Leaderboard | `GET /api/leaderboard` | Top users |
-| Admin | `GET /api/admin/overview` | Platform analytics |
+~~~bash
+npm run dev              # frontend and backend
+npm run dev:frontend     # frontend only
+npm run dev:backend      # backend only
+npm run build            # production build
+npm run db:push          # sync Prisma schema
+npm run db:seed          # seed demo data
+~~~
 
-## Features by Phase
+## Security Notes
 
-- [x] **Phase 1**: Authentication, Database, Dashboard
-- [x] **Phase 2**: Coding Practice, AI Coding Assistant
-- [x] **Phase 3**: LectureToLife Module
-- [x] **Phase 4**: Task Management, Wellness Tracking
-- [x] **Phase 5**: Community Module
-- [x] **Phase 6**: Mock Interviews, Gamification, Analytics
+- JWT sessions are set as http-only cookies.
+- JWT_SECRET must be set to a strong value in production.
+- Public registration cannot create admin accounts.
+- Challenge solutions are not returned by public challenge endpoints.
+- Local SQLite database files are ignored and should not be committed.
 
-## Security
+## Deployment Notes
 
-- JWT authentication with bcrypt password hashing
-- Rate limiting on API endpoints
-- Helmet security headers
-- Input validation with Zod
-- Prisma ORM (SQL injection protection)
-- Role-based access control (Student, Organization, Admin)
+For production, deploy the frontend and backend to HTTPS hosts and configure:
 
-## Deployment
+- FRONTEND_URL on the backend to match the deployed frontend origin
+- NEXT_PUBLIC_API_URL on the frontend to match the deployed backend /api URL
+- DATABASE_URL for PostgreSQL or Supabase
+- JWT_SECRET as a long random string
+- OPENAI_API_KEY if full AI behavior is required
 
-### Frontend (Vercel)
-```bash
-cd frontend && vercel
-```
-
-### Backend (Railway)
-Set environment variables and deploy the `backend/` directory.
-
-### Database (Supabase)
-Use the Supabase connection string as `DATABASE_URL` and run `prisma db push`.
+The Android wrapper should point to the deployed HTTPS frontend URL before release.
 
 ## License
 
-University Capstone Project — 2026
+University Capstone Project - 2026

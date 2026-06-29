@@ -1,14 +1,14 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { api, User, getToken, getStoredUser, setStoredUser, clearAuth } from '@/lib/utils';
+import { api, User, getStoredUser, setStoredUser, clearAuth } from '@/lib/utils';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -27,14 +27,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = getToken();
     const stored = getStoredUser();
-    if (token && stored) {
-      setUser(stored);
-      refreshUser().finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    if (stored) setUser(stored);
+    refreshUser().finally(() => setLoading(false));
   }, []);
 
   async function refreshUser() {
@@ -49,26 +44,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function login(email: string, password: string) {
-    const data = await api<{ user: User; token: string }>('/auth/login', {
+    const data = await api<{ user: User }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    localStorage.setItem('token', data.token);
     setStoredUser(data.user);
     setUser(data.user);
   }
 
   async function register(formData: RegisterData) {
-    const data = await api<{ user: User; token: string }>('/auth/register', {
+    const data = await api<{ user: User }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(formData),
     });
-    localStorage.setItem('token', data.token);
     setStoredUser(data.user);
     setUser(data.user);
   }
 
-  function logout() {
+  async function logout() {
+    try {
+      await api('/auth/logout', { method: 'POST' });
+    } catch {
+      // Local cleanup still happens if the API is unreachable.
+    }
     clearAuth();
     setUser(null);
   }

@@ -37,6 +37,7 @@ export default function LectureToLifePage() {
   const [uploads, setUploads] = useState<LectureUpload[]>([demoUpload]);
   const [selected, setSelected] = useState<LectureUpload | null>(demoUpload);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     api<LectureUpload[]>('/ai/lecture-to-life')
@@ -46,14 +47,14 @@ export default function LectureToLifePage() {
         setSelected(next[0]);
       })
       .catch(() => {
-        setUploads([demoUpload]);
-        setSelected(demoUpload);
+        setError('Could not load saved lecture packs from the backend.');
       });
   }, []);
 
   async function convert() {
     if (!content.trim()) return;
     setLoading(true);
+    setError('');
     try {
       const upload = await api<LectureUpload>('/ai/lecture-to-life', {
         method: 'POST',
@@ -65,18 +66,11 @@ export default function LectureToLifePage() {
       });
       setUploads((prev) => [upload, ...prev]);
       setSelected(upload);
-    } catch {
-      const upload = {
-        ...demoUpload,
-        id: crypto.randomUUID(),
-        fileName: fileName || 'Lecture Notes',
-        summary: content.slice(0, 260) || demoUpload.summary,
-      };
-      setUploads((prev) => [upload, ...prev]);
-      setSelected(upload);
-    } finally {
       setContent('');
       setFileName('');
+    } catch {
+      setError('Could not generate this study pack. Please check the backend or AI configuration and try again.');
+    } finally {
       setLoading(false);
     }
   }
@@ -88,6 +82,10 @@ export default function LectureToLifePage() {
         <h1 className="text-2xl font-bold text-white md:text-3xl">Transform lectures into learning material</h1>
         <p className="text-sm text-muted-foreground">Upload notes or paste content and let AI generate summaries, flashcards, quizzes, and exercises.</p>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <Card>

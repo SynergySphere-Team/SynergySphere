@@ -24,10 +24,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
     // ── Change this URL once your app is deployed ──────────────────────────
-    // Deployed example:  "https://your-app.vercel.app"
-    // Local dev example: "http://10.0.2.2:3000"  (Android emulator → localhost)
-    // Local dev (phone): "http://192.168.x.x:3000" (replace with your PC's IP)
-    private val APP_URL = "http://10.0.2.2:3000"
+    // Use a deployed HTTPS URL for release builds.
+    // For local emulator testing only, temporarily change this to http://10.0.2.2:3000.
+    private val APP_URL = "https://your-app.vercel.app"
     // ───────────────────────────────────────────────────────────────────────
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -67,11 +66,11 @@ class MainActivity : AppCompatActivity() {
         webSettings.displayZoomControls = false
         webSettings.setSupportZoom(false)
         webSettings.cacheMode = WebSettings.LOAD_DEFAULT
-        webSettings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        webSettings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
 
         // Allow cookies for login sessions
         CookieManager.getInstance().setAcceptCookie(true)
-        CookieManager.getInstance().setAcceptThirdPartyCookies(binding.webView, true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(binding.webView, false)
 
         binding.webView.webViewClient = object : WebViewClient() {
 
@@ -102,7 +101,7 @@ class MainActivity : AppCompatActivity() {
             ): Boolean {
                 val url = request?.url?.toString() ?: return false
                 // Open external links in the browser, keep internal links in WebView
-                return if (url.startsWith(APP_URL) || url.startsWith("http://10.0.2.2")) {
+                return if (url.startsWith(APP_URL)) {
                     false // Let WebView handle it
                 } else {
                     startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
@@ -166,7 +165,7 @@ class MainActivity : AppCompatActivity() {
                 </style>
             </head>
             <body>
-                <div class="icon">🌐</div>
+                <div class="icon">!</div>
                 <h1>No Connection</h1>
                 <p>SynergySphere could not be reached.<br>Please check your internet connection<br>or make sure the server is running.</p>
                 <button onclick="window.location.reload()">Try Again</button>

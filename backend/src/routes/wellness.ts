@@ -51,9 +51,10 @@ router.get('/insights', async (req: AuthRequest, res) => {
     return;
   }
 
-  const avgStress = entries.reduce((s, e) => s + e.stressLevel, 0) / entries.length;
-  const avgMood = entries.reduce((s, e) => s + e.mood, 0) / entries.length;
-  const avgEnergy = entries.reduce((s, e) => s + e.energyLevel, 0) / entries.length;
+  type WellnessPoint = { stressLevel: number; mood: number; energyLevel: number };
+  const avgStress = entries.reduce((sum: number, entry: WellnessPoint) => sum + entry.stressLevel, 0) / entries.length;
+  const avgMood = entries.reduce((sum: number, entry: WellnessPoint) => sum + entry.mood, 0) / entries.length;
+  const avgEnergy = entries.reduce((sum: number, entry: WellnessPoint) => sum + entry.energyLevel, 0) / entries.length;
 
   const recommendations: string[] = [];
   if (avgStress > 6) {

@@ -55,6 +55,7 @@ export default function CodingPage() {
   const [code, setCode] = useState(fallbackChallenges[0].starterCode || '');
   const [result, setResult] = useState<{ passed: boolean; xpEarned: number } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     api<Challenge[]>('/challenges')
@@ -65,6 +66,7 @@ export default function CodingPage() {
         setCode(next[0].starterCode || '');
       })
       .catch(() => {
+        setError('Could not load live challenges. Showing local examples only.');
         setChallenges(fallbackChallenges);
         setSelected(fallbackChallenges[0]);
         setCode(fallbackChallenges[0].starterCode || '');
@@ -79,6 +81,7 @@ export default function CodingPage() {
 
   async function submit() {
     setLoading(true);
+    setError('');
     try {
       const res = await api<{ passed: boolean; xpEarned: number }>(`/challenges/${selected.id}/submit`, {
         method: 'POST',
@@ -86,7 +89,8 @@ export default function CodingPage() {
       });
       setResult(res);
     } catch {
-      setResult({ passed: true, xpEarned: selected.xpReward });
+      setError('Could not submit this challenge. Please check the backend connection and try again.');
+      setResult({ passed: false, xpEarned: 0 });
     } finally {
       setLoading(false);
     }
@@ -114,6 +118,10 @@ export default function CodingPage() {
           ))}
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[0.9fr_1.4fr_0.8fr]">
         <Card>

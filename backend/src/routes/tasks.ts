@@ -10,15 +10,17 @@ router.use(authenticate);
 
 const taskSchema = z.object({
   title: z.string().min(1).max(200),
-  description: z.string().optional(),
-  status: z.enum(['TODO', 'IN_PROGRESS', 'DONE']).optional(),
-  dueDate: z.string().datetime().optional(),
+  description: z.string().max(2000).optional(),
+  status: z.enum(['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE']).optional(),
+  dueDate: z.string().datetime().optional().nullable(),
 });
 
 router.get('/', async (req: AuthRequest, res) => {
+  const take = Math.min(Number(req.query.take) || 100, 200);
   const tasks = await prisma.task.findMany({
     where: { userId: req.user!.userId },
     orderBy: { createdAt: 'desc' },
+    take,
   });
   res.json(tasks);
 });
@@ -42,14 +44,14 @@ router.patch('/:id', validateBody(taskSchema.partial()), async (req: AuthRequest
     where: { id: paramId(req), userId: req.user!.userId },
     data: {
       ...req.body,
-      dueDate: req.body.dueDate ? new Date(req.body.dueDate) : undefined,
+      dueDate: req.body.dueDate ? new Date(req.body.dueDate) : req.body.dueDate,
     },
   });
   if (task.count === 0) {
     res.status(404).json({ error: 'Task not found' });
     return;
   }
-  const updated = await prisma.task.findUnique({ where: { id: paramId(req) } });
+  const updated = await prisma.task.findFirst({ where: { id: paramId(req), userId: req.user!.userId } });
   res.json(updated);
 });
 

@@ -18,24 +18,20 @@ export interface User {
   level: number;
 }
 
-export function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('token');
-}
-
-export function setToken(token: string) {
-  localStorage.setItem('token', token);
-}
-
 export function clearAuth() {
-  localStorage.removeItem('token');
   localStorage.removeItem('user');
 }
 
 export function getStoredUser(): User | null {
   if (typeof window === 'undefined') return null;
   const raw = localStorage.getItem('user');
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as User;
+  } catch {
+    clearAuth();
+    return null;
+  }
 }
 
 export function setStoredUser(user: User) {
@@ -46,16 +42,20 @@ export async function api<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getToken();
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  if (options.body && !(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+    res = await fetch(API_URL + endpoint, {
+      ...options,
+      credentials: 'include',
+      headers,
+    });
   } catch {
     throw new Error(
       'Cannot reach the API server. Start the backend with: npm run dev:backend (port 4000)'
@@ -64,7 +64,6 @@ export async function api<T>(
 
   if (res.status === 401) {
     clearAuth();
-    if (typeof window !== 'undefined') window.location.href = '/login';
     throw new Error('Unauthorized');
   }
 

@@ -27,9 +27,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="dashboard-grid min-h-screen bg-background text-foreground">
       <Sidebar />
-      <div className="ml-56 min-h-screen">
+      <div className="min-h-screen md:ml-56">
         <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-[#050a0d]/82 px-5 py-3 backdrop-blur-xl">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-xs font-bold text-primary md:hidden">SS</div>
             <div className="relative max-w-lg flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -58,7 +59,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <Sparkles className="hidden h-4 w-4 text-primary/70 xl:block" />
           </div>
         </header>
-        <main className="min-h-[calc(100vh-65px)] p-5 xl:p-6">{children}</main>
+        <main className="min-h-[calc(100vh-65px)] p-4 sm:p-5 xl:p-6">{children}</main>
       </div>
     </div>
   );
