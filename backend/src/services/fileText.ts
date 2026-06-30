@@ -1,13 +1,40 @@
-import { unzipSync } from 'fflate';
-import { PdfReader } from 'pdfreader';
+import { createRequire } from 'node:module';
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+const require = createRequire(import.meta.url);
 
 type ExtractTextInput = {
   fileName: string;
   fileType: string;
   base64: string;
 };
+
+type PdfItem = {
+  page?: number;
+  text?: string;
+  x?: number;
+  y?: number;
+};
+
+type PdfReaderCtor = new () => {
+  parseBuffer(buffer: Buffer, callback: (err: unknown, item?: PdfItem | null) => void): void;
+};
+
+function loadPdfReader(): PdfReaderCtor {
+  try {
+    return (require('pdfreader') as { PdfReader: PdfReaderCtor }).PdfReader;
+  } catch {
+    throw new Error('PDF parsing is not installed. Run npm install pdfreader --workspace=backend, or paste the lecture text manually.');
+  }
+}
+
+function loadUnzipSync(): (data: Uint8Array) => Record<string, Uint8Array> {
+  try {
+    return (require('fflate') as { unzipSync: (data: Uint8Array) => Record<string, Uint8Array> }).unzipSync;
+  } catch {
+    throw new Error('Word document parsing is not installed. Run npm install fflate --workspace=backend, or paste the lecture text manually.');
+  }
+}
 
 export async function extractTextFromUpload(input: ExtractTextInput): Promise<string> {
   const buffer = Buffer.from(input.base64, 'base64');
@@ -60,6 +87,7 @@ function isTextFile(fileName: string, mime: string): boolean {
 async function extractPdfText(buffer: Buffer): Promise<string> {
   const pages = new Map<number, Map<number, Array<{ x: number; text: string }>>>();
   let currentPage = 0;
+  const PdfReader = loadPdfReader();
 
   await new Promise<void>((resolve, reject) => {
     new PdfReader().parseBuffer(buffer, (err, item) => {
@@ -117,6 +145,7 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
 }
 
 function extractDocxText(buffer: Buffer): string {
+  const unzipSync = loadUnzipSync();
   let files: Record<string, Uint8Array>;
   try {
     files = unzipSync(new Uint8Array(buffer));

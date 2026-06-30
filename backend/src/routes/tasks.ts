@@ -65,7 +65,7 @@ router.get('/productivity-stats', async (req: AuthRequest, res) => {
        LIMIT 10`,
       [userId, 'DONE'],
     ),
-    queryOne(
+    queryOne<{ stressLevel: number; mood: number; energyLevel: number }>(
       `SELECT *
        FROM "Wellness"
        WHERE "userId" = $1
@@ -83,7 +83,7 @@ router.get('/productivity-stats', async (req: AuthRequest, res) => {
   ]);
 
   const statusCounts = Object.fromEntries(
-    tasksByStatus.map((row) => [row.status, row.count]),
+    tasksByStatus.map((row: { status: string; count: number }) => [row.status, row.count]),
   );
 
   const wellnessScore = latestWellness
