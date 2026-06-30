@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../lib/prisma.js';
+import { execute, newId, nullable, query, queryOne } from '../lib/db.js';
 import { paramId } from '../lib/params.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
@@ -23,11 +23,14 @@ const focusSchema = z.object({
 
 router.get('/', async (req: AuthRequest, res) => {
   const take = Math.min(Number(req.query.take) || 100, 200);
-  const tasks = await prisma.task.findMany({
-    where: { userId: req.user!.userId },
-    orderBy: { createdAt: 'desc' },
-    take,
-  });
+  const tasks = await query(
+    `SELECT *
+     FROM "Task"
+     WHERE "userId" = $1
+     ORDER BY "createdAt" DESC
+     LIMIT $2`,
+    [req.user!.userId, take],
+  );
   res.json(tasks);
 });
 
@@ -45,34 +48,42 @@ router.get('/productivity-stats', async (req: AuthRequest, res) => {
     latestWellness,
     tasksByStatus,
   ] = await Promise.all([
-    prisma.task.count({
-      where: { userId, status: 'DONE', updatedAt: { gte: startOfDay } },
-    }),
-    prisma.task.count({ where: { userId, status: 'DONE' } }),
-    prisma.focusSession.count({ where: { userId, completedAt: { gte: startOfDay } } }),
-    prisma.focusSession.aggregate({
-      where: { userId, completedAt: { gte: startOfDay } },
-      _sum: { durationMinutes: true },
-    }),
-    prisma.task.findMany({
-      where: { userId, status: 'DONE' },
-      orderBy: { updatedAt: 'desc' },
-      take: 10,
-      select: { id: true, title: true, learnedNote: true, updatedAt: true },
-    }),
-    prisma.wellness.findFirst({
-      where: { userId },
-      orderBy: { date: 'desc' },
-    }),
-    prisma.task.groupBy({
-      by: ['status'],
-      where: { userId },
-      _count: { status: true },
-    }),
+    countTasks('WHERE "userId" = $1 AND "status" = $2 AND "updatedAt" >= $3', [userId, 'DONE', startOfDay]),
+    countTasks('WHERE "userId" = $1 AND "status" = $2', [userId, 'DONE']),
+    countTable('"FocusSession"', 'WHERE "userId" = $1 AND "completedAt" >= $2', [userId, startOfDay]),
+    queryOne<{ durationMinutes: number }>(
+      `SELECT COALESCE(SUM("durationMinutes"), 0)::int AS "durationMinutes"
+       FROM "FocusSession"
+       WHERE "userId" = $1 AND "completedAt" >= $2`,
+      [userId, startOfDay],
+    ),
+    query(
+      `SELECT "id", "title", "learnedNote", "updatedAt"
+       FROM "Task"
+       WHERE "userId" = $1 AND "status" = $2
+       ORDER BY "updatedAt" DESC
+       LIMIT 10`,
+      [userId, 'DONE'],
+    ),
+    queryOne(
+      `SELECT *
+       FROM "Wellness"
+       WHERE "userId" = $1
+       ORDER BY "date" DESC
+       LIMIT 1`,
+      [userId],
+    ),
+    query<{ status: string; count: number }>(
+      `SELECT "status", COUNT(*)::int AS "count"
+       FROM "Task"
+       WHERE "userId" = $1
+       GROUP BY "status"`,
+      [userId],
+    ),
   ]);
 
   const statusCounts = Object.fromEntries(
-    tasksByStatus.map((row) => [row.status, row._count.status]),
+    tasksByStatus.map((row) => [row.status, row.count]),
   );
 
   const wellnessScore = latestWellness
@@ -83,8 +94,8 @@ router.get('/productivity-stats', async (req: AuthRequest, res) => {
     tasksCompletedToday,
     totalTasksCompleted,
     focusSessionsToday,
-    focusMinutesToday: focusMinutesToday._sum.durationMinutes || 0,
-    focusHoursToday: ((focusMinutesToday._sum.durationMinutes || 0) / 60).toFixed(1),
+    focusMinutesToday: focusMinutesToday?.durationMinutes || 0,
+    focusHoursToday: ((focusMinutesToday?.durationMinutes || 0) / 60).toFixed(1),
     learnedTasks,
     wellnessScore,
     statusCounts,
@@ -92,12 +103,12 @@ router.get('/productivity-stats', async (req: AuthRequest, res) => {
 });
 
 router.post('/focus-session', validateBody(focusSchema), async (req: AuthRequest, res) => {
-  const session = await prisma.focusSession.create({
-    data: {
-      userId: req.user!.userId,
-      durationMinutes: req.body.durationMinutes,
-    },
-  });
+  const session = await queryOne(
+    `INSERT INTO "FocusSession" ("id", "userId", "durationMinutes")
+     VALUES ($1, $2, $3)
+     RETURNING *`,
+    [newId(), req.user!.userId, req.body.durationMinutes],
+  );
 
   if (req.body.durationMinutes >= 25) {
     await awardXp(req.user!.userId, 15, 'Completed a focus session');
@@ -108,37 +119,60 @@ router.post('/focus-session', validateBody(focusSchema), async (req: AuthRequest
 
 router.post('/', validateBody(taskSchema), async (req: AuthRequest, res) => {
   const { title, description, learnedNote, status, dueDate } = req.body;
-  const task = await prisma.task.create({
-    data: {
-      userId: req.user!.userId,
+  const task = await queryOne(
+    `INSERT INTO "Task" ("id", "userId", "title", "description", "learnedNote", "status", "dueDate")
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING *`,
+    [
+      newId(),
+      req.user!.userId,
       title,
-      description,
-      learnedNote,
-      status: status || 'TODO',
-      dueDate: dueDate ? new Date(dueDate) : undefined,
-    },
-  });
+      nullable(description),
+      nullable(learnedNote),
+      status || 'TODO',
+      dueDate ? new Date(dueDate) : null,
+    ],
+  );
   res.status(201).json(task);
 });
 
 router.patch('/:id', validateBody(taskSchema.partial()), async (req: AuthRequest, res) => {
-  const existing = await prisma.task.findFirst({
-    where: { id: paramId(req), userId: req.user!.userId },
-  });
+  const existing = await queryOne<{ id: string; status: string; title: string }>(
+    `SELECT "id", "status", "title"
+     FROM "Task"
+     WHERE "id" = $1 AND "userId" = $2`,
+    [paramId(req), req.user!.userId],
+  );
   if (!existing) {
     res.status(404).json({ error: 'Task not found' });
     return;
   }
 
-  const task = await prisma.task.update({
-    where: { id: existing.id },
-    data: {
-      ...req.body,
-      dueDate: req.body.dueDate ? new Date(req.body.dueDate) : req.body.dueDate,
-    },
-  });
+  const updates: string[] = [];
+  const values: unknown[] = [];
+  const add = (column: string, value: unknown) => {
+    values.push(value);
+    updates.push(`"${column}" = $${values.length}`);
+  };
 
-  if (existing.status !== 'DONE' && task.status === 'DONE') {
+  if (req.body.title !== undefined) add('title', req.body.title);
+  if (req.body.description !== undefined) add('description', req.body.description);
+  if (req.body.learnedNote !== undefined) add('learnedNote', req.body.learnedNote);
+  if (req.body.status !== undefined) add('status', req.body.status);
+  if (req.body.dueDate !== undefined) {
+    add('dueDate', req.body.dueDate ? new Date(req.body.dueDate) : null);
+  }
+
+  values.push(existing.id);
+  const task = await queryOne<{ status: string; title: string }>(
+    `UPDATE "Task"
+     SET ${updates.length > 0 ? updates.join(', ') + ', ' : ''}"updatedAt" = CURRENT_TIMESTAMP
+     WHERE "id" = $${values.length}
+     RETURNING *`,
+    values,
+  );
+
+  if (task && existing.status !== 'DONE' && task.status === 'DONE') {
     await awardXp(req.user!.userId, 10, 'Completed task: ' + task.title);
   }
 
@@ -146,10 +180,12 @@ router.patch('/:id', validateBody(taskSchema.partial()), async (req: AuthRequest
 });
 
 router.delete('/:id', async (req: AuthRequest, res) => {
-  const result = await prisma.task.deleteMany({
-    where: { id: paramId(req), userId: req.user!.userId },
-  });
-  if (result.count === 0) {
+  const deleted = await execute(
+    `DELETE FROM "Task"
+     WHERE "id" = $1 AND "userId" = $2`,
+    [paramId(req), req.user!.userId],
+  );
+  if (deleted === 0) {
     res.status(404).json({ error: 'Task not found' });
     return;
   }
@@ -157,3 +193,15 @@ router.delete('/:id', async (req: AuthRequest, res) => {
 });
 
 export default router;
+
+async function countTasks(whereSql: string, params: readonly unknown[]): Promise<number> {
+  return countTable('"Task"', whereSql, params);
+}
+
+async function countTable(tableSql: string, whereSql: string, params: readonly unknown[]): Promise<number> {
+  const row = await queryOne<{ count: number }>(
+    `SELECT COUNT(*)::int AS "count" FROM ${tableSql} ${whereSql}`,
+    params,
+  );
+  return row?.count || 0;
+}

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { prisma } from '../lib/prisma.js';
+import { query, queryOne } from '../lib/db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -19,23 +19,28 @@ router.get('/stats', async (req: AuthRequest, res) => {
       unreadNotifications,
       recentWellness,
     ] = await Promise.all([
-      prisma.task.count({ where: { userId, status: 'DONE' } }),
-      prisma.challengeAttempt.count({ where: { userId, passed: true } }),
-      prisma.wellness.count({ where: { userId } }),
-      prisma.interview.count({ where: { userId } }),
-      prisma.projectApplication.count({ where: { userId } }),
-      prisma.notification.count({ where: { userId, read: false } }),
-      prisma.wellness.findMany({
-        where: { userId },
-        orderBy: { date: 'desc' },
-        take: 7,
-      }),
+      countTable('"Task"', 'WHERE "userId" = $1 AND "status" = $2', [userId, 'DONE']),
+      countTable('"ChallengeAttempt"', 'WHERE "userId" = $1 AND "passed" = true', [userId]),
+      countTable('"Wellness"', 'WHERE "userId" = $1', [userId]),
+      countTable('"Interview"', 'WHERE "userId" = $1', [userId]),
+      countTable('"ProjectApplication"', 'WHERE "userId" = $1', [userId]),
+      countTable('"Notification"', 'WHERE "userId" = $1 AND "read" = false', [userId]),
+      query(
+        `SELECT *
+         FROM "Wellness"
+         WHERE "userId" = $1
+         ORDER BY "date" DESC
+         LIMIT 7`,
+        [userId],
+      ),
     ]);
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { xp: true, level: true, firstName: true, lastName: true },
-    });
+    const user = await queryOne<{ xp: number; level: number; firstName: string; lastName: string }>(
+      `SELECT "xp", "level", "firstName", "lastName"
+       FROM "User"
+       WHERE "id" = $1`,
+      [userId],
+    );
 
     const levelTitles = [
       'Junior Developer',
@@ -65,3 +70,11 @@ router.get('/stats', async (req: AuthRequest, res) => {
 });
 
 export default router;
+
+async function countTable(tableSql: string, whereSql: string, params: readonly unknown[]): Promise<number> {
+  const row = await queryOne<{ count: number }>(
+    `SELECT COUNT(*)::int AS "count" FROM ${tableSql} ${whereSql}`,
+    params,
+  );
+  return row?.count || 0;
+}

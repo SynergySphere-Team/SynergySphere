@@ -15,7 +15,7 @@ SynergySphere is a university capstone platform combining:
 | Layer | Technology |
 | --- | --- |
 | Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS |
-| Backend | Node.js, Express, Prisma ORM, JWT auth via http-only cookie |
+| Backend | Node.js, Express, lightweight PostgreSQL access via pg, JWT auth via http-only cookie |
 | Database | PostgreSQL locally, Supabase-compatible PostgreSQL in production |
 | AI | OpenAI-compatible chat endpoint with demo fallback |
 | Mobile | Android WebView wrapper for deployed HTTPS frontend |
@@ -60,7 +60,7 @@ Optionally add OPENAI_API_KEY and OPENAI_MODEL for full AI behavior.
 ### 4. Setup Database
 
 ~~~bash
-npm run db:push
+npm run db:migrate
 npm run db:seed
 ~~~
 
@@ -87,7 +87,7 @@ Admin users are created by the seed script only. Public registration allows Stud
 ~~~text
 SynergySphere/
   frontend/          Next.js app
-  backend/           Express API and Prisma schema
+  backend/           Express API, SQL data access, and seed/migration scripts
   supabase/          SQL migration for Supabase/PostgreSQL setup
   android/           Android WebView shell for deployed frontend
   docker-compose.yml Local PostgreSQL
@@ -100,7 +100,7 @@ npm run dev              # frontend and backend
 npm run dev:frontend     # frontend only
 npm run dev:backend      # backend only
 npm run build            # production build
-npm run db:push          # sync Prisma schema
+npm run db:migrate       # apply SQL migrations
 npm run db:seed          # seed demo data
 ~~~
 

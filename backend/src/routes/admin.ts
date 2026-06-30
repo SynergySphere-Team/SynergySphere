@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { prisma } from '../lib/prisma.js';
+import { query, queryOne } from '../lib/db.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 
 const router = Router();
@@ -22,27 +22,39 @@ router.get('/overview', async (_req, res) => {
     wellnessTrend,
     recentUsers,
   ] = await Promise.all([
-    prisma.user.count(),
-    prisma.user.count({ where: { updatedAt: { gte: weekAgo } } }),
-    prisma.user.count({ where: { updatedAt: { gte: dayAgo } } }),
-    prisma.challengeAttempt.count({ where: { passed: true } }),
-    prisma.projectApplication.count(),
-    prisma.interview.aggregate({ _avg: { score: true }, where: { score: { not: null } } }),
-    prisma.wellness.aggregate({
-      _avg: { stressLevel: true, mood: true, energyLevel: true },
-      where: { date: { gte: weekAgo } },
-    }),
-    prisma.wellness.findMany({
-      where: { date: { gte: weekAgo } },
-      select: { stressLevel: true, mood: true, energyLevel: true, date: true },
-      orderBy: { date: 'desc' },
-      take: 100,
-    }),
-    prisma.user.findMany({
-      select: { firstName: true, lastName: true, email: true, role: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-    }),
+    countTable('"User"', '', []),
+    countTable('"User"', 'WHERE "updatedAt" >= $1', [weekAgo]),
+    countTable('"User"', 'WHERE "updatedAt" >= $1', [dayAgo]),
+    countTable('"ChallengeAttempt"', 'WHERE "passed" = true', []),
+    countTable('"ProjectApplication"', '', []),
+    queryOne<{ avgScore: number | null }>(
+      `SELECT AVG("score")::float AS "avgScore"
+       FROM "Interview"
+       WHERE "score" IS NOT NULL`,
+    ),
+    queryOne<{ avgStressLevel: number | null; avgMood: number | null; avgEnergyLevel: number | null }>(
+      `SELECT
+         AVG("stressLevel")::float AS "avgStressLevel",
+         AVG("mood")::float AS "avgMood",
+         AVG("energyLevel")::float AS "avgEnergyLevel"
+       FROM "Wellness"
+       WHERE "date" >= $1`,
+      [weekAgo],
+    ),
+    query(
+      `SELECT "stressLevel", "mood", "energyLevel", "date"
+       FROM "Wellness"
+       WHERE "date" >= $1
+       ORDER BY "date" DESC
+       LIMIT 100`,
+      [weekAgo],
+    ),
+    query(
+      `SELECT "firstName", "lastName", "email", "role", "createdAt"
+       FROM "User"
+       ORDER BY "createdAt" DESC
+       LIMIT 10`,
+    ),
   ]);
 
   res.json({
@@ -51,13 +63,21 @@ router.get('/overview', async (_req, res) => {
     dailyLogins,
     challengesCompleted,
     projectApplications,
-    avgInterviewScore: avgInterviewScore._avg.score || 0,
-    avgStressLevel: wellnessStats._avg.stressLevel || 0,
-    avgMood: wellnessStats._avg.mood || 0,
-    avgEnergy: wellnessStats._avg.energyLevel || 0,
+    avgInterviewScore: avgInterviewScore?.avgScore || 0,
+    avgStressLevel: wellnessStats?.avgStressLevel || 0,
+    avgMood: wellnessStats?.avgMood || 0,
+    avgEnergy: wellnessStats?.avgEnergyLevel || 0,
     wellnessTrend: wellnessTrend.reverse(),
     recentUsers,
   });
 });
 
 export default router;
+
+async function countTable(tableSql: string, whereSql: string, params: readonly unknown[]): Promise<number> {
+  const row = await queryOne<{ count: number }>(
+    `SELECT COUNT(*)::int AS "count" FROM ${tableSql} ${whereSql}`,
+    params,
+  );
+  return row?.count || 0;
+}

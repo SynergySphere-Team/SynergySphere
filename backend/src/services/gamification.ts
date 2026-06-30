@@ -1,4 +1,4 @@
-import { prisma } from '../lib/prisma.js';
+import { newId, query, queryOne, transaction } from '../lib/db.js';
 
 const XP_PER_LEVEL = 500;
 
@@ -23,61 +23,88 @@ export function getLevelTitle(level: number): string {
 export async function awardXp(userId: string, amount: number, reason: string): Promise<void> {
   if (amount <= 0) return;
 
-  const user = await prisma.user.update({
-    where: { id: userId },
-    data: { xp: { increment: amount } },
-  });
+  await transaction(async (client) => {
+    const user = await queryOne<{ xp: number; level: number }>(
+      `UPDATE "User"
+       SET "xp" = "xp" + $1, "updatedAt" = CURRENT_TIMESTAMP
+       WHERE "id" = $2
+       RETURNING "xp", "level"`,
+      [amount, userId],
+      client,
+    );
 
-  const notifications = [
-    {
-      userId,
-      title: '+' + amount + ' XP',
-      message: reason,
-      type: 'xp',
-    },
-  ];
+    if (!user) return;
 
-  const newLevel = getLevelFromXp(user.xp);
-  if (newLevel > user.level) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { level: newLevel },
-    });
-    notifications.push({
-      userId,
-      title: 'Level Up!',
-      message: 'Congratulations! You reached Level ' + newLevel + ': ' + getLevelTitle(newLevel),
-      type: 'achievement',
-    });
-  }
+    const notifications = [
+      {
+        userId,
+        title: '+' + amount + ' XP',
+        message: reason,
+        type: 'xp',
+      },
+    ];
 
-  const badges = await prisma.badge.findMany({
-    where: { xpRequired: { lte: user.xp } },
-    select: { id: true, name: true },
-    take: 100,
-  });
-
-  if (badges.length > 0) {
-    const existing = await prisma.userBadge.findMany({
-      where: { userId, badgeId: { in: (badges as BadgeAward[]).map((badge: BadgeAward) => badge.id) } },
-      select: { badgeId: true },
-    });
-    const existingIds = new Set(existing.map((badge: { badgeId: string }) => badge.badgeId));
-    const newBadges = (badges as BadgeAward[]).filter((badge: BadgeAward) => !existingIds.has(badge.id));
-
-    if (newBadges.length > 0) {
-      await prisma.userBadge.createMany({
-        data: newBadges.map((badge: BadgeAward) => ({ userId, badgeId: badge.id })),
-        skipDuplicates: true,
+    const newLevel = getLevelFromXp(user.xp);
+    if (newLevel > user.level) {
+      await client.query(
+        `UPDATE "User"
+         SET "level" = $1, "updatedAt" = CURRENT_TIMESTAMP
+         WHERE "id" = $2`,
+        [newLevel, userId],
+      );
+      notifications.push({
+        userId,
+        title: 'Level Up!',
+        message: 'Congratulations! You reached Level ' + newLevel + ': ' + getLevelTitle(newLevel),
+        type: 'achievement',
       });
-      notifications.push(...newBadges.map((badge: BadgeAward) => ({
+    }
+
+    const badges = await query<BadgeAward>(
+      `SELECT "id", "name"
+       FROM "Badge"
+       WHERE "xpRequired" <= $1
+       ORDER BY "xpRequired" ASC
+       LIMIT 100`,
+      [user.xp],
+      client,
+    );
+
+    if (badges.length > 0) {
+      const badgeIds = badges.map((badge) => badge.id);
+      const existing = await query<{ badgeId: string }>(
+        `SELECT "badgeId"
+         FROM "UserBadge"
+         WHERE "userId" = $1 AND "badgeId" = ANY($2::text[])`,
+        [userId, badgeIds],
+        client,
+      );
+      const existingIds = new Set(existing.map((badge) => badge.badgeId));
+      const newBadges = badges.filter((badge) => !existingIds.has(badge.id));
+
+      for (const badge of newBadges) {
+        await client.query(
+          `INSERT INTO "UserBadge" ("id", "userId", "badgeId")
+           VALUES ($1, $2, $3)
+           ON CONFLICT ("userId", "badgeId") DO NOTHING`,
+          [newId(), userId, badge.id],
+        );
+      }
+
+      notifications.push(...newBadges.map((badge) => ({
         userId,
         title: 'Badge Earned!',
         message: 'You earned the "' + badge.name + '" badge!',
         type: 'badge',
       })));
     }
-  }
 
-  await prisma.notification.createMany({ data: notifications });
+    for (const notification of notifications) {
+      await client.query(
+        `INSERT INTO "Notification" ("id", "userId", "title", "message", "type")
+         VALUES ($1, $2, $3, $4, $5)`,
+        [newId(), notification.userId, notification.title, notification.message, notification.type],
+      );
+    }
+  });
 }

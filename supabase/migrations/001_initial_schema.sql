@@ -1,5 +1,5 @@
 -- SynergySphere initial PostgreSQL schema.
--- This mirrors backend/prisma/schema.prisma for Supabase or local Postgres.
+-- This schema is used by the lightweight pg data layer and Supabase/local Postgres.
 
 CREATE TABLE IF NOT EXISTS "User" (
   "id" TEXT PRIMARY KEY,
