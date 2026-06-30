@@ -1,10 +1,16 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { paramId } from '../lib/params.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { awardXp } from '../services/gamification.js';
 import { generateAiResponse } from '../services/ai.js';
+import {
+  buildLectureMaterialsFromContent,
+  buildLecturePrompt,
+  parseLectureJson,
+} from '../services/lectureMaterials.js';
 
 const router = Router();
 router.use(authenticate);
@@ -103,40 +109,73 @@ router.post('/interview/evaluate', validateBody(answerSchema), async (req: AuthR
 const lectureSchema = z.object({
   fileName: z.string().min(1).max(255),
   fileType: z.string().min(1).max(100),
-  content: z.string().min(1).max(20000),
+  content: z.string().min(20).max(50000),
 });
 
 router.post('/lecture-to-life', validateBody(lectureSchema), async (req: AuthRequest, res) => {
-  const prompt = [
-    'Convert this lecture content into study materials.',
-    'Return JSON: {"summary":"...","flashcards":[{"front":"...","back":"..."}],"quiz":[{"question":"...","options":["a","b","c","d"],"answer":0}]}',
-    'Content: ' + req.body.content.slice(0, 8000),
-  ].join('\n');
+  const { fileName, fileType, content } = req.body;
+  const prompt = buildLecturePrompt(content, fileName);
 
-  const raw = await generateAiResponse('You are an educational content transformer.', prompt);
-  let materials: { summary: string; flashcards: unknown[]; quiz: unknown[] } = {
-    summary: 'Summary generated from your lecture notes.',
-    flashcards: [],
-    quiz: [],
-  };
-  try {
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (match) materials = JSON.parse(match[0]);
-  } catch { /* use defaults */ }
+  const raw = await generateAiResponse(
+    'You are an educational content transformer. Return only valid JSON based on the lecture content provided.',
+    prompt,
+  );
+
+  let materials = parseLectureJson(raw);
+  if (!materials) {
+    materials = buildLectureMaterialsFromContent(content, fileName);
+  }
 
   const upload = await prisma.lectureUpload.create({
     data: {
       userId: req.user!.userId,
-      fileName: req.body.fileName,
-      fileType: req.body.fileType,
+      fileName,
+      fileType,
+      content: content.slice(0, 50000),
       summary: materials.summary,
       flashcards: materials.flashcards,
       quiz: materials.quiz,
+      miniProjects: materials.miniProjects,
+      codingExercises: materials.codingExercises,
     },
   });
 
   await awardXp(req.user!.userId, 30, 'Lecture converted to study materials');
   res.status(201).json(upload);
+});
+
+router.post('/lecture-to-life/:id/regenerate', async (req: AuthRequest, res) => {
+  const existing = await prisma.lectureUpload.findFirst({
+    where: { id: paramId(req), userId: req.user!.userId },
+  });
+  if (!existing?.content) {
+    res.status(404).json({ error: 'Lecture not found or has no saved content to regenerate from' });
+    return;
+  }
+
+  const prompt = buildLecturePrompt(existing.content, existing.fileName);
+  const raw = await generateAiResponse(
+    'You are an educational content transformer. Return only valid JSON based on the lecture content provided.',
+    prompt,
+  );
+
+  let materials = parseLectureJson(raw);
+  if (!materials) {
+    materials = buildLectureMaterialsFromContent(existing.content, existing.fileName);
+  }
+
+  const upload = await prisma.lectureUpload.update({
+    where: { id: existing.id },
+    data: {
+      summary: materials.summary,
+      flashcards: materials.flashcards,
+      quiz: materials.quiz,
+      miniProjects: materials.miniProjects,
+      codingExercises: materials.codingExercises,
+    },
+  });
+
+  res.json(upload);
 });
 
 router.get('/lecture-to-life', async (req: AuthRequest, res) => {
@@ -149,6 +188,8 @@ router.get('/lecture-to-life', async (req: AuthRequest, res) => {
       summary: true,
       flashcards: true,
       quiz: true,
+      miniProjects: true,
+      codingExercises: true,
       createdAt: true,
     },
     orderBy: { createdAt: 'desc' },

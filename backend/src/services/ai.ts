@@ -7,6 +7,11 @@
  *  3. Rule-based fallback (always works, no API key required)
  */
 
+import {
+  buildLectureMaterialsFromContent,
+  extractLectureContent,
+} from './lectureMaterials.js';
+
 const AI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS) || 25000;
 
 /* ─────────────────────────── main export ─────────────────────────── */
@@ -63,8 +68,8 @@ async function callGemini(apiKey: string, systemPrompt: string, userMessage: str
           },
         ],
         generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1500,
+          temperature: 0.4,
+          maxOutputTokens: 4096,
         },
       }),
     });
@@ -104,8 +109,8 @@ async function callOpenAI(apiKey: string, systemPrompt: string, userMessage: str
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        temperature: 0.7,
-        max_tokens: 1500,
+        temperature: 0.4,
+        max_tokens: 4096,
       }),
     });
 
@@ -146,28 +151,10 @@ function fallbackResponse(systemPrompt: string, message: string): string {
 
   // ── Lecture / flashcards ──
   if (isTransformer || (!isInterviewer && !isEvaluator && (lower.includes('flashcard') || lower.includes('lecture')))) {
-    return JSON.stringify({
-      summary:
-        'This content covers fundamental programming concepts including data structures, algorithms, and software design principles.',
-      flashcards: [
-        { front: 'What is Big-O notation?', back: 'A way to describe algorithm time/space complexity as input size grows.' },
-        { front: 'What is a stack?', back: 'A LIFO (Last In, First Out) data structure.' },
-        { front: 'What is memoization?', back: 'Caching function results to avoid redundant computation.' },
-        { front: 'What is a closure?', back: 'A function that retains access to its outer scope after the outer function has returned.' },
-      ],
-      quiz: [
-        {
-          question: 'Which data structure uses LIFO ordering?',
-          options: ['Queue', 'Stack', 'Array', 'Tree'],
-          answer: 1,
-        },
-        {
-          question: 'What is the time complexity of binary search?',
-          options: ['O(n)', 'O(n²)', 'O(log n)', 'O(1)'],
-          answer: 2,
-        },
-      ],
-    });
+    const lectureContent = extractLectureContent(message);
+    const fileNameMatch = message.match(/Lecture title:\s*(.+)/i);
+    const fileName = fileNameMatch?.[1]?.trim();
+    return JSON.stringify(buildLectureMaterialsFromContent(lectureContent, fileName));
   }
 
   // ── Code explanation ──

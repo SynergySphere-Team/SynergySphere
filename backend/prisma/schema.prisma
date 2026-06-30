@@ -30,6 +30,7 @@ model User {
   projectApplications ProjectApplication[]
   notifications       Notification[]
   lectureUploads      LectureUpload[]
+  focusSessions       FocusSession[]
 }
 
 model Skill {
@@ -51,6 +52,7 @@ model Task {
   userId      String
   title       String
   description String?
+  learnedNote String?
   status      String    @default("TODO")
   dueDate     DateTime?
   createdAt   DateTime  @default(now())
@@ -60,6 +62,18 @@ model Task {
 
   @@index([userId, status])
   @@index([userId, createdAt])
+}
+
+model FocusSession {
+  id              String   @id @default(cuid())
+  userId          String
+  durationMinutes Int
+  completedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, completedAt])
 }
 
 model Wellness {
@@ -203,15 +217,17 @@ model Portfolio {
 }
 
 model LectureUpload {
-  id         String   @id @default(cuid())
-  userId     String
-  fileName   String
-  fileType   String
-  content    String?
-  summary    String?
-  flashcards Json?
-  quiz       Json?
-  createdAt  DateTime @default(now())
+  id               String   @id @default(cuid())
+  userId           String
+  fileName         String
+  fileType         String
+  content          String?
+  summary          String?
+  flashcards       Json?
+  quiz             Json?
+  miniProjects     Json?
+  codingExercises  Json?
+  createdAt        DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { paramId } from '../lib/params.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
+import { awardXp } from '../services/gamification.js';
 
 const router = Router();
 
@@ -21,15 +22,74 @@ const projectSelect = {
   _count: { select: { applications: true } },
 } as const;
 
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, async (req: AuthRequest, res) => {
   const take = Math.min(Number(req.query.take) || 50, 100);
+  const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+  const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+
   const projects = await prisma.project.findMany({
-    where: { isActive: true },
+    where: {
+      isActive: true,
+      ...(category && category !== 'ALL' ? { category } : {}),
+      ...(search
+        ? {
+            OR: [
+              { title: { contains: search, mode: 'insensitive' } },
+              { description: { contains: search, mode: 'insensitive' } },
+              { organization: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    },
     select: projectSelect,
     orderBy: { createdAt: 'desc' },
     take,
   });
-  res.json(projects);
+
+  const userApplications = await prisma.projectApplication.findMany({
+    where: { userId: req.user!.userId },
+    select: { projectId: true, status: true },
+  });
+  const appliedMap = new Map(userApplications.map((a) => [a.projectId, a.status]));
+
+  res.json(
+    projects.map((project) => ({
+      ...project,
+      hasApplied: appliedMap.has(project.id),
+      applicationStatus: appliedMap.get(project.id) || null,
+    })),
+  );
+});
+
+router.get('/my-applications', authenticate, async (req: AuthRequest, res) => {
+  const applications = await prisma.projectApplication.findMany({
+    where: { userId: req.user!.userId },
+    include: {
+      project: {
+        select: {
+          id: true,
+          title: true,
+          xpReward: true,
+          category: true,
+          organization: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const totalXpEarned = applications
+    .filter((a) => a.status === 'COMPLETED')
+    .reduce((sum, a) => sum + (a.project?.xpReward || 0), 0);
+
+  res.json({
+    applications,
+    stats: {
+      projectsJoined: applications.length,
+      hoursContributed: applications.length * 4,
+      xpEarned: totalXpEarned,
+    },
+  });
 });
 
 router.get('/:id', authenticate, async (req, res) => {
@@ -56,11 +116,25 @@ const applySchema = z.object({
 
 router.post('/:id/apply', authenticate, validateBody(applySchema), async (req: AuthRequest, res) => {
   try {
-    const project = await prisma.project.findFirst({ where: { id: paramId(req), isActive: true }, select: { id: true } });
+    const project = await prisma.project.findFirst({
+      where: { id: paramId(req), isActive: true },
+      select: { id: true, title: true, xpReward: true },
+    });
     if (!project) {
       res.status(404).json({ error: 'Project not found' });
       return;
     }
+
+    const existing = await prisma.projectApplication.findUnique({
+      where: {
+        projectId_userId: { projectId: project.id, userId: req.user!.userId },
+      },
+    });
+    if (existing) {
+      res.status(409).json({ error: 'Already applied to this project', application: existing });
+      return;
+    }
+
     const application = await prisma.projectApplication.create({
       data: {
         projectId: project.id,
@@ -68,6 +142,9 @@ router.post('/:id/apply', authenticate, validateBody(applySchema), async (req: A
         deliverable: req.body.deliverable,
       },
     });
+
+    await awardXp(req.user!.userId, Math.min(project.xpReward, 50), 'Joined community project: ' + project.title);
+
     res.status(201).json(application);
   } catch {
     res.status(409).json({ error: 'Already applied to this project' });
