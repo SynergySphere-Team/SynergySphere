@@ -125,16 +125,17 @@ async function callOpenAI(apiKey: string, systemPrompt: string, userMessage: str
 function fallbackResponse(systemPrompt: string, message: string): string {
   const lower = message.toLowerCase();
   const isInterviewer = systemPrompt.toLowerCase().includes('interview');
-  const isEducation = systemPrompt.toLowerCase().includes('educational');
+  const isTransformer = systemPrompt.toLowerCase().includes('transformer');
+  const isEvaluator = systemPrompt.toLowerCase().includes('evaluator');
 
   // ── Interview questions ──
-  if (isInterviewer || lower.includes('interview') && lower.includes('question')) {
+  if (isInterviewer || (lower.includes('interview') && lower.includes('question'))) {
     const topic = extractTopic(message);
     return JSON.stringify(getInterviewQuestions(topic));
   }
 
   // ── Interview evaluation ──
-  if (lower.includes('evaluate') || lower.includes('answers')) {
+  if (isEvaluator || (lower.includes('evaluate') && lower.includes('answers'))) {
     return JSON.stringify({
       score: 75,
       feedback:
@@ -144,7 +145,7 @@ function fallbackResponse(systemPrompt: string, message: string): string {
   }
 
   // ── Lecture / flashcards ──
-  if (isEducation || lower.includes('flashcard') || lower.includes('lecture') || lower.includes('summary')) {
+  if (isTransformer || (!isInterviewer && !isEvaluator && (lower.includes('flashcard') || lower.includes('lecture')))) {
     return JSON.stringify({
       summary:
         'This content covers fundamental programming concepts including data structures, algorithms, and software design principles.',

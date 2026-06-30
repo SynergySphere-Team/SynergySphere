@@ -51,6 +51,51 @@ interface TestResult {
 
 const fallbackChallenges: Challenge[] = [
   {
+    id: 'hello-world',
+    title: 'Hello World',
+    difficulty: 'EASY',
+    description: 'Write a function that returns "Hello, SynergySphere!"',
+    language: 'JavaScript',
+    starterCode: 'function greet() {\n  // Your code here\n}',
+    xpReward: 50,
+  },
+  {
+    id: 'sum-array',
+    title: 'Sum Array',
+    difficulty: 'EASY',
+    description: 'Write a function that returns the sum of all numbers in an array.',
+    language: 'JavaScript',
+    starterCode: 'function sumArray(arr) {\n  // Your code here\n}',
+    xpReward: 50,
+  },
+  {
+    id: 'fizzbuzz',
+    title: 'FizzBuzz',
+    difficulty: 'MEDIUM',
+    description: 'Return "Fizz" for multiples of 3, "Buzz" for 5, "FizzBuzz" for both.',
+    language: 'JavaScript',
+    starterCode: 'function fizzBuzz(n) {\n  // Your code here\n}',
+    xpReward: 75,
+  },
+  {
+    id: 'sql-top-students',
+    title: 'SQL: Top Students',
+    difficulty: 'MEDIUM',
+    description: 'Write a SQL query to find students with GPA above 3.5.',
+    language: 'SQL',
+    starterCode: 'SELECT * FROM students WHERE',
+    xpReward: 75,
+  },
+  {
+    id: 'binary-search',
+    title: 'Binary Search',
+    difficulty: 'HARD',
+    description: 'Implement binary search on a sorted array.',
+    language: 'JavaScript',
+    starterCode: 'function binarySearch(arr, target) {\n  // Your code here\n}',
+    xpReward: 100,
+  },
+  {
     id: 'two-sum',
     title: 'Two Sum',
     difficulty: 'EASY',
@@ -121,6 +166,37 @@ const fallbackChallenges: Challenge[] = [
 /* ─────────────────────────── per-challenge test cases ─────────────────────────── */
 
 const challengeTests: Record<string, { fn: string; cases: TestCase[] }> = {
+  'hello-world': {
+    fn: 'greet',
+    cases: [
+      { label: 'greet()', args: [], expected: 'Hello, SynergySphere!' },
+    ],
+  },
+  'sum-array': {
+    fn: 'sumArray',
+    cases: [
+      { label: 'sumArray([1, 2, 3])', args: [[1, 2, 3]], expected: 6 },
+      { label: 'sumArray([10, -2, 5])', args: [[10, -2, 5]], expected: 13 },
+      { label: 'sumArray([])', args: [[]], expected: 0 },
+    ],
+  },
+  fizzbuzz: {
+    fn: 'fizzBuzz',
+    cases: [
+      { label: 'fizzBuzz(3)', args: [3], expected: 'Fizz' },
+      { label: 'fizzBuzz(5)', args: [5], expected: 'Buzz' },
+      { label: 'fizzBuzz(15)', args: [15], expected: 'FizzBuzz' },
+      { label: 'fizzBuzz(7)', args: [7], expected: 7 },
+    ],
+  },
+  'binary-search': {
+    fn: 'binarySearch',
+    cases: [
+      { label: 'binarySearch([1, 2, 3, 4, 5], 3)', args: [[1, 2, 3, 4, 5], 3], expected: 2 },
+      { label: 'binarySearch([1, 2, 3, 4, 5], 6)', args: [[1, 2, 3, 4, 5], 6], expected: -1 },
+      { label: 'binarySearch([1, 3, 5, 7, 9], 1)', args: [[1, 3, 5, 7, 9], 1], expected: 0 },
+    ],
+  },
   'two-sum': {
     fn: 'twoSum',
     cases: [
@@ -185,6 +261,26 @@ const challengeTests: Record<string, { fn: string; cases: TestCase[] }> = {
 /* ─────────────────────────── per-challenge AI hints ─────────────────────────── */
 
 const challengeHints: Record<string, string[]> = {
+  'hello-world': [
+    '💡 Write a function that simply returns the exact string: "Hello, SynergySphere!".',
+    '💡 Pay attention to spelling, capitalization, and punctuation.',
+  ],
+  'sum-array': [
+    '💡 You can iterate through the array with a loop and add each number to a sum variable.',
+    '💡 Alternatively, you can use the Array.prototype.reduce() method.',
+  ],
+  fizzbuzz: [
+    '💡 Check for the combined condition (multiple of 3 AND 5) first.',
+    '💡 Use the modulo operator (%) to check if a number is divisible.',
+  ],
+  'sql-top-students': [
+    '💡 Use the SELECT statement to retrieve records from the "students" table.',
+    '💡 Use the WHERE clause to filter rows where the GPA is greater than 3.5.',
+  ],
+  'binary-search': [
+    '💡 Maintain low and high pointers to divide the search space in half each time.',
+    '💡 Calculate mid = Math.floor((low + high) / 2) and compare with target.',
+  ],
   'two-sum': [
     '💡 A brute-force O(n²) loop works, but try a hash map for O(n).',
     '💡 For each number, check if (target - nums[i]) is already in the map.',
@@ -219,6 +315,10 @@ const challengeHints: Record<string, string[]> = {
 
 /* ─────────────────────────── helpers ─────────────────────────── */
 
+function getChallengeKey(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
 function deepEqual(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((v, i) => deepEqual(v, b[i]));
@@ -237,8 +337,8 @@ function linkedListToArray(node: { val: number; next: unknown } | null): number[
   return arr;
 }
 
-function runTests(code: string, challengeId: string): TestResult[] {
-  const spec = challengeTests[challengeId];
+function runTests(code: string, challengeKey: string): TestResult[] {
+  const spec = challengeTests[challengeKey];
   if (!spec) return [];
 
   let fn: (...args: unknown[]) => unknown;
@@ -261,7 +361,7 @@ function runTests(code: string, challengeId: string): TestResult[] {
     try {
       let got = fn(...(tc.args as unknown[]));
       // Normalise linked-list results
-      if (challengeId === 'reverse-linked-list') {
+      if (challengeKey === 'reverse-linked-list') {
         got = linkedListToArray(got as { val: number; next: unknown } | null);
       }
       const passed = deepEqual(got, tc.expected);
@@ -331,34 +431,97 @@ export default function CodingPage() {
     setShowHints(false);
   }
 
-  function handleRun() {
+  async function handleRun() {
     setRunning(true);
     setSubmitResult(null);
-    // Slight delay so the UI updates before the potentially blocking eval
-    setTimeout(() => {
-      const results = runTests(code, selected.id);
-      setTestResults(results);
-      setRunning(false);
-    }, 50);
+    setTestResults([]);
+
+    const challengeKey = getChallengeKey(selected.title);
+    const spec = challengeTests[challengeKey];
+
+    if (spec && selected.language !== 'SQL') {
+      // Local JavaScript execution
+      setTimeout(() => {
+        const results = runTests(code, challengeKey);
+        setTestResults(results);
+        setRunning(false);
+      }, 50);
+    } else {
+      // Backend-based execution (for SQL or unknown challenges)
+      try {
+        const res = await api<{ passed: boolean; xpEarned: number }>(
+          `/challenges/${selected.id}/submit`,
+          { method: 'POST', body: JSON.stringify({ code }) }
+        );
+        setTestResults([
+          {
+            label: selected.language === 'SQL' ? 'SQL Query Execution & Verification' : 'Verification',
+            passed: res.passed,
+            expected: 'Correct query output / solution match',
+            got: res.passed ? 'Success' : 'Incorrect query / solution mismatch',
+          },
+        ]);
+      } catch (err) {
+        setTestResults([
+          {
+            label: 'Verification',
+            passed: false,
+            expected: 'Successful verification',
+            got: 'Error checking with server',
+            error: (err as Error).message || 'Server connection failed',
+          },
+        ]);
+      } finally {
+        setRunning(false);
+      }
+    }
   }
 
   async function handleSubmit() {
-    // First run tests client-side
-    const results = runTests(code, selected.id);
-    setTestResults(results);
-    const allPassed = results.length > 0 && results.every((r) => r.passed);
-
     setSubmitting(true);
+    setSubmitResult(null);
+
+    const challengeKey = getChallengeKey(selected.title);
+    const spec = challengeTests[challengeKey];
+    let results: TestResult[] = [];
+
+    if (spec && selected.language !== 'SQL') {
+      results = runTests(code, challengeKey);
+      setTestResults(results);
+    }
+
+    const allPassedLocal = results.length > 0 ? results.every((r) => r.passed) : true;
+
     try {
-      // Try backend submit for XP tracking
       const res = await api<{ passed: boolean; xpEarned: number }>(
         `/challenges/${selected.id}/submit`,
-        { method: 'POST', body: JSON.stringify({ code, testResults: results.map((r) => ({ label: r.label, passed: r.passed })) }) }
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            code,
+            testResults: results.length > 0 ? results.map((r) => ({ label: r.label, passed: r.passed })) : undefined,
+          }),
+        }
       );
-      setSubmitResult({ passed: allPassed, xpEarned: allPassed ? res.xpEarned : 0 });
+
+      const finalPassed = spec && selected.language !== 'SQL' ? (allPassedLocal && res.passed) : res.passed;
+      if (!spec || selected.language === 'SQL') {
+        setTestResults([
+          {
+            label: selected.language === 'SQL' ? 'SQL Query Execution & Verification' : 'Verification',
+            passed: res.passed,
+            expected: 'Correct query output / solution match',
+            got: res.passed ? 'Success' : 'Incorrect query / solution mismatch',
+          },
+        ]);
+      }
+      setSubmitResult({ passed: finalPassed, xpEarned: res.xpEarned });
     } catch {
-      // Backend unavailable – use local result only
-      setSubmitResult({ passed: allPassed, xpEarned: allPassed ? selected.xpReward : 0 });
+      if (spec && selected.language !== 'SQL') {
+        setSubmitResult({ passed: allPassedLocal, xpEarned: allPassedLocal ? selected.xpReward : 0 });
+      } else {
+        setSubmitResult({ passed: false, xpEarned: 0 });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -367,9 +530,9 @@ export default function CodingPage() {
   async function getAiHint() {
     setHintLoading(true);
     setShowHints(true);
-    const staticHints = challengeHints[selected.id] || [];
+    const challengeKey = getChallengeKey(selected.title);
+    const staticHints = challengeHints[challengeKey] || [];
 
-    // Try AI endpoint first
     try {
       const prompt = `I am working on the coding challenge "${selected.title}": ${selected.description}\n\nHere is my current code:\n${code}\n\nGive me ONE short, specific hint (1-2 sentences) to help me improve or fix my solution. Do NOT give the full answer.`;
       const res = await api<{ response: string }>('/ai/chat', {
@@ -378,7 +541,6 @@ export default function CodingPage() {
       });
       setAiHint(res.response);
     } catch {
-      // Fallback to local hints
       const hint = staticHints[hintIndex % staticHints.length] || 'Think about the time complexity and whether a different data structure could help.';
       setAiHint(hint);
       setHintIndex((prev) => prev + 1);
@@ -400,6 +562,7 @@ export default function CodingPage() {
 
   const allPassed = testResults.length > 0 && testResults.every((r) => r.passed);
   const passedCount = testResults.filter((r) => r.passed).length;
+  const currentKey = getChallengeKey(selected.title);
 
   return (
     <DashboardLayout>
@@ -582,7 +745,7 @@ export default function CodingPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {(challengeTests[selected.id]?.cases || []).map((tc, i) => (
+              {(challengeTests[currentKey]?.cases || []).map((tc, i) => (
                 <div
                   key={i}
                   className={`rounded-lg border p-3 font-mono text-xs ${
@@ -602,8 +765,8 @@ export default function CodingPage() {
                   </div>
                 </div>
               ))}
-              {!challengeTests[selected.id] && (
-                <p className="text-xs text-muted-foreground">No test cases configured for this challenge.</p>
+              {!challengeTests[currentKey] && (
+                <p className="text-xs text-muted-foreground">No local test cases configured. Verification runs on backend.</p>
               )}
             </CardContent>
           </Card>
@@ -636,7 +799,7 @@ export default function CodingPage() {
               </Button>
 
               {showHints && aiHint && (
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm leading-6 text-muted-foreground">
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm leading-6 text-muted-foreground font-sans">
                   {aiHint}
                 </div>
               )}
@@ -652,7 +815,7 @@ export default function CodingPage() {
                 </button>
                 {showHints && (
                   <div className="mt-2 space-y-2">
-                    {(challengeHints[selected.id] || []).map((hint, i) => (
+                    {(challengeHints[currentKey] || []).map((hint, i) => (
                       <p key={i} className="text-xs leading-5 text-muted-foreground">
                         {hint}
                       </p>
