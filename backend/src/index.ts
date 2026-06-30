@@ -14,13 +14,53 @@ import aiRoutes from './routes/ai.js';
 import notificationRoutes from './routes/notifications.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import adminRoutes from './routes/admin.js';
+import { pool } from './lib/db.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+const DEFAULT_DEV_ORIGINS = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+];
+
+function configuredOrigins(): string[] {
+  return [process.env.FRONTEND_URL, process.env.FRONTEND_URLS]
+    .filter((value): value is string => Boolean(value))
+    .flatMap((value) => value.split(','))
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+const allowedOrigins = new Set([
+  ...configuredOrigins(),
+  ...(process.env.NODE_ENV === 'production' ? [] : DEFAULT_DEV_ORIGINS),
+]);
+
+function isDevLoopbackOrigin(origin: string): boolean {
+  if (process.env.NODE_ENV === 'production') return false;
+
+  try {
+    const url = new URL(origin);
+    return ['http:', 'https:'].includes(url.protocol) &&
+      ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin) || isDevLoopbackOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`Origin ${origin} is not allowed by CORS`));
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -67,4 +107,13 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 app.listen(PORT, () => {
   console.log(`SynergySphere API running on http://localhost:${PORT}`);
+  pool.query('SELECT 1')
+    .then(() => console.log('Database connection OK'))
+    .catch((error: NodeJS.ErrnoException) => {
+      console.error('Database connection failed:', error.message);
+      if (error.code === 'ECONNREFUSED') {
+        console.error('Start PostgreSQL with: docker compose up -d');
+        console.error('Then initialize data with: npm run db:migrate && npm run db:seed');
+      }
+    });
 });

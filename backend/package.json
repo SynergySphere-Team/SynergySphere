@@ -19,7 +19,6 @@
     "fflate": "^0.8.3",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
-    "pdfreader": "^3.0.8",
     "pg": "^8.22.0",
     "zod": "^3.24.1"
   },
@@ -29,7 +28,6 @@
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.5",
-    "@types/pg": "^8.20.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }

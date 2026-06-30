@@ -49,7 +49,7 @@ cp frontend/.env.local.example frontend/.env.local
 Edit backend/.env and set a strong unique JWT_SECRET:
 
 ~~~env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/synergysphere?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/synergysphere"
 JWT_SECRET="replace-with-a-long-random-secret"
 PORT=4000
 FRONTEND_URL="http://localhost:3000"
@@ -72,6 +72,7 @@ npm run dev
 
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:4000
+- Frontend proxy: http://localhost:3000/api forwards to the backend in development
 
 ## Demo Accounts
 
@@ -118,6 +119,7 @@ For production, deploy the frontend and backend to HTTPS hosts and configure:
 
 - FRONTEND_URL on the backend to match the deployed frontend origin
 - NEXT_PUBLIC_API_URL on the frontend to match the deployed backend /api URL
+- BACKEND_URL on the frontend only when using the local /api proxy against a non-default backend host
 - DATABASE_URL for PostgreSQL or Supabase
 - JWT_SECRET as a long random string
 - OPENAI_API_KEY if full AI behavior is required

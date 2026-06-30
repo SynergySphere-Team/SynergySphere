@@ -5,7 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+
+function buildApiUrl(endpoint: string): string {
+  const base = API_URL.replace(/\/$/, '');
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${base}${path}`;
+}
 
 export interface User {
   id: string;
@@ -51,18 +57,19 @@ export async function api<T>(
 
   let res: Response;
   try {
-    res = await fetch(API_URL + endpoint, {
+    res = await fetch(buildApiUrl(endpoint), {
       ...options,
       credentials: 'include',
       headers,
     });
   } catch {
+    const apiTarget = API_URL.startsWith('/') ? 'the local /api dev proxy' : API_URL;
     throw new Error(
-      'Cannot reach the API server. Start the backend with: npm run dev:backend (port 4000)'
+      `Cannot reach the API server through ${apiTarget}. Start the app with npm run dev and make sure the backend is running on port 4000.`
     );
   }
 
-  if (res.status === 401) {
+  if (res.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/register')) {
     clearAuth();
     throw new Error('Unauthorized');
   }

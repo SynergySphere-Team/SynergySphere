@@ -2,9 +2,47 @@ import { randomUUID } from 'node:crypto';
 import pg, { type PoolClient, type QueryResultRow } from 'pg';
 
 const { Pool } = pg;
+const DEFAULT_DEV_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/synergysphere';
+
+function normalizeDatabaseUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    // Prisma-style params are not valid PostgreSQL connection options for node-pg.
+    parsed.searchParams.delete('schema');
+    parsed.searchParams.delete('connection_limit');
+    parsed.searchParams.delete('pool_timeout');
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+function getDatabaseUrl(): string {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+
+  if (databaseUrl && !databaseUrl.startsWith('file:')) {
+    return normalizeDatabaseUrl(databaseUrl);
+  }
+
+  if (databaseUrl?.startsWith('file:')) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('DATABASE_URL must point to PostgreSQL in production');
+    }
+
+    console.warn(
+      'DATABASE_URL uses a file: URL, but this backend uses PostgreSQL. Falling back to local Docker PostgreSQL.'
+    );
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('DATABASE_URL must be set in production');
+  }
+
+  return DEFAULT_DEV_DATABASE_URL;
+}
 
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: getDatabaseUrl(),
   max: Number(process.env.DB_POOL_SIZE || 10),
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,

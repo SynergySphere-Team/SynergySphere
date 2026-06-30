@@ -90,9 +90,22 @@ router.post('/register', validateBody(registerSchema), async (req, res) => {
     res.status(201).json({ user });
   } catch (error) {
     console.error('Register error:', error);
+    if (isDbUnavailable(error)) {
+      res.status(503).json({
+        error: 'Database unavailable. Start PostgreSQL with docker compose up -d, then run npm run db:migrate && npm run db:seed.',
+      });
+      return;
+    }
     res.status(500).json({ error: 'Registration failed' });
   }
 });
+
+function isDbUnavailable(error: unknown): boolean {
+  return typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === '57P03');
+}
 
 router.post('/login', validateBody(loginSchema), async (req, res) => {
   try {
@@ -122,6 +135,12 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
     res.json({ user: safeUser });
   } catch (error) {
     console.error('Login error:', error);
+    if (isDbUnavailable(error)) {
+      res.status(503).json({
+        error: 'Database unavailable. Start PostgreSQL with docker compose up -d, then run npm run db:migrate && npm run db:seed.',
+      });
+      return;
+    }
     res.status(500).json({ error: 'Login failed' });
   }
 });
