@@ -1,3 +1,5 @@
+import { api } from './utils';
+
 export async function extractTextFromFile(file: File): Promise<string> {
   const name = file.name.toLowerCase();
   const type = file.type;
@@ -13,14 +15,14 @@ export async function extractTextFromFile(file: File): Promise<string> {
   }
 
   if (type === 'application/pdf' || name.endsWith('.pdf')) {
-    return extractPdfText(file);
+    return extractServerText(file);
   }
 
   if (
     type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     name.endsWith('.docx')
   ) {
-    return extractDocxText(file);
+    return extractServerText(file);
   }
 
   if (name.endsWith('.pptx') || name.endsWith('.ppt')) {
@@ -34,41 +36,28 @@ export async function extractTextFromFile(file: File): Promise<string> {
   return file.text();
 }
 
-async function extractPdfText(file: File): Promise<string> {
-  const pdfjs = await import('pdfjs-dist');
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-
-  const buffer = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: buffer }).promise;
-  const pages: string[] = [];
-
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const text = content.items
-      .map((item) => ('str' in item ? item.str : ''))
-      .join(' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (text) pages.push(text);
-  }
-
-  const result = pages.join('\n\n').trim();
-  if (!result) {
-    throw new Error('No readable text found in this PDF. Try a text-based PDF or paste the slide content manually.');
-  }
-  return result;
+async function extractServerText(file: File): Promise<string> {
+  const { text } = await api<{ text: string }>('/ai/extract-lecture-text', {
+    method: 'POST',
+    body: JSON.stringify({
+      fileName: file.name,
+      fileType: file.type,
+      base64: await fileToBase64(file),
+    }),
+  });
+  return text;
 }
 
-async function extractDocxText(file: File): Promise<string> {
-  const mammoth = await import('mammoth');
-  const buffer = await file.arrayBuffer();
-  const result = await mammoth.extractRawText({ arrayBuffer: buffer });
-  const text = result.value.trim();
-  if (!text) {
-    throw new Error('No readable text found in this Word document.');
-  }
-  return text;
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read this file.'));
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      resolve(result.includes(',') ? result.slice(result.indexOf(',') + 1) : result);
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 export function inferFileType(file: File): string {
