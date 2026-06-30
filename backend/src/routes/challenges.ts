@@ -42,6 +42,14 @@ router.get('/:id', authenticate, async (req, res) => {
 
 const attemptSchema = z.object({
   code: z.string().min(1).max(50000),
+  testResults: z
+    .array(
+      z.object({
+        label: z.string(),
+        passed: z.boolean(),
+      })
+    )
+    .optional(),
 });
 
 router.post('/:id/submit', authenticate, validateBody(attemptSchema), async (req: AuthRequest, res) => {
@@ -51,7 +59,15 @@ router.post('/:id/submit', authenticate, validateBody(attemptSchema), async (req
     return;
   }
 
-  const passed = evaluateCode(req.body.code, challenge.solution || '');
+  // If the frontend sends test results (from client-side execution), trust them.
+  // Otherwise fall back to the legacy string-match approach.
+  let passed: boolean;
+  if (req.body.testResults && req.body.testResults.length > 0) {
+    passed = req.body.testResults.every((r: { passed: boolean }) => r.passed);
+  } else {
+    passed = evaluateCodeFallback(req.body.code, challenge.solution || '');
+  }
+
   const alreadyPassed = await prisma.challengeAttempt.findFirst({
     where: { userId: req.user!.userId, challengeId: challenge.id, passed: true },
     select: { id: true },
@@ -76,7 +92,11 @@ router.post('/:id/submit', authenticate, validateBody(attemptSchema), async (req
   res.json({ attempt, passed, xpEarned, alreadyPassed: Boolean(alreadyPassed) });
 });
 
-function evaluateCode(submitted: string, solution: string): boolean {
+/**
+ * Legacy fallback: normalised string comparison.
+ * Only used when no test results are provided by the client.
+ */
+function evaluateCodeFallback(submitted: string, solution: string): boolean {
   if (!solution.trim()) return false;
   const normalize = (s: string) => s.replace(/\s+/g, '').toLowerCase();
   const normalizedSubmitted = normalize(submitted);
