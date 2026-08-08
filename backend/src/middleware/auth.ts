@@ -58,7 +58,14 @@ function parseCookies(header: string | undefined): Record<string, string> {
 }
 
 function getRequestToken(req: Request): string | null {
-  return parseCookies(req.headers.cookie)[AUTH_COOKIE_NAME] || null;
+  const cookieToken = parseCookies(req.headers.cookie)[AUTH_COOKIE_NAME];
+  if (cookieToken) return cookieToken;
+
+  const authorization = req.headers.authorization;
+  if (!authorization) return null;
+
+  const [scheme, token] = authorization.split(' ');
+  return scheme === 'Bearer' && token ? token : null;
 }
 
 export interface AuthPayload {

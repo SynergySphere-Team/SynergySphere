@@ -47,6 +47,14 @@ function setSessionCookie(res: Response, token: string) {
   res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions());
 }
 
+function isMobileClient(req: { get(name: string): string | undefined }): boolean {
+  return req.get('X-SynergySphere-Client') === 'mobile';
+}
+
+function sessionResponse<T extends SafeUser>(req: { get(name: string): string | undefined }, user: T, token: string) {
+  return isMobileClient(req) ? { user, token } : { user };
+}
+
 router.post('/register', validateBody(registerSchema), async (req, res) => {
   try {
     const { firstName, lastName, email, password, role } = req.body;
@@ -87,7 +95,7 @@ router.post('/register', validateBody(registerSchema), async (req, res) => {
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
     setSessionCookie(res, token);
 
-    res.status(201).json({ user });
+    res.status(201).json(sessionResponse(req, user, token));
   } catch (error) {
     console.error('Register error:', error);
     if (isDbUnavailable(error)) {
@@ -132,7 +140,7 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
     setSessionCookie(res, token);
 
     const { password: _password, ...safeUser } = user;
-    res.json({ user: safeUser });
+    res.json(sessionResponse(req, safeUser, token));
   } catch (error) {
     console.error('Login error:', error);
     if (isDbUnavailable(error)) {

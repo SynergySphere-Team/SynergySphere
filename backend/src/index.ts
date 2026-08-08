@@ -44,8 +44,13 @@ function isDevLoopbackOrigin(origin: string): boolean {
 
   try {
     const url = new URL(origin);
-    return ['http:', 'https:'].includes(url.protocol) &&
-      ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname);
+    const host = url.hostname;
+    return ['http:', 'https:', 'exp:'].includes(url.protocol) && (
+      ['localhost', '127.0.0.1', '10.0.2.2', '::1', '[::1]'].includes(host) ||
+      host.startsWith('192.168.') ||
+      host.startsWith('10.') ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)
+    );
   } catch {
     return false;
   }

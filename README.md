@@ -18,7 +18,7 @@ SynergySphere is a university capstone platform combining:
 | Backend | Node.js, Express, lightweight PostgreSQL access via pg, JWT auth via http-only cookie |
 | Database | PostgreSQL locally, Supabase-compatible PostgreSQL in production |
 | AI | OpenAI-compatible chat endpoint with demo fallback |
-| Mobile | Android WebView wrapper for deployed HTTPS frontend |
+| Mobile | Expo SDK 57, React Native, TypeScript, Expo Router, SecureStore |
 
 ## Quick Start
 
@@ -89,8 +89,9 @@ Admin users are created by the seed script only. Public registration allows Stud
 SynergySphere/
   frontend/          Next.js app
   backend/           Express API, SQL data access, and seed/migration scripts
+  mobile/            Native Expo React Native application
   supabase/          SQL migration for Supabase/PostgreSQL setup
-  android/           Android WebView shell for deployed frontend
+  android/           Legacy Android WebView shell (not the primary mobile app)
   docker-compose.yml Local PostgreSQL
 ~~~
 
@@ -100,14 +101,21 @@ SynergySphere/
 npm run dev              # frontend and backend
 npm run dev:frontend     # frontend only
 npm run dev:backend      # backend only
+npm run dev:mobile       # Expo React Native app
 npm run build            # production build
 npm run db:migrate       # apply SQL migrations
 npm run db:seed          # seed demo data
 ~~~
 
+## Documentation
+
+- Use case diagram: [docs/use-case-diagram.md](docs/use-case-diagram.md)
+- Mobile development and deployment: [MOBILE_SETUP.md](MOBILE_SETUP.md)
+
 ## Security Notes
 
-- JWT sessions are set as http-only cookies.
+- Web JWT sessions are set as http-only cookies. Expo receives a bearer token only
+  for requests marked as the mobile client, and keeps it in SecureStore.
 - JWT_SECRET must be set to a strong value in production.
 - Public registration cannot create admin accounts.
 - Challenge solutions are not returned by public challenge endpoints.
@@ -124,7 +132,7 @@ For production, deploy the frontend and backend to HTTPS hosts and configure:
 - JWT_SECRET as a long random string
 - OPENAI_API_KEY if full AI behavior is required
 
-The Android wrapper should point to the deployed HTTPS frontend URL before release.
+The `android/` wrapper is legacy. Use the Expo project under `mobile/` for native releases.
 
 ## License
 
