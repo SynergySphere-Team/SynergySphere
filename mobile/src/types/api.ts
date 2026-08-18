@@ -41,8 +41,9 @@ export interface Challenge { id: string; title: string; difficulty: string; desc
 export interface Project {
   id: string; title: string; category: string; location: string | null; organization: string;
   description: string; requirements: string | null; xpReward: number;
-  hasApplied: boolean; applicationStatus: string | null; _count: { applications: number };
+  hasApplied: boolean; applicationStatus: string | null; isCreator: boolean; _count: { applications: number };
 }
+export interface ProjectMessage { id: string; body: string; createdAt: string; userId: string; firstName: string; lastName: string; role: string; }
 
 export interface Notification { id: string; title: string; message: string; type: string; read: boolean; createdAt: string; }
 

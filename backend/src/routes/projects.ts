@@ -31,10 +31,12 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
   values.push(take);
   const projects = await query<{
     id: string;
+    creatorId: string | null;
     _count: { applications: number };
   }>(
     `SELECT
        p."id",
+       p."creatorId",
        p."title",
        p."category",
        p."location",
@@ -67,8 +69,50 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
       ...project,
       hasApplied: appliedMap.has(project.id),
       applicationStatus: appliedMap.get(project.id) || null,
+      isCreator: project.creatorId === req.user!.userId,
     })),
   );
+});
+
+async function canUseDiscussion(projectId: string, userId: string, role: string) {
+  const project = await queryOne<{ id: string; creatorId: string | null }>(
+    `SELECT "id", "creatorId" FROM "Project" WHERE "id" = $1`,
+    [projectId],
+  );
+  if (!project) return { project: null, allowed: false };
+  if (role === 'ADMIN' || project.creatorId === userId) return { project, allowed: true };
+  const application = await queryOne(`SELECT "id" FROM "ProjectApplication" WHERE "projectId" = $1 AND "userId" = $2`, [projectId, userId]);
+  return { project, allowed: Boolean(application) };
+}
+
+router.get('/:id/messages', authenticate, async (req: AuthRequest, res) => {
+  const projectId = paramId(req);
+  const access = await canUseDiscussion(projectId, req.user!.userId, req.user!.role);
+  if (!access.project) { res.status(404).json({ error: 'Project not found' }); return; }
+  if (!access.allowed) { res.status(403).json({ error: 'Join this project before using its discussion.' }); return; }
+  const messages = await query(
+    `SELECT m."id", m."body", m."createdAt", m."userId", u."firstName", u."lastName", u."role"
+     FROM "ProjectMessage" m JOIN "User" u ON u."id" = m."userId"
+     WHERE m."projectId" = $1 ORDER BY m."createdAt" ASC LIMIT 200`,
+    [projectId],
+  );
+  res.json(messages);
+});
+
+const messageSchema = z.object({ body: z.string().trim().min(1).max(2000) });
+router.post('/:id/messages', authenticate, validateBody(messageSchema), async (req: AuthRequest, res) => {
+  const projectId = paramId(req);
+  const access = await canUseDiscussion(projectId, req.user!.userId, req.user!.role);
+  if (!access.project) { res.status(404).json({ error: 'Project not found' }); return; }
+  if (!access.allowed) { res.status(403).json({ error: 'Join this project before using its discussion.' }); return; }
+  const message = await queryOne(
+    `WITH inserted AS (
+       INSERT INTO "ProjectMessage" ("id", "projectId", "userId", "body") VALUES ($1, $2, $3, $4) RETURNING *
+     ) SELECT inserted."id", inserted."body", inserted."createdAt", inserted."userId", u."firstName", u."lastName", u."role"
+     FROM inserted JOIN "User" u ON u."id" = inserted."userId"`,
+    [newId(), projectId, req.user!.userId, req.body.body],
+  );
+  res.status(201).json(message);
 });
 
 router.get('/my-applications', authenticate, async (req: AuthRequest, res) => {
@@ -192,13 +236,14 @@ router.post('/', authenticate, validateBody(projectSchema), async (req: AuthRequ
   }
   try {
     const project = await queryOne(
-      `INSERT INTO "Project" (
-         "id", "title", "category", "location", "organization", "description", "requirements", "xpReward"
+    `INSERT INTO "Project" (
+         "id", "creatorId", "title", "category", "location", "organization", "description", "requirements", "xpReward"
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         newId(),
+        req.user!.userId,
         req.body.title,
         req.body.category,
         nullable(req.body.location),
