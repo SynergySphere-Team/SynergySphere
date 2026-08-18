@@ -45,3 +45,17 @@ export interface Project {
 }
 
 export interface Notification { id: string; title: string; message: string; type: string; read: boolean; createdAt: string; }
+
+export interface Leader { id: string; firstName: string; lastName: string; xp: number; level: number; profilePicture?: string | null; _count: { challengeAttempts: number; userBadges: number }; }
+export interface PortfolioItem { id: string; title: string; description: string | null; projectLink: string | null; githubLink: string | null; }
+export interface InterviewQuestion { question: string; difficulty: 'easy' | 'medium' | 'hard'; }
+export interface Interview { id: string; topic: string; questions: InterviewQuestion[] | string; score: number | null; feedback: string | null; weakAreas: string[] | string | null; }
+export interface LectureUpload {
+  id: string; fileName: string; fileType: string; summary: string; createdAt: string;
+  flashcards: { front: string; back: string }[] | string;
+  quiz: { question: string; options: string[]; answer: number }[] | string;
+  miniProjects: { title: string; description: string }[] | string;
+  codingExercises: { title: string; description: string }[] | string;
+}
+export interface ProductivityStats { tasksCompletedToday: number; totalTasksCompleted: number; focusSessionsToday: number; focusMinutesToday: number; focusHoursToday: string; wellnessScore: number | null; statusCounts: Record<string, number>; learnedTasks: { id: string; title: string; learnedNote: string | null }[]; }
+export interface AdminOverview { totalUsers: number; activeUsers: number; dailyLogins: number; challengesCompleted: number; projectApplications: number; avgInterviewScore: number; avgStressLevel: number; avgMood: number; avgEnergy: number; recentUsers: { firstName: string; lastName: string; email: string; role: string; createdAt: string }[]; }
