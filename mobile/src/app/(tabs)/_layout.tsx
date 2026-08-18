@@ -19,7 +19,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="wellness" options={{ title: 'Wellness' }} />
       <Tabs.Screen name="explore" options={{ title: 'Explore' }} />
       <Tabs.Screen name="more" options={{ href: null }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile', href: null }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings', href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="coding" options={{ href: null }} />

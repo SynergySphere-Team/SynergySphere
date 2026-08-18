@@ -37,6 +37,7 @@ export interface WellnessEntry {
 }
 
 export interface Challenge { id: string; title: string; difficulty: string; description: string; language: string | null; xpReward: number; }
+export interface LearningResource { id: string; title: string; topic: string; level: string; minutes: number; xpReward: number; source: string; url: string; outcome: string; question: string; options: string[]; answer: number; completed: boolean; }
 
 export interface Project {
   id: string; title: string; category: string; location: string | null; organization: string;

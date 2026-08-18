@@ -11,7 +11,6 @@ const items: NavigationItem[] = [
   { label: 'Tasks', href: '/tasks', icon: 'checkmark-circle' },
   { label: 'Wellness', href: '/wellness', icon: 'heart' },
   { label: 'Explore', href: '/explore', icon: 'compass' },
-  { label: 'Profile', href: '/profile', icon: 'person' },
   { label: 'Settings', href: '/settings', icon: 'settings' },
 ];
 

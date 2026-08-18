@@ -7,7 +7,6 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -35,9 +34,11 @@ export default function LoginPage() {
     <div className="dashboard-grid flex min-h-screen items-center justify-center p-4">
       <Card className="relative w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
-            <Sparkles className="h-6 w-6 text-primary" />
-          </div>
+          <img
+            src="/brand/synergysphere-logo.svg"
+            alt="SynergySphere"
+            className="mx-auto mb-3 h-auto w-60 max-w-full"
+          />
           <CardTitle className="text-2xl">Welcome Back</CardTitle>
           <CardDescription>Sign in to your SynergySphere account</CardDescription>
         </CardHeader>
