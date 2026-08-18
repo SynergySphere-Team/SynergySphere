@@ -44,6 +44,7 @@ export interface Project {
   description: string; requirements: string | null; xpReward: number;
   hasApplied: boolean; applicationStatus: string | null; isCreator: boolean; _count: { applications: number };
 }
+export interface ProjectJoinRequest { id: string; status: 'PENDING' | 'APPROVED' | 'DECLINED'; createdAt: string; userId: string; firstName: string; lastName: string; email: string; profilePicture?: string | null; }
 export interface ProjectMessage { id: string; body: string; createdAt: string; userId: string; firstName: string; lastName: string; role: string; }
 
 export interface Notification { id: string; title: string; message: string; type: string; read: boolean; createdAt: string; }

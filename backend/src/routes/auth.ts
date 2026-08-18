@@ -27,6 +27,12 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const updateProfileSchema = z.object({
+  firstName: z.string().trim().min(1).max(50),
+  lastName: z.string().trim().min(1).max(50),
+  profilePicture: z.string().regex(/^data:image\/(png|jpeg|webp);base64,/, 'Profile photo must be a PNG, JPEG, or WebP image.').max(7_000_000).nullable().optional(),
+});
+
 type SafeUser = {
   id: string;
   firstName: string;
@@ -199,6 +205,23 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Me error:', error);
     res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+router.patch('/me', authenticate, validateBody(updateProfileSchema), async (req: AuthRequest, res) => {
+  try {
+    const user = await queryOne<SafeUser>(
+      `UPDATE "User"
+       SET "firstName" = $1, "lastName" = $2, "profilePicture" = COALESCE($3, "profilePicture"), "updatedAt" = CURRENT_TIMESTAMP
+       WHERE "id" = $4
+       RETURNING "id", "firstName", "lastName", "email", "role", "profilePicture", "xp", "level", "createdAt"`,
+      [req.body.firstName, req.body.lastName, req.body.profilePicture, req.user!.userId],
+    );
+    if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+    res.json(user);
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ error: 'Could not update profile' });
   }
 });
 

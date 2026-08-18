@@ -81,7 +81,7 @@ async function canUseDiscussion(projectId: string, userId: string, role: string)
   );
   if (!project) return { project: null, allowed: false };
   if (role === 'ADMIN' || project.creatorId === userId) return { project, allowed: true };
-  const application = await queryOne(`SELECT "id" FROM "ProjectApplication" WHERE "projectId" = $1 AND "userId" = $2`, [projectId, userId]);
+  const application = await queryOne(`SELECT "id" FROM "ProjectApplication" WHERE "projectId" = $1 AND "userId" = $2 AND "status" = 'APPROVED'`, [projectId, userId]);
   return { project, allowed: Boolean(application) };
 }
 
@@ -153,6 +153,36 @@ router.get('/my-applications', authenticate, async (req: AuthRequest, res) => {
   });
 });
 
+router.get('/:id/applications', authenticate, async (req: AuthRequest, res) => {
+  const projectId = paramId(req);
+  const project = await queryOne<{ creatorId: string | null }>(`SELECT "creatorId" FROM "Project" WHERE "id" = $1`, [projectId]);
+  if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
+  if (req.user!.role !== 'ADMIN' && project.creatorId !== req.user!.userId) { res.status(403).json({ error: 'Only the project owner can review join requests.' }); return; }
+  const applications = await query(
+    `SELECT pa."id", pa."status", pa."createdAt", u."id" AS "userId", u."firstName", u."lastName", u."email", u."profilePicture"
+     FROM "ProjectApplication" pa JOIN "User" u ON u."id" = pa."userId"
+     WHERE pa."projectId" = $1 ORDER BY CASE pa."status" WHEN 'PENDING' THEN 0 ELSE 1 END, pa."createdAt" DESC`,
+    [projectId],
+  );
+  res.json(applications);
+});
+
+const reviewApplicationSchema = z.object({ status: z.enum(['APPROVED', 'DECLINED']) });
+router.patch('/:id/applications/:applicationId', authenticate, validateBody(reviewApplicationSchema), async (req: AuthRequest, res) => {
+  const projectId = paramId(req);
+  const project = await queryOne<{ creatorId: string | null; title: string; xpReward: number }>(`SELECT "creatorId", "title", "xpReward" FROM "Project" WHERE "id" = $1`, [projectId]);
+  if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
+  if (req.user!.role !== 'ADMIN' && project.creatorId !== req.user!.userId) { res.status(403).json({ error: 'Only the project owner can review join requests.' }); return; }
+  const application = await queryOne<{ id: string; userId: string; status: string }>(
+    `UPDATE "ProjectApplication" SET "status" = $1, "updatedAt" = CURRENT_TIMESTAMP
+     WHERE "id" = $2 AND "projectId" = $3 AND "status" = 'PENDING' RETURNING "id", "userId", "status"`,
+    [req.body.status, req.params.applicationId, projectId],
+  );
+  if (!application) { res.status(409).json({ error: 'This request has already been reviewed or does not exist.' }); return; }
+  if (application.status === 'APPROVED') await awardXp(application.userId, Math.min(project.xpReward, 50), 'Joined community project: ' + project.title);
+  res.json(application);
+});
+
 router.get('/:id', authenticate, async (req, res) => {
   const project = await queryOne(
     `SELECT *
@@ -209,8 +239,6 @@ router.post('/:id/apply', authenticate, validateBody(applySchema), async (req: A
        RETURNING *`,
       [newId(), project.id, req.user!.userId, nullable(req.body.deliverable)],
     );
-
-    await awardXp(req.user!.userId, Math.min(project.xpReward, 50), 'Joined community project: ' + project.title);
 
     res.status(201).json(application);
   } catch (error) {

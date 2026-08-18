@@ -3,7 +3,8 @@ import { api, authStorage, ApiError } from '@/services/api';
 import type { AuthResponse, User } from '@/types/api';
 
 type RegisterInput = { firstName: string; lastName: string; email: string; password: string; role?: 'STUDENT' | 'ORGANIZATION' };
-type AuthContextValue = { user: User | null; loading: boolean; login(email: string, password: string): Promise<void>; register(data: RegisterInput): Promise<void>; logout(): Promise<void>; refresh(): Promise<void>; };
+type ProfileInput = { firstName: string; lastName: string; profilePicture?: string | null };
+type AuthContextValue = { user: User | null; loading: boolean; login(email: string, password: string): Promise<void>; register(data: RegisterInput): Promise<void>; logout(): Promise<void>; refresh(): Promise<void>; updateProfile(data: ProfileInput): Promise<void>; };
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -21,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user, loading, refresh,
     login: async (email, password) => establishSession(await api.post<AuthResponse>('/auth/login', { email, password })),
     register: async (data) => establishSession(await api.post<AuthResponse>('/auth/register', data)),
+    updateProfile: async (data) => setUser(await api.patch<User>('/auth/me', data)),
     logout: async () => { try { await api.post('/auth/logout'); } finally { await authStorage.clearToken(); setUser(null); } },
   }), [user, loading, refresh]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
