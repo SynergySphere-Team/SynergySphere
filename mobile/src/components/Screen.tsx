@@ -6,23 +6,14 @@ import { useTheme } from '@/context/ThemeContext';
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const statusBarHeight = Math.max(insets.top, 20);
   const content = (
-    <View
-      style={[
-        styles.content,
-        {
-          paddingBottom: Math.max(insets.bottom + 90, 120),
-          paddingTop: statusBarHeight + 8,
-        },
-      ]}
-    >
+    <View style={[styles.content, { paddingBottom: Math.max(insets.bottom + 90, 120) }]}>
       {children}
     </View>
   );
   return (
     <SafeAreaView
-      edges={['left', 'right']}
+      edges={['top', 'left', 'right']}
       style={[styles.safe, { backgroundColor: colors.background }]}
     >
       {scroll ? (
