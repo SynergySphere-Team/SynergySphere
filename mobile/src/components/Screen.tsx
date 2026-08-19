@@ -6,8 +6,41 @@ import { useTheme } from '@/context/ThemeContext';
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const content = <View style={[styles.content, { paddingBottom: Math.max(insets.bottom + 90, 120) }]}>{children}</View>;
-  return <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safe, { backgroundColor: colors.background }]}>{scroll ? <ScrollView style={styles.scroller} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" nestedScrollEnabled showsVerticalScrollIndicator={false}>{content}</ScrollView> : content}</SafeAreaView>;
+  const statusBarHeight = Math.max(insets.top, 20);
+  const content = (
+    <View
+      style={[
+        styles.content,
+        {
+          paddingBottom: Math.max(insets.bottom + 90, 120),
+          paddingTop: statusBarHeight + 8,
+        },
+      ]}
+    >
+      {children}
+    </View>
+  );
+  return (
+    <SafeAreaView
+      edges={['left', 'right']}
+      style={[styles.safe, { backgroundColor: colors.background }]}
+    >
+      {scroll ? (
+        <ScrollView
+          style={styles.scroller}
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </ScrollView>
+      ) : (
+        content
+      )}
+    </SafeAreaView>
+  );
 }
 export function Loading() {
   const { colors, theme } = useTheme();
