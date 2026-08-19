@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Loading } from '@/components/Screen';
 import { FloatingNavigation } from '@/components/FloatingNavigation';
 import { WorkspaceMenu } from '@/components/WorkspaceMenu';
@@ -9,11 +10,11 @@ import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 
 export default function TabsLayout() {
-  const { user, loading } = useAuth(); const router = useRouter(); const pathname = usePathname(); const [menuOpen, setMenuOpen] = useState(false);
+  const { user, loading } = useAuth(); const router = useRouter(); const pathname = usePathname(); const insets = useSafeAreaInsets(); const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => { if (!loading && !user) router.replace('/(auth)/login'); }, [loading, router, user]);
   if (loading || !user) return <Loading />;
   return <View style={{ flex: 1 }}>
-    <Tabs screenOptions={{ headerStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTintColor: colors.text, headerTitleStyle: { fontSize: 18, fontWeight: '800' }, headerRight: () => pathname === '/' ? null : <Pressable accessibilityRole="button" accessibilityLabel="Open workspace menu" hitSlop={12} onPress={() => setMenuOpen(true)} style={{ padding: 8 }}><Ionicons name="menu" size={24} color={colors.text} /></Pressable>, tabBarStyle: { display: 'none' } }}>
+    <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}>
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen name="tasks" options={{ title: 'Tasks' }} />
       <Tabs.Screen name="wellness" options={{ title: 'Wellness' }} />
@@ -32,6 +33,9 @@ export default function TabsLayout() {
       <Tabs.Screen name="admin" options={{ href: null }} />
       <Tabs.Screen name="project-chat" options={{ title: 'Project discussion', href: null }} />
     </Tabs>
+    {pathname !== '/' ? <Pressable accessibilityRole="button" accessibilityLabel="Open workspace menu" hitSlop={12} onPress={() => setMenuOpen(true)} style={{ position: 'absolute', top: insets.top + 6, right: 16, zIndex: 10, width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+      <Ionicons name="menu" size={19} color={colors.text} />
+    </Pressable> : null}
     <FloatingNavigation />
     <WorkspaceMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />
   </View>;

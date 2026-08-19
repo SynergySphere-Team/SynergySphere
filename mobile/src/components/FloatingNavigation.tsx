@@ -38,5 +38,5 @@ const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: 0, right: 0, zIndex: 20, alignItems: 'center', paddingHorizontal: 14 },
   shell: { width: '100%', maxWidth: 660, minHeight: 66, flexDirection: 'row', alignItems: 'center', padding: 7, borderRadius: 27, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 12 },
   item: { flex: 1, minHeight: 52, justifyContent: 'center' }, itemInner: { height: 48, borderRadius: 18, alignItems: 'center', justifyContent: 'center', gap: 3, overflow: 'hidden' },
-  activeFill: { ...StyleSheet.absoluteFill, backgroundColor: colors.primary, borderRadius: 18 }, label: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: -0.15 }, labelActive: { color: colors.background }, pressed: { opacity: 0.72 },
+  activeFill: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.primary, borderRadius: 18 }, label: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: -0.15 }, labelActive: { color: colors.background }, pressed: { opacity: 0.72 },
 });
