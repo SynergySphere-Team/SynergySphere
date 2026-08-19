@@ -1,0 +1,36 @@
+<svg width="720" height="220" viewBox="0 0 720 220" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title description">
+  <title id="title">SynergySphere</title>
+  <desc id="description">A connected orbit logo mark with the SynergySphere wordmark.</desc>
+  <defs>
+    <linearGradient id="orbGradient" x1="31" y1="27" x2="157" y2="164" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C8FF79"/>
+      <stop offset="0.48" stop-color="#8EE85C"/>
+      <stop offset="1" stop-color="#23B978"/>
+    </linearGradient>
+    <linearGradient id="ringGradient" x1="21" y1="55" x2="175" y2="141" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D9FF99"/>
+      <stop offset="0.48" stop-color="#7FEA69"/>
+      <stop offset="1" stop-color="#22C58D"/>
+    </linearGradient>
+    <filter id="glow" x="-31" y="-31" width="244" height="244" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feFlood flood-color="#79E86A" flood-opacity="0.4"/>
+      <feComposite in2="blur" operator="in"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g transform="translate(20 20)">
+    <circle cx="90" cy="90" r="60" fill="url(#orbGradient)" fill-opacity="0.13" filter="url(#glow)"/>
+    <circle cx="90" cy="90" r="50" fill="#0B1A1D" stroke="#B4F779" stroke-opacity="0.35" stroke-width="2"/>
+    <path d="M45 102C63 128 97 138 126 122C148 110 159 86 152 63" stroke="url(#ringGradient)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M128 54C102 31 67 38 48 60C33 77 31 99 43 117" stroke="url(#ringGradient)" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="45" cy="119" r="9" fill="#D8FF9A"/>
+    <circle cx="152" cy="61" r="9" fill="#42D78B"/>
+    <path d="M66 91C75 78 87 71 104 69C117 68 128 72 137 80" stroke="#E7FFD0" stroke-opacity="0.86" stroke-width="5" stroke-linecap="round"/>
+    <path d="M70 103C80 114 94 119 108 116C119 114 128 107 133 98" stroke="#92EE77" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(206 68)">
+    <text x="0" y="48" fill="#F2FFF0" font-family="Inter, Arial, sans-serif" font-size="50" font-weight="700" letter-spacing="-2.2">Synergy<tspan fill="#9BEA6A">Sphere</tspan></text>
+    <text x="3" y="79" fill="#8BA7A2" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="600" letter-spacing="4.1">LEARN  •  BUILD  •  THRIVE</text>
+  </g>
+</svg>

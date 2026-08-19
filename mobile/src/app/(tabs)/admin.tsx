@@ -1,0 +1,80 @@
+import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { Screen, Loading, Notice } from '@/components/Screen';
+import { Card, Heading, Stat } from '@/components/ui';
+import { useTheme } from '@/context/ThemeContext';
+import { api } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
+import type { AdminOverview } from '@/types/api';
+
+export default function AdminScreen() {
+  const { user } = useAuth();
+  const { colors } = useTheme();
+  const [data, setData] = useState<AdminOverview | null>(null);
+  const [error, setError] = useState('');
+  const [loaded, setLoaded] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setData(await api.get<AdminOverview>('/admin/overview'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load analytics.');
+    } finally {
+      setLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user?.role === 'ADMIN') load();
+    else setLoaded(true);
+  }, [load, user?.role]);
+
+  if (!loaded) return <Loading />;
+  if (user?.role !== 'ADMIN') {
+    return (
+      <Screen>
+        <Heading>Analytics</Heading>
+        <Notice>Analytics are available to administrators only.</Notice>
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen>
+      <Heading subtitle="A live view of the SynergySphere platform.">Analytics</Heading>
+      {error ? <Notice>{error}</Notice> : null}
+      {data ? (
+        <>
+          <View style={styles.grid}>
+            <Stat label="Total users" value={data.totalUsers} />
+            <Stat label="Active this week" value={data.activeUsers} />
+            <Stat label="Daily logins" value={data.dailyLogins} />
+            <Stat label="Challenges passed" value={data.challengesCompleted} />
+            <Stat label="Applications" value={data.projectApplications} />
+            <Stat label="Interview average" value={`${Math.round(data.avgInterviewScore)}%`} />
+          </View>
+          <Card>
+            <Text style={[styles.title, { color: colors.text }]}>Wellness averages</Text>
+            <Text style={[styles.copy, { color: colors.muted }]}>
+              Stress {data.avgStressLevel.toFixed(1)} · Mood {data.avgMood.toFixed(1)} · Energy {data.avgEnergy.toFixed(1)}
+            </Text>
+          </Card>
+          <Card>
+            <Text style={[styles.title, { color: colors.text }]}>Recent users</Text>
+            {data.recentUsers.map((item) => (
+              <Text key={item.email} style={[styles.copy, { color: colors.muted }]}>
+                • {item.firstName} {item.lastName} · {item.role}
+              </Text>
+            ))}
+          </Card>
+        </>
+      ) : null}
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  title: { fontSize: 17, fontWeight: '800' },
+  copy: { lineHeight: 21, fontSize: 13 },
+});

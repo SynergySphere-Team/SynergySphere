@@ -1,0 +1,89 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Linking, StyleSheet, Text } from 'react-native';
+import { Screen, Loading, Notice } from '@/components/Screen';
+import { Button, Card, Field, Heading } from '@/components/ui';
+import { useTheme } from '@/context/ThemeContext';
+import { api } from '@/services/api';
+import type { PortfolioItem } from '@/types/api';
+
+export default function PortfolioScreen() {
+  const { colors } = useTheme();
+  const [items, setItems] = useState<PortfolioItem[]>([]);
+  const [form, setForm] = useState({ title: '', description: '', projectLink: '', githubLink: '' });
+  const [showForm, setShowForm] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      setItems(await api.get<PortfolioItem[]>('/portfolio'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load your portfolio.');
+    } finally {
+      setLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function save() {
+    if (!form.title.trim()) return;
+    try {
+      await api.post('/portfolio', form);
+      setForm({ title: '', description: '', projectLink: '', githubLink: '' });
+      setShowForm(false);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save this project.');
+    }
+  }
+
+  async function remove(id: string) {
+    try {
+      await api.delete(`/portfolio/${id}`);
+      setItems((current) => current.filter((item) => item.id !== id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not remove this project.');
+    }
+  }
+
+  if (!loaded) return <Loading />;
+
+  return (
+    <Screen>
+      <Heading subtitle="Showcase the projects that demonstrate your skills.">Portfolio</Heading>
+      {error ? <Notice>{error}</Notice> : null}
+      <Button title={showForm ? 'Close form' : 'Add project'} onPress={() => setShowForm((value) => !value)} />
+      {showForm ? (
+        <Card>
+          <Field label="Project title" value={form.title} onChangeText={(title) => setForm({ ...form, title })} />
+          <Field label="Description" value={form.description} onChangeText={(description) => setForm({ ...form, description })} multiline />
+          <Field label="Project URL" value={form.projectLink} onChangeText={(projectLink) => setForm({ ...form, projectLink })} autoCapitalize="none" />
+          <Field label="GitHub URL" value={form.githubLink} onChangeText={(githubLink) => setForm({ ...form, githubLink })} autoCapitalize="none" />
+          <Button title="Save project" onPress={save} disabled={!form.title.trim()} />
+        </Card>
+      ) : null}
+      {items.length === 0 ? (
+        <Text style={[styles.empty, { color: colors.muted }]}>Add your first project to begin your portfolio.</Text>
+      ) : (
+        items.map((item) => (
+          <Card key={item.id}>
+            <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+            {item.description ? <Text style={[styles.copy, { color: colors.muted }]}>{item.description}</Text> : null}
+            {item.projectLink ? <Button title="Open project" secondary onPress={() => Linking.openURL(item.projectLink!)} /> : null}
+            {item.githubLink ? <Button title="Open GitHub" secondary onPress={() => Linking.openURL(item.githubLink!)} /> : null}
+            <Button title="Remove project" secondary onPress={() => remove(item.id)} />
+          </Card>
+        ))
+      )}
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  title: { fontSize: 17, fontWeight: '800' },
+  copy: { lineHeight: 20, fontSize: 13 },
+  empty: { textAlign: 'center', marginTop: 30, fontSize: 14 },
+});

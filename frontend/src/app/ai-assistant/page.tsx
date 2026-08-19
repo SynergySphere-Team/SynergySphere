@@ -1,0 +1,418 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { api } from '@/lib/utils';
+import {
+  Bot,
+  Bug,
+  CheckCircle2,
+  Code2,
+  FileCode2,
+  Loader2,
+  Send,
+  Sparkles,
+  TestTube,
+  Trash2,
+  User,
+  Wand2,
+  Zap,
+} from 'lucide-react';
+
+/* ─────────────────────────── types ─────────────────────────── */
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
+
+/* ─────────────────────────── starter code ─────────────────────────── */
+
+const starterCode =
+  'public class Main {\n  public static void main(String[] args) {\n    int n = 5;\n    for (int i = 0; i < n; i++) {\n      for (int j = 0; j <= i; j++) {\n        System.out.print(j + " ");\n      }\n      System.out.println();\n    }\n  }\n}';
+
+/* ─────────────────────────── quick action definitions ─────────────────────────── */
+
+const quickActions = [
+  {
+    label: 'Explain',
+    icon: Sparkles,
+    prompt: (code: string) =>
+      `Explain this code clearly and concisely, step by step:\n\n\`\`\`\n${code}\n\`\`\``,
+  },
+  {
+    label: 'Debug',
+    icon: Bug,
+    prompt: (code: string) =>
+      `Find and fix any bugs or issues in this code. List each problem and show the corrected version:\n\n\`\`\`\n${code}\n\`\`\``,
+  },
+  {
+    label: 'Optimize',
+    icon: Zap,
+    prompt: (code: string) =>
+      `Optimize this code for better performance and readability. Show the improved version with an explanation of changes:\n\n\`\`\`\n${code}\n\`\`\``,
+  },
+  {
+    label: 'Generate Tests',
+    icon: TestTube,
+    prompt: (code: string) =>
+      `Generate comprehensive unit tests for this code. Include edge cases:\n\n\`\`\`\n${code}\n\`\`\``,
+  },
+];
+
+/* ─────────────────────────── AI analysis (local) ─────────────────────────── */
+
+function analyzeCodeLocally(code: string): { title: string; items: string[] }[] {
+  const lines = code.split('\n').length;
+  const hasLoop = /for|while/.test(code);
+  const hasNested = /for[\s\S]{0,50}for|while[\s\S]{0,50}while/.test(code);
+  const hasRecursion = /function\s+(\w+)[\s\S]*\1\s*\(/.test(code);
+
+  const complexity =
+    hasNested ? 'O(n²) – nested loops detected' : hasLoop ? 'O(n) – single loop' : hasRecursion ? 'O(n) or worse – recursive' : 'O(1) – constant';
+  const spaceComplexity = /new\s+(Map|Set|Array|\[)/.test(code) ? 'O(n) – uses extra storage' : 'O(1) – in-place';
+
+  const issues: string[] = [];
+  if (lines > 50) issues.push('Consider breaking into smaller functions');
+  if (/console\.log/.test(code)) issues.push('Debug logs found – remove before production');
+  if (!hasLoop && !hasRecursion && lines < 5) issues.push('Consider edge cases for empty inputs');
+  if (issues.length === 0) issues.push('No obvious issues detected');
+
+  const suggestions: string[] = [];
+  if (hasNested) suggestions.push('Consider a hash map to reduce to O(n)');
+  if (/var\s/.test(code)) suggestions.push('Prefer let/const over var');
+  if (!/\/\/|\/\*/.test(code) && lines > 10) suggestions.push('Add comments for complex logic');
+  if (suggestions.length === 0) suggestions.push('Code looks clean!');
+
+  return [
+    { title: 'Complexity', items: [`Time: ${complexity}`, `Space: ${spaceComplexity}`] },
+    { title: 'Issues', items: issues },
+    { title: 'Suggestions', items: suggestions },
+  ];
+}
+
+/* ─────────────────────────── component ─────────────────────────── */
+
+export default function AIAssistantPage() {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: 'assistant',
+      content:
+        "👋 Hi! I'm your SynergySphere AI Coding Assistant. I can help you:\n\n• **Explain** code step-by-step\n• **Debug** errors and bugs\n• **Optimize** for better performance\n• **Generate tests** and documentation\n\nPaste your code in the editor, use the quick action buttons, or just ask me anything!",
+      timestamp: new Date(),
+    },
+  ]);
+  const [input, setInput] = useState('');
+  const [codeContext, setCodeContext] = useState(starterCode);
+  const [loading, setLoading] = useState(false);
+  const [analysis, setAnalysis] = useState(() => analyzeCodeLocally(starterCode));
+  const [recentPrompts, setRecentPrompts] = useState<string[]>([]);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Re-analyze whenever code changes
+  useEffect(() => {
+    setAnalysis(analyzeCodeLocally(codeContext));
+  }, [codeContext]);
+
+  async function sendMessage(text: string) {
+    if (!text.trim() || loading) return;
+    const userMsg: Message = { role: 'user', content: text.trim(), timestamp: new Date() };
+    setInput('');
+    setMessages((prev) => [...prev, userMsg]);
+    setLoading(true);
+
+    // Track recent prompts
+    setRecentPrompts((prev) => [text.trim().slice(0, 60), ...prev.filter((p) => p !== text.trim().slice(0, 60))].slice(0, 6));
+
+    try {
+      const res = await api<{ response: string }>('/ai/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: text.trim(),
+          context: codeContext || undefined,
+        }),
+      });
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: res.response, timestamp: new Date() },
+      ]);
+    } catch {
+      // Fallback: generate a helpful local response
+      const fallback = generateLocalResponse(text, codeContext);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: fallback, timestamp: new Date() },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleQuickAction(action: (typeof quickActions)[number]) {
+    if (!codeContext.trim()) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Please paste some code in the Code Context editor first, then I can help!',
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
+    sendMessage(action.prompt(codeContext));
+  }
+
+  function clearChat() {
+    setMessages([
+      {
+        role: 'assistant',
+        content: "Chat cleared! Paste your code and ask me anything.",
+        timestamp: new Date(),
+      },
+    ]);
+  }
+
+  function formatTime(date: Date) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  return (
+    <DashboardLayout>
+      {/* Header */}
+      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            AI Workspace
+          </p>
+          <h1 className="text-2xl font-bold text-white md:text-3xl">Coding Assistant</h1>
+          <p className="text-sm text-muted-foreground">
+            Debug, explain, refactor, and understand code with AI.
+          </p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={clearChat} className="gap-2">
+          <Wand2 className="h-4 w-4" />
+          New Chat
+        </Button>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[0.85fr_1.3fr_0.75fr]">
+        {/* ── AI Chat ── */}
+        <Card className="min-h-[650px]">
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle className="flex items-center gap-2">
+              <Bot className="h-4 w-4 text-primary" />
+              AI Assistant
+            </CardTitle>
+            <button
+              onClick={clearChat}
+              className="rounded-md p-1 text-muted-foreground transition hover:text-white"
+              title="Clear chat"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </CardHeader>
+          <CardContent className="flex h-[560px] flex-col">
+            {/* Messages */}
+            <div className="scrollbar-thin flex-1 space-y-4 overflow-y-auto pr-1">
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                  {msg.role === 'assistant' && (
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                      <Bot className="h-4 w-4 text-primary" />
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[84%] space-y-1 ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col`}
+                  >
+                    <div
+                      className={`rounded-lg border px-4 py-3 text-sm leading-6 ${
+                        msg.role === 'user'
+                          ? 'border-primary/30 bg-primary/[0.15] text-primary'
+                          : 'border-white/[0.08] bg-secondary/45 text-muted-foreground'
+                      }`}
+                    >
+                      <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground/50">{formatTime(msg.timestamp)}</span>
+                  </div>
+                  {msg.role === 'user' && (
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary">
+                      <User className="h-4 w-4" />
+                    </div>
+                  )}
+                </div>
+              ))}
+              {loading && (
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                    <Bot className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-secondary/45 px-4 py-3 text-sm text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                    Thinking…
+                  </div>
+                </div>
+              )}
+              <div ref={bottomRef} />
+            </div>
+
+            {/* Input */}
+            <div className="mt-4 flex gap-2 border-t border-white/[0.08] pt-4">
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage(input)}
+                placeholder="Ask about code, concepts, errors…"
+                disabled={loading}
+              />
+              <Button onClick={() => sendMessage(input)} disabled={loading || !input.trim()}>
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Code editor ── */}
+        <Card className="min-h-[650px]">
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle className="flex items-center gap-2">
+              <Code2 className="h-4 w-4 text-primary" />
+              Code Context
+            </CardTitle>
+            <span className="rounded-lg border border-white/[0.08] bg-secondary/50 px-2 py-1 text-xs text-muted-foreground">
+              Java / JS / Python
+            </span>
+          </CardHeader>
+          <CardContent>
+            <textarea
+              value={codeContext}
+              onChange={(e) => setCodeContext(e.target.value)}
+              className="h-[430px] w-full resize-none rounded-lg border border-white/[0.08] bg-[#050a0d] p-4 font-mono text-sm leading-6 text-green-100 outline-none focus:ring-2 focus:ring-primary/30"
+              spellCheck={false}
+              placeholder="Paste your code here, then use the action buttons below…"
+            />
+            {/* Quick action buttons – all wired up */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {quickActions.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <Button
+                    key={action.label}
+                    variant="secondary"
+                    size="sm"
+                    disabled={loading}
+                    onClick={() => handleQuickAction(action)}
+                    className="gap-1.5"
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {action.label}
+                  </Button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground/60">
+              Paste code above and click a button, or type a question in the chat.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* ── Right panel ── */}
+        <div className="space-y-4">
+          {/* Live analysis */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Live Analysis
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {analysis.map(({ title, items }) => (
+                <div key={title} className="rounded-lg border border-white/[0.07] bg-secondary/40 p-3">
+                  <p className="mb-2 text-xs font-semibold text-white">{title}</p>
+                  {items.map((item) => (
+                    <p key={item} className="text-xs text-muted-foreground">{item}</p>
+                  ))}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Recent prompts */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileCode2 className="h-4 w-4 text-primary" />
+                Recent Prompts
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {recentPrompts.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Your recent questions will appear here.
+                </p>
+              ) : (
+                recentPrompts.map((prompt, i) => (
+                  <button
+                    key={i}
+                    onClick={() => sendMessage(prompt)}
+                    disabled={loading}
+                    className="flex w-full items-start gap-2 rounded-lg border border-white/[0.07] bg-secondary/40 p-3 text-left text-xs text-muted-foreground transition hover:border-primary/25 hover:text-white"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+                    <span className="line-clamp-2">{prompt}</span>
+                  </button>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+}
+
+/* ─────────────────────────── local AI fallback ─────────────────────────── */
+
+function generateLocalResponse(message: string, code: string): string {
+  const lower = message.toLowerCase();
+
+  if (lower.includes('explain')) {
+    const lines = code.split('\n').length;
+    return `Here's an explanation of your code:\n\n• The code is ${lines} lines long.\n• It appears to be ${detectLanguage(code)} code.\n• ${describeCode(code)}\n\n⚠️ For detailed AI explanations, connect the backend (port 4000) and add an OPENAI_API_KEY or GEMINI_API_KEY to backend/.env.`;
+  }
+  if (lower.includes('debug') || lower.includes('error') || lower.includes('bug')) {
+    return `To help debug your code:\n\n1. Check for syntax errors – look at brackets, parentheses, and semicolons.\n2. Add console.log() statements to trace variable values.\n3. Check that all variables are declared before use.\n4. Look for off-by-one errors in loops.\n\n⚠️ For AI-powered debugging, connect the backend and add an API key to backend/.env.`;
+  }
+  if (lower.includes('optim')) {
+    return `Optimization tips for your code:\n\n1. 🗺️ Use hash maps/sets for O(1) lookups instead of nested loops.\n2. 🔄 Avoid re-computing values inside loops – cache them.\n3. 🧹 Remove any console.log() debug statements.\n4. ✂️ Break large functions into smaller, focused ones.\n\n⚠️ For AI-powered optimization, connect the backend and add an API key to backend/.env.`;
+  }
+  if (lower.includes('test')) {
+    return `Here are general test cases to consider:\n\n• ✅ Normal inputs (typical use case)\n• 📭 Empty inputs (empty string, empty array, null)\n• 🔢 Edge values (0, negative numbers, very large numbers)\n• 🔁 Duplicate values\n• 🃏 Single-element inputs\n\n⚠️ For AI-generated tests, connect the backend and add an API key to backend/.env.`;
+  }
+
+  return `I received your message: "${message}"\n\nI'm running in offline mode because the backend server is not reachable. Here's what you can do:\n\n1. Start the backend: open a terminal → cd backend → npm run dev\n2. Add an AI key to backend/.env:\n   GEMINI_API_KEY="your-key"  (free at aistudio.google.com)\n   or OPENAI_API_KEY="sk-..."\n\nOnce connected, I'll have full AI capabilities!`;
+}
+
+function detectLanguage(code: string): string {
+  if (/public\s+class|System\.out|void\s+main/.test(code)) return 'Java';
+  if (/def\s+\w+|import\s+\w+|print\(/.test(code)) return 'Python';
+  if (/function\s*\(|const\s+|let\s+|=>\s*{/.test(code)) return 'JavaScript';
+  return 'unknown language';
+}
+
+function describeCode(code: string): string {
+  if (/for[\s\S]*for/.test(code)) return 'It uses nested loops, which may have O(n²) time complexity.';
+  if (/for|while/.test(code)) return 'It uses a loop to iterate over data.';
+  if (/class/.test(code)) return 'It defines a class with methods.';
+  return 'Review the logic carefully for correctness.';
+}
