@@ -2,20 +2,203 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card, Field, Heading } from '@/components/ui';
+import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
-import { colors } from '@/constants/theme';
 import type { ProductivityStats, Task } from '@/types/api';
 
-const nextStatus: Record<Task['status'], Task['status']> = { TODO: 'IN_PROGRESS', IN_PROGRESS: 'REVIEW', REVIEW: 'DONE', DONE: 'TODO' };
+const nextStatus: Record<Task['status'], Task['status']> = {
+  TODO: 'IN_PROGRESS',
+  IN_PROGRESS: 'REVIEW',
+  REVIEW: 'DONE',
+  DONE: 'TODO',
+};
+
 export default function TasksScreen() {
-  const [tasks, setTasks] = useState<Task[]>([]); const [title, setTitle] = useState(''); const [description, setDescription] = useState(''); const [error, setError] = useState(''); const [adding, setAdding] = useState(false); const [loaded, setLoaded] = useState(false); const [stats, setStats] = useState<ProductivityStats | null>(null); const [focus, setFocus] = useState('25'); const [learned, setLearned] = useState<Record<string, string>>({});
-  const load = useCallback(async () => { try { setError(''); const [taskData, statsData] = await Promise.all([api.get<Task[]>('/tasks'), api.get<ProductivityStats>('/tasks/productivity-stats')]); setTasks(taskData); setStats(statsData); } catch (e) { setError(e instanceof Error ? e.message : 'Could not load tasks.'); } finally { setLoaded(true); } }, []);
-  useEffect(() => { load(); }, [load]);
-  async function add() { if (!title.trim()) return; setAdding(true); try { await api.post<Task>('/tasks', { title: title.trim(), ...(description.trim() ? { description: description.trim() } : {}) }); setTitle(''); setDescription(''); await load(); } catch (e) { setError(e instanceof Error ? e.message : 'Could not create task.'); } finally { setAdding(false); } }
-  async function advance(task: Task) { try { await api.patch<Task>(`/tasks/${task.id}`, { status: nextStatus[task.status] }); await load(); } catch (e) { setError(e instanceof Error ? e.message : 'Could not update task.'); } }
-  async function saveLearned(task: Task) { try { await api.patch<Task>(`/tasks/${task.id}`, { learnedNote: learned[task.id] || null }); await load(); } catch (e) { setError(e instanceof Error ? e.message : 'Could not save learned note.'); } }
-  async function completeFocus() { const durationMinutes = Number(focus); if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 180) { setError('Focus minutes must be between 1 and 180.'); return; } try { await api.post('/tasks/focus-session', { durationMinutes }); await load(); } catch (e) { setError(e instanceof Error ? e.message : 'Could not save focus session.'); } }
+  const { colors, theme } = useTheme();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [error, setError] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [stats, setStats] = useState<ProductivityStats | null>(null);
+  const [focus, setFocus] = useState('25');
+  const [learned, setLearned] = useState<Record<string, string>>({});
+
+  const load = useCallback(async () => {
+    try {
+      setError('');
+      const [taskData, statsData] = await Promise.all([
+        api.get<Task[]>('/tasks'),
+        api.get<ProductivityStats>('/tasks/productivity-stats'),
+      ]);
+      setTasks(taskData);
+      setStats(statsData);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load tasks.');
+    } finally {
+      setLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function add() {
+    if (!title.trim()) return;
+    setAdding(true);
+    try {
+      await api.post<Task>('/tasks', {
+        title: title.trim(),
+        ...(description.trim() ? { description: description.trim() } : {}),
+      });
+      setTitle('');
+      setDescription('');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not create task.');
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function advance(task: Task) {
+    try {
+      await api.patch<Task>(`/tasks/${task.id}`, { status: nextStatus[task.status] });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not update task.');
+    }
+  }
+
+  async function saveLearned(task: Task) {
+    try {
+      await api.patch<Task>(`/tasks/${task.id}`, { learnedNote: learned[task.id] || null });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save learned note.');
+    }
+  }
+
+  async function completeFocus() {
+    const durationMinutes = Number(focus);
+    if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 180) {
+      setError('Focus minutes must be between 1 and 180.');
+      return;
+    }
+    try {
+      await api.post('/tasks/focus-session', { durationMinutes });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save focus session.');
+    }
+  }
+
   if (!loaded) return <Loading />;
-  return <Screen><Heading subtitle="Plan work, track focus, and earn XP.">Productivity</Heading>{error ? <Notice>{error}</Notice> : null}<Card><Text style={styles.summary}>Today: {stats?.tasksCompletedToday || 0} completed · {stats?.focusMinutesToday || 0} focus minutes</Text><Field label="Focus session (minutes)" value={focus} onChangeText={setFocus} keyboardType="number-pad" /><Button title="Complete focus session" onPress={completeFocus} secondary /></Card><Card><Field label="New task" value={title} onChangeText={setTitle} placeholder="What do you want to accomplish?" /><Field label="Description (optional)" value={description} onChangeText={setDescription} placeholder="Add context" multiline /><Button title={adding ? 'Adding…' : 'Add task'} onPress={add} disabled={adding || !title.trim()} /></Card>{tasks.length === 0 ? <Text style={styles.empty}>No tasks yet. Add one above to get started.</Text> : tasks.map((task) => <Card key={task.id}><View style={styles.row}><View style={styles.body}><Text style={[styles.status, task.status === 'DONE' && styles.done]}>{task.status.replace('_', ' ')}</Text><Text style={[styles.title, task.status === 'DONE' && styles.done]}>{task.title}</Text>{task.description ? <Text style={styles.description}>{task.description}</Text> : null}</View><Button title={task.status === 'DONE' ? 'Reopen' : 'Advance'} onPress={() => advance(task)} secondary /></View>{task.status === 'DONE' ? <><Field label="What did you learn?" value={learned[task.id] ?? task.learnedNote ?? ''} onChangeText={value => setLearned(current => ({ ...current, [task.id]: value }))} multiline /><Button title="Save learning note" onPress={() => saveLearned(task)} secondary /></> : null}</Card>)}</Screen>;
+
+  const isLight = theme === 'light';
+
+  return (
+    <Screen>
+      <Heading subtitle="Plan work, track focus, and earn XP.">Productivity</Heading>
+      {error ? <Notice>{error}</Notice> : null}
+      <Card>
+        <Text style={[styles.summary, { color: isLight ? '#1e6827' : colors.primary }]}>
+          Today: {stats?.tasksCompletedToday || 0} completed · {stats?.focusMinutesToday || 0} focus minutes
+        </Text>
+        <Field label="Focus session (minutes)" value={focus} onChangeText={setFocus} keyboardType="number-pad" />
+        <Button title="Complete focus session" onPress={completeFocus} secondary />
+      </Card>
+      <Card>
+        <Field
+          label="New task"
+          value={title}
+          onChangeText={setTitle}
+          placeholder="What do you want to accomplish?"
+        />
+        <Field
+          label="Description (optional)"
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Add context"
+          multiline
+        />
+        <Button
+          title={adding ? 'Adding…' : 'Add task'}
+          onPress={add}
+          disabled={adding || !title.trim()}
+        />
+      </Card>
+      {tasks.length === 0 ? (
+        <Text style={[styles.empty, { color: colors.muted }]}>No tasks yet. Add one above to get started.</Text>
+      ) : (
+        tasks.map((task) => {
+          const isDone = task.status === 'DONE';
+          return (
+            <Card key={task.id}>
+              <View style={styles.row}>
+                <View style={styles.body}>
+                  <Text
+                    style={[
+                      styles.status,
+                      { color: isDone ? colors.completedTitle : isLight ? '#1e6827' : colors.primary },
+                    ]}
+                  >
+                    {task.status.replace('_', ' ')}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.title,
+                      { color: isDone ? colors.completedTitle : colors.text },
+                      isDone && styles.doneTitle,
+                    ]}
+                  >
+                    {task.title}
+                  </Text>
+                  {task.description ? (
+                    <Text
+                      style={[
+                        styles.description,
+                        { color: isDone ? colors.completedDesc : colors.muted },
+                      ]}
+                    >
+                      {task.description}
+                    </Text>
+                  ) : null}
+                </View>
+                <Button
+                  title={isDone ? 'Reopen' : 'Advance'}
+                  onPress={() => advance(task)}
+                  secondary
+                />
+              </View>
+              {isDone ? (
+                <>
+                  <Field
+                    label="What did you learn?"
+                    value={learned[task.id] ?? task.learnedNote ?? ''}
+                    onChangeText={(value) => setLearned((current) => ({ ...current, [task.id]: value }))}
+                    multiline
+                  />
+                  <Button title="Save learning note" onPress={() => saveLearned(task)} secondary />
+                </>
+              ) : null}
+            </Card>
+          );
+        })
+      )}
+    </Screen>
+  );
 }
-const styles = StyleSheet.create({ row: { flexDirection: 'row', alignItems: 'center', gap: 12 }, body: { flex: 1, gap: 4 }, status: { color: colors.primary, fontSize: 11, fontWeight: '800' }, title: { color: colors.text, fontSize: 16, fontWeight: '700' }, description: { color: colors.muted, fontSize: 13 }, summary: { color: colors.primary, fontWeight: '700' }, done: { color: colors.muted, textDecorationLine: 'line-through' }, empty: { color: colors.muted, textAlign: 'center', marginTop: 30 } });
+
+const styles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  body: { flex: 1, gap: 4 },
+  status: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  title: { fontSize: 16, fontWeight: '700' },
+  doneTitle: { textDecorationLine: 'line-through' },
+  description: { fontSize: 13, lineHeight: 18 },
+  summary: { fontWeight: '700', fontSize: 14 },
+  empty: { textAlign: 'center', marginTop: 30, fontSize: 14 },
+});

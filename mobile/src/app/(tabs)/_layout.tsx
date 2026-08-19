@@ -7,11 +7,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Loading } from '@/components/Screen';
 import { FloatingNavigation, NAV_TAB_ITEMS } from '@/components/FloatingNavigation';
 import { WorkspaceMenu } from '@/components/WorkspaceMenu';
-import { colors } from '@/constants/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
 export default function TabsLayout() {
   const { user, loading } = useAuth();
+  const { colors } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();

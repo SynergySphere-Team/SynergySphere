@@ -3,7 +3,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { usePathname, useRouter } from 'expo-router';
 import { Animated, Easing, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '@/constants/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 export type NavigationItem = { label: string; href: string; icon: keyof typeof Ionicons.glyphMap };
 export const NAV_TAB_ITEMS: NavigationItem[] = [
@@ -18,6 +18,7 @@ export function FloatingNavigation() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const { colors, theme } = useTheme();
   const [containerWidth, setContainerWidth] = useState(0);
 
   const activeIndex = Math.max(
@@ -50,7 +51,18 @@ export function FloatingNavigation() {
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(insets.bottom, 12) }]}>
-      <View accessibilityRole="tablist" onLayout={onLayout} style={styles.shell}>
+      <View
+        accessibilityRole="tablist"
+        onLayout={onLayout}
+        style={[
+          styles.shell,
+          {
+            backgroundColor: colors.navSurface,
+            borderColor: colors.navBorder,
+            shadowOpacity: theme === 'light' ? 0.08 : 0.35,
+          },
+        ]}
+      >
         {itemWidth > 0 && (
           <Animated.View
             pointerEvents="none"
@@ -58,6 +70,7 @@ export function FloatingNavigation() {
               styles.activeIndicator,
               {
                 width: itemWidth,
+                backgroundColor: colors.navActive,
                 transform: [{ translateX }],
               },
             ]}
@@ -65,6 +78,7 @@ export function FloatingNavigation() {
         )}
         {NAV_TAB_ITEMS.map((item, index) => {
           const active = index === activeIndex;
+          const textColor = active ? colors.navActiveText : colors.navInactive;
           return (
             <Pressable
               key={item.href}
@@ -74,8 +88,8 @@ export function FloatingNavigation() {
               onPress={() => router.push(item.href as never)}
               style={({ pressed }) => [styles.item, pressed && styles.pressed]}
             >
-              <Ionicons name={item.icon} size={20} color={active ? colors.background : colors.muted} />
-              <Text numberOfLines={1} style={[styles.label, active && styles.labelActive]}>
+              <Ionicons name={item.icon} size={20} color={textColor} />
+              <Text numberOfLines={1} style={[styles.label, { color: textColor }]}>
                 {item.label}
               </Text>
             </Pressable>
@@ -102,11 +116,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 7,
     borderRadius: 35,
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
     shadowColor: '#000',
-    shadowOpacity: 0.35,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 12,
@@ -117,7 +128,6 @@ const styles = StyleSheet.create({
     left: 7,
     height: 56,
     borderRadius: 29,
-    backgroundColor: colors.primary,
   },
   item: {
     flex: 1,
@@ -128,13 +138,9 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   label: {
-    color: colors.muted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: -0.15,
-  },
-  labelActive: {
-    color: colors.background,
   },
   pressed: {
     opacity: 0.75,
