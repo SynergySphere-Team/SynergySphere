@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Loading } from '@/components/Screen';
 import { FloatingNavigation, NAV_TAB_ITEMS } from '@/components/FloatingNavigation';
 import { WorkspaceMenu } from '@/components/WorkspaceMenu';
-import { GlassHeader } from '@/components/GlassHeader';
+
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
@@ -96,7 +96,6 @@ export default function TabsLayout() {
             <Ionicons name="menu" size={19} color={colors.text} />
           </Pressable>
         ) : null}
-        <GlassHeader />
         <FloatingNavigation />
         <WorkspaceMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />
       </View>
