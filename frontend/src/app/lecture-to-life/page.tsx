@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/utils';
 import { extractTextFromFile, inferFileType } from '@/lib/lectureExtract';
+import { WebCurriculumSection } from '@/components/curriculum/WebCurriculumSection';
 import {
   BookOpen,
   Code2,
@@ -55,6 +56,7 @@ const TABS = ['Summary', 'Flashcards', 'Quiz', 'Mini Projects', 'Coding Exercise
 type Tab = (typeof TABS)[number];
 
 export default function LectureToLifePage() {
+  const [pageMode, setPageMode] = useState<'curriculum' | 'upload'>('curriculum');
   const [content, setContent] = useState('');
   const [fileName, setFileName] = useState('');
   const [fileType, setFileType] = useState('text');
@@ -176,13 +178,43 @@ export default function LectureToLifePage() {
         <p className="text-sm text-muted-foreground">
           Upload slides or paste content — summaries, flashcards, quizzes, and exercises are generated from your material.
         </p>
+
+        {/* Mode Switcher */}
+        <div className="mt-4 flex items-center gap-2">
+          <button
+            onClick={() => setPageMode('curriculum')}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition ${
+              pageMode === 'curriculum'
+                ? 'bg-primary text-primary-foreground shadow'
+                : 'bg-white/[0.05] text-muted-foreground hover:bg-white/[0.1] hover:text-white'
+            }`}
+          >
+            <Code2 className="h-4 w-4" />
+            <span>Programming Academy (W3Schools)</span>
+          </button>
+          <button
+            onClick={() => setPageMode('upload')}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition ${
+              pageMode === 'upload'
+                ? 'bg-primary text-primary-foreground shadow'
+                : 'bg-white/[0.05] text-muted-foreground hover:bg-white/[0.1] hover:text-white'
+            }`}
+          >
+            <Upload className="h-4 w-4" />
+            <span>Upload Lecture Notes</span>
+          </button>
+        </div>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
-      )}
+      {pageMode === 'curriculum' ? (
+        <WebCurriculumSection />
+      ) : (
+        <>
+          {error && (
+            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+          )}
 
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -400,6 +432,8 @@ export default function LectureToLifePage() {
           </Card>
         </div>
       )}
-    </DashboardLayout>
+    </>
+  )}
+</DashboardLayout>
   );
 }

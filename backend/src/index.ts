@@ -15,6 +15,7 @@ import notificationRoutes from './routes/notifications.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import adminRoutes from './routes/admin.js';
 import learningRoutes from './routes/learning.js';
+import curriculumRoutes from './routes/curriculum.js';
 import { pool } from './lib/db.js';
 
 const app = express();
@@ -102,6 +103,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/learning', learningRoutes);
+app.use('/api/curriculum', curriculumRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
