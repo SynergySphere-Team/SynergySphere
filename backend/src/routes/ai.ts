@@ -74,9 +74,17 @@ router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => 
         ].join('\n'),
   ].join('\n');
 
-  const prompt = context
-    ? 'Code Context:\n' + context + '\n\nQuestion: ' + message
-    : message;
+  const askingAboutCode =
+    /```/.test(message) ||
+    /\b(this code|the code|my code|the snippet|code context|walk through|debug|optimi[sz]e|generate tests|unit test)\b/i.test(
+      message,
+    );
+  const prompt =
+    context && askingAboutCode
+      ? 'Student code (explain this snippet):\n' + context + '\n\nQuestion: ' + message
+      : context
+        ? message + '\n\n(The student also has this editor buffer; only use it if the question is about the code.)\n```\n' + context + '\n```'
+        : message;
 
   const historySummary = history.length
     ? history.slice(-3).map((t) => `${t.role === 'user' ? 'Q' : 'A'}: ${t.content.slice(0, 80)}`).join(' | ')
@@ -86,7 +94,7 @@ router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => 
     systemPrompt,
     prompt,
     history,
-    () => buildGroundedFallback(message, bundle, historySummary),
+    () => buildGroundedFallback(message, bundle, historySummary, context),
   );
 
   res.json({

@@ -141,6 +141,7 @@ function AIAssistantInner() {
   ]);
   const [input, setInput] = useState('');
   const [codeContext, setCodeContext] = useState('');
+  const [codeEditedByUser, setCodeEditedByUser] = useState(false);
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState(() => analyzeCodeLocally(''));
   const [recentPrompts, setRecentPrompts] = useState<string[]>([]);
@@ -176,7 +177,10 @@ function AIAssistantInner() {
         });
         // Prefill the editor with the lesson's first example, not a generic starter.
         const exampleCode = detail.content?.examples?.[0]?.code;
-        if (exampleCode) setCodeContext((prev) => prev || exampleCode);
+        if (exampleCode) {
+          setCodeContext((prev) => prev || exampleCode);
+          setCodeEditedByUser(false);
+        }
       } catch {
         if (!cancelled) setLesson(null);
       }
@@ -196,15 +200,19 @@ function AIAssistantInner() {
   }, [codeContext]);
 
   const historyFromMessages = useCallback(
-    (msgs: Message[]): Array<{ role: 'user' | 'assistant'; content: string }> =>
-      msgs
+    (msgs: Message[]): Array<{ role: 'user' | 'assistant'; content: string }> => {
+      const firstUser = msgs.findIndex((m) => m.role === 'user');
+      if (firstUser < 0) return [];
+      return msgs
+        .slice(firstUser)
         .filter((m) => m.role === 'user' || m.role === 'assistant')
         .slice(-20)
-        .map((m) => ({ role: m.role, content: m.content })),
+        .map((m) => ({ role: m.role, content: m.content }));
+    },
     [],
   );
 
-  async function sendMessage(text: string, currentMessages?: Message[]) {
+  async function sendMessage(text: string, currentMessages?: Message[], forcedContext?: string) {
     if (!text.trim() || loading) return;
     const userMsg: Message = { role: 'user', content: text.trim(), timestamp: new Date() };
     const baseMessages = currentMessages ?? messages;
@@ -216,12 +224,15 @@ function AIAssistantInner() {
     // Track recent prompts
     setRecentPrompts((prev) => [text.trim().slice(0, 60), ...prev.filter((p) => p !== text.trim().slice(0, 60))].slice(0, 6));
 
+    const contextToSend =
+      forcedContext?.trim() || (codeEditedByUser && codeContext.trim() ? codeContext : undefined);
+
     try {
       const res = await api<ChatResponse>('/ai/chat', {
         method: 'POST',
         body: JSON.stringify({
           message: text.trim(),
-          context: codeContext || undefined,
+          context: contextToSend,
           // Pin the grounded lesson on every request so follow-ups stay in-lesson.
           ...(lesson ? { lessonId: lesson.id } : {}),
           history: historyFromMessages(baseMessages).slice(-20),
@@ -262,7 +273,7 @@ function AIAssistantInner() {
       ]);
       return;
     }
-    sendMessage(action.prompt(codeContext));
+    sendMessage(action.prompt(codeContext), undefined, codeContext);
   }
 
   function clearChat() {
@@ -424,7 +435,10 @@ function AIAssistantInner() {
           <CardContent>
             <textarea
               value={codeContext}
-              onChange={(e) => setCodeContext(e.target.value)}
+              onChange={(e) => {
+                setCodeContext(e.target.value);
+                setCodeEditedByUser(true);
+              }}
               className="h-[430px] w-full resize-none rounded-lg border border-white/[0.08] bg-[#050a0d] p-4 font-mono text-sm leading-6 text-green-100 outline-none focus:ring-2 focus:ring-primary/30"
               spellCheck={false}
               placeholder="Paste your code here, then use the action buttons below…"

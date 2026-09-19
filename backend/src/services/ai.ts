@@ -21,17 +21,24 @@ const AI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS) || 25000;
 
 /* ─────────────────────────── main export ─────────────────────────── */
 
+function usableHistory(history: ChatTurn[]): ChatTurn[] {
+  const firstUser = history.findIndex((turn) => turn.role === 'user');
+  return firstUser < 0 ? [] : history.slice(firstUser);
+}
+
 export async function generateAiResponse(
   systemPrompt: string,
   userMessage: string,
   history: ChatTurn[] = [],
   offlineFallback: () => string = () => fallbackResponse(systemPrompt, userMessage),
 ): Promise<string> {
+  const priorTurns = usableHistory(history);
+
   // 1. Try Gemini first (free)
   const geminiKey = process.env.GEMINI_API_KEY;
   if (geminiKey) {
     try {
-      const result = await callGemini(geminiKey, systemPrompt, userMessage, history);
+      const result = await callGemini(geminiKey, systemPrompt, userMessage, priorTurns);
       if (result) return result;
     } catch (err) {
       console.error('Gemini API error:', err);
@@ -42,7 +49,7 @@ export async function generateAiResponse(
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
-      const result = await callOpenAI(openaiKey, systemPrompt, userMessage, history);
+      const result = await callOpenAI(openaiKey, systemPrompt, userMessage, priorTurns);
       if (result) return result;
     } catch (err) {
       console.error('OpenAI API error:', err);
@@ -55,18 +62,38 @@ export async function generateAiResponse(
 
 /* ─────────────────────────── Gemini ─────────────────────────── */
 
-function turnToText(turn: ChatTurn): string {
-  const prefix = turn.role === 'user' ? 'Student' : 'Assistant';
-  return `${prefix}: ${turn.content}`;
-}
-
 async function callGemini(
   apiKey: string,
   systemPrompt: string,
   userMessage: string,
   history: ChatTurn[] = [],
 ): Promise<string> {
-  const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  const models = [
+    process.env.GEMINI_MODEL,
+    'gemini-2.0-flash',
+    'gemini-flash-latest',
+    'gemini-1.5-flash',
+  ].filter((model, index, all): model is string => Boolean(model) && all.indexOf(model) === index);
+
+  let lastError = '';
+  for (const model of models) {
+    const result = await callGeminiModel(apiKey, model, systemPrompt, userMessage, history);
+    if (result.ok) return result.text;
+    lastError = result.error;
+    if (!/404|not found|NOT_FOUND/i.test(result.error)) {
+      throw new Error(result.error);
+    }
+  }
+  throw new Error(lastError || 'Gemini request failed');
+}
+
+async function callGeminiModel(
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+  history: ChatTurn[],
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const controller = new AbortController();
@@ -100,14 +127,18 @@ async function callGemini(
 
     if (!response.ok) {
       const errBody = await response.text();
-      throw new Error(`Gemini request failed ${response.status}: ${errBody}`);
+      return {
+        ok: false,
+        error: `Gemini request failed ${response.status}: ${errBody}`,
+      };
     }
 
     const data = await response.json() as {
       candidates: Array<{ content: { parts: Array<{ text: string }> } }>;
     };
 
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return { ok: true, text };
   } finally {
     clearTimeout(timeout);
   }

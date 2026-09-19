@@ -55,7 +55,19 @@ PORT=4001
 FRONTEND_URL="http://localhost:3000"
 ~~~
 
-Optionally add OPENAI_API_KEY and OPENAI_MODEL for full AI behavior.
+For full AI Workspace responses, add one provider to `backend/.env` (Gemini is tried first when both are configured):
+
+~~~env
+# Option 1: Google Gemini
+GEMINI_API_KEY="your-gemini-key"
+GEMINI_MODEL="gemini-1.5-flash"
+
+# Option 2: OpenAI
+OPENAI_API_KEY="your-openai-key"
+OPENAI_MODEL="gpt-4o-mini"
+~~~
+
+Without a provider key, the workspace still gives a code-aware offline walkthrough for pasted code, but it cannot provide model-generated explanations or follow-up reasoning.
 
 ### 4. Setup Database
 
@@ -130,7 +142,7 @@ For production, deploy the frontend and backend to HTTPS hosts and configure:
 - BACKEND_URL on the frontend only when using the local /api proxy against a non-default backend host
 - DATABASE_URL for PostgreSQL or Supabase
 - JWT_SECRET as a long random string
-- OPENAI_API_KEY if full AI behavior is required
+- GEMINI_API_KEY or OPENAI_API_KEY if full AI behavior is required
 
 The `android/` wrapper is legacy. Use the Expo project under `mobile/` for native releases.
 

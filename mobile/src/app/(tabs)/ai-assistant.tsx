@@ -31,7 +31,8 @@ type LessonPreview = {
 
 export default function AIAssistantScreen() {
   const { colors, theme } = useTheme();
-  const { lesson: lessonParam } = useLocalSearchParams<{ lesson?: string }>();
+  const { lesson: lessonParamRaw } = useLocalSearchParams<{ lesson?: string | string[] }>();
+  const lessonParam = Array.isArray(lessonParamRaw) ? lessonParamRaw[0] : lessonParamRaw;
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -42,6 +43,7 @@ export default function AIAssistantScreen() {
   ]);
   const [message, setMessage] = useState('');
   const [context, setContext] = useState('');
+  const [contextEditedByUser, setContextEditedByUser] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [lesson, setLesson] = useState<LessonPreview | null>(null);
@@ -71,6 +73,7 @@ export default function AIAssistantScreen() {
           firstExampleCode: detail.content?.examples?.[0]?.code,
         });
         setContext((prev) => prev || detail.content?.examples?.[0]?.code || '');
+        setContextEditedByUser(false);
       } catch {
         if (!cancelled) setLesson(null);
       }
@@ -81,18 +84,18 @@ export default function AIAssistantScreen() {
   }, [lessonParam]);
 
   const historyFromMessages = useCallback(
-    (msgs: Message[]): Array<{ role: 'user' | 'assistant'; content: string }> =>
-      msgs
-        .filter((m) => m.role === 'You' || m.role === 'SynergySphere AI')
-        .slice(-20)
-        .map((m) => ({
-          role: m.role === 'You' ? ('user' as const) : ('assistant' as const),
-          content: m.content,
-        })),
+    (msgs: Message[]): Array<{ role: 'user' | 'assistant'; content: string }> => {
+      const firstUser = msgs.findIndex((m) => m.role === 'You');
+      if (firstUser < 0) return [];
+      return msgs.slice(firstUser).slice(-20).map((m) => ({
+        role: m.role === 'You' ? ('user' as const) : ('assistant' as const),
+        content: m.content,
+      }));
+    },
     [],
   );
 
-  async function send(value = message) {
+  async function send(value = message, forcedContext?: string) {
     if (!value.trim() || loading) return;
     const question = value.trim();
     const baseMessages = messages;
@@ -100,9 +103,11 @@ export default function AIAssistantScreen() {
     setMessage('');
     setLoading(true);
     try {
+      const contextToSend =
+        forcedContext?.trim() || (contextEditedByUser && context.trim() ? context : undefined);
       const response = await api.post<{ response: string; grounding?: Grounding }>('/ai/chat', {
         message: question,
-        ...(context.trim() ? { context } : {}),
+        ...(contextToSend ? { context: contextToSend } : {}),
         ...(lesson ? { lessonId: lesson.id } : {}),
         history: historyFromMessages(baseMessages).slice(-20),
       });
@@ -154,7 +159,10 @@ export default function AIAssistantScreen() {
         <Field
           label={lesson ? 'Code context (pre-filled from the lesson)' : 'Optional code context'}
           value={context}
-          onChangeText={setContext}
+          onChangeText={(text) => {
+            setContext(text);
+            setContextEditedByUser(true);
+          }}
           multiline
           placeholder="Paste code or notes for better answers"
           style={styles.context}
@@ -191,7 +199,7 @@ export default function AIAssistantScreen() {
         />
         <Button
           title="Explain my code"
-          onPress={() => send('Explain the code context step by step and suggest one improvement.')}
+          onPress={() => send('Explain the code context step by step and suggest one improvement.', context)}
           disabled={loading || !context.trim()}
         />
       </Card>

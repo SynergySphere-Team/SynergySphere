@@ -91,7 +91,11 @@ interface FlatLessonEntry {
   moduleName: string;
 }
 
+let cachedFlatLessons: FlatLessonEntry[] | null = null;
+
 export function getAllFlatLessons(): FlatLessonEntry[] {
+  if (cachedFlatLessons) return cachedFlatLessons;
+
   const result: FlatLessonEntry[] = [];
   for (const subject of w3schoolsProgrammingDomain.subjects as SubjectSpec[]) {
     for (const mod of subject.modules as ModuleSpec[]) {
@@ -112,6 +116,7 @@ export function getAllFlatLessons(): FlatLessonEntry[] {
       }
     }
   }
+  cachedFlatLessons = result;
   return result;
 }
 
@@ -700,11 +705,33 @@ function synthesizeUploadAnswer(message: string, upload: GroundedUpload): string
  * returning canned copy. Only a question with NO matched context gets the
  * "add GEMINI_API_KEY" notice.
  */
+function isAskingAboutSnippet(message: string): boolean {
+  return (
+    /```/.test(message) ||
+    /\b(this code|the code|my code|the snippet|code context|walk through|debug|optimi[sz]e|generate tests|unit test)\b/i.test(
+      message,
+    )
+  );
+}
+
 export function buildGroundedFallback(
   message: string,
   bundle: GroundingBundle,
   historySummary?: string,
+  codeContext?: string,
 ): string {
+  const code = isAskingAboutSnippet(message) ? extractCode(message, codeContext) : null;
+  if (code) {
+    const walkthrough = synthesizeCodeExplanation(message, code);
+    if (!bundle.lesson && !bundle.upload) return walkthrough;
+    const grounded = bundle.lesson
+      ? synthesizeLessonAnswer(message, bundle.lesson)
+      : bundle.upload
+        ? synthesizeUploadAnswer(message, bundle.upload)
+        : '';
+    return `${walkthrough}\n\n---\nHow this connects to LectureToLife:\n${grounded}`.slice(0, 4000);
+  }
+
   if (!bundle.hasContext) {
     return (
       "I'm SynergySphere AI running in demo mode, and I couldn't match your question to a LectureToLife lesson or one of your study packs.\n\n" +
@@ -724,4 +751,107 @@ export function buildGroundedFallback(
     parts.push('', `(Continuing from earlier: ${historySummary})`);
   }
   return parts.join('\n').slice(0, 4000);
+}
+
+function extractCode(message: string, codeContext?: string): string | null {
+  if (codeContext?.trim()) return codeContext.trim();
+
+  const fencedCode = message.match(/```(?:[\w+-]+)?\s*\n?([\s\S]*?)```/);
+  if (fencedCode?.[1]?.trim()) return fencedCode[1].trim();
+
+  return null;
+}
+
+function inferCodeLanguage(code: string): string {
+  if (/\b(public\s+)?class\s+\w+|System\.out\.print|\bvoid\s+main\b/.test(code)) return 'Java';
+  if (/\bdef\s+\w+\s*\(|\bprint\(|\bimport\s+\w+/.test(code)) return 'Python';
+  if (/\bSELECT\b|\bINSERT\s+INTO\b|\bCREATE\s+TABLE\b/i.test(code)) return 'SQL';
+  if (/\binterface\s+\w+|:\s*(string|number|boolean)\b|\btype\s+\w+\s*=/.test(code)) return 'TypeScript';
+  if (/\bfunction\s+\w+\s*\(|=>|\bconst\s+|\blet\s+/.test(code)) return 'JavaScript';
+  if (/^\s*#include\s*[<\"]/.test(code)) return 'C/C++';
+  return 'code';
+}
+
+function firstMatch(code: string, pattern: RegExp): string | undefined {
+  return code.match(pattern)?.slice(1).find(Boolean);
+}
+
+function synthesizeCodeExplanation(message: string, code: string): string {
+  const language = inferCodeLanguage(code);
+  const normalizedLines = code.split(/\r?\n/);
+  const codeLines = normalizedLines.filter((line) => line.trim() && !line.trim().startsWith('//') && !line.trim().startsWith('#'));
+  const functionName = firstMatch(code, /(?:function|def)\s+(\w+)\s*\(|(?:public|private|protected)?\s*(?:static\s+)?[\w<>\[\]]+\s+(\w+)\s*\(/);
+  const className = firstMatch(code, /\bclass\s+(\w+)/);
+  const variables = [...code.matchAll(/\b(?:const|let|var|final|int|double|String|boolean)\s+(\w+)/g)]
+    .map((match) => match[1])
+    .filter((name, index, all) => all.indexOf(name) === index)
+    .slice(0, 5);
+  const hasLoop = /\b(for|while|forEach)\b/.test(code);
+  const loopCount = (code.match(/\b(for|while|forEach)\b/g) || []).length;
+  const hasCondition = /\b(if|else if|switch|case)\b/.test(code);
+  const returns = [...code.matchAll(/\breturn\s+([^;\n}]+)/g)].map((match) => match[1].trim()).slice(0, 3);
+  const isDebugRequest = /\b(debug|bug|fix|error)\b/i.test(message);
+  const isOptimizationRequest = /\b(optimi[sz]e|improve|refactor|performance)\b/i.test(message);
+  const isTestRequest = /\b(test|spec)\b/i.test(message);
+  const purpose =
+    /new\s+Set\s*\(/.test(code) && /return\s+\[?\.\.\./.test(code)
+      ? 'remove duplicate values by keeping only values that have not been seen before.'
+      : /\.sort\s*\(/.test(code)
+        ? 'sort a collection into a chosen order.'
+        : /\.filter\s*\(/.test(code)
+          ? 'keep only the values that satisfy a condition.'
+          : /\.map\s*\(/.test(code)
+            ? 'transform each value in a collection into a new value.'
+            : /\.reduce\s*\(/.test(code)
+              ? 'combine a collection into one accumulated result.'
+              : undefined;
+
+  const lines: string[] = [
+    `Here is a code-specific walkthrough (${language}; ${codeLines.length} non-empty lines):`,
+    '',
+  ];
+
+  if (purpose) lines.push(`• **Likely purpose:** this code appears to ${purpose}`);
+  if (className) lines.push(`• **Structure:** it defines the \`${className}\` class.`);
+  if (functionName) lines.push(`• **Entry point:** \`${functionName}\` is the main function/method that performs the work.`);
+  if (variables.length) lines.push(`• **State:** it creates \`${variables.join('`, `')}\`, which hold the values used by the logic.`);
+  if (hasLoop) lines.push(`• **Iteration:** it uses ${loopCount > 1 ? `${loopCount} loop constructs` : 'a loop'} to process repeated data or steps.`);
+  if (hasCondition) lines.push('• **Decisions:** its conditional logic chooses different behaviour depending on the input or current state.');
+  if (returns.length) lines.push(`• **Result:** it returns ${returns.map((value) => `\`${value}\``).join(' or ')}.`);
+
+  if (!className && !functionName && !variables.length && !hasLoop && !hasCondition && !returns.length) {
+    lines.push('• This snippet is mostly expressions or declarations, so its effect comes from the values it creates or calls it makes.');
+  }
+
+  lines.push('', 'How to read it step by step:');
+  normalizedLines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) return;
+
+    let explanation: string | undefined;
+    if (/\b(?:function|def)\s+\w+\s*\(/.test(trimmed)) explanation = 'declares a reusable function and its inputs.';
+    else if (/\bclass\s+\w+/.test(trimmed)) explanation = 'declares a class that groups related data and behaviour.';
+    else if (/\b(for|while|forEach)\b/.test(trimmed)) explanation = 'starts repeated work over a collection or while a condition remains true.';
+    else if (/\b(if|else if|switch|case)\b/.test(trimmed)) explanation = 'checks a condition and selects the matching path.';
+    else if (/\breturn\b/.test(trimmed)) explanation = 'finishes this function/method and sends a value back to its caller.';
+    else if (/\b(?:const|let|var|final|int|double|String|boolean)\b/.test(trimmed)) explanation = 'creates or updates a named value used later in the code.';
+    else if (/\w+\s*\(/.test(trimmed)) explanation = 'calls a function or method to perform an operation.';
+
+    if (explanation) lines.push(`${index + 1}. Line ${index + 1}: ${explanation} (\`${trimmed.slice(0, 110)}\`)`);
+  });
+
+  lines.push('', 'Complexity and review notes:');
+  if (loopCount >= 2) lines.push('• The visible loops may be O(n²) if one loop runs inside another; if they are separate, the work is closer to O(n).');
+  else if (hasLoop) lines.push('• The visible loop suggests at least O(n) time for one pass through its input.');
+  else lines.push('• No loops are visible, so this snippet is likely O(1) aside from any work inside called functions.');
+  if (/\bvar\s+/.test(code)) lines.push('• Consider replacing \`var\` with \`const\` or \`let\` to make scope and reassignment clearer.');
+  if (/<=\s*\w+\.length|<\s*=\s*\w+\.length/.test(code)) lines.push('• Check loop bounds carefully: indexing through \`.length\` usually needs \`< length\`, not \`<= length\`.');
+  if (/==(?!=)/.test(code) && language === 'JavaScript') lines.push('• Consider \`===\` instead of \`==\` in JavaScript to avoid implicit type conversion.');
+
+  if (isDebugRequest) lines.push('', 'For debugging, share the exact input, expected output, actual output, and any error message so the issue can be narrowed down.');
+  if (isOptimizationRequest) lines.push('', 'For optimization, measure the slow input first; the biggest gain is usually avoiding repeated work inside the loop.');
+  if (isTestRequest) lines.push('', 'Useful tests include a normal input, an empty input, a single item, duplicate values, and boundary values.');
+
+  lines.push('', 'For deeper, conversational explanations and fixes, configure GEMINI_API_KEY or OPENAI_API_KEY in backend/.env.');
+  return lines.join('\n').slice(0, 4000);
 }
