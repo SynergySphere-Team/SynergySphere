@@ -8,6 +8,7 @@ import {
   W3SCHOOLS_BASE_SOURCE,
 } from '../data/w3schoolsCurriculumData.js';
 import type { LessonSpec, SubjectSpec } from '../data/lectureCurriculumTypes.js';
+import { materializeLesson } from '../data/curriculumLessonMaterial.js';
 import { W3SchoolsSyncEngine } from '../services/w3schoolsSyncEngine.js';
 
 const router = Router();
@@ -69,7 +70,13 @@ function getAllFlatLessons(): FlatLessonEntry[] {
   const result: FlatLessonEntry[] = [];
   for (const subject of w3schoolsProgrammingDomain.subjects) {
     for (const mod of subject.modules) {
-      for (const les of mod.lessons) {
+      for (const [lessonIndex, sourceLesson] of mod.lessons.entries()) {
+        const les = materializeLesson(
+          sourceLesson,
+          subject,
+          mod,
+          mod.lessons[lessonIndex - 1]?.title,
+        );
         result.push({
           lesson: les,
           subjectId: subject.id,
@@ -161,14 +168,22 @@ router.get('/technologies/:techId', async (req: AuthRequest, res) => {
     name: m.name,
     description: m.description,
     sortOrder: m.sortOrder,
-    lessons: m.lessons.map((l) => ({
-      id: l.id,
-      title: l.title,
-      overview: l.overview,
-      difficulty: l.difficulty,
-      sortOrder: l.sortOrder,
-      completed: completedSet.has(l.id),
-    })),
+    lessons: m.lessons.map((sourceLesson, lessonIndex) => {
+      const l = materializeLesson(
+        sourceLesson,
+        subject,
+        m,
+        m.lessons[lessonIndex - 1]?.title,
+      );
+      return {
+        id: l.id,
+        title: l.title,
+        overview: l.overview,
+        difficulty: l.difficulty,
+        sortOrder: l.sortOrder,
+        completed: completedSet.has(l.id),
+      };
+    }),
   }));
 
   res.json({

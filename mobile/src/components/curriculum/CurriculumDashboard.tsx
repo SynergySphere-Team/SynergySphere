@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -41,6 +41,7 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
   // Sync state
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const technologyRequestId = useRef(0);
 
   // Load technologies list
   const loadTechnologies = useCallback(async () => {
@@ -59,9 +60,14 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
 
   // Load active technology detail
   const loadTechDetail = useCallback(async (techId: string) => {
+    const requestId = ++technologyRequestId.current;
     setDetailLoading(true);
+    setActiveTechDetail(null);
     try {
       const detail = await api.get<TechnologyDetail>(`/curriculum/technologies/${techId}`);
+      // A slower response for a previously selected tab must never replace the
+      // curriculum the learner selected most recently.
+      if (requestId !== technologyRequestId.current) return;
       setActiveTechDetail(detail);
       // Auto-expand first module by default
       if (detail.modules && detail.modules.length > 0) {
@@ -73,7 +79,7 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
     } catch {
       // Handle error
     } finally {
-      setDetailLoading(false);
+      if (requestId === technologyRequestId.current) setDetailLoading(false);
     }
   }, []);
 

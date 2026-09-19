@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '@/lib/utils';
 import {
   BookOpen,
@@ -75,6 +75,7 @@ interface LessonDetail {
   moduleId: string;
   moduleName: string;
   learningObjectives: string[];
+  prerequisites?: string[];
   content: {
     explanation: string;
     keyConcepts?: KeyConcept[];
@@ -83,6 +84,9 @@ interface LessonDetail {
     rules?: string[];
     commonMistakes?: string[];
     relatedConcepts?: string[];
+    exercise?: { prompt: string; successCriteria: string };
+    quiz?: { question: string; answer: string };
+    challenge?: { prompt: string; successCriteria: string };
   };
   sources: Array<{ resourceTitle: string; sourceUrl: string }>;
   completed: boolean;
@@ -123,6 +127,9 @@ export function WebCurriculumSection() {
   const [consoleOpen, setConsoleOpen] = useState<Record<number, boolean>>({});
   const [runningIndex, setRunningIndex] = useState<number | null>(null);
   const [xpBanner, setXpBanner] = useState<string | null>(null);
+  const technologyRequestId = useRef(0);
+  const lessonRequestId = useRef(0);
+  const requestedLessonForTechnology = useRef<{ technologyId: string; lessonId: string } | null>(null);
 
   const loadTechnologies = useCallback(async () => {
     try {
@@ -135,14 +142,21 @@ export function WebCurriculumSection() {
     }
   }, []);
 
-  const loadTechDetail = useCallback(async (techId: string) => {
+  const loadTechDetail = useCallback(async (techId: string, selectFirstLesson = false) => {
+    const requestId = ++technologyRequestId.current;
+    setActiveTechDetail(null);
     try {
       const detail = await api<TechnologyDetail>(`/curriculum/technologies/${techId}`);
+      // A delayed response for a previous tab must not overwrite the current curriculum.
+      if (requestId !== technologyRequestId.current) return;
       setActiveTechDetail(detail);
       if (detail.modules?.length > 0) {
         setExpandedModules((prev) => ({ ...prev, [detail.modules[0].id]: true }));
-        // Load first lesson if none selected
-        if (detail.modules[0].lessons?.length > 0) {
+        const requestedLesson = requestedLessonForTechnology.current;
+        if (requestedLesson?.technologyId === techId) {
+          requestedLessonForTechnology.current = null;
+          loadLesson(requestedLesson.lessonId);
+        } else if (selectFirstLesson && detail.modules[0].lessons?.length > 0) {
           loadLesson(detail.modules[0].lessons[0].id);
         }
       }
@@ -152,15 +166,17 @@ export function WebCurriculumSection() {
   }, []);
 
   const loadLesson = async (lessonId: string) => {
+    const requestId = ++lessonRequestId.current;
     setLessonLoading(true);
     setXpBanner(null);
     try {
       const detail = await api<LessonDetail>(`/curriculum/lessons/${lessonId}`);
+      if (requestId !== lessonRequestId.current) return;
       setActiveLesson(detail);
     } catch {
       // Handle
     } finally {
-      setLessonLoading(false);
+      if (requestId === lessonRequestId.current) setLessonLoading(false);
     }
   };
 
@@ -170,7 +186,7 @@ export function WebCurriculumSection() {
 
   useEffect(() => {
     if (activeTechId) {
-      loadTechDetail(activeTechId);
+      loadTechDetail(activeTechId, true);
     }
   }, [activeTechId, loadTechDetail]);
 
@@ -272,8 +288,11 @@ export function WebCurriculumSection() {
                   <button
                     key={item.id}
                     onClick={() => {
+                      requestedLessonForTechnology.current = {
+                        technologyId: item.subjectId,
+                        lessonId: item.id,
+                      };
                       setActiveTechId(item.subjectId);
-                      loadLesson(item.id);
                       setSearchQuery('');
                     }}
                     className="flex w-full items-center justify-between rounded p-2 text-left text-xs hover:bg-white/5"
@@ -533,6 +552,36 @@ export function WebCurriculumSection() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Practice material is tied to the selected lesson, rather than a generic runner card. */}
+              {(activeLesson.content.exercise || activeLesson.content.quiz || activeLesson.content.challenge) && (
+                <div className="rounded-xl border border-white/[0.08] bg-black/20 p-6 space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-primary">
+                    Apply this lesson
+                  </h3>
+                  {activeLesson.content.exercise && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-slate-200">Exercise</p>
+                      <p className="text-sm leading-6 text-slate-300">{activeLesson.content.exercise.prompt}</p>
+                      <p className="text-xs text-muted-foreground">Success: {activeLesson.content.exercise.successCriteria}</p>
+                    </div>
+                  )}
+                  {activeLesson.content.challenge && (
+                    <div className="space-y-1 border-t border-white/[0.08] pt-4">
+                      <p className="text-xs font-bold text-slate-200">Challenge</p>
+                      <p className="text-sm leading-6 text-slate-300">{activeLesson.content.challenge.prompt}</p>
+                      <p className="text-xs text-muted-foreground">Success: {activeLesson.content.challenge.successCriteria}</p>
+                    </div>
+                  )}
+                  {activeLesson.content.quiz && (
+                    <div className="space-y-1 border-t border-white/[0.08] pt-4">
+                      <p className="text-xs font-bold text-slate-200">Check your understanding</p>
+                      <p className="text-sm leading-6 text-slate-300">{activeLesson.content.quiz.question}</p>
+                      <p className="text-xs text-primary">Answer: {activeLesson.content.quiz.answer}</p>
+                    </div>
+                  )}
                 </div>
               )}
 

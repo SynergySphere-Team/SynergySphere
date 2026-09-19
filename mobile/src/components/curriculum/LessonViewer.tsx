@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -31,17 +31,20 @@ export function LessonViewer({
   const [loading, setLoading] = useState(true);
   const [updatingProgress, setUpdatingProgress] = useState(false);
   const [xpBanner, setXpBanner] = useState<string | null>(null);
+  const lessonRequestId = useRef(0);
 
   const fetchLesson = useCallback(async (id: string) => {
+    const requestId = ++lessonRequestId.current;
     setLoading(true);
     setXpBanner(null);
     try {
       const data = await api.get<LessonDetail>(`/curriculum/lessons/${id}`);
+      if (requestId !== lessonRequestId.current) return;
       setLesson(data);
     } catch {
       // Handle error
     } finally {
-      setLoading(false);
+      if (requestId === lessonRequestId.current) setLoading(false);
     }
   }, []);
 
@@ -299,6 +302,36 @@ export function LessonViewer({
               explanation={ex.explanation}
             />
           ))}
+        </View>
+      ) : null}
+
+      {(lesson.content.exercise || lesson.content.quiz || lesson.content.challenge) ? (
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.sectionHeadingRow}>
+            <Ionicons name="fitness-outline" size={17} color={isLight ? '#0284c7' : colors.primary} />
+            <Text style={[styles.sectionHeading, { color: colors.text }]}>APPLY THIS LESSON</Text>
+          </View>
+          {lesson.content.exercise ? (
+            <View style={styles.practiceItem}>
+              <Text style={[styles.practiceLabel, { color: colors.text }]}>Exercise</Text>
+              <Text style={[styles.bulletText, { color: colors.text }]}>{lesson.content.exercise.prompt}</Text>
+              <Text style={[styles.practiceSuccess, { color: colors.muted }]}>Success: {lesson.content.exercise.successCriteria}</Text>
+            </View>
+          ) : null}
+          {lesson.content.challenge ? (
+            <View style={[styles.practiceItem, { borderTopColor: colors.border }]}>
+              <Text style={[styles.practiceLabel, { color: colors.text }]}>Challenge</Text>
+              <Text style={[styles.bulletText, { color: colors.text }]}>{lesson.content.challenge.prompt}</Text>
+              <Text style={[styles.practiceSuccess, { color: colors.muted }]}>Success: {lesson.content.challenge.successCriteria}</Text>
+            </View>
+          ) : null}
+          {lesson.content.quiz ? (
+            <View style={[styles.practiceItem, { borderTopColor: colors.border }]}>
+              <Text style={[styles.practiceLabel, { color: colors.text }]}>Check your understanding</Text>
+              <Text style={[styles.bulletText, { color: colors.text }]}>{lesson.content.quiz.question}</Text>
+              <Text style={[styles.practiceSuccess, { color: isLight ? '#0284c7' : colors.primary }]}>Answer: {lesson.content.quiz.answer}</Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -613,6 +646,19 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
     marginBottom: 2,
+  },
+  practiceItem: {
+    gap: 5,
+    borderTopWidth: 1,
+    paddingTop: 10,
+  },
+  practiceLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  practiceSuccess: {
+    fontSize: 12,
+    lineHeight: 18,
   },
   relatedChips: {
     flexDirection: 'row',

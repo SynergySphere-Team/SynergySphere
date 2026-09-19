@@ -20,12 +20,15 @@ export interface LessonContent {
   explanation: string;
   keyConcepts: Array<{ title: string; definition: string; purpose?: string }>;
   syntax?: string[];
-  examples?: Array<{ title: string; code: string; explanation: string }>;
+  examples?: Array<{ title: string; language?: string; code: string; explanation: string }>;
   commands?: Array<{ command: string; meaning: string; options?: string }>;
   rules?: string[];
   practicalApplications: string[];
   commonMistakes: string[];
   relatedConcepts: string[];
+  exercise?: { prompt: string; successCriteria: string };
+  quiz?: { question: string; answer: string };
+  challenge?: { prompt: string; successCriteria: string };
   conflicts?: LessonConflict[];
 }
 
@@ -46,6 +49,7 @@ export interface LessonSpec {
   technologyVersion: string;
   sortOrder: number;
   learningObjectives: string[];
+  prerequisites?: string[];
   content: LessonContent;
   revisionNotes: LessonRevision;
   sources: LessonSourceSpec[];

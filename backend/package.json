@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "db:migrate": "tsx src/scripts/migrate.ts",
-    "db:seed": "tsx src/scripts/seed.ts"
+    "db:seed": "tsx src/scripts/seed.ts",
+    "curriculum:verify": "tsx src/scripts/verifyCurriculum.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

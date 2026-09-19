@@ -57,6 +57,9 @@ export interface LessonContent {
   practicalApplications?: string[];
   commonMistakes?: string[];
   relatedConcepts?: string[];
+  exercise?: { prompt: string; successCriteria: string };
+  quiz?: { question: string; answer: string };
+  challenge?: { prompt: string; successCriteria: string };
 }
 
 export interface LessonRevisionNotes {
@@ -91,6 +94,7 @@ export interface LessonDetail {
   difficulty: Difficulty;
   technologyVersion: string;
   learningObjectives: string[];
+  prerequisites?: string[];
   content: LessonContent;
   revisionNotes: LessonRevisionNotes;
   sources: LessonSource[];
