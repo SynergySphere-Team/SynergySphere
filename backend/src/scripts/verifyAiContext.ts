@@ -1,0 +1,94 @@
+/**
+ * Offline verification for the AI Workspace grounding bundle.
+ * Run: cd backend && npx tsx src/scripts/verifyAiContext.ts
+ * No DB or API key required.
+ */
+import { buildGroundingBundle, buildGroundedFallback } from '../services/aiContext.js';
+import { generateAiResponse } from '../services/ai.js';
+
+async function main() {
+  let failures = 0;
+  const check = (name: string, ok: boolean, detail?: string) => {
+    if (!ok) failures++;
+    console.log(`${ok ? 'PASS' : 'FAIL'} — ${name}${detail ? ` (${detail})` : ''}`);
+  };
+
+  // 1. Acceptance: pinned JS lesson + closure question cites the lesson and its example.
+  const pinned = await buildGroundingBundle({
+    userId: 'offline-test-user',
+    message: 'What is a closure?',
+    lessonId: 'javascript-javascript-scope-javascript-scope',
+  });
+  const pinnedAnswer = await generateAiResponse(
+    'grounded',
+    'What is a closure?',
+    [],
+    () => buildGroundedFallback('What is a closure?', pinned),
+  );
+  check(
+    'pinned lesson is used as grounding source',
+    pinned.source === 'lesson' && pinned.reference.lessonTitle === 'JavaScript Scope',
+    `source=${pinned.source} title=${pinned.reference.lessonTitle ?? 'none'}`,
+  );
+  check(
+    'offline answer cites the lesson (with or without API key)',
+    pinnedAnswer.includes('JavaScript › JAVASCRIPT SCOPE › JavaScript Scope'),
+    pinnedAnswer.split('\n')[0],
+  );
+  check(
+    'offline answer reuses the lesson example',
+    /Example from the lesson/i.test(pinnedAnswer) && /const|function|console/.test(pinnedAnswer),
+  );
+  check(
+    'offline answer includes closure general answer since outside lesson',
+    /closure is a function that remembers/i.test(pinnedAnswer),
+  );
+  check('grounding bundle ≤ 8k chars', pinned.contextBlock.length <= 8000, `${pinned.contextBlock.length} chars`);
+
+  // 2. On-topic free-text question matches the right academy lesson.
+  const forLoop = await buildGroundingBundle({ userId: 'offline-test-user', message: 'how does a for loop work?' });
+  check(
+    'for-loop question matches a JavaScript loops lesson',
+    forLoop.source === 'search' &&
+      (forLoop.reference.lessonTitle === 'JavaScript For Loop' || forLoop.reference.lessonTitle === 'JavaScript Loops'),
+    `title=${forLoop.reference.lessonTitle ?? 'none'}`,
+  );
+
+  const joins = await buildGroundingBundle({ userId: 'offline-test-user', message: 'how do INNER JOIN and LEFT JOIN differ?' });
+  check(
+    'SQL join question matches SQL INNER JOIN lesson',
+    joins.source === 'search' && joins.reference.lessonTitle === 'SQL INNER JOIN',
+    `title=${joins.reference.lessonTitle ?? 'none'}`,
+  );
+
+  // 3. No false grounding: canned API-key copy ONLY when nothing matched.
+  const outside = await buildGroundingBundle({ userId: 'offline-test-user', message: 'Who wrote Hamlet?' });
+  const outsideAnswer = await generateAiResponse('No context matched.', 'Who wrote Hamlet?', [], () =>
+    buildGroundedFallback('Who wrote Hamlet?', outside),
+  );  check(
+    'unrelated question admits no context (no lesson pinned)',
+    !outside.hasContext && outside.source === 'none',
+  );
+  check(
+    'canned API-key fallback only when nothing matched',
+    outsideAnswer.includes('add GEMINI_API_KEY') && outsideAnswer.length > 50,
+  );
+
+  // 4. Starter code prefill comes from the lesson example, not the generic Java loop.
+  check(
+    'starter code taken from the lesson example',
+    Boolean(pinned.starterCode) && !pinned.starterCode!.includes('public class Main'),
+    (pinned.starterCode ?? 'none').split('\n')[0],
+  );
+
+  if (failures > 0) {
+    process.exitCode = 1;
+  } else {
+    console.log('\nAll AI Workspace grounding checks passed.');
+  }
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exitCode = 1;
+});

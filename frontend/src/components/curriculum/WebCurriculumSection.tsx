@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/utils';
 import {
   BookOpen,
@@ -18,6 +19,7 @@ import {
   RefreshCw,
   ArrowLeft,
   ArrowRight,
+  MessageCircleQuestion,
 } from 'lucide-react';
 
 interface Technology {
@@ -110,6 +112,7 @@ interface SearchResult {
 }
 
 export function WebCurriculumSection() {
+  const router = useRouter();
   const [technologies, setTechnologies] = useState<Technology[]>([]);
   const [activeTechId, setActiveTechId] = useState('java');
   const [activeTechDetail, setActiveTechDetail] = useState<TechnologyDetail | null>(null);
@@ -430,8 +433,18 @@ export function WebCurriculumSection() {
                     </span>
                   </div>
 
-                  <button
-                    onClick={handleToggleComplete}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() =>
+                        router.push(`/ai-assistant?lesson=${encodeURIComponent(activeLesson.id)}`)
+                      }
+                      className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition hover:bg-primary/20"
+                    >
+                      <MessageCircleQuestion className="h-4 w-4" />
+                      Ask AI about this lesson
+                    </button>
+                    <button
+                      onClick={handleToggleComplete}
                     className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                       activeLesson.completed
                         ? 'bg-emerald-600 text-white'
@@ -440,7 +453,8 @@ export function WebCurriculumSection() {
                   >
                     <CheckCircle2 className="h-4 w-4" />
                     {activeLesson.completed ? 'Completed ✓' : 'Mark Complete'}
-                  </button>
+                    </button>
+                  </div>
                 </div>
 
                 <h1 className="text-2xl font-bold text-white">{activeLesson.title}</h1>

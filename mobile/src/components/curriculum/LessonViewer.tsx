@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import { CodeBlock } from './CodeBlock';
@@ -26,6 +27,7 @@ export function LessonViewer({
 }: LessonViewerProps) {
   const { colors, theme } = useTheme();
   const isLight = theme === 'light';
+  const router = useRouter();
 
   const [lesson, setLesson] = useState<LessonDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -185,6 +187,28 @@ export function LessonViewer({
         <Text style={[styles.overviewText, { color: colors.muted }]}>
           {lesson.overview}
         </Text>
+
+        {/* Ask AI about this lesson → opens AI Workspace grounded on this lesson */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Ask AI about this lesson"
+          onPress={() =>
+            router.push({
+              pathname: '/(tabs)/ai-assistant',
+              params: { lesson: lesson.id },
+            })
+          }
+          style={({ pressed }) => [
+            styles.askAiBtn,
+            { borderColor: colors.primary },
+            pressed && { opacity: 0.8 },
+          ]}
+        >
+          <Ionicons name="chatbubbles-outline" size={15} color={colors.primary} />
+          <Text style={[styles.askAiBtnText, { color: colors.primary }]}>
+            Ask AI about this lesson
+          </Text>
+        </Pressable>
       </View>
 
       {/* 3. Learning Objectives */}
@@ -575,6 +599,19 @@ const styles = StyleSheet.create({
   overviewText: {
     fontSize: 14,
     lineHeight: 21,
+  },
+  askAiBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    minHeight: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  askAiBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
   },
   sectionHeadingRow: {
     flexDirection: 'row',

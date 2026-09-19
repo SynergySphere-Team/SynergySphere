@@ -5,7 +5,11 @@ import { paramId } from '../lib/params.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { awardXp } from '../services/gamification.js';
-import { generateAiResponse } from '../services/ai.js';
+import { generateAiResponse, type ChatTurn } from '../services/ai.js';
+import {
+  buildGroundingBundle,
+  buildGroundedFallback,
+} from '../services/aiContext.js';
 import { extractTextFromUpload } from '../services/fileText.js';
 import {
   buildLectureMaterialsFromContent,
@@ -16,24 +20,85 @@ import {
 const router = Router();
 router.use(authenticate);
 
+const chatTurnSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string().min(1).max(4000),
+});
+
 const chatSchema = z.object({
   message: z.string().min(1).max(4000),
   context: z.string().max(12000).optional(),
+  lessonId: z.string().min(1).max(255).optional(),
+  uploadId: z.string().min(1).max(255).optional(),
+  history: z.array(chatTurnSchema).max(20).optional(),
 });
 
 router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => {
+  const { message, context, lessonId, uploadId } = req.body;
+  const history: ChatTurn[] = Array.isArray(req.body.history) ? req.body.history.slice(-20) : [];
+
+  const bundle = await buildGroundingBundle({
+    userId: req.user!.userId,
+    message,
+    lessonId,
+    uploadId,
+  });
+
+  const ref = bundle.reference;
+  const groundedLabel = ref.lessonTitle
+    ? `${ref.subjectName ?? ''} › ${ref.moduleName ?? ''} › ${ref.lessonTitle}`
+    : ref.uploadFileName
+      ? `study pack "${ref.uploadFileName}"`
+      : null;
+
   const systemPrompt = [
-    'You are SynergySphere AI Coding Assistant.',
-    'Help students debug code, explain concepts, suggest improvements, generate snippets, and explain errors.',
-    'Be concise, educational, and encouraging.',
+    'You are the SynergySphere AI Workspace assistant for LectureToLife Programming Academy.',
+    'You help students debug code, explain concepts, suggest improvements, generate snippets, and explain errors.',
+    'Be concise, educational, encouraging, and match the lesson\'s difficulty level.',
+    '',
+    bundle.hasContext
+      ? [
+          'GROUNDED CONTEXT (from LectureToLife Programming Academy / the student\'s study pack):',
+          bundle.contextBlock,
+          '',
+          'STRICT RULES:',
+          '1. Ground every substantive claim in the GROUNDED CONTEXT above. Do not switch to a different curriculum.',
+          `2. When the matched lesson is relevant, name it using its full path: "${groundedLabel ?? 'the matched lesson'}".`,
+          '3. Reuse that lesson\'s key concepts, syntax, examples, quiz, and exercise instead of inventing your own material.',
+          '4. If the student\'s question is outside the provided context, say so explicitly first (e.g. "That is outside this lesson…"), then still answer helpfully and generally.',
+          '5. Refer to the student\'s completed lessons and study packs when they are relevant to the question.',
+        ].join('\n')
+      : [
+          'No LessonToLife context matched this question.',
+          'Answer helpfully and generally, and suggest the student open a lesson in the Programming Academy or ask from inside a lesson so you can ground the answer.',
+        ].join('\n'),
   ].join('\n');
 
-  const prompt = req.body.context
-    ? 'Context:\n' + req.body.context + '\n\nQuestion: ' + req.body.message
-    : req.body.message;
-  const response = await generateAiResponse(systemPrompt, prompt);
+  const prompt = context
+    ? 'Code Context:\n' + context + '\n\nQuestion: ' + message
+    : message;
 
-  res.json({ response });
+  const historySummary = history.length
+    ? history.slice(-3).map((t) => `${t.role === 'user' ? 'Q' : 'A'}: ${t.content.slice(0, 80)}`).join(' | ')
+    : undefined;
+
+  const response = await generateAiResponse(
+    systemPrompt,
+    prompt,
+    history,
+    () => buildGroundedFallback(message, bundle, historySummary),
+  );
+
+  res.json({
+    response,
+    grounding: {
+      source: bundle.source,
+      lessonId: ref.lessonId ?? null,
+      lessonTitle: ref.lessonTitle ?? null,
+      subjectName: ref.subjectName ?? null,
+      moduleName: ref.moduleName ?? null,
+    },
+  });
 });
 
 const interviewSchema = z.object({

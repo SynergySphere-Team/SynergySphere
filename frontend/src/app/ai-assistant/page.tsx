@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { api } from '@/lib/utils';
 import {
   Bot,
   Bug,
+  BookOpen,
   CheckCircle2,
   Code2,
   FileCode2,
@@ -28,12 +30,31 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  lessonTitle?: string;
+  subjectName?: string;
+  moduleName?: string;
 }
 
-/* ─────────────────────────── starter code ─────────────────────────── */
+interface ChatResponse {
+  response: string;
+  grounding?: {
+    source: 'lesson' | 'upload' | 'search' | 'none';
+    lessonId: string | null;
+    lessonTitle: string | null;
+    subjectName: string | null;
+    moduleName: string | null;
+  };
+}
 
-const starterCode =
-  'public class Main {\n  public static void main(String[] args) {\n    int n = 5;\n    for (int i = 0; i < n; i++) {\n      for (int j = 0; j <= i; j++) {\n        System.out.print(j + " ");\n      }\n      System.out.println();\n    }\n  }\n}';
+interface LessonPreview {
+  id: string;
+  title: string;
+  subjectName?: string;
+  moduleName?: string;
+  difficulty?: string;
+  firstExampleCode?: string;
+  firstExampleLanguage?: string;
+}
 
 /* ─────────────────────────── quick action definitions ─────────────────────────── */
 
@@ -98,20 +119,72 @@ function analyzeCodeLocally(code: string): { title: string; items: string[] }[] 
 /* ─────────────────────────── component ─────────────────────────── */
 
 export default function AIAssistantPage() {
+  return (
+    <Suspense fallback={<DashboardLayout><div className="p-8 text-sm text-muted-foreground">Loading AI Workspace…</div></DashboardLayout>}>
+      <AIAssistantInner />
+    </Suspense>
+  );
+}
+
+function AIAssistantInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const lessonParam = searchParams.get('lesson') || '';
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
       content:
-        "👋 Hi! I'm your SynergySphere AI Coding Assistant. I can help you:\n\n• **Explain** code step-by-step\n• **Debug** errors and bugs\n• **Optimize** for better performance\n• **Generate tests** and documentation\n\nPaste your code in the editor, use the quick action buttons, or just ask me anything!",
+        "👋 Hi! I'm your SynergySphere AI Workspace assistant, grounded in the LectureToLife Programming Academy and your own study packs. Ask about the lesson you're studying, paste code, or use the quick actions!",
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
-  const [codeContext, setCodeContext] = useState(starterCode);
+  const [codeContext, setCodeContext] = useState('');
   const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState(() => analyzeCodeLocally(starterCode));
+  const [analysis, setAnalysis] = useState(() => analyzeCodeLocally(''));
   const [recentPrompts, setRecentPrompts] = useState<string[]>([]);
+  const [lesson, setLesson] = useState<LessonPreview | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Fetch lesson details when ?lesson=<id> is present (used for chip + editor prefill).
+  useEffect(() => {
+    if (!lessonParam) {
+      setLesson(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const detail = await api<{
+          id: string;
+          title: string;
+          difficulty: string;
+          subjectName: string;
+          moduleName: string;
+          content: { examples?: Array<{ code: string; language?: string }> };
+        }>(`/curriculum/lessons/${lessonParam}`);
+        if (cancelled) return;
+        setLesson({
+          id: detail.id,
+          title: detail.title,
+          subjectName: detail.subjectName,
+          moduleName: detail.moduleName,
+          difficulty: detail.difficulty,
+          firstExampleCode: detail.content?.examples?.[0]?.code,
+          firstExampleLanguage: detail.content?.examples?.[0]?.language,
+        });
+        // Prefill the editor with the lesson's first example, not a generic starter.
+        const exampleCode = detail.content?.examples?.[0]?.code;
+        if (exampleCode) setCodeContext((prev) => prev || exampleCode);
+      } catch {
+        if (!cancelled) setLesson(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lessonParam]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -122,27 +195,48 @@ export default function AIAssistantPage() {
     setAnalysis(analyzeCodeLocally(codeContext));
   }, [codeContext]);
 
-  async function sendMessage(text: string) {
+  const historyFromMessages = useCallback(
+    (msgs: Message[]): Array<{ role: 'user' | 'assistant'; content: string }> =>
+      msgs
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .slice(-20)
+        .map((m) => ({ role: m.role, content: m.content })),
+    [],
+  );
+
+  async function sendMessage(text: string, currentMessages?: Message[]) {
     if (!text.trim() || loading) return;
     const userMsg: Message = { role: 'user', content: text.trim(), timestamp: new Date() };
+    const baseMessages = currentMessages ?? messages;
     setInput('');
-    setMessages((prev) => [...prev, userMsg]);
+    const nextMessages = [...baseMessages, userMsg];
+    setMessages(nextMessages);
     setLoading(true);
 
     // Track recent prompts
     setRecentPrompts((prev) => [text.trim().slice(0, 60), ...prev.filter((p) => p !== text.trim().slice(0, 60))].slice(0, 6));
 
     try {
-      const res = await api<{ response: string }>('/ai/chat', {
+      const res = await api<ChatResponse>('/ai/chat', {
         method: 'POST',
         body: JSON.stringify({
           message: text.trim(),
           context: codeContext || undefined,
+          // Pin the grounded lesson on every request so follow-ups stay in-lesson.
+          ...(lesson ? { lessonId: lesson.id } : {}),
+          history: historyFromMessages(baseMessages).slice(-20),
         }),
       });
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: res.response, timestamp: new Date() },
+        {
+          role: 'assistant',
+          content: res.response,
+          timestamp: new Date(),
+          lessonTitle: res.grounding?.lessonTitle || undefined,
+          subjectName: res.grounding?.subjectName || undefined,
+          moduleName: res.grounding?.moduleName || undefined,
+        },
       ]);
     } catch {
       // Fallback: generate a helpful local response
@@ -172,13 +266,16 @@ export default function AIAssistantPage() {
   }
 
   function clearChat() {
-    setMessages([
+    const fresh: Message[] = [
       {
         role: 'assistant',
-        content: "Chat cleared! Paste your code and ask me anything.",
+        content: lesson
+          ? `Chat cleared! Ask me anything about "${lesson.title}" — I'll stay grounded in that lesson.`
+          : 'Chat cleared! Ask about any LectureToLife lesson or paste code and I can help.',
         timestamp: new Date(),
       },
-    ]);
+    ];
+    setMessages(fresh);
   }
 
   function formatTime(date: Date) {
@@ -193,9 +290,13 @@ export default function AIAssistantPage() {
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
             AI Workspace
           </p>
-          <h1 className="text-2xl font-bold text-white md:text-3xl">Coding Assistant</h1>
+          <h1 className="text-2xl font-bold text-white md:text-3xl">
+            {lesson ? 'Lesson Assistant' : 'Coding Assistant'}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Debug, explain, refactor, and understand code with AI.
+            {lesson
+              ? `Grounded in LectureToLife Programming Academy — ${lesson.subjectName ?? ''}${lesson.moduleName ? ` › ${lesson.moduleName}` : ''}`
+              : 'Grounded in LectureToLife Programming Academy and your study packs.'}
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={clearChat} className="gap-2">
@@ -203,6 +304,25 @@ export default function AIAssistantPage() {
           New Chat
         </Button>
       </div>
+
+      {/* Grounded lesson chip */}
+      {lesson && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-primary/25 bg-primary/[0.07] px-4 py-3">
+          <BookOpen className="h-4 w-4 text-primary" />
+          <span className="text-xs font-semibold text-primary">Grounded in</span>
+          <span className="text-xs text-white">
+            {lesson.subjectName ? `${lesson.subjectName} › ` : ''}
+            {lesson.moduleName ? `${lesson.moduleName} › ` : ''}
+            {lesson.title}
+          </span>
+          <button
+            onClick={() => router.push('/lecture-to-life')}
+            className="ml-auto text-[11px] text-muted-foreground underline-offset-2 hover:text-white hover:underline"
+          >
+            Open lesson
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[0.85fr_1.3fr_0.75fr]">
         {/* ── AI Chat ── */}
@@ -242,6 +362,11 @@ export default function AIAssistantPage() {
                     >
                       <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
                     </div>
+                    {msg.role === 'assistant' && msg.lessonTitle && (
+                      <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        Based on: {msg.lessonTitle}
+                      </span>
+                    )}
                     <span className="text-[10px] text-muted-foreground/50">{formatTime(msg.timestamp)}</span>
                   </div>
                   {msg.role === 'user' && (
@@ -271,7 +396,9 @@ export default function AIAssistantPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage(input)}
-                placeholder="Ask about code, concepts, errors…"
+                placeholder={
+                  lesson ? `Ask about ${lesson.title}…` : 'Ask about code, concepts, errors…'
+                }
                 disabled={loading}
               />
               <Button onClick={() => sendMessage(input)} disabled={loading || !input.trim()}>
@@ -289,7 +416,9 @@ export default function AIAssistantPage() {
               Code Context
             </CardTitle>
             <span className="rounded-lg border border-white/[0.08] bg-secondary/50 px-2 py-1 text-xs text-muted-foreground">
-              Java / JS / Python
+              {lesson?.firstExampleLanguage
+                ? `${lesson.firstExampleLanguage} example from the lesson`
+                : 'Java / JS / Python'}
             </span>
           </CardHeader>
           <CardContent>
@@ -320,7 +449,9 @@ export default function AIAssistantPage() {
               })}
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground/60">
-              Paste code above and click a button, or type a question in the chat.
+              {lesson?.firstExampleCode
+                ? 'Pre-filled with the first example from this lesson — edit it or paste your own code.'
+                : 'Paste code above and click a button, or type a question in the chat.'}
             </p>
           </CardContent>
         </Card>

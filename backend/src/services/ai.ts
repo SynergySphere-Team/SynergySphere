@@ -12,16 +12,26 @@ import {
   extractLectureContent,
 } from './lectureMaterials.js';
 
+export interface ChatTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 const AI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS) || 25000;
 
 /* ─────────────────────────── main export ─────────────────────────── */
 
-export async function generateAiResponse(systemPrompt: string, userMessage: string): Promise<string> {
+export async function generateAiResponse(
+  systemPrompt: string,
+  userMessage: string,
+  history: ChatTurn[] = [],
+  offlineFallback: () => string = () => fallbackResponse(systemPrompt, userMessage),
+): Promise<string> {
   // 1. Try Gemini first (free)
   const geminiKey = process.env.GEMINI_API_KEY;
   if (geminiKey) {
     try {
-      const result = await callGemini(geminiKey, systemPrompt, userMessage);
+      const result = await callGemini(geminiKey, systemPrompt, userMessage, history);
       if (result) return result;
     } catch (err) {
       console.error('Gemini API error:', err);
@@ -32,20 +42,30 @@ export async function generateAiResponse(systemPrompt: string, userMessage: stri
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
-      const result = await callOpenAI(openaiKey, systemPrompt, userMessage);
+      const result = await callOpenAI(openaiKey, systemPrompt, userMessage, history);
       if (result) return result;
     } catch (err) {
       console.error('OpenAI API error:', err);
     }
   }
 
-  // 3. Intelligent fallback
-  return fallbackResponse(systemPrompt, userMessage);
+  // 3. Intelligent fallback — grounded callers inject their own synthesizer
+  return offlineFallback();
 }
 
 /* ─────────────────────────── Gemini ─────────────────────────── */
 
-async function callGemini(apiKey: string, systemPrompt: string, userMessage: string): Promise<string> {
+function turnToText(turn: ChatTurn): string {
+  const prefix = turn.role === 'user' ? 'Student' : 'Assistant';
+  return `${prefix}: ${turn.content}`;
+}
+
+async function callGemini(
+  apiKey: string,
+  systemPrompt: string,
+  userMessage: string,
+  history: ChatTurn[] = [],
+): Promise<string> {
   const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -62,6 +82,10 @@ async function callGemini(apiKey: string, systemPrompt: string, userMessage: str
           parts: [{ text: systemPrompt }],
         },
         contents: [
+          ...history.map((turn) => ({
+            role: turn.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: turn.content }],
+          })),
           {
             role: 'user',
             parts: [{ text: userMessage }],
@@ -91,7 +115,12 @@ async function callGemini(apiKey: string, systemPrompt: string, userMessage: str
 
 /* ─────────────────────────── OpenAI ─────────────────────────── */
 
-async function callOpenAI(apiKey: string, systemPrompt: string, userMessage: string): Promise<string> {
+async function callOpenAI(
+  apiKey: string,
+  systemPrompt: string,
+  userMessage: string,
+  history: ChatTurn[] = [],
+): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
 
@@ -107,6 +136,10 @@ async function callOpenAI(apiKey: string, systemPrompt: string, userMessage: str
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
+          ...history.map((turn) => ({
+            role: turn.role,
+            content: turn.content,
+          })),
           { role: 'user', content: userMessage },
         ],
         temperature: 0.4,
