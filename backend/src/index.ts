@@ -114,7 +114,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`SynergySphere API running on http://localhost:${PORT}`);
   pool.query('SELECT 1')
     .then(() => console.log('Database connection OK'))
@@ -125,4 +125,15 @@ app.listen(PORT, () => {
         console.error('Then initialize data with: npm run db:migrate && npm run db:seed');
       }
     });
+});
+
+server.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(
+      `Port ${PORT} is already in use. Stop the existing service on that port, or set PORT to another value in backend/.env.`,
+    );
+    return;
+  }
+
+  console.error('Unable to start the SynergySphere API:', error.message);
 });
