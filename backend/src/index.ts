@@ -19,7 +19,7 @@ import curriculumRoutes from './routes/curriculum.js';
 import { pool } from './lib/db.js';
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 4001;
 
 const DEFAULT_DEV_ORIGINS = [
   'http://localhost:3000',

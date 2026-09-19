@@ -519,7 +519,7 @@ function generateLocalResponse(message: string, code: string): string {
 
   if (lower.includes('explain')) {
     const lines = code.split('\n').length;
-    return `Here's an explanation of your code:\n\n• The code is ${lines} lines long.\n• It appears to be ${detectLanguage(code)} code.\n• ${describeCode(code)}\n\n⚠️ For detailed AI explanations, connect the backend (port 4000) and add an OPENAI_API_KEY or GEMINI_API_KEY to backend/.env.`;
+    return `Here's an explanation of your code:\n\n• The code is ${lines} lines long.\n• It appears to be ${detectLanguage(code)} code.\n• ${describeCode(code)}\n\n⚠️ For detailed AI explanations, connect the backend (port 4001) and add an OPENAI_API_KEY or GEMINI_API_KEY to backend/.env.`;
   }
   if (lower.includes('debug') || lower.includes('error') || lower.includes('bug')) {
     return `To help debug your code:\n\n1. Check for syntax errors – look at brackets, parentheses, and semicolons.\n2. Add console.log() statements to trace variable values.\n3. Check that all variables are declared before use.\n4. Look for off-by-one errors in loops.\n\n⚠️ For AI-powered debugging, connect the backend and add an API key to backend/.env.`;

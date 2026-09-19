@@ -51,7 +51,7 @@ Edit backend/.env and set a strong unique JWT_SECRET:
 ~~~env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/synergysphere"
 JWT_SECRET="replace-with-a-long-random-secret"
-PORT=4000
+PORT=4001
 FRONTEND_URL="http://localhost:3000"
 ~~~
 
@@ -71,7 +71,7 @@ npm run dev
 ~~~
 
 - Frontend: http://localhost:3000
-- Backend API: http://localhost:4000
+- Backend API: http://localhost:4001
 - Frontend proxy: http://localhost:3000/api forwards to the backend in development
 
 ## Demo Accounts

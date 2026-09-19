@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = (process.env.BACKEND_URL || 'http://localhost:4000').replace(/\/$/, '');
+const BACKEND_URL = (process.env.BACKEND_URL || 'http://localhost:4001').replace(/\/$/, '');
 
 async function proxyRequest(request: NextRequest, pathSegments: string[]) {
   const path = pathSegments.join('/');
@@ -30,7 +30,7 @@ async function proxyRequest(request: NextRequest, pathSegments: string[]) {
     // Letting this throw produces an HTML 500 page, which becomes the opaque
     // "Request failed" message in every client screen.
     return NextResponse.json(
-      { error: 'The SynergySphere API is unavailable. Start the backend on port 4000 and try again.' },
+      { error: 'The SynergySphere API is unavailable. Start the backend on port 4001 and try again.' },
       { status: 503 },
     );
   }

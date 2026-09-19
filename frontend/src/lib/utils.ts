@@ -65,7 +65,7 @@ export async function api<T>(
   } catch {
     const apiTarget = API_URL.startsWith('/') ? 'the local /api dev proxy' : API_URL;
     throw new Error(
-      `Cannot reach the API server through ${apiTarget}. Start the app with npm run dev and make sure the backend is running on port 4000.`
+      `Cannot reach the API server through ${apiTarget}. Start the app with npm run dev and make sure the backend is running on port 4001.`
     );
   }
 
