@@ -48,8 +48,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Home Practical Example",
-                "code": "// JavaScript Home in JavaScript\nconsole.log(\"Demonstrating JavaScript Home\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Home.\n\nExpected Output:\nDemonstrating JavaScript Home"
+                "code": "document.getElementById(\"demo\").innerHTML = \"Hello JavaScript\";",
+                "explanation": "The W3Schools JavaScript home chapter shows how JavaScript can change the content of an HTML element.\n\nExpected effect: the element with id=\"demo\" shows \"Hello JavaScript\"."
               }
             ],
             "rules": [
@@ -130,8 +130,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Introduction Practical Example",
-                "code": "// JavaScript Introduction in JavaScript\nconsole.log(\"Demonstrating JavaScript Introduction\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Introduction.\n\nExpected Output:\nDemonstrating JavaScript Introduction"
+                "code": "document.getElementById(\"demo\").innerHTML = \"Hello JavaScript\";",
+                "explanation": "The W3Schools JavaScript introduction chapter leads with this DOM text update.\n\nExpected effect: the element with id=\"demo\" shows \"Hello JavaScript\"."
               }
             ],
             "rules": [
@@ -212,8 +212,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Where To Practical Example",
-                "code": "// JavaScript Where To in JavaScript\nconsole.log(\"Demonstrating JavaScript Where To\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Where To.\n\nExpected Output:\nDemonstrating JavaScript Where To"
+                "code": "<script>\ndocument.getElementById(\"demo\").innerHTML = \"Hello JavaScript\";\n</script>",
+                "explanation": "The W3Schools \"where to\" chapter shows a small inline script that updates the page.\n\nExpected effect: the element with id=\"demo\" shows \"Hello JavaScript\"."
               }
             ],
             "rules": [
@@ -294,8 +294,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Output Practical Example",
-                "code": "// JavaScript Output in JavaScript\nconsole.log(\"Demonstrating JavaScript Output\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Output.\n\nExpected Output:\nDemonstrating JavaScript Output"
+                "code": "document.getElementById(\"demo\").innerHTML = \"Hello Dolly.\";",
+                "explanation": "The W3Schools output chapter shows writing into an HTML element with innerHTML.\n\nExpected effect: the element with id=\"demo\" shows \"Hello Dolly.\"."
               }
             ],
             "rules": [
@@ -376,8 +376,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Statements Practical Example",
-                "code": "// JavaScript Statements in JavaScript\nconsole.log(\"Demonstrating JavaScript Statements\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Statements.\n\nExpected Output:\nDemonstrating JavaScript Statements"
+                "code": "let x, y, z;\nx = 5;\ny = 6;\nz = x + y;",
+                "explanation": "The W3Schools statements chapter leads with several assignment statements that build up a result.\n\nExpected state: z is 11."
               }
             ],
             "rules": [
@@ -458,8 +458,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Syntax Practical Example",
-                "code": "// JavaScript Syntax in JavaScript\nconsole.log(\"Demonstrating JavaScript Syntax\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Syntax.\n\nExpected Output:\nDemonstrating JavaScript Syntax"
+                "code": "document.getElementById(\"demo\").innerHTML = \"Hello Dolly!\";\n\nlet person = \"Hege\";\nlet person=\"Hege\";",
+                "explanation": "The W3Schools syntax chapter shows spacing around operators and how JavaScript ignores redundant spaces.\n\nExpected effect: the code is equivalent; the last line re-declares a local variable."
               }
             ],
             "rules": [
@@ -540,8 +540,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Comments Practical Example",
-                "code": "// JavaScript Comments in JavaScript\nconsole.log(\"Demonstrating JavaScript Comments\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Comments.\n\nExpected Output:\nDemonstrating JavaScript Comments"
+                "code": "// Change heading\ndocument.getElementById(\"myH\").innerHTML = \"My First Page\";\n// Change paragraph\ndocument.getElementById(\"myP\").innerHTML = \"My first paragraph.\",",
+                "explanation": "The W3Schools comments chapter shows how // comments are ignored and how statements can be commented out.\n\nExpected effect: the heading and paragraph update, while the commented statement does not run."
               }
             ],
             "rules": [
@@ -622,8 +622,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Variables Practical Example",
-                "code": "// JavaScript Variables in JavaScript\nconsole.log(\"Demonstrating JavaScript Variables\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Variables.\n\nExpected Output:\nDemonstrating JavaScript Variables"
+                "code": "let x = 5;\nlet y = 6;\nlet z = x + y;",
+                "explanation": "The W3Schools variables chapter uses let to declare and combine numbers.\n\nExpected result: z is 11."
               }
             ],
             "rules": [
@@ -704,8 +704,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript let Practical Example",
-                "code": "// JavaScript let in JavaScript\nconsole.log(\"Demonstrating JavaScript let\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript let.\n\nExpected Output:\nDemonstrating JavaScript let"
+                "code": "let x = 5;\nlet y = 6;\nlet z = x + y;",
+                "explanation": "The W3Schools let chapter shows a modern let declaration with three variables.\n\nExpected result: z is 11."
               }
             ],
             "rules": [
@@ -786,8 +786,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript const Practical Example",
-                "code": "// JavaScript const in JavaScript\nconsole.log(\"Demonstrating JavaScript const\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript const.\n\nExpected Output:\nDemonstrating JavaScript const"
+                "code": "const x = 5;\nconst y = 6;\nconst z = x + y;",
+                "explanation": "The W3Schools const chapter shows a constant declaration with three values.\n\nExpected result: z is 11."
               }
             ],
             "rules": [
@@ -868,8 +868,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Types Practical Example",
-                "code": "// JavaScript Types in JavaScript\nconsole.log(\"Demonstrating JavaScript Types\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Types.\n\nExpected Output:\nDemonstrating JavaScript Types"
+                "code": "typeof \"Hello\"\ntypeof 0\ntypeof true",
+                "explanation": "The W3Schools types chapter often checks the type of a string, a number, and a boolean.\n\nExpected result: string, number, boolean."
               }
             ],
             "rules": [
@@ -1041,8 +1041,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Arithmetic Practical Example",
-                "code": "// JavaScript Arithmetic in JavaScript\nconsole.log(\"Demonstrating JavaScript Arithmetic\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Arithmetic.\n\nExpected Output:\nDemonstrating JavaScript Arithmetic"
+                "code": "var x = 5;\nvar y = 2;\nvar z = x + y;",
+                "explanation": "The W3Schools arithmetic chapter opens with a simple add using var.\n\nExpected result: z is 7."
               }
             ],
             "rules": [
@@ -1123,8 +1123,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Assignment Practical Example",
-                "code": "// JavaScript Assignment in JavaScript\nconsole.log(\"Demonstrating JavaScript Assignment\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Assignment.\n\nExpected Output:\nDemonstrating JavaScript Assignment"
+                "code": "var x = 10;\nx += 5;\nx -= 3;\nx *= 2;",
+                "explanation": "The W3Schools assignment chapter shows +=, -=, and *= combined on one variable.\n\nExpected result: x becomes 24."
               }
             ],
             "rules": [
@@ -1205,8 +1205,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Comparisons Practical Example",
-                "code": "// JavaScript Comparisons in JavaScript\nconsole.log(\"Demonstrating JavaScript Comparisons\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Comparisons.\n\nExpected Output:\nDemonstrating JavaScript Comparisons"
+                "code": "var x = 5;\nvar y = 3;\nx == y;\nx === y;\nx != y;\nx !== y;",
+                "explanation": "The W3Schools comparisons chapter contrasts ==, ===, !=, and !== on the same values.\n\nExpected results: false, false, true, true."
               }
             ],
             "rules": [
@@ -1287,8 +1287,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Conditional Practical Example",
-                "code": "// JavaScript Conditional in JavaScript\nconsole.log(\"Demonstrating JavaScript Conditional\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Conditional.\n\nExpected Output:\nDemonstrating JavaScript Conditional"
+                "code": "if (new Date().getHours() < 18) {\n    document.write(\"Good day!\");\n}",
+                "explanation": "The W3Schools conditional chapter shows a time-based greeting written into the page.\n\nExpected effect: writes \"Good day!\" when the hour is before 18."
               }
             ],
             "rules": [
@@ -1369,8 +1369,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript If Practical Example",
-                "code": "// JavaScript If in JavaScript\nconsole.log(\"Demonstrating JavaScript If\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript If.\n\nExpected Output:\nDemonstrating JavaScript If"
+                "code": "if (hour < 18) {\n    greeting = \"Good day\";\n}",
+                "explanation": "The W3Schools if chapter shows assigning a greeting based on the hour.\n\nExpected result: greeting is \"Good day\" when hour is less than 18."
               }
             ],
             "rules": [
@@ -1451,8 +1451,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript If Else Practical Example",
-                "code": "// JavaScript If Else in JavaScript\nconsole.log(\"Demonstrating JavaScript If Else\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript If Else.\n\nExpected Output:\nDemonstrating JavaScript If Else"
+                "code": "if (hour < 18) {\n    greeting = \"Good day\";\n} else {\n    greeting = \"Good evening\";\n}",
+                "explanation": "The W3Schools if-else chapter shows a fallback greeting for later hours.\n\nExpected result: greeting is \"Good day\" or \"Good evening\" depending on the hour."
               }
             ],
             "rules": [
@@ -1533,8 +1533,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Ternary Practical Example",
-                "code": "// JavaScript Ternary in JavaScript\nconsole.log(\"Demonstrating JavaScript Ternary\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Ternary.\n\nExpected Output:\nDemonstrating JavaScript Ternary"
+                "code": "var voteable = (age < 18) ? \"Too young\" : \"Old enough\";",
+                "explanation": "The W3Schools ternary chapter uses a compact conditional to choose a message.\n\nExpected result: voteable is \"Too young\" when age is under 18, otherwise \"Old enough\"."
               }
             ],
             "rules": [
@@ -1615,8 +1615,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Switch Practical Example",
-                "code": "// JavaScript Switch in JavaScript\nconsole.log(\"Demonstrating JavaScript Switch\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Switch.\n\nExpected Output:\nDemonstrating JavaScript Switch"
+                "code": "switch (new Date().getDay()) {\n  case 6:\n    text = \"Today is Saturday\";\n    break;\n  case 0:\n    text = \"Today is Sunday\";\n    break;\n  default:\n    text = \"Looking forward to the weekend\";\n}",
+                "explanation": "The W3Schools switch chapter uses the current day-of-week to choose a message.\n\nExpected result: text reflects today or the weekend message."
               }
             ],
             "rules": [
@@ -1697,8 +1697,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Booleans Practical Example",
-                "code": "// JavaScript Booleans in JavaScript\nconsole.log(\"Demonstrating JavaScript Booleans\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Booleans.\n\nExpected Output:\nDemonstrating JavaScript Booleans"
+                "code": "var x = 5;\nvar y = 5;\nvar z = 6;\n(x == 5)\n(x == 5 && y == 5)\n(x == 5 && z == 5)",
+                "explanation": "The W3Schools booleans chapter compares values and combines them with &&.\n\nExpected results: true, true, false."
               }
             ],
             "rules": [
@@ -1779,8 +1779,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Logical Practical Example",
-                "code": "// JavaScript Logical in JavaScript\nconsole.log(\"Demonstrating JavaScript Logical\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Logical.\n\nExpected Output:\nDemonstrating JavaScript Logical"
+                "code": "var a1 =  true && true;\nvar a2 =  true && false;\nvar a3 =  false && true;\nvar a4 =  false && (3 == 4);\nvar o1 =  true || true;\nvar o2 =  false || true;",
+                "explanation": "The W3Schools logical operators chapter shows && and || on boolean expressions.\n\nExpected results: a1 is true, a2 is false, a3 is false, a4 is false, o1 is true, o2 is true."
               }
             ],
             "rules": [
@@ -1952,8 +1952,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript For Loop Practical Example",
-                "code": "// JavaScript For Loop in JavaScript\nconsole.log(\"Demonstrating JavaScript For Loop\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript For Loop.\n\nExpected Output:\nDemonstrating JavaScript For Loop"
+                "code": "for (let i = 0; i < 5; i++) {\n  text += \"The number is \" + i + \"<br>\";\n}",
+                "explanation": "The W3Schools for-loop chapter repeats a statement and appends the counter.\n\nExpected result: text contains the numbers 0 through 4."
               }
             ],
             "rules": [
@@ -2034,8 +2034,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript While Loop Practical Example",
-                "code": "// JavaScript While Loop in JavaScript\nconsole.log(\"Demonstrating JavaScript While Loop\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript While Loop.\n\nExpected Output:\nDemonstrating JavaScript While Loop"
+                "code": "while (i < 10) {\n  text += \"The number is \" + i;\n  i++;\n}",
+                "explanation": "The W3Schools while-loop chapter repeats while a counter is small.\n\nExpected result: text contains the numbers 0 through 9."
               }
             ],
             "rules": [
@@ -2116,8 +2116,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Break Practical Example",
-                "code": "// JavaScript Break in JavaScript\nconsole.log(\"Demonstrating JavaScript Break\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Break.\n\nExpected Output:\nDemonstrating JavaScript Break"
+                "code": "for (let i = 0; i < 10; i++) {\n  if (i === 3) { break; }\n  text += \"The number is \" + i + \"<br>\";\n}",
+                "explanation": "The W3Schools break chapter stops a loop early when i reaches 3.\n\nExpected result: text contains the numbers 0, 1, and 2."
               }
             ],
             "rules": [
@@ -2198,8 +2198,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Continue Practical Example",
-                "code": "// JavaScript Continue in JavaScript\nconsole.log(\"Demonstrating JavaScript Continue\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Continue.\n\nExpected Output:\nDemonstrating JavaScript Continue"
+                "code": "for (let i = 0; i < 10; i++) {\n  if (i === 3) { continue; }\n  text += \"The number is \" + i + \"<br>\";\n}",
+                "explanation": "The W3Schools continue chapter skips the body when i is 3.\n\nExpected result: text contains 0, 1, 2, 4, 5, 6, 7, 8, and 9."
               }
             ],
             "rules": [
@@ -2280,8 +2280,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Control Flow Practical Example",
-                "code": "// JavaScript Control Flow in JavaScript\nconsole.log(\"Demonstrating JavaScript Control Flow\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Control Flow.\n\nExpected Output:\nDemonstrating JavaScript Control Flow"
+                "code": "for (let i = 0; i < 5; i++) {\n  if (i === 3) { break; }\n  text += \"The number is \" + i + \"<br>\";\n}",
+                "explanation": "The W3Schools control-flow chapter often revisits the same loop with a break to show the difference.\n\nExpected result: text contains the numbers 0, 1, and 2."
               }
             ],
             "rules": [
@@ -2371,8 +2371,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Strings Practical Example",
-                "code": "// JavaScript Strings in JavaScript\nconsole.log(\"Demonstrating JavaScript Strings\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Strings.\n\nExpected Output:\nDemonstrating JavaScript Strings"
+                "code": "var answer = \"It's alright\";\nvar answer2 = \"He is called 'Johnny'\";\nvar answer3 = 'She is called \"Sammy\"';",
+                "explanation": "The W3Schools strings chapter shows how quotes can be mixed inside string literals.\n\nExpected result: three valid string values with nested quotes."
               }
             ],
             "rules": [
@@ -2453,8 +2453,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript String Templates Practical Example",
-                "code": "// JavaScript String Templates in JavaScript\nconsole.log(\"Demonstrating JavaScript String Templates\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript String Templates.\n\nExpected Output:\nDemonstrating JavaScript String Templates"
+                "code": "let price = 10;\nlet vat = 0.25;\nlet total = `The total is ${price * 1.25}`;\n// template\nlet text = `Hello ${firstName}, you are ${age} years old.`;",
+                "explanation": "The W3Schools template-literals chapter shows backtick strings with embedded expressions.\n\nExpected result: total is \"The total is 12.5\" and text interpolates the variables."
               }
             ],
             "rules": [
@@ -2535,8 +2535,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript String Methods Practical Example",
-                "code": "// JavaScript String Methods in JavaScript\nconsole.log(\"Demonstrating JavaScript String Methods\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript String Methods.\n\nExpected Output:\nDemonstrating JavaScript String Methods"
+                "code": "var str = \"Hello World\";\nstr.length;\nstr.toUpperCase();\nstr.toLowerCase();\nstr.substring(0, 5);",
+                "explanation": "The W3Schools string-methods chapter inspects length and transforms the same string in several ways.\n\nExpected results: 11, \"HELLO WORLD\", \"hello world\", and \"Hello\"."
               }
             ],
             "rules": [
@@ -2617,8 +2617,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript String Search Practical Example",
-                "code": "// JavaScript String Search in JavaScript\nconsole.log(\"Demonstrating JavaScript String Search\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript String Search.\n\nExpected Output:\nDemonstrating JavaScript String Search"
+                "code": "var str = \"Please locate where 'locate' occurs!\";\nstr.indexOf(\"locate\");\nstr.lastIndexOf(\"locate\");\nstr.search(\"locate\");",
+                "explanation": "The W3Schools string-search chapter locates the word \"locate\" in different ways.\n\nExpected results: 17, 31, and 17."
               }
             ],
             "rules": [
@@ -2790,8 +2790,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Numbers Practical Example",
-                "code": "// JavaScript Numbers in JavaScript\nconsole.log(\"Demonstrating JavaScript Numbers\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Numbers.\n\nExpected Output:\nDemonstrating JavaScript Numbers"
+                "code": "var x = 10;\nvar y = 20;\nvar z = x + y;",
+                "explanation": "The W3Schools numbers chapter opens with a simple addition.\n\nExpected result: z is 30."
               }
             ],
             "rules": [
@@ -2872,8 +2872,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Number Methods Practical Example",
-                "code": "// JavaScript Number Methods in JavaScript\nconsole.log(\"Demonstrating JavaScript Number Methods\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Number Methods.\n\nExpected Output:\nDemonstrating JavaScript Number Methods"
+                "code": "var x = 123e5;\nvar y = 123e-5;\nx.toExponential();\ny.toPrecision(3);",
+                "explanation": "The W3Schools number-methods chapter uses exponential notation and precision conversion.\n\nExpected results: 1.23e+7 and 0.00123 (then string conversions)."
               }
             ],
             "rules": [
@@ -2954,8 +2954,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Number Properties Practical Example",
-                "code": "// JavaScript Number Properties in JavaScript\nconsole.log(\"Demonstrating JavaScript Number Properties\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Number Properties.\n\nExpected Output:\nDemonstrating JavaScript Number Properties"
+                "code": "Number.MAX_VALUE;\nNumber.MIN_VALUE;\nNumber.NEGATIVE_INFINITY;\nNumber.POSITIVE_INFINITY;\nNumber.NaN;",
+                "explanation": "The W3Schools number-properties chapter lists the built-in Number constants.\n\nExpected result: the four special values plus NaN."
               }
             ],
             "rules": [
@@ -3118,8 +3118,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript Bitwise Practical Example",
-                "code": "// JavaScript Bitwise in JavaScript\nconsole.log(\"Demonstrating JavaScript Bitwise\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript Bitwise.\n\nExpected Output:\nDemonstrating JavaScript Bitwise"
+                "code": "var x = 5;\nvar y = 1;\nx & y;\nx | y;\nx ^ y;\nx << 1;\nx >> 1;",
+                "explanation": "The W3Schools bitwise chapter applies & | ^ << >> to small integers.\n\nExpected results: 1, 5, 4, 10, 2."
               }
             ],
             "rules": [
@@ -3200,8 +3200,8 @@ export const javascriptSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "JavaScript BigInt Practical Example",
-                "code": "// JavaScript BigInt in JavaScript\nconsole.log(\"Demonstrating JavaScript BigInt\");",
-                "explanation": "Demonstrates basic declaration and execution of JavaScript BigInt.\n\nExpected Output:\nDemonstrating JavaScript BigInt"
+                "code": "let x = 9999999999999999;\nlet y = 9999999999999999n;\nconsole.log(x == y);\nconsole.log(x === y);",
+                "explanation": "The W3Schools bigint chapter shows where Number precision breaks and how BigInt avoids it.\n\nExpected results: true, false."
               }
             ],
             "rules": [

@@ -48,8 +48,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Home Practical Example",
-                "code": "# Python Home demonstration\nprint(\"Executing Python Home demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Home.\n\nExpected Output:\nExecuting Python Home demonstration in Python"
+                "code": "print(\"Hello, World!\")",
+                "explanation": "The first Python program shows how to display a short message.\n\nExpected output:\nHello, World!"
               }
             ],
             "rules": [
@@ -130,8 +130,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Introduction Practical Example",
-                "code": "# Python Introduction demonstration\nprint(\"Executing Python Introduction demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Introduction.\n\nExpected Output:\nExecuting Python Introduction demonstration in Python"
+                "code": "print(\"Hello, World!\")",
+                "explanation": "The W3Schools introduction example prints a message to the console.\n\nExpected output:\nHello, World!"
               }
             ],
             "rules": [
@@ -212,8 +212,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Get Started Practical Example",
-                "code": "# Python Get Started demonstration\nprint(\"Executing Python Get Started demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Get Started.\n\nExpected Output:\nExecuting Python Get Started demonstration in Python"
+                "code": "import sys\nprint(sys.version)",
+                "explanation": "The W3Schools get-started example checks which Python version the editor is running.\n\nExpected output looks like:\n3.12.2 (main, Feb 14 2024, ...)"
               }
             ],
             "rules": [
@@ -294,8 +294,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Syntax Practical Example",
-                "code": "# Python Syntax demonstration\nprint(\"Executing Python Syntax demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Syntax.\n\nExpected Output:\nExecuting Python Syntax demonstration in Python"
+                "code": "if True:\n    print(\"indented block\")",
+                "explanation": "Python uses indentation instead of braces to group statements.\n\nExpected output:\nindented block"
               }
             ],
             "rules": [
@@ -376,8 +376,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Statements Practical Example",
-                "code": "# Python Statements demonstration\nprint(\"Executing Python Statements demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Statements.\n\nExpected Output:\nExecuting Python Statements demonstration in Python"
+                "code": "x = 5\ny = 10\nz = x + y\nprint(z)",
+                "explanation": "A short program made of several statements that assigns values and prints a result.\n\nExpected output:\n15"
               }
             ],
             "rules": [
@@ -458,8 +458,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Output Practical Example",
-                "code": "# Python Output demonstration\nprint(\"Executing Python Output demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Output.\n\nExpected Output:\nExecuting Python Output demonstration in Python"
+                "code": "print(\"Hello, World!\")\nprint(123)\nprint(3.14)\nprint(True)",
+                "explanation": "The W3Schools output chapter shows how print() displays strings, integers, floats, and booleans.\n\nExpected output:\nHello, World!\n123\n3.14\nTrue"
               }
             ],
             "rules": [
@@ -540,8 +540,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Comments Practical Example",
-                "code": "# Python Comments demonstration\nprint(\"Executing Python Comments demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Comments.\n\nExpected Output:\nExecuting Python Comments demonstration in Python"
+                "code": "# this is a comment\nprint(\"Hello, World!\")\n# print(\"this will not run\")",
+                "explanation": "The W3Schools comments chapter shows how # comments are ignored by Python.\n\nExpected output:\nHello, World!"
               }
             ],
             "rules": [
@@ -622,8 +622,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Variables Practical Example",
-                "code": "# Python Variables demonstration\nprint(\"Executing Python Variables demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Variables.\n\nExpected Output:\nExecuting Python Variables demonstration in Python"
+                "code": "x = 5\ny = \"John\"\nprint(x)\nprint(y)",
+                "explanation": "The W3Schools variables chapter shows how variables store a number and a string.\n\nExpected output:\n5\nJohn"
               }
             ],
             "rules": [
@@ -704,8 +704,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Data Types Practical Example",
-                "code": "# Python Data Types demonstration\nprint(\"Executing Python Data Types demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Data Types.\n\nExpected Output:\nExecuting Python Data Types demonstration in Python"
+                "code": "x = 5\nprint(type(x))\ny = \"Hello\"\nprint(type(y))",
+                "explanation": "The W3Schools data-types chapter shows how type() reports the type of a value.\n\nExpected output:\n<class 'int'>\n<class 'str'>"
               }
             ],
             "rules": [
@@ -786,8 +786,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Numbers Practical Example",
-                "code": "# Python Numbers demonstration\nprint(\"Executing Python Numbers demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Numbers.\n\nExpected Output:\nExecuting Python Numbers demonstration in Python"
+                "code": "x = 5\ny = 3.14\nprint(x + y)",
+                "explanation": "Python treats numbers as int or float and can combine them in expressions.\n\nExpected output:\n8.14"
               }
             ],
             "rules": [
@@ -868,8 +868,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Casting Practical Example",
-                "code": "# Python Casting demonstration\nprint(\"Executing Python Casting demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Casting.\n\nExpected Output:\nExecuting Python Casting demonstration in Python"
+                "code": "x = str(3)\ny = int(3)\nz = float(3)\nprint(x, y, z)",
+                "explanation": "The W3Schools casting chapter shows how to convert values with str(), int(), and float().\n\nExpected output:\n3 3 3.0"
               }
             ],
             "rules": [
@@ -950,8 +950,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Strings Practical Example",
-                "code": "# Python Strings demonstration\nprint(\"Executing Python Strings demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Strings.\n\nExpected Output:\nExecuting Python Strings demonstration in Python"
+                "code": "x = \"John\"\n# is the same as\nx = 'John'\nprint(x)",
+                "explanation": "The W3Schools strings chapter shows that single and double quotes are interchangeable in Python.\n\nExpected output:\nJohn"
               }
             ],
             "rules": [
@@ -1032,8 +1032,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Booleans Practical Example",
-                "code": "# Python Booleans demonstration\nprint(\"Executing Python Booleans demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Booleans.\n\nExpected Output:\nExecuting Python Booleans demonstration in Python"
+                "code": "print(10 > 9)\nprint(10 == 9)\nprint(10 < 9)",
+                "explanation": "The W3Schools booleans chapter uses comparisons to show True and False results.\n\nExpected output:\nTrue\nFalse\nFalse"
               }
             ],
             "rules": [
@@ -1114,8 +1114,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Operators Practical Example",
-                "code": "# Python Operators demonstration\nprint(\"Executing Python Operators demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Operators.\n\nExpected Output:\nExecuting Python Operators demonstration in Python"
+                "code": "x = 5\ny = 3\nprint(x + y)\nprint(x - y)\nprint(x * y)",
+                "explanation": "The W3Schools operators chapter uses arithmetic operators to combine numbers.\n\nExpected output:\n8\n2\n15"
               }
             ],
             "rules": [
@@ -1205,8 +1205,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Lists Practical Example",
-                "code": "# Python Lists demonstration\nprint(\"Executing Python Lists demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Lists.\n\nExpected Output:\nExecuting Python Lists demonstration in Python"
+                "code": "thislist = [\"apple\", \"banana\", \"cherry\"]\nprint(thislist)",
+                "explanation": "The W3Schools lists chapter shows a simple list literal and prints it.\n\nExpected output:\n['apple', 'banana', 'cherry']"
               }
             ],
             "rules": [
@@ -1287,8 +1287,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Access List Items Practical Example",
-                "code": "# Access List Items demonstration\nprint(\"Executing Access List Items demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Access List Items.\n\nExpected Output:\nExecuting Access List Items demonstration in Python"
+                "code": "thislist = [\"apple\", \"banana\", \"cherry\"]\nprint(thislist[1])",
+                "explanation": "The W3Schools access-items chapter shows how index 1 returns the second item.\n\nExpected output:\nbanana"
               }
             ],
             "rules": [
@@ -1369,8 +1369,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Change List Items Practical Example",
-                "code": "# Change List Items demonstration\nprint(\"Executing Change List Items demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Change List Items.\n\nExpected Output:\nExecuting Change List Items demonstration in Python"
+                "code": "thislist = [\"apple\", \"banana\", \"cherry\"]\nthislist[1] = \"blackcurrant\"\nprint(thislist)",
+                "explanation": "The W3Schools change-items chapter shows how to replace an item by index.\n\nExpected output:\n['apple', 'blackcurrant', 'cherry']"
               }
             ],
             "rules": [
@@ -1451,8 +1451,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Add List Items Practical Example",
-                "code": "# Add List Items demonstration\nprint(\"Executing Add List Items demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Add List Items.\n\nExpected Output:\nExecuting Add List Items demonstration in Python"
+                "code": "thislist = [\"apple\", \"banana\", \"cherry\"]\nthislist.append(\"orange\")\nprint(thislist)",
+                "explanation": "The W3Schools add-items chapter shows append() adding an item to the end.\n\nExpected output:\n['apple', 'banana', 'cherry', 'orange']"
               }
             ],
             "rules": [
@@ -1533,8 +1533,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Remove List Items Practical Example",
-                "code": "# Remove List Items demonstration\nprint(\"Executing Remove List Items demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Remove List Items.\n\nExpected Output:\nExecuting Remove List Items demonstration in Python"
+                "code": "thislist = [\"apple\", \"banana\", \"cherry\"]\nthislist.remove(\"banana\")\nprint(thislist)",
+                "explanation": "The W3Schools remove-items chapter shows remove() deleting a matching value.\n\nExpected output:\n['apple', 'cherry']"
               }
             ],
             "rules": [
@@ -1615,8 +1615,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Loop Lists Practical Example",
-                "code": "# Loop Lists demonstration\nprint(\"Executing Loop Lists demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Loop Lists.\n\nExpected Output:\nExecuting Loop Lists demonstration in Python"
+                "code": "thislist = [\"apple\", \"banana\", \"cherry\"]\nfor x in thislist:\n    print(x)",
+                "explanation": "The W3Schools loop-lists chapter shows how a for loop visits each item.\n\nExpected output:\napple\nbanana\ncherry"
               }
             ],
             "rules": [
@@ -1697,8 +1697,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "List Comprehension Practical Example",
-                "code": "# List Comprehension demonstration\nprint(\"Executing List Comprehension demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of List Comprehension.\n\nExpected Output:\nExecuting List Comprehension demonstration in Python"
+                "code": "fruits = [\"apple\", \"banana\", \"cherry\", \"kiwi\", \"mango\"]\nnewlist = [x for x in fruits if \"a\" in x]\nprint(newlist)",
+                "explanation": "The W3Schools list-comprehension chapter filters items with a compact expression.\n\nExpected output:\n['apple', 'banana', 'mango']"
               }
             ],
             "rules": [
@@ -1779,8 +1779,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Sort Lists Practical Example",
-                "code": "# Sort Lists demonstration\nprint(\"Executing Sort Lists demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Sort Lists.\n\nExpected Output:\nExecuting Sort Lists demonstration in Python"
+                "code": "thislist = [\"orange\", \"mango\", \"kiwi\", \"pineapple\", \"banana\"]\nthislist.sort()\nprint(thislist)",
+                "explanation": "The W3Schools sort-lists chapter shows sort() arranging strings alphabetically.\n\nExpected output:\n['banana', 'kiwi', 'mango', 'orange', 'pineapple']"
               }
             ],
             "rules": [
@@ -1861,8 +1861,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Copy Lists Practical Example",
-                "code": "# Copy Lists demonstration\nprint(\"Executing Copy Lists demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Copy Lists.\n\nExpected Output:\nExecuting Copy Lists demonstration in Python"
+                "code": "thislist = [\"apple\", \"banana\", \"cherry\"]\nmylist = list(thislist)\nprint(mylist)",
+                "explanation": "The W3Schools copy-lists chapter shows copying with list().\n\nExpected output:\n['apple', 'banana', 'cherry']"
               }
             ],
             "rules": [
@@ -1943,8 +1943,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Join Lists Practical Example",
-                "code": "# Join Lists demonstration\nprint(\"Executing Join Lists demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Join Lists.\n\nExpected Output:\nExecuting Join Lists demonstration in Python"
+                "code": "list1 = [\"a\", \"b\", \"c\"]\nlist2 = [1, 2, 3]\nlist3 = list1 + list2\nprint(list3)",
+                "explanation": "The W3Schools join-lists chapter shows combining lists with +.\n\nExpected output:\n['a', 'b', 'c', 1, 2, 3]"
               }
             ],
             "rules": [
@@ -2025,8 +2025,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "List Methods Practical Example",
-                "code": "# List Methods demonstration\nprint(\"Executing List Methods demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of List Methods.\n\nExpected Output:\nExecuting List Methods demonstration in Python"
+                "code": "thislist = [\"apple\", \"banana\", \"cherry\"]\nthislist.append(\"orange\")\nprint(len(thislist))",
+                "explanation": "The W3Schools list-methods chapter shows append() and len() together.\n\nExpected output:\n4"
               }
             ],
             "rules": [
@@ -2116,8 +2116,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Tuples Practical Example",
-                "code": "# Python Tuples demonstration\nprint(\"Executing Python Tuples demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Tuples.\n\nExpected Output:\nExecuting Python Tuples demonstration in Python"
+                "code": "thistuple = (\"apple\", \"banana\", \"cherry\")\nprint(thistuple)",
+                "explanation": "The W3Schools tuples chapter shows a tuple literal printed directly.\n\nExpected output:\n('apple', 'banana', 'cherry')"
               }
             ],
             "rules": [
@@ -2198,8 +2198,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Access Tuples Practical Example",
-                "code": "# Access Tuples demonstration\nprint(\"Executing Access Tuples demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Access Tuples.\n\nExpected Output:\nExecuting Access Tuples demonstration in Python"
+                "code": "thistuple = (\"apple\", \"banana\", \"cherry\")\nprint(thistuple[1])",
+                "explanation": "The W3Schools access-tuples chapter shows how index 1 returns the second item.\n\nExpected output:\nbanana"
               }
             ],
             "rules": [
@@ -2280,8 +2280,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Update Tuples Practical Example",
-                "code": "# Update Tuples demonstration\nprint(\"Executing Update Tuples demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Update Tuples.\n\nExpected Output:\nExecuting Update Tuples demonstration in Python"
+                "code": "x = (\"apple\", \"banana\", \"cherry\")\ny = list(x)\ny[1] = \"kiwi\"\nx = tuple(y)\nprint(x)",
+                "explanation": "The W3Schools update-tuples chapter shows converting to a list, changing it, and converting back.\n\nExpected output:\n('apple', 'kiwi', 'cherry')"
               }
             ],
             "rules": [
@@ -2362,8 +2362,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Unpack Tuples Practical Example",
-                "code": "# Unpack Tuples demonstration\nprint(\"Executing Unpack Tuples demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Unpack Tuples.\n\nExpected Output:\nExecuting Unpack Tuples demonstration in Python"
+                "code": "fruits = (\"apple\", \"banana\", \"cherry\")\n(green, yellow, red) = fruits\nprint(green)\nprint(yellow)\nprint(red)",
+                "explanation": "The W3Schools unpack-tuples chapter shows unpacking a tuple into separate variables.\n\nExpected output:\napple\nbanana\ncherry"
               }
             ],
             "rules": [
@@ -2444,8 +2444,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Loop Tuples Practical Example",
-                "code": "# Loop Tuples demonstration\nprint(\"Executing Loop Tuples demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Loop Tuples.\n\nExpected Output:\nExecuting Loop Tuples demonstration in Python"
+                "code": "thistuple = (\"apple\", \"banana\", \"cherry\")\nfor x in thistuple:\n    print(x)",
+                "explanation": "The W3Schools loop-tuples chapter shows a for loop visiting each tuple item.\n\nExpected output:\napple\nbanana\ncherry"
               }
             ],
             "rules": [
@@ -2526,8 +2526,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Join Tuples Practical Example",
-                "code": "# Join Tuples demonstration\nprint(\"Executing Join Tuples demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Join Tuples.\n\nExpected Output:\nExecuting Join Tuples demonstration in Python"
+                "code": "tuple1 = (\"a\", \"b\", \"c\")\ntuple2 = (1, 2, 3)\ntuple3 = tuple1 + tuple2\nprint(tuple3)",
+                "explanation": "The W3Schools join-tuples chapter shows combining tuples with +.\n\nExpected output:\n('a', 'b', 'c', 1, 2, 3)"
               }
             ],
             "rules": [
@@ -2608,8 +2608,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Tuple Methods Practical Example",
-                "code": "# Tuple Methods demonstration\nprint(\"Executing Tuple Methods demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Tuple Methods.\n\nExpected Output:\nExecuting Tuple Methods demonstration in Python"
+                "code": "thistuple = (\"apple\", \"banana\", \"cherry\")\nprint(thistuple.count(\"cherry\"))",
+                "explanation": "The W3Schools tuple-methods chapter shows count() returning how many times a value appears.\n\nExpected output:\n1"
               }
             ],
             "rules": [
@@ -2699,8 +2699,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Sets Practical Example",
-                "code": "# Python Sets demonstration\nprint(\"Executing Python Sets demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Sets.\n\nExpected Output:\nExecuting Python Sets demonstration in Python"
+                "code": "thisset = {\"apple\", \"banana\", \"cherry\"}\nprint(thisset)",
+                "explanation": "The W3Schools sets chapter shows a set literal printed directly.\n\nExpected output contains:\napple, banana, cherry (order may vary)"
               }
             ],
             "rules": [
@@ -2781,8 +2781,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Access Set Items Practical Example",
-                "code": "# Access Set Items demonstration\nprint(\"Executing Access Set Items demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Access Set Items.\n\nExpected Output:\nExecuting Access Set Items demonstration in Python"
+                "code": "thisset = {\"apple\", \"banana\", \"cherry\"}\nfor x in thisset:\n    print(x)",
+                "explanation": "The W3Schools access-set-items chapter shows that sets cannot be accessed by index, so a loop is used.\n\nExpected output contains:\napple, banana, cherry (order may vary)"
               }
             ],
             "rules": [
@@ -2863,8 +2863,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Add Set Items Practical Example",
-                "code": "# Add Set Items demonstration\nprint(\"Executing Add Set Items demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Add Set Items.\n\nExpected Output:\nExecuting Add Set Items demonstration in Python"
+                "code": "thisset = {\"apple\", \"banana\", \"cherry\"}\nthisset.add(\"orange\")\nprint(thisset)",
+                "explanation": "The W3Schools add-set-items chapter shows add() inserting one new item.\n\nExpected output contains:\napple, banana, cherry, orange (order may vary)"
               }
             ],
             "rules": [
@@ -2945,8 +2945,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Remove Set Items Practical Example",
-                "code": "# Remove Set Items demonstration\nprint(\"Executing Remove Set Items demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Remove Set Items.\n\nExpected Output:\nExecuting Remove Set Items demonstration in Python"
+                "code": "thisset = {\"apple\", \"banana\", \"cherry\"}\nthisset.remove(\"banana\")\nprint(thisset)",
+                "explanation": "The W3Schools remove-set-items chapter shows remove() deleting a matching item.\n\nExpected output contains:\napple, cherry (order may vary)"
               }
             ],
             "rules": [
@@ -3027,8 +3027,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Loop Sets Practical Example",
-                "code": "# Loop Sets demonstration\nprint(\"Executing Loop Sets demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Loop Sets.\n\nExpected Output:\nExecuting Loop Sets demonstration in Python"
+                "code": "thisset = {\"apple\", \"banana\", \"cherry\"}\nfor x in thisset:\n    print(x)",
+                "explanation": "The W3Schools loop-sets chapter shows a for loop visiting each set item.\n\nExpected output contains:\napple, banana, cherry (order may vary)"
               }
             ],
             "rules": [
@@ -3109,8 +3109,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Join Sets Practical Example",
-                "code": "# Join Sets demonstration\nprint(\"Executing Join Sets demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Join Sets.\n\nExpected Output:\nExecuting Join Sets demonstration in Python"
+                "code": "set1 = {\"a\", \"b\", \"c\"}\nset2 = {1, 2, 3}\nset3 = set1.union(set2)\nprint(set3)",
+                "explanation": "The W3Schools join-sets chapter shows union() combining two sets.\n\nExpected output contains:\na, b, c, 1, 2, 3 (order may vary)"
               }
             ],
             "rules": [
@@ -3191,8 +3191,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Frozenset Practical Example",
-                "code": "# Frozenset demonstration\nprint(\"Executing Frozenset demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Frozenset.\n\nExpected Output:\nExecuting Frozenset demonstration in Python"
+                "code": "mylist = [\"apple\", \"banana\", \"cherry\"]\nfs = frozenset(mylist)\nprint(fs)",
+                "explanation": "The W3Schools frozenset chapter shows creating an immutable set from a list.\n\nExpected output contains:\nfrozenset({'apple', 'banana', 'cherry'}) (order may vary)"
               }
             ],
             "rules": [
@@ -3273,8 +3273,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Set Methods Practical Example",
-                "code": "# Set Methods demonstration\nprint(\"Executing Set Methods demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Set Methods.\n\nExpected Output:\nExecuting Set Methods demonstration in Python"
+                "code": "thisset = {\"apple\", \"banana\", \"cherry\"}\nthisset.add(\"orange\")\nprint(len(thisset))",
+                "explanation": "The W3Schools set-methods chapter shows add() and len() together.\n\nExpected output:\n4"
               }
             ],
             "rules": [
@@ -3364,8 +3364,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Dictionaries Practical Example",
-                "code": "# Python Dictionaries demonstration\nprint(\"Executing Python Dictionaries demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Dictionaries.\n\nExpected Output:\nExecuting Python Dictionaries demonstration in Python"
+                "code": "thisdict = {\n  \"brand\": \"Ford\",\n  \"model\": \"Mustang\",\n  \"year\": 1964\n}\nprint(thisdict)",
+                "explanation": "The W3Schools dictionaries chapter shows a dictionary literal printed directly.\n\nExpected output:\n{'brand': 'Ford', 'model': 'Mustang', 'year': 1964}"
               }
             ],
             "rules": [
@@ -3446,8 +3446,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Access Dictionary Items Practical Example",
-                "code": "# Access Dictionary Items demonstration\nprint(\"Executing Access Dictionary Items demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Access Dictionary Items.\n\nExpected Output:\nExecuting Access Dictionary Items demonstration in Python"
+                "code": "thisdict = {\n  \"brand\": \"Ford\",\n  \"model\": \"Mustang\",\n  \"year\": 1964\n}\nprint(thisdict[\"model\"])",
+                "explanation": "The W3Schools access-dictionary-items chapter shows accessing a value by key.\n\nExpected output:\nMustang"
               }
             ],
             "rules": [
@@ -3528,8 +3528,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Change Dictionary Items Practical Example",
-                "code": "# Change Dictionary Items demonstration\nprint(\"Executing Change Dictionary Items demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Change Dictionary Items.\n\nExpected Output:\nExecuting Change Dictionary Items demonstration in Python"
+                "code": "thisdict = {\n  \"brand\": \"Ford\",\n  \"model\": \"Mustang\",\n  \"year\": 1964\n}\nthisdict[\"year\"] = 2018\nprint(thisdict)",
+                "explanation": "The W3Schools change-dictionary-items chapter shows updating a value by key.\n\nExpected output:\n{'brand': 'Ford', 'model': 'Mustang', 'year': 2018}"
               }
             ],
             "rules": [
@@ -3610,8 +3610,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Add Dictionary Items Practical Example",
-                "code": "# Add Dictionary Items demonstration\nprint(\"Executing Add Dictionary Items demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Add Dictionary Items.\n\nExpected Output:\nExecuting Add Dictionary Items demonstration in Python"
+                "code": "thisdict = {\n  \"brand\": \"Ford\",\n  \"model\": \"Mustang\",\n  \"year\": 1964\n}\nthisdict[\"color\"] = \"red\"\nprint(thisdict)",
+                "explanation": "The W3Schools add-dictionary-items chapter shows adding a new key.\n\nExpected output:\n{'brand': 'Ford', 'model': 'Mustang', 'year': 1964, 'color': 'red'}"
               }
             ],
             "rules": [
@@ -3692,8 +3692,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Remove Dictionary Items Practical Example",
-                "code": "# Remove Dictionary Items demonstration\nprint(\"Executing Remove Dictionary Items demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Remove Dictionary Items.\n\nExpected Output:\nExecuting Remove Dictionary Items demonstration in Python"
+                "code": "thisdict = {\n  \"brand\": \"Ford\",\n  \"model\": \"Mustang\",\n  \"year\": 1964\n}\nthisdict.pop(\"model\")\nprint(thisdict)",
+                "explanation": "The W3Schools remove-dictionary-items chapter shows pop() removing a key.\n\nExpected output:\n{'brand': 'Ford', 'year': 1964}"
               }
             ],
             "rules": [
@@ -3774,8 +3774,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Loop Dictionaries Practical Example",
-                "code": "# Loop Dictionaries demonstration\nprint(\"Executing Loop Dictionaries demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Loop Dictionaries.\n\nExpected Output:\nExecuting Loop Dictionaries demonstration in Python"
+                "code": "thisdict = {\n  \"brand\": \"Ford\",\n  \"model\": \"Mustang\",\n  \"year\": 1964\n}\nfor x in thisdict:\n    print(x)",
+                "explanation": "The W3Schools loop-dictionaries chapter shows a for loop visiting dictionary keys.\n\nExpected output:\nbrand\nmodel\nyear"
               }
             ],
             "rules": [
@@ -3856,8 +3856,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Copy Dictionaries Practical Example",
-                "code": "# Copy Dictionaries demonstration\nprint(\"Executing Copy Dictionaries demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Copy Dictionaries.\n\nExpected Output:\nExecuting Copy Dictionaries demonstration in Python"
+                "code": "thisdict = {\n  \"brand\": \"Ford\",\n  \"model\": \"Mustang\",\n  \"year\": 1964\n}\nmydict = thisdict.copy()\nprint(mydict)",
+                "explanation": "The W3Schools copy-dictionaries chapter shows copying with .copy().\n\nExpected output:\n{'brand': 'Ford', 'model': 'Mustang', 'year': 1964}"
               }
             ],
             "rules": [
@@ -3938,8 +3938,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Nested Dictionaries Practical Example",
-                "code": "# Nested Dictionaries demonstration\nprint(\"Executing Nested Dictionaries demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Nested Dictionaries.\n\nExpected Output:\nExecuting Nested Dictionaries demonstration in Python"
+                "code": "myfamily = {\n  \"child1\": {\n    \"name\": \"Emil\",\n    \"year\": 2004\n  },\n  \"child2\": {\n    \"name\": \"Tobias\",\n    \"year\": 2007\n  },\n  \"child3\": {\n    \"name\": \"Linus\",\n    \"year\": 2011\n  }\n}\nprint(myfamily)",
+                "explanation": "The W3Schools nested-dictionaries chapter shows a dictionary of child dictionaries.\n\nExpected output mirrors the nested structure.\n"
               }
             ],
             "rules": [
@@ -4020,8 +4020,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Dictionary Methods Practical Example",
-                "code": "# Dictionary Methods demonstration\nprint(\"Executing Dictionary Methods demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Dictionary Methods.\n\nExpected Output:\nExecuting Dictionary Methods demonstration in Python"
+                "code": "thisdict = {\n  \"brand\": \"Ford\",\n  \"model\": \"Mustang\",\n  \"year\": 1964\n}\nprint(len(thisdict))",
+                "explanation": "The W3Schools dictionary-methods chapter shows len() returning the number of keys.\n\nExpected output:\n3"
               }
             ],
             "rules": [
@@ -4111,8 +4111,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python If...Else Practical Example",
-                "code": "# Python If...Else demonstration\nprint(\"Executing Python If...Else demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python If...Else.\n\nExpected Output:\nExecuting Python If...Else demonstration in Python"
+                "code": "a = 33\nb = 200\nif b > a:\n    print(\"b is greater than a\")",
+                "explanation": "The W3Schools if-else chapter uses this comparison to print its first conditional message.\n\nExpected output:\nb is greater than a"
               }
             ],
             "rules": [
@@ -4193,8 +4193,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python While Loops Practical Example",
-                "code": "# Python While Loops demonstration\nprint(\"Executing Python While Loops demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python While Loops.\n\nExpected Output:\nExecuting Python While Loops demonstration in Python"
+                "code": "i = 1\nwhile i < 6:\n    print(i)\n    i += 1",
+                "explanation": "The W3Schools while-loops chapter runs this loop until i reaches 6.\n\nExpected output:\n1\n2\n3\n4\n5"
               }
             ],
             "rules": [
@@ -4275,8 +4275,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python For Loops Practical Example",
-                "code": "# Python For Loops demonstration\nprint(\"Executing Python For Loops demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python For Loops.\n\nExpected Output:\nExecuting Python For Loops demonstration in Python"
+                "code": "fruits = [\"apple\", \"banana\", \"cherry\"]\nfor x in fruits:\n    print(x)",
+                "explanation": "The W3Schools for-loops chapter iterates this list and prints each fruit.\n\nExpected output:\napple\nbanana\ncherry"
               }
             ],
             "rules": [
@@ -4366,8 +4366,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Functions Practical Example",
-                "code": "# Python Functions demonstration\nprint(\"Executing Python Functions demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Functions.\n\nExpected Output:\nExecuting Python Functions demonstration in Python"
+                "code": "def my_function():\n    print(\"Hello from a function\")\n\nmy_function()",
+                "explanation": "The W3Schools functions chapter defines a simple function and calls it.\n\nExpected output:\nHello from a function"
               }
             ],
             "rules": [
@@ -4448,8 +4448,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Lambda Practical Example",
-                "code": "# Python Lambda demonstration\nprint(\"Executing Python Lambda demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Lambda.\n\nExpected Output:\nExecuting Python Lambda demonstration in Python"
+                "code": "x = lambda a, b : a * b\nprint(x(5, 6))",
+                "explanation": "The W3Schools lambda chapter shows a short anonymous function multiplying two numbers.\n\nExpected output:\n30"
               }
             ],
             "rules": [
@@ -4539,8 +4539,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Classes/Objects Practical Example",
-                "code": "# Python Classes/Objects demonstration\nprint(\"Executing Python Classes/Objects demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Classes/Objects.\n\nExpected Output:\nExecuting Python Classes/Objects demonstration in Python"
+                "code": "class MyClass:\n  x = 5\n\nprint(MyClass)",
+                "explanation": "The W3Schools classes/objects chapter shows a minimal class definition and prints the class itself.\n\nExpected output:\n<class '__main__.MyClass'> (exact repr may vary)"
               }
             ],
             "rules": [
@@ -4621,8 +4621,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Inheritance Practical Example",
-                "code": "# Python Inheritance demonstration\nprint(\"Executing Python Inheritance demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Inheritance.\n\nExpected Output:\nExecuting Python Inheritance demonstration in Python"
+                "code": "class MyClass:\n  x = 5\n\nclass MyChildClass(MyClass):\n  pass\n\nprint(MyChildClass.x)",
+                "explanation": "The W3Schools inheritance chapter shows a child class inheriting an attribute.\n\nExpected output:\n5"
               }
             ],
             "rules": [
@@ -4703,8 +4703,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Iterators Practical Example",
-                "code": "# Python Iterators demonstration\nprint(\"Executing Python Iterators demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Iterators.\n\nExpected Output:\nExecuting Python Iterators demonstration in Python"
+                "code": "mytuple = (\"apple\", \"banana\", \"cherry\")\nmyit = iter(mytuple)\nprint(next(myit))\nprint(next(myit))\nprint(next(myit))",
+                "explanation": "The W3Schools iterators chapter uses iter() and next() to step through a tuple.\n\nExpected output:\napple\nbanana\ncherry"
               }
             ],
             "rules": [
@@ -4785,8 +4785,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Polymorphism Practical Example",
-                "code": "# Python Polymorphism demonstration\nprint(\"Executing Python Polymorphism demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Polymorphism.\n\nExpected Output:\nExecuting Python Polymorphism demonstration in Python"
+                "code": "class Car:\n    def f(self):\n        print(\"Need wheels\")\n\nclass Bike:\n    def f(self):\n        print(\"Need pedals\")\n\nfor v in (Car(), Bike()):\n    v.f()",
+                "explanation": "The W3Schools polymorphism chapter shows how different classes can share a method name.\n\nExpected output:\nNeed wheels\nNeed pedals"
               }
             ],
             "rules": [
@@ -4867,8 +4867,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Scope Practical Example",
-                "code": "# Python Scope demonstration\nprint(\"Executing Python Scope demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Scope.\n\nExpected Output:\nExecuting Python Scope demonstration in Python"
+                "code": "x = 5\ndef myfunc():\n    print(x)\n\nmyfunc()",
+                "explanation": "The W3Schools scope chapter shows a function reading a variable from the outer scope.\n\nExpected output:\n5"
               }
             ],
             "rules": [
@@ -4958,8 +4958,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Modules Practical Example",
-                "code": "# Python Modules demonstration\nprint(\"Executing Python Modules demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Modules.\n\nExpected Output:\nExecuting Python Modules demonstration in Python"
+                "code": "import platform\nprint(platform.system())",
+                "explanation": "The W3Schools modules chapter uses import to load and call a built-in module.\n\nExpected output might be:\nWindows (depends on the runtime)"
               }
             ],
             "rules": [
@@ -5040,8 +5040,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python PIP Practical Example",
-                "code": "# Python PIP demonstration\nprint(\"Executing Python PIP demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python PIP.\n\nExpected Output:\nExecuting Python PIP demonstration in Python"
+                "code": "import sys\nprint(sys.version)",
+                "explanation": "The W3Schools PIP chapter is paired with checking the Python environment.\n\nExpected output looks like:\n3.12.2 (main, Feb 14 2024, ...)"
               }
             ],
             "rules": [
@@ -5131,8 +5131,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Dates Practical Example",
-                "code": "# Python Dates demonstration\nprint(\"Executing Python Dates demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Dates.\n\nExpected Output:\nExecuting Python Dates demonstration in Python"
+                "code": "import datetime\nprint(datetime.datetime.now())",
+                "explanation": "The W3Schools dates chapter shows datetime.now() for the current date and time.\n\nExpected output looks like:\n2026-09-17 09:41:23.123456"
               }
             ],
             "rules": [
@@ -5213,8 +5213,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Math Practical Example",
-                "code": "# Python Math demonstration\nprint(\"Executing Python Math demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Math.\n\nExpected Output:\nExecuting Python Math demonstration in Python"
+                "code": "import math\nprint(math.sqrt(64))",
+                "explanation": "The W3Schools math chapter shows math.sqrt() calculating a square root.\n\nExpected output:\n8.0"
               }
             ],
             "rules": [
@@ -5295,8 +5295,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python JSON Practical Example",
-                "code": "# Python JSON demonstration\nprint(\"Executing Python JSON demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python JSON.\n\nExpected Output:\nExecuting Python JSON demonstration in Python"
+                "code": "import json\nprint(json.dumps({'name': 'John', 'age': 30}))",
+                "explanation": "The W3Schools json chapter shows json.dumps() converting a Python object to a JSON string.\n\nExpected output:\n{\"name\": \"John\", \"age\": 30}"
               }
             ],
             "rules": [
@@ -5377,8 +5377,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python RegEx Practical Example",
-                "code": "# Python RegEx demonstration\nprint(\"Executing Python RegEx demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python RegEx.\n\nExpected Output:\nExecuting Python RegEx demonstration in Python"
+                "code": "import re\nprint(re.findall(\"ai\", \"The rain in Spain\"))",
+                "explanation": "The W3Schools regex chapter shows findall() returning every match.\n\nExpected output:\n['ai', 'ai']"
               }
             ],
             "rules": [
@@ -5459,8 +5459,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Try...Except Practical Example",
-                "code": "# Python Try...Except demonstration\nprint(\"Executing Python Try...Except demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Try...Except.\n\nExpected Output:\nExecuting Python Try...Except demonstration in Python"
+                "code": "try:\n    print(x)\nexcept:\n    print(\"An exception occurred\")",
+                "explanation": "The W3Schools try-except chapter shows catching an undefined-variable error.\n\nExpected output:\nAn exception occurred"
               }
             ],
             "rules": [
@@ -5541,8 +5541,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python User Input Practical Example",
-                "code": "# Python User Input demonstration\nprint(\"Executing Python User Input demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python User Input.\n\nExpected Output:\nExecuting Python User Input demonstration in Python"
+                "code": "username = input(\"Enter username:\")\nprint(\"Username is:\" + username)",
+                "explanation": "The W3Schools user-input chapter shows input() collecting text from the user.\n\nExpected output depends on the typed input, for example:\nEnter username: John\nUsername is: John"
               }
             ],
             "rules": [
@@ -5623,8 +5623,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python String Formatting Practical Example",
-                "code": "# Python String Formatting demonstration\nprint(\"Executing Python String Formatting demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python String Formatting.\n\nExpected Output:\nExecuting Python String Formatting demonstration in Python"
+                "code": "age = 36\nprint(f\"My name is John, I am {age}\")",
+                "explanation": "The W3Schools string-formatting chapter shows an f-string interpolating a variable.\n\nExpected output:\nMy name is John, I am 36"
               }
             ],
             "rules": [
@@ -5705,8 +5705,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python File Handling Practical Example",
-                "code": "# Python File Handling demonstration\nprint(\"Executing Python File Handling demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python File Handling.\n\nExpected Output:\nExecuting Python File Handling demonstration in Python"
+                "code": "f = open(\"demofile.txt\", \"r\")\nprint(f.read())\nf.close()",
+                "explanation": "The W3Schools file-handling chapter shows opening a text file and reading its contents.\n\nExpected output depends on demofile.txt, for example:\nHello! Welcome to demofile.txt\nThis file is for testing purposes.\nGood Luck!!"
               }
             ],
             "rules": [
@@ -5796,8 +5796,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python NumPy Practical Example",
-                "code": "# Python NumPy demonstration\nprint(\"Executing Python NumPy demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python NumPy.\n\nExpected Output:\nExecuting Python NumPy demonstration in Python"
+                "code": "import numpy as np\narr = np.array([1, 2, 3, 4, 5])\nprint(arr)",
+                "explanation": "The W3Schools NumPy chapter starts by creating a NumPy array from a Python list.\n\nExpected output looks like:\n[1 2 3 4 5]"
               }
             ],
             "rules": [
@@ -5878,8 +5878,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Pandas Practical Example",
-                "code": "# Python Pandas demonstration\nprint(\"Executing Python Pandas demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Pandas.\n\nExpected Output:\nExecuting Python Pandas demonstration in Python"
+                "code": "import pandas as pd\ndf = pd.DataFrame({\"calories\": [420, 380, 390], \"duration\": [50, 40, 45]})\nprint(df)",
+                "explanation": "The W3Schools Pandas chapter creates a DataFrame from a dictionary of lists.\n\nExpected output:\n   calories  duration\n0       420        50\n1       380        40\n2       390        45"
               }
             ],
             "rules": [
@@ -5960,8 +5960,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python SciPy Practical Example",
-                "code": "# Python SciPy demonstration\nprint(\"Executing Python SciPy demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python SciPy.\n\nExpected Output:\nExecuting Python SciPy demonstration in Python"
+                "code": "import numpy as np\nfrom scipy import constants\nprint(constants.pi)",
+                "explanation": "The W3Schools SciPy chapter often uses scipy.constants as an easy first import.\n\nExpected output looks like:\n3.141592653589793"
               }
             ],
             "rules": [
@@ -6042,8 +6042,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Matplotlib Practical Example",
-                "code": "# Python Matplotlib demonstration\nprint(\"Executing Python Matplotlib demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Matplotlib.\n\nExpected Output:\nExecuting Python Matplotlib demonstration in Python"
+                "code": "import matplotlib.pyplot as plt\nplt.plot([1, 2, 3, 4])\nplt.ylabel('some numbers')\nplt.show()",
+                "explanation": "The W3Schools Matplotlib chapter starts with a minimal plot drawn from a list of numbers.\n\nExpected output is a simple line chart window (or inline chart in a notebook-like editor)."
               }
             ],
             "rules": [
@@ -6124,8 +6124,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Machine Learning Practical Example",
-                "code": "# Python Machine Learning demonstration\nprint(\"Executing Python Machine Learning demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Machine Learning.\n\nExpected Output:\nExecuting Python Machine Learning demonstration in Python"
+                "code": "from sklearn.linear_model import LinearRegression\nX = [[0, 0], [1, 1], [2, 2]]\ny = [0, 1, 2]\nclf = LinearRegression().fit(X, y)\nprint(clf.predict([[3, 3]]))",
+                "explanation": "The W3Schools machine-learning chapter introduces linear regression with a tiny dataset.\n\nExpected output looks like:\n[3.]"
               }
             ],
             "rules": [
@@ -6215,8 +6215,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python MySQL Practical Example",
-                "code": "# Python MySQL demonstration\nprint(\"Executing Python MySQL demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python MySQL.\n\nExpected Output:\nExecuting Python MySQL demonstration in Python"
+                "code": "import mysql.connector\ncon = mysql.connector.connect(\n  host=\"localhost\",\n  user=\"yourusername\",\n  password=\"yourpassword\"\n)\nprint(\"Connection OK\" if con else \"Unable to connect\")",
+                "explanation": "The W3Schools Python-MySQL chapter starts by testing a database connection.\n\nExpected output if the connection works:\nConnection OK"
               }
             ],
             "rules": [
@@ -6297,8 +6297,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python MongoDB Practical Example",
-                "code": "# Python MongoDB demonstration\nprint(\"Executing Python MongoDB demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python MongoDB.\n\nExpected Output:\nExecuting Python MongoDB demonstration in Python"
+                "code": "import pymongo\nmyclient = pymongo.MongoClient(\"mongodb://localhost:27017/\")\nprint(myclient.list_database_names())",
+                "explanation": "The W3Schools Python-MongoDB chapter starts by listing the databases on a local MongoDB server.\n\nExpected output looks like:\n['admin', 'local', ...] (depending on the server)"
               }
             ],
             "rules": [
@@ -6388,8 +6388,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Examples Practical Example",
-                "code": "# Python Examples demonstration\nprint(\"Executing Python Examples demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Examples.\n\nExpected Output:\nExecuting Python Examples demonstration in Python"
+                "code": "print(\"Hello, World!\")\nprint(1 + 1)",
+                "explanation": "The W3Schools Python examples chapter often begins with a couple of very short runnable snippets.\n\nExpected output:\nHello, World!\n2"
               }
             ],
             "rules": [
@@ -6470,8 +6470,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Exercises Practical Example",
-                "code": "# Python Exercises demonstration\nprint(\"Executing Python Exercises demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Exercises.\n\nExpected Output:\nExecuting Python Exercises demonstration in Python"
+                "code": "print(10 + 5)",
+                "explanation": "The W3Schools Python exercises chapter often opens with a tiny arithmetic task.\n\nExpected output:\n15"
               }
             ],
             "rules": [
@@ -6552,8 +6552,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Quiz Practical Example",
-                "code": "# Python Quiz demonstration\nprint(\"Executing Python Quiz demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Quiz.\n\nExpected Output:\nExecuting Python Quiz demonstration in Python"
+                "code": "q = \"What is 5 + 5?\"\nprint(q)",
+                "explanation": "The W3Schools Python quiz chapter presents a sample question.\n\nExpected output:\nWhat is 5 + 5?"
               }
             ],
             "rules": [
@@ -6634,8 +6634,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Code Challenges Practical Example",
-                "code": "# Python Code Challenges demonstration\nprint(\"Executing Python Code Challenges demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Code Challenges.\n\nExpected Output:\nExecuting Python Code Challenges demonstration in Python"
+                "code": "print(10 // 3)",
+                "explanation": "The W3Schools Python code-challenge chapter often opens with a quick computation.\n\nExpected output:\n3"
               }
             ],
             "rules": [
@@ -6716,8 +6716,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Practice Problems Practical Example",
-                "code": "# Python Practice Problems demonstration\nprint(\"Executing Python Practice Problems demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Practice Problems.\n\nExpected Output:\nExecuting Python Practice Problems demonstration in Python"
+                "code": "print(abs(-7.25))",
+                "explanation": "The W3Schools Python practice-problems chapter often opens with a small built-in function exercise.\n\nExpected output:\n7.25"
               }
             ],
             "rules": [
@@ -6798,8 +6798,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Syllabus Practical Example",
-                "code": "# Python Syllabus demonstration\nprint(\"Executing Python Syllabus demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Syllabus.\n\nExpected Output:\nExecuting Python Syllabus demonstration in Python"
+                "code": "print(\"Python Syllabus\")\nprint(\"1. Intro\", \"2. Syntax\", \"3. Variables\")",
+                "explanation": "The W3Schools Python syllabus chapter presents an outline of topics.\n\nExpected output:\nPython Syllabus\n1. Intro 2. Syntax 3. Variables"
               }
             ],
             "rules": [
@@ -6880,8 +6880,8 @@ export const pythonSubject: SubjectSpec = {
             "examples": [
               {
                 "title": "Python Study Plan Practical Example",
-                "code": "# Python Study Plan demonstration\nprint(\"Executing Python Study Plan demonstration in Python\")",
-                "explanation": "Demonstrates basic declaration and execution of Python Study Plan.\n\nExpected Output:\nExecuting Python Study Plan demonstration in Python"
+                "code": "print(\"Step 1: Learn syntax\", \"Step 2: Build examples\")",
+                "explanation": "The W3Schools Python study-plan chapter presents a short sequence of study steps.\n\nExpected output:\nStep 1: Learn syntax Step 2: Build examples"
               }
             ],
             "rules": [
