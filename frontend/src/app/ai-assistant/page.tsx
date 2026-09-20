@@ -87,32 +87,64 @@ const quickActions = [
 
 /* ─────────────────────────── AI analysis (local) ─────────────────────────── */
 
-function analyzeCodeLocally(code: string): { title: string; items: string[] }[] {
-  const lines = code.split('\n').length;
-  const hasLoop = /for|while/.test(code);
-  const hasNested = /for[\s\S]{0,50}for|while[\s\S]{0,50}while/.test(code);
-  const hasRecursion = /function\s+(\w+)[\s\S]*\1\s*\(/.test(code);
+type AnalysisResult = { title: string; items: string[] };
 
-  const complexity =
-    hasNested ? 'O(n²) – nested loops detected' : hasLoop ? 'O(n) – single loop' : hasRecursion ? 'O(n) or worse – recursive' : 'O(1) – constant';
-  const spaceComplexity = /new\s+(Map|Set|Array|\[)/.test(code) ? 'O(n) – uses extra storage' : 'O(1) – in-place';
+function analyzeCodeLocally(code: string): AnalysisResult[] | null {
+  const trimmed = code.trim();
+  if (!trimmed) return null; // No code → show waiting state, not fake defaults
 
+  const lines = trimmed.split('\n');
+  const lineCount = lines.length;
+  const hasLoop = /\bfor\b|\bwhile\b/.test(trimmed);
+  const hasNested = /\bfor\b[\s\S]{0,80}\bfor\b|\bwhile\b[\s\S]{0,80}\bwhile\b/.test(trimmed);
+  const hasRecursion = /function\s+(\w+)[\s\S]{0,300}\b\1\s*\(/.test(trimmed);
+  const hasSorting = /\.sort\s*\(|bubbleSort|mergeSort|quickSort/i.test(trimmed);
+  const usesHashMap = /new\s+(Map|Set)\b|{[^}]{0,200}}/.test(trimmed);
+  const usesArray = /new\s+Array\b|\[\s*\]/.test(trimmed);
+
+  // ── Complexity ──
+  let timeComplexity: string;
+  if (hasSorting && !hasNested) timeComplexity = 'O(n log n) – sorting operation detected';
+  else if (hasNested) timeComplexity = 'O(n²) – nested loops detected';
+  else if (hasLoop) timeComplexity = 'O(n) – single loop over data';
+  else if (hasRecursion) timeComplexity = 'O(n) or worse – recursive calls detected';
+  else timeComplexity = 'O(1) – no loops or recursion found';
+
+  let spaceComplexity: string;
+  if (usesHashMap) spaceComplexity = 'O(n) – hash map/set allocates extra memory';
+  else if (usesArray) spaceComplexity = 'O(n) – dynamic array allocation';
+  else if (hasRecursion) spaceComplexity = 'O(n) – recursion uses call stack space';
+  else spaceComplexity = 'O(1) – no significant extra memory used';
+
+  // ── Issues ──
   const issues: string[] = [];
-  if (lines > 50) issues.push('Consider breaking into smaller functions');
-  if (/console\.log/.test(code)) issues.push('Debug logs found – remove before production');
-  if (!hasLoop && !hasRecursion && lines < 5) issues.push('Consider edge cases for empty inputs');
-  if (issues.length === 0) issues.push('No obvious issues detected');
+  if (lineCount > 60) issues.push(`Function is ${lineCount} lines — consider splitting into smaller helpers`);
+  if (/console\.log\s*\(/.test(trimmed)) issues.push('console.log() detected — remove debug logs before shipping');
+  if (/catch\s*\(\w*\)\s*\{\s*\}/.test(trimmed)) issues.push('Empty catch block — silent error swallowing detected');
+  if (/==\s/.test(trimmed) && !/===\s/.test(trimmed)) issues.push('Use === (strict equality) instead of ==');
+  if (/var\s+\w+/.test(trimmed)) issues.push('var used — prefer const or let for block scoping');
+  if (/\beval\s*\(/.test(trimmed)) issues.push('eval() detected — dangerous, avoid in production');
+  if (hasNested && !usesHashMap) issues.push('Nested loops can often be replaced with a hash map for O(n)');
+  if (issues.length === 0) issues.push('✓ No obvious issues found in a quick scan');
 
+  // ── Suggestions ──
   const suggestions: string[] = [];
-  if (hasNested) suggestions.push('Consider a hash map to reduce to O(n)');
-  if (/var\s/.test(code)) suggestions.push('Prefer let/const over var');
-  if (!/\/\/|\/\*/.test(code) && lines > 10) suggestions.push('Add comments for complex logic');
-  if (suggestions.length === 0) suggestions.push('Code looks clean!');
+  if (hasNested && !usesHashMap) suggestions.push('Replace inner loop with a Map/Set for O(n) lookup');
+  if (/var\s/.test(trimmed)) suggestions.push('Replace var with const (or let if re-assigned)');
+  if (!/\/\/|\/\*/.test(trimmed) && lineCount > 8) suggestions.push('Add inline comments for non-obvious logic');
+  if (hasRecursion && !trimmed.includes('memo') && !trimmed.includes('cache')) suggestions.push('Add memoization to avoid repeated recursive computations');
+  if (trimmed.includes('return true') && trimmed.includes('return false')) suggestions.push('Simplify if/return true/return false to a single boolean expression');
+  if (suggestions.length === 0) suggestions.push('✓ Code structure looks solid — good job!');
+
+  // ── Detected language ──
+  const lang = detectLanguage(trimmed);
+  const langNote = lang !== 'Unknown' ? `Detected language: ${lang}` : '';
 
   return [
-    { title: 'Complexity', items: [`Time: ${complexity}`, `Space: ${spaceComplexity}`] },
+    { title: 'Complexity', items: [`⏱ Time:  ${timeComplexity}`, `💾 Space: ${spaceComplexity}`] },
     { title: 'Issues', items: issues },
     { title: 'Suggestions', items: suggestions },
+    ...(langNote ? [{ title: 'Language', items: [langNote, `${lineCount} line${lineCount !== 1 ? 's' : ''} analysed`] }] : [{ title: 'Stats', items: [`${lineCount} line${lineCount !== 1 ? 's' : ''} analysed`] }]),
   ];
 }
 
@@ -143,7 +175,7 @@ function AIAssistantInner() {
   const [codeContext, setCodeContext] = useState('');
   const [codeEditedByUser, setCodeEditedByUser] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState(() => analyzeCodeLocally(''));
+  const [analysis, setAnalysis] = useState<AnalysisResult[] | null>(null);
   const [recentPrompts, setRecentPrompts] = useState<string[]>([]);
   const [lesson, setLesson] = useState<LessonPreview | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -481,14 +513,23 @@ function AIAssistantInner() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {analysis.map(({ title, items }) => (
-                <div key={title} className="rounded-lg border border-white/[0.07] bg-secondary/40 p-3">
-                  <p className="mb-2 text-xs font-semibold text-white">{title}</p>
-                  {items.map((item) => (
-                    <p key={item} className="text-xs text-muted-foreground">{item}</p>
-                  ))}
+              {!analysis ? (
+                <div className="rounded-lg border border-white/[0.07] bg-secondary/30 p-4 text-center">
+                  <Code2 className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
+                  <p className="text-xs text-muted-foreground">
+                    Paste code in the editor to see a live complexity and quality analysis.
+                  </p>
                 </div>
-              ))}
+              ) : (
+                analysis.map(({ title, items }) => (
+                  <div key={title} className="rounded-lg border border-white/[0.07] bg-secondary/40 p-3">
+                    <p className="mb-2 text-xs font-semibold text-white">{title}</p>
+                    {items.map((item) => (
+                      <p key={item} className="text-xs leading-5 text-muted-foreground">{item}</p>
+                    ))}
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -530,34 +571,81 @@ function AIAssistantInner() {
 
 function generateLocalResponse(message: string, code: string): string {
   const lower = message.toLowerCase();
+  const lang = detectLanguage(code);
+  const lines = code.trim().split('\n').length;
+  const hasCode = code.trim().length > 0;
 
   if (lower.includes('explain')) {
-    const lines = code.split('\n').length;
-    return `Here's an explanation of your code:\n\n• The code is ${lines} lines long.\n• It appears to be ${detectLanguage(code)} code.\n• ${describeCode(code)}\n\n⚠️ For detailed AI explanations, connect the backend (port 4001) and add an OPENAI_API_KEY or GEMINI_API_KEY to backend/.env.`;
+    if (!hasCode) return 'Please paste some code in the Code Context editor first, then I can explain it!';
+    return `Here's a quick analysis of your ${lang} code:\n\n• ${lines} lines of code detected\n• ${describeCode(code)}\n• Language: ${lang}\n\n${generateOfflineCodeSummary(code)}\n\n⚠️ For a full AI explanation, start the backend (cd backend → npm run dev) and add GEMINI_API_KEY or OPENAI_API_KEY to backend/.env.`;
   }
   if (lower.includes('debug') || lower.includes('error') || lower.includes('bug')) {
-    return `To help debug your code:\n\n1. Check for syntax errors – look at brackets, parentheses, and semicolons.\n2. Add console.log() statements to trace variable values.\n3. Check that all variables are declared before use.\n4. Look for off-by-one errors in loops.\n\n⚠️ For AI-powered debugging, connect the backend and add an API key to backend/.env.`;
+    if (!hasCode) return 'Paste your buggy code in the Code Context editor first!';
+    const issues: string[] = [];
+    if (/console\.log/.test(code)) issues.push('• Debug console.log() found — probably not the bug, but clean these up');
+    if (/catch\s*\(\w*\)\s*\{\s*\}/.test(code)) issues.push('• Empty catch block — errors are being silently swallowed here');
+    if (/==\s/.test(code) && !/===\s/.test(code)) issues.push('• Loose == comparison used — this can cause type coercion bugs, use === instead');
+    if (/var\s/.test(code)) issues.push('• var used — can cause hoisting bugs, switch to const/let');
+    if (issues.length === 0) issues.push('• No obvious syntax or style issues spotted by static scan');
+    return `Quick bug scan of your ${lang} code:\n\n${issues.join('\n')}\n\nFor deeper debugging:\n1. Add console.log() before the failing line to inspect values\n2. Check array indices for off-by-one errors\n3. Verify all variables are defined before use\n\n⚠️ For AI-powered debugging, start the backend and add an API key to backend/.env.`;
   }
   if (lower.includes('optim')) {
-    return `Optimization tips for your code:\n\n1. 🗺️ Use hash maps/sets for O(1) lookups instead of nested loops.\n2. 🔄 Avoid re-computing values inside loops – cache them.\n3. 🧹 Remove any console.log() debug statements.\n4. ✂️ Break large functions into smaller, focused ones.\n\n⚠️ For AI-powered optimization, connect the backend and add an API key to backend/.env.`;
+    if (!hasCode) return 'Paste the code you want to optimize in the Code Context editor!';
+    const tips: string[] = [];
+    if (/for[\s\S]{0,80}for/.test(code)) tips.push('🗺️ Replace nested loops with a Map/Set for O(n) time complexity');
+    if (/\.forEach|\.map|\.filter/.test(code)) tips.push('✅ Good: using built-in array methods — these are optimised');
+    if (/console\.log/.test(code)) tips.push('🧹 Remove console.log() calls — these slow down production code');
+    if (tips.length === 0) tips.push('🔄 Avoid re-computing values inside loops — cache them in a variable');
+    tips.push('✂️ Keep functions under 20 lines — split large functions into helpers');
+    tips.push('🎯 Use early returns to reduce nesting depth');
+    return `Optimization suggestions for your ${lang} code:\n\n${tips.join('\n')}\n\n⚠️ For AI-powered optimization, start the backend and add an API key.`;
   }
   if (lower.includes('test')) {
-    return `Here are general test cases to consider:\n\n• ✅ Normal inputs (typical use case)\n• 📭 Empty inputs (empty string, empty array, null)\n• 🔢 Edge values (0, negative numbers, very large numbers)\n• 🔁 Duplicate values\n• 🃏 Single-element inputs\n\n⚠️ For AI-generated tests, connect the backend and add an API key to backend/.env.`;
+    if (!hasCode) return 'Paste the code you want to test in the Code Context editor!';
+    return `Test cases to write for your ${lang} code:\n\n✅ Happy path — typical valid inputs\n📭 Empty inputs — empty string, empty array, null, undefined\n🔢 Edge values — 0, -1, very large numbers, single character\n🔁 Duplicates — repeated values in arrays/strings\n🚫 Invalid inputs — wrong types, missing required args\n${lang === 'JavaScript' || lang === 'TypeScript' ? '⚡ Async edge cases — what if a Promise rejects?\n' : ''}\n⚠️ For auto-generated unit tests, start the backend and add an API key.`;
   }
 
-  return `I received your message: "${message}"\n\nI'm running in offline mode because the backend server is not reachable. Here's what you can do:\n\n1. Start the backend: open a terminal → cd backend → npm run dev\n2. Add an AI key to backend/.env:\n   GEMINI_API_KEY="your-key"  (free at aistudio.google.com)\n   or OPENAI_API_KEY="sk-..."\n\nOnce connected, I'll have full AI capabilities!`;
+  if (!hasCode) {
+    return `Got it — you asked: "${message}"\n\nTry pasting some code in the Code Context editor and use the Explain, Debug, Optimize, or Generate Tests buttons for instant analysis!`;
+  }
+
+  return `I see you're working on ${lines} lines of ${lang} code.\n\nI'm currently in offline mode (backend unreachable). To get full AI answers:\n\n1. Open a terminal and run: cd backend && npm run dev\n2. Add an AI key to backend/.env:\n   GEMINI_API_KEY="your-key"  ← free at aistudio.google.com\n   or OPENAI_API_KEY="sk-..."\n\nOnce online, I can answer: "${message}" with full context.`;
 }
 
 function detectLanguage(code: string): string {
-  if (/public\s+class|System\.out|void\s+main/.test(code)) return 'Java';
-  if (/def\s+\w+|import\s+\w+|print\(/.test(code)) return 'Python';
-  if (/function\s*\(|const\s+|let\s+|=>\s*{/.test(code)) return 'JavaScript';
-  return 'unknown language';
+  if (/public\s+class\s+\w+|System\.out\.(print|println)|void\s+main\s*\(/.test(code)) return 'Java';
+  if (/def\s+\w+\s*\(|^\s*print\s*\(|import\s+\w+\s*$|:\s*$/m.test(code)) return 'Python';
+  if (/using\s+System|namespace\s+\w+|Console\.Write/.test(code)) return 'C#';
+  if (/#include\s*<|std::|cout\s*<<|int\s+main\s*\(/.test(code)) return 'C++';
+  if (/interface\s+\w+|:\s*(string|number|boolean|void)\b|<[A-Z]\w*>/.test(code)) return 'TypeScript';
+  if (/require\s*\(|module\.exports|process\.env/.test(code)) return 'Node.js';
+  if (/import\s+React|jsx|useState|useEffect|<\w+\s*\/>/.test(code)) return 'React';
+  if (/<html|<div|<p\s|<h[1-6]|<!DOCTYPE/i.test(code)) return 'HTML';
+  if (/\{[\s\S]*:\s*[\w#"'(]|@media|margin:|padding:|font-size:/.test(code)) return 'CSS';
+  if (/SELECT\s+|FROM\s+|WHERE\s+|INSERT\s+INTO/i.test(code)) return 'SQL';
+  if (/function\s*\w*\s*\(|const\s+\w+\s*=|let\s+\w+\s*=|=>\s*\{?/.test(code)) return 'JavaScript';
+  return 'Unknown';
 }
 
 function describeCode(code: string): string {
-  if (/for[\s\S]*for/.test(code)) return 'It uses nested loops, which may have O(n²) time complexity.';
+  if (/class\s+\w+\s+extends/.test(code)) return 'It defines an inherited class — object-oriented pattern.';
+  if (/class\s+\w+/.test(code)) return 'It defines a class with methods.';
+  if (/for[\s\S]{0,80}for/.test(code)) return 'It uses nested loops — O(n²) time complexity is possible.';
   if (/for|while/.test(code)) return 'It uses a loop to iterate over data.';
-  if (/class/.test(code)) return 'It defines a class with methods.';
-  return 'Review the logic carefully for correctness.';
+  if (/function\s+(\w+)[\s\S]{0,200}\b\1\s*\(/.test(code)) return 'It appears to use recursion.';
+  if (/new\s+(Map|Set)\b/.test(code)) return 'It uses a Map or Set — efficient O(1) lookups.';
+  if (/=>\s*{?/.test(code)) return 'It uses arrow functions — modern JS/TS style.';
+  return 'It is a short function — review the logic for edge cases.';
+}
+
+function generateOfflineCodeSummary(code: string): string {
+  const parts: string[] = [];
+  if (/new\s+Map\b/.test(code)) parts.push('Uses a Map for O(1) key lookup — good choice');
+  if (/new\s+Set\b/.test(code)) parts.push('Uses a Set for unique value tracking — efficient');
+  if (/for[\s\S]{0,80}for/.test(code)) parts.push('Contains nested loops — watch for O(n²) performance on large inputs');
+  if (/\.sort\s*\(/.test(code)) parts.push('Uses sorting — typically O(n log n) time');
+  if (/console\.log/.test(code)) parts.push('Has console.log() calls — remove for production');
+  if (/var\s/.test(code)) parts.push('Uses var — consider upgrading to const/let');
+  if (parts.length === 0) parts.push('Code appears well-structured at a glance');
+  return parts.map(p => `• ${p}`).join('\n');
 }
