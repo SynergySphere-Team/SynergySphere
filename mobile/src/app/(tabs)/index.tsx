@@ -34,7 +34,7 @@ export default function HomeScreen() {
   const primaryAccent = isLight ? '#1e6827' : colors.primary;
 
   const workspaces: { title: string; description: string; route: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-    { title: 'Learning Hub', description: 'Solve coding challenges and earn XP.', route: '/coding', icon: 'code-slash' },
+    { title: 'Learning Hub', description: 'Interactive programming curriculum & challenges.', route: '/coding', icon: 'code-slash' },
     { title: 'AI Workspace', description: 'Get explanations, reviews, and debugging help.', route: '/ai-assistant', icon: 'sparkles' },
     { title: 'LectureToLife', description: 'Turn lecture notes into study materials.', route: '/lecture-to-life', icon: 'school' },
     { title: 'Community', description: 'Find and apply to impact projects.', route: '/community', icon: 'people' },

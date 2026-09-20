@@ -20,13 +20,14 @@ import {
   LogOut,
   Sparkles,
   Settings,
+  Upload,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/coding', label: 'Learning Hub', icon: Code2 },
+  { href: '/learning-hub', label: 'Learning Hub', icon: BookOpen },
   { href: '/ai-assistant', label: 'AI Workspace', icon: Bot },
-  { href: '/lecture-to-life', label: 'LectureToLife', icon: BookOpen },
+  { href: '/lecture-to-life', label: 'LectureToLife', icon: Upload },
   { href: '/tasks', label: 'Productivity', icon: CheckSquare },
   { href: '/community', label: 'Community', icon: Users },
   { href: '/portfolio', label: 'Portfolio', icon: Briefcase },
@@ -63,7 +64,7 @@ export function Sidebar() {
       <nav className="scrollbar-thin flex-1 space-y-1 overflow-y-auto p-3">
         {items.map((item) => {
           const Icon = item.icon;
-          const active = pathname === item.href;
+          const active = pathname === item.href || (item.href === '/learning-hub' && pathname === '/coding');
           return (
             <Link
               key={`${item.href}-${item.label}`}

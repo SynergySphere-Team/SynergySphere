@@ -6,7 +6,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
 const destinations = [
-  ['Learning Hub', 'Solve coding challenges and submit solutions.', '/coding'],
+  ['Learning Hub', 'Interactive programming curriculum & challenges.', '/coding'],
   ['AI Workspace', 'Ask for explanations, reviews, and debugging help.', '/ai-assistant'],
   ['LectureToLife', 'Turn lecture notes into study materials.', '/lecture-to-life'],
   ['Community', 'Find and apply to impact projects.', '/community'],

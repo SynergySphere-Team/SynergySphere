@@ -327,7 +327,7 @@ function AIAssistantInner() {
             {lesson.title}
           </span>
           <button
-            onClick={() => router.push('/lecture-to-life')}
+            onClick={() => router.push('/learning-hub')}
             className="ml-auto text-[11px] text-muted-foreground underline-offset-2 hover:text-white hover:underline"
           >
             Open lesson
