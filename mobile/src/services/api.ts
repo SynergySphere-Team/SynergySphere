@@ -1,9 +1,36 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 
 const TOKEN_KEY = 'synergysphere.auth-token';
-const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
 let webToken: string | null = null;
+
+export function getApiUrl(): string {
+  const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (envUrl) {
+    return envUrl.replace(/\/$/, '');
+  }
+
+  const extraUrl = (Constants.expoConfig?.extra as Record<string, any> | undefined)?.apiUrl;
+  if (typeof extraUrl === 'string' && extraUrl.trim()) {
+    return extraUrl.trim().replace(/\/$/, '');
+  }
+
+  // Infer host from Expo Go / development client Metro connection
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    (Constants as any).manifest2?.extra?.expoClient?.hostUri ||
+    (Constants as any).manifest?.debuggerHost;
+
+  if (typeof hostUri === 'string' && hostUri) {
+    const host = hostUri.split(':')[0];
+    if (host) {
+      return `http://${host}:4000/api`;
+    }
+  }
+
+  return 'http://10.0.0.115:4000/api';
+}
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status?: number, public readonly details?: Record<string, string[]>) {
@@ -16,7 +43,8 @@ async function getToken(): Promise<string | null> {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  if (!API_URL) {
+  const baseUrl = getApiUrl();
+  if (!baseUrl) {
     throw new ApiError('API URL is not configured. Set EXPO_PUBLIC_API_URL in mobile/.env.');
   }
   const token = await getToken();
@@ -30,7 +58,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path.startsWith('/') ? path : `/${path}`}`, { ...options, headers });
+    response = await fetch(`${baseUrl}${path.startsWith('/') ? path : `/${path}`}`, { ...options, headers });
   } catch {
     throw new ApiError('Unable to reach SynergySphere. Check your connection and API URL.');
   }

@@ -41,13 +41,15 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-image",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "router": {},
+      "apiUrl": "http://10.0.0.115:4000/api",
       "eas": {
         "projectId": "c468063c-c2dd-48fc-a5b8-7afed33039a1"
       }

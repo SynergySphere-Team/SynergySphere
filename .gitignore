@@ -23,6 +23,9 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+inst_user_settings.tmp
+.expo/
+*.tmp
 
 # Logs
 *.log
