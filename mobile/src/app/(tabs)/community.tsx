@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-
+import { Image } from 'expo-image';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card, Field, Heading } from '@/components/ui';
 import { api } from '@/services/api';
@@ -198,6 +198,13 @@ export default function CommunityScreen() {
 
   return (
     <Screen>
+      <View style={styles.headerBrand}>
+      <Image
+        source={require('../../../assets/images/community-logo.png')}
+        style={styles.communityLogo}
+        contentFit="contain"
+      />
+    </View>
       <Heading subtitle="Join projects that create a practical community impact.">
         Community
       </Heading>
@@ -629,5 +636,15 @@ const styles = StyleSheet.create({
   requestActions: {
     flexDirection: 'row',
     gap: 8,
+  },
+
+  headerBrand: {
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+
+  communityLogo: {
+    width: 70,
+    height: 70,
   },
 });
