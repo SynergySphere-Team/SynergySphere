@@ -1,13 +1,34 @@
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Image } from 'expo-image';
-import { Screen, Loading, Notice } from '@/components/Screen';
-import { Button, Card, Field, Heading } from '@/components/ui';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter } from 'expo-router';
+
+import {
+  Screen,
+  Loading,
+  Notice,
+} from '@/components/Screen';
+import {
+  Button,
+  Card,
+  Field,
+  Heading,
+} from '@/components/ui';
+
 import { api } from '@/services/api';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
-import type { Project, ProjectJoinRequest } from '@/types/api';
+import type {
+  Project,
+  ProjectJoinRequest,
+} from '@/types/api';
 
 const categories = [
   'SUSTAINABILITY',
@@ -17,22 +38,58 @@ const categories = [
   'OTHER',
 ] as const;
 
+const communityShortcuts = [
+  {
+    label: 'Eco-tourism',
+    subtitle: 'Opportunities',
+    category: 'ECO_TOURISM',
+    icon: 'leaf-outline' as const,
+  },
+  {
+    label: 'Green Infrastructure',
+    subtitle: 'Projects',
+    category: 'GREEN_INFRASTRUCTURE',
+    icon: 'business-outline' as const,
+  },
+  {
+    label: 'Events',
+    subtitle: '& Webinars',
+    category: 'OTHER',
+    icon: 'calendar-outline' as const,
+  },
+  {
+    label: 'Discussions',
+    subtitle: 'Community',
+    category: 'OTHER',
+    icon: 'people-outline' as const,
+  },
+];
+
 export default function CommunityScreen() {
   const { user } = useAuth();
   const { colors, theme } = useTheme();
+  const router = useRouter();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] =
+    useState<string>('ALL');
+
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
-  const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
+
+  const [showCreate, setShowCreate] =
+    useState(false);
+
+  const [creating, setCreating] =
+    useState(false);
 
   const [requests, setRequests] = useState<
     Record<string, ProjectJoinRequest[]>
   >({});
 
-  const [reviewing, setReviewing] = useState('');
+  const [reviewing, setReviewing] =
+    useState('');
 
   const [form, setForm] = useState({
     title: '',
@@ -42,48 +99,80 @@ export default function CommunityScreen() {
     category: 'SUSTAINABILITY',
   });
 
-  const load = useCallback(async (query = '') => {
-    try {
-      setError('');
+  const load = useCallback(
+    async (
+      query = '',
+      category = 'ALL'
+    ) => {
+      try {
+        setError('');
 
-      setProjects(
-        await api.get<Project[]>(
-          `/projects${
-            query
-              ? `?search=${encodeURIComponent(query)}`
-              : ''
-          }`
-        )
-      );
-    } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : 'Could not load projects.'
-      );
-    } finally {
-      setLoaded(true);
-    }
-  }, []);
+        const params: string[] = [];
+
+        if (query.trim()) {
+          params.push(
+            `search=${encodeURIComponent(
+              query.trim()
+            )}`
+          );
+        }
+
+        if (
+          category &&
+          category !== 'ALL'
+        ) {
+          params.push(
+            `category=${encodeURIComponent(
+              category
+            )}`
+          );
+        }
+
+        const queryString =
+          params.length > 0
+            ? `?${params.join('&')}`
+            : '';
+
+        const result =
+          await api.get<Project[]>(
+            `/projects${queryString}`
+          );
+
+        setProjects(result);
+      } catch (e) {
+        setError(
+          e instanceof Error
+            ? e.message
+            : 'Could not load projects.'
+        );
+      } finally {
+        setLoaded(true);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     load();
   }, [load]);
 
-  async function apply(id: string) {
-    try {
-      setError('');
+  function handleSearch() {
+    setSelectedCategory('ALL');
+    load(search, 'ALL');
+  }
 
-      await api.post(`/projects/${id}/apply`, {});
+  function handleShortcut(
+    category: string
+  ) {
+    setSelectedCategory(category);
+    setSearch('');
+    load('', category);
+  }
 
-      await load(search);
-    } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : 'Could not join the project.'
-      );
-    }
+  function showAllProjects() {
+    setSelectedCategory('ALL');
+    setSearch('');
+    load('', 'ALL');
   }
 
   async function createProject() {
@@ -103,9 +192,13 @@ export default function CommunityScreen() {
       await api.post('/projects', {
         ...form,
         title: form.title.trim(),
-        organization: form.organization.trim(),
-        description: form.description.trim(),
-        location: form.location.trim() || undefined,
+        organization:
+          form.organization.trim(),
+        description:
+          form.description.trim(),
+        location:
+          form.location.trim() ||
+          undefined,
       });
 
       setForm({
@@ -118,7 +211,10 @@ export default function CommunityScreen() {
 
       setShowCreate(false);
 
-      await load(search);
+      await load(
+        search,
+        selectedCategory
+      );
     } catch (e) {
       setError(
         e instanceof Error
@@ -130,12 +226,16 @@ export default function CommunityScreen() {
     }
   }
 
-  async function loadRequests(projectId: string) {
+  async function loadRequests(
+    projectId: string
+  ) {
     try {
       setError('');
 
       const result =
-        await api.get<ProjectJoinRequest[]>(
+        await api.get<
+          ProjectJoinRequest[]
+        >(
           `/projects/${projectId}/applications`
         );
 
@@ -155,7 +255,9 @@ export default function CommunityScreen() {
   async function reviewRequest(
     projectId: string,
     applicationId: string,
-    status: 'APPROVED' | 'DECLINED'
+    status:
+      | 'APPROVED'
+      | 'DECLINED'
   ) {
     setReviewing(applicationId);
 
@@ -169,7 +271,10 @@ export default function CommunityScreen() {
 
       await Promise.all([
         loadRequests(projectId),
-        load(search),
+        load(
+          search,
+          selectedCategory
+        ),
       ]);
     } catch (e) {
       setError(
@@ -190,45 +295,203 @@ export default function CommunityScreen() {
     return <Loading />;
   }
 
-  const isLight = theme === 'light';
+  const isLight =
+    theme === 'light';
 
   const tagColor = isLight
     ? '#1e6827'
     : colors.primary;
 
+  const myProjects =
+    projects.filter(
+      (item) => item.isCreator
+    );
+
+  const projectRequests =
+    projects.filter(
+      (item) =>
+        !item.isCreator &&
+        item.hasApplied
+    );
+
+  const featuredProjects =
+    projects.filter(
+      (item) =>
+        !item.isCreator &&
+        !item.hasApplied
+    );
+
   return (
     <Screen>
-      <View style={styles.headerBrand}>
-      <Image
-        source={require('../../../assets/images/community-logo.png')}
-        style={styles.communityLogo}
-        contentFit="contain"
-      />
-    </View>
-      <Heading subtitle="Join projects that create a practical community impact.">
-        Community
-      </Heading>
+      {/* HEADER */}
+      <View style={styles.headerRow}>
+        <Image
+          source={require('../../../assets/images/community-logo.png')}
+          style={
+            styles.communityLogo
+          }
+          contentFit="contain"
+        />
+
+        <View style={styles.headerText}>
+          <Heading subtitle="Join projects that create a practical community impact.">
+            Community
+          </Heading>
+        </View>
+      </View>
 
       {error ? (
         <Notice>{error}</Notice>
       ) : null}
 
+      {/* SEARCH */}
       <Card>
         <Field
           label="Find projects"
           value={search}
           onChangeText={setSearch}
           placeholder="Search projects or organizations"
-          onSubmitEditing={() => load(search)}
+          onSubmitEditing={
+            handleSearch
+          }
         />
 
         <Button
           title="Search"
-          onPress={() => load(search)}
+          onPress={handleSearch}
           secondary
         />
       </Card>
 
+      {/* EXPLORE */}
+      <View
+        style={
+          styles.categorySection
+        }
+      >
+        <View
+          style={
+            styles.sectionHeaderRow
+          }
+        >
+          <Text
+            style={[
+              styles.sectionHeading,
+              {
+                color: colors.text,
+              },
+            ]}
+          >
+            Explore Community
+          </Text>
+
+          {selectedCategory !==
+          'ALL' ? (
+            <Pressable
+              onPress={
+                showAllProjects
+              }
+            >
+              <Text
+                style={[
+                  styles.clearFilter,
+                  {
+                    color:
+                      tagColor,
+                  },
+                ]}
+              >
+                Show all
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        <View
+          style={
+            styles.categoryGrid
+          }
+        >
+          {communityShortcuts.map(
+            (item) => (
+              <Pressable
+                key={item.label}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.label} ${item.subtitle}`}
+                onPress={() =>
+                  handleShortcut(
+                    item.category
+                  )
+                }
+                style={({
+                  pressed,
+                }) => [
+                  styles.categoryCard,
+                  {
+                    backgroundColor:
+                      colors.surface,
+                    borderColor:
+                      selectedCategory ===
+                      item.category
+                        ? tagColor
+                        : colors.border,
+                  },
+                  pressed &&
+                    styles.categoryPressed,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.categoryIcon,
+                    {
+                      backgroundColor:
+                        colors.surfaceElevated,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      item.icon
+                    }
+                    size={23}
+                    color={
+                      tagColor
+                    }
+                  />
+                </View>
+
+                <Text
+                  style={[
+                    styles.categoryTitle,
+                    {
+                      color:
+                        colors.text,
+                    },
+                  ]}
+                >
+                  {item.label}
+                </Text>
+
+                <Text
+                  style={[
+                    styles.categorySubtitle,
+                    {
+                      color:
+                        colors.muted,
+                    },
+                  ]}
+                >
+                  {
+                    item.subtitle
+                  }
+                </Text>
+              </Pressable>
+            )
+          )}
+        </View>
+      </View>
+
+      {/* CREATE PROJECT */}
       {canCreate ? (
         <>
           <Button
@@ -239,7 +502,10 @@ export default function CommunityScreen() {
             }
             secondary
             onPress={() =>
-              setShowCreate((value) => !value)
+              setShowCreate(
+                (value) =>
+                  !value
+              )
             }
           />
 
@@ -248,7 +514,10 @@ export default function CommunityScreen() {
               <Text
                 style={[
                   styles.title,
-                  { color: colors.text },
+                  {
+                    color:
+                      colors.text,
+                  },
                 ]}
               >
                 Create a project
@@ -256,8 +525,12 @@ export default function CommunityScreen() {
 
               <Field
                 label="Project title"
-                value={form.title}
-                onChangeText={(title) =>
+                value={
+                  form.title
+                }
+                onChangeText={(
+                  title
+                ) =>
                   setForm({
                     ...form,
                     title,
@@ -267,8 +540,12 @@ export default function CommunityScreen() {
 
               <Field
                 label="Organization"
-                value={form.organization}
-                onChangeText={(organization) =>
+                value={
+                  form.organization
+                }
+                onChangeText={(
+                  organization
+                ) =>
                   setForm({
                     ...form,
                     organization,
@@ -278,8 +555,12 @@ export default function CommunityScreen() {
 
               <Field
                 label="Location (optional)"
-                value={form.location}
-                onChangeText={(location) =>
+                value={
+                  form.location
+                }
+                onChangeText={(
+                  location
+                ) =>
                   setForm({
                     ...form,
                     location,
@@ -289,8 +570,12 @@ export default function CommunityScreen() {
 
               <Field
                 label="Description"
-                value={form.description}
-                onChangeText={(description) =>
+                value={
+                  form.description
+                }
+                onChangeText={(
+                  description
+                ) =>
                   setForm({
                     ...form,
                     description,
@@ -302,31 +587,43 @@ export default function CommunityScreen() {
               <Text
                 style={[
                   styles.categoryLabel,
-                  { color: colors.text },
+                  {
+                    color:
+                      colors.text,
+                  },
                 ]}
               >
                 Category
               </Text>
 
-              <View style={styles.categories}>
-                {categories.map((category) => (
-                  <Button
-                    key={category}
-                    title={category.replaceAll(
-                      '_',
-                      ' '
-                    )}
-                    secondary={
-                      form.category !== category
-                    }
-                    onPress={() =>
-                      setForm({
-                        ...form,
-                        category,
-                      })
-                    }
-                  />
-                ))}
+              <View
+                style={
+                  styles.categories
+                }
+              >
+                {categories.map(
+                  (category) => (
+                    <Button
+                      key={
+                        category
+                      }
+                      title={category.replaceAll(
+                        '_',
+                        ' '
+                      )}
+                      secondary={
+                        form.category !==
+                        category
+                      }
+                      onPress={() =>
+                        setForm({
+                          ...form,
+                          category,
+                        })
+                      }
+                    />
+                  )
+                )}
               </View>
 
               <Button
@@ -335,7 +632,9 @@ export default function CommunityScreen() {
                     ? 'Creating project...'
                     : 'Create project'
                 }
-                onPress={createProject}
+                onPress={
+                  createProject
+                }
                 disabled={
                   creating ||
                   !form.title.trim() ||
@@ -348,303 +647,656 @@ export default function CommunityScreen() {
         </>
       ) : null}
 
-      {projects.map((item) => (
-        <Card key={item.id}>
+      {/* MY PROJECTS */}
+      {canCreate ? (
+        <>
           <Text
             style={[
-              styles.tag,
-              { color: tagColor },
+              styles.sectionHeading,
+              {
+                color: colors.text,
+              },
             ]}
           >
-            {item.category} • {item.xpReward} XP
+            My Community Projects
           </Text>
 
-          <Text
-            style={[
-              styles.title,
-              { color: colors.text },
-            ]}
-          >
-            {item.title}
-          </Text>
-
-          <Text
-            style={[
-              styles.copy,
-              { color: colors.muted },
-            ]}
-          >
-            {item.organization}
-            {item.location
-              ? ` • ${item.location}`
-              : ''}
-          </Text>
-
-          <Text
-            style={[
-              styles.copy,
-              { color: colors.muted },
-            ]}
-          >
-            {item.description}
-          </Text>
-
-          {item.isCreator ? (
-            <>
-              <Button
-                title={
-                  requests[item.id]
-                    ? 'Refresh join requests'
-                    : 'Review join requests'
-                }
-                secondary
-                onPress={() =>
-                  loadRequests(item.id)
-                }
-              />
-
-              {requests[item.id]?.map(
-                (request) => (
-                  <View
-                    key={request.id}
+          {myProjects.length >
+          0 ? (
+            myProjects.map(
+              (item) => (
+                <Card
+                  key={
+                    item.id
+                  }
+                >
+                  <Text
                     style={[
-                      styles.request,
+                      styles.tag,
                       {
-                        borderTopColor:
-                          colors.border,
+                        color:
+                          tagColor,
                       },
                     ]}
                   >
-                    <View
-                      style={styles.requestCopy}
-                    >
-                      <Text
-                        style={[
-                          styles.requestName,
-                          { color: colors.text },
-                        ]}
-                      >
-                        {request.firstName}{' '}
-                        {request.lastName}
-                      </Text>
+                    {item.category.replaceAll(
+                      '_',
+                      ' '
+                    )}{' '}
+                    •{' '}
+                    {
+                      item.xpReward
+                    }{' '}
+                    XP
+                  </Text>
 
-                      <Text
-                        style={[
-                          styles.hint,
-                          { color: colors.muted },
-                        ]}
-                      >
-                        {request.email} •{' '}
-                        {request.status}
-                      </Text>
-                    </View>
+                  <Text
+                    style={[
+                      styles.title,
+                      {
+                        color:
+                          colors.text,
+                      },
+                    ]}
+                  >
+                    {item.title}
+                  </Text>
 
-                    {request.status ===
-                    'PENDING' ? (
+                  <Text
+                    style={[
+                      styles.copy,
+                      {
+                        color:
+                          colors.muted,
+                      },
+                    ]}
+                  >
+                    {
+                      item.organization
+                    }
+                    {item.location
+                      ? ` • ${item.location}`
+                      : ''}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.copy,
+                      {
+                        color:
+                          colors.muted,
+                      },
+                    ]}
+                  >
+                    {
+                      item.description
+                    }
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.hint,
+                      {
+                        color:
+                          colors.muted,
+                      },
+                    ]}
+                  >
+                    {
+                      item
+                        ._count
+                        ?.applications ??
+                      0
+                    }{' '}
+                    application(s)
+                  </Text>
+
+                  <Button
+                    title={
+                      requests[
+                        item.id
+                      ]
+                        ? 'Refresh join requests'
+                        : 'Review join requests'
+                    }
+                    secondary
+                    onPress={() =>
+                      loadRequests(
+                        item.id
+                      )
+                    }
+                  />
+
+                  {requests[
+                    item.id
+                  ]?.map(
+                    (
+                      request
+                    ) => (
                       <View
-                        style={
-                          styles.requestActions
+                        key={
+                          request.id
                         }
+                        style={[
+                          styles.request,
+                          {
+                            borderTopColor:
+                              colors.border,
+                          },
+                        ]}
                       >
-                        <Button
-                          title={
-                            reviewing ===
-                            request.id
-                              ? 'Reviewing...'
-                              : 'Allow'
+                        <View
+                          style={
+                            styles.requestCopy
                           }
-                          onPress={() =>
-                            reviewRequest(
-                              item.id,
-                              request.id,
-                              'APPROVED'
-                            )
-                          }
-                          disabled={Boolean(
-                            reviewing
-                          )}
-                        />
+                        >
+                          <Text
+                            style={[
+                              styles.requestName,
+                              {
+                                color:
+                                  colors.text,
+                              },
+                            ]}
+                          >
+                            {
+                              request.firstName
+                            }{' '}
+                            {
+                              request.lastName
+                            }
+                          </Text>
 
-                        <Button
-                          title="Decline"
-                          secondary
-                          onPress={() =>
-                            reviewRequest(
-                              item.id,
-                              request.id,
-                              'DECLINED'
-                            )
-                          }
-                          disabled={Boolean(
-                            reviewing
-                          )}
-                        />
+                          <Text
+                            style={[
+                              styles.hint,
+                              {
+                                color:
+                                  colors.muted,
+                              },
+                            ]}
+                          >
+                            {
+                              request.email
+                            }{' '}
+                            •{' '}
+                            {
+                              request.status
+                            }
+                          </Text>
+                        </View>
+
+                        {request.status ===
+                        'PENDING' ? (
+                          <View
+                            style={
+                              styles.requestActions
+                            }
+                          >
+                            <Button
+                              title={
+                                reviewing ===
+                                request.id
+                                  ? 'Reviewing...'
+                                  : 'Allow'
+                              }
+                              onPress={() =>
+                                reviewRequest(
+                                  item.id,
+                                  request.id,
+                                  'APPROVED'
+                                )
+                              }
+                              disabled={Boolean(
+                                reviewing
+                              )}
+                            />
+
+                            <Button
+                              title="Decline"
+                              secondary
+                              onPress={() =>
+                                reviewRequest(
+                                  item.id,
+                                  request.id,
+                                  'DECLINED'
+                                )
+                              }
+                              disabled={Boolean(
+                                reviewing
+                              )}
+                            />
+                          </View>
+                        ) : null}
                       </View>
-                    ) : null}
-                  </View>
-                )
-              )}
-            </>
+                    )
+                  )}
+                </Card>
+              )
+            )
           ) : (
-            <>
-              {!item.hasApplied ? (
-                <Button
-                  title="Request to join"
-                  onPress={() =>
-                    apply(item.id)
-                  }
-                />
-              ) : null}
-
-              {item.applicationStatus ===
-              'PENDING' ? (
-                <Text
-                  style={[
-                    styles.pending,
-                    { color: colors.muted },
-                  ]}
-                >
-                  Your request is pending review.
-                </Text>
-              ) : null}
-
-              {item.applicationStatus ===
-              'APPROVED' ? (
-                <Text
-                  style={[
-                    styles.approved,
-                    { color: tagColor },
-                  ]}
-                >
-                  ✓ Your application has been approved.
-                </Text>
-              ) : null}
-
-              {item.applicationStatus ===
-              'DECLINED' ? (
-                <Text style={styles.declined}>
-                  Your application was not approved.
-                </Text>
-              ) : null}
-
-              {!item.hasApplied ? (
-                <Text
-                  style={[
-                    styles.hint,
-                    { color: colors.muted },
-                  ]}
-                >
-                  Submit a request to participate in this project.
-                </Text>
-              ) : null}
-            </>
+            <Card>
+              <Text
+                style={[
+                  styles.copy,
+                  {
+                    color:
+                      colors.muted,
+                  },
+                ]}
+              >
+                You have not
+                created any
+                community
+                projects yet.
+              </Text>
+            </Card>
           )}
-        </Card>
-      ))}
+        </>
+      ) : null}
 
-      {projects.length === 0 ? (
+      {/* PROJECT REQUESTS */}
+      <Text
+        style={[
+          styles.sectionHeading,
+          {
+            color: colors.text,
+          },
+        ]}
+      >
+        Project Requests
+      </Text>
+
+      {projectRequests.length >
+      0 ? (
+        projectRequests.map(
+          (item) => (
+            <Card
+              key={item.id}
+            >
+              <Text
+                style={[
+                  styles.title,
+                  {
+                    color:
+                      colors.text,
+                  },
+                ]}
+              >
+                {item.title}
+              </Text>
+
+              <Text
+                style={[
+                  styles.copy,
+                  {
+                    color:
+                      colors.muted,
+                  },
+                ]}
+              >
+                {
+                  item.organization
+                }
+                {item.location
+                  ? ` • ${item.location}`
+                  : ''}
+              </Text>
+
+              <Text
+                style={[
+                  styles.statusText,
+                  {
+                    color:
+                      item.applicationStatus ===
+                      'APPROVED'
+                        ? tagColor
+                        : item.applicationStatus ===
+                            'DECLINED'
+                          ? '#B3261E'
+                          : colors.muted,
+                  },
+                ]}
+              >
+                {item.applicationStatus ===
+                'APPROVED'
+                  ? 'Approved'
+                  : item.applicationStatus ===
+                      'DECLINED'
+                    ? 'Declined'
+                    : 'Pending'}
+              </Text>
+
+              <Button
+                title="View Opportunity"
+                secondary
+                onPress={() =>
+                  router.push(
+                    `/community/${item.id}` as never
+                  )
+                }
+              />
+            </Card>
+          )
+        )
+      ) : (
+        <Card>
+          <Text
+            style={[
+              styles.copy,
+              {
+                color:
+                  colors.muted,
+              },
+            ]}
+          >
+            You have no
+            project requests
+            yet.
+          </Text>
+        </Card>
+      )}
+
+      {/* FEATURED OPPORTUNITIES */}
+      <Text
+        style={[
+          styles.sectionHeading,
+          {
+            color: colors.text,
+          },
+        ]}
+      >
+        Featured Opportunities
+      </Text>
+
+      {featuredProjects.length >
+      0 ? (
+        featuredProjects.map(
+          (item) => (
+            <Card
+              key={item.id}
+            >
+              <Text
+                style={[
+                  styles.tag,
+                  {
+                    color:
+                      tagColor,
+                  },
+                ]}
+              >
+                {item.category.replaceAll(
+                  '_',
+                  ' '
+                )}{' '}
+                •{' '}
+                {
+                  item.xpReward
+                }{' '}
+                XP
+              </Text>
+
+              <Text
+                style={[
+                  styles.title,
+                  {
+                    color:
+                      colors.text,
+                  },
+                ]}
+              >
+                {item.title}
+              </Text>
+
+              <Text
+                style={[
+                  styles.copy,
+                  {
+                    color:
+                      colors.muted,
+                  },
+                ]}
+              >
+                {
+                  item.organization
+                }
+                {item.location
+                  ? ` • ${item.location}`
+                  : ''}
+              </Text>
+
+              <Text
+                style={[
+                  styles.copy,
+                  {
+                    color:
+                      colors.muted,
+                  },
+                ]}
+              >
+                {
+                  item.description
+                }
+              </Text>
+
+              <Button
+                title="View Opportunity"
+                onPress={() =>
+                  router.push(
+                    `/community/${item.id}` as never
+                  )
+                }
+              />
+
+              <Text
+                style={[
+                  styles.hint,
+                  {
+                    color:
+                      colors.muted,
+                  },
+                ]}
+              >
+                View the
+                opportunity for
+                full details and
+                application
+                information.
+              </Text>
+            </Card>
+          )
+        )
+      ) : (
         <Card>
           <Text
             style={[
               styles.emptyTitle,
-              { color: colors.text },
+              {
+                color:
+                  colors.text,
+              },
             ]}
           >
-            No projects found
+            No featured
+            opportunities found
           </Text>
 
           <Text
             style={[
               styles.copy,
-              { color: colors.muted },
+              {
+                color:
+                  colors.muted,
+              },
             ]}
           >
-            Try another search or check again later
-            for new community opportunities.
+            You may already
+            have applied to the
+            available projects,
+            or the current
+            filter has no
+            matching
+            opportunities.
           </Text>
+
+          {selectedCategory !==
+          'ALL' ? (
+            <Button
+              title="Show all projects"
+              secondary
+              onPress={
+                showAllProjects
+              }
+            />
+          ) : null}
         </Card>
-      ) : null}
+      )}
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  tag: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
+const styles =
+  StyleSheet.create({
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      marginBottom: 8,
+    },
 
-  title: {
-    fontSize: 17,
-    fontWeight: '800',
-  },
+    communityLogo: {
+      width: 58,
+      height: 58,
+    },
 
-  copy: {
-    lineHeight: 20,
-    fontSize: 13,
-  },
+    headerText: {
+      flex: 1,
+    },
 
-  hint: {
-    fontSize: 12,
-  },
+    categorySection: {
+      gap: 12,
+      marginTop: 4,
+      marginBottom: 10,
+    },
 
-  pending: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
+    sectionHeaderRow: {
+      flexDirection: 'row',
+      justifyContent:
+        'space-between',
+      alignItems: 'center',
+    },
 
-  approved: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
+    sectionHeading: {
+      fontSize: 18,
+      fontWeight: '800',
+      marginTop: 12,
+    },
 
-  declined: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#B3261E',
-  },
+    clearFilter: {
+      fontSize: 13,
+      fontWeight: '800',
+      marginTop: 12,
+    },
 
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
+    categoryGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent:
+        'space-between',
+      gap: 12,
+    },
 
-  categoryLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
+    categoryCard: {
+      width: '48%',
+      minHeight: 125,
+      borderWidth: 1,
+      borderRadius: 18,
+      padding: 14,
+      justifyContent:
+        'center',
+      gap: 5,
+    },
 
-  categories: {
-    gap: 7,
-  },
+    categoryIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent:
+        'center',
+      marginBottom: 5,
+    },
 
-  request: {
-    borderTopWidth: 1,
-    paddingTop: 10,
-    gap: 8,
-  },
+    categoryTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+    },
 
-  requestCopy: {
-    gap: 2,
-  },
+    categorySubtitle: {
+      fontSize: 12,
+      fontWeight: '500',
+    },
 
-  requestName: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
+    categoryPressed: {
+      opacity: 0.7,
+    },
 
-  requestActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+    tag: {
+      fontSize: 12,
+      fontWeight: '800',
+    },
 
-  headerBrand: {
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
+    title: {
+      fontSize: 17,
+      fontWeight: '800',
+    },
 
-  communityLogo: {
-    width: 70,
-    height: 70,
-  },
-});
+    copy: {
+      lineHeight: 20,
+      fontSize: 13,
+    },
+
+    hint: {
+      fontSize: 12,
+    },
+
+    statusText: {
+      fontSize: 13,
+      fontWeight: '700',
+      marginTop: 4,
+    },
+
+    emptyTitle: {
+      fontSize: 16,
+      fontWeight: '800',
+    },
+
+    categoryLabel: {
+      fontSize: 13,
+      fontWeight: '700',
+    },
+
+    categories: {
+      gap: 7,
+    },
+
+    request: {
+      borderTopWidth: 1,
+      paddingTop: 10,
+      gap: 8,
+    },
+
+    requestCopy: {
+      gap: 2,
+    },
+
+    requestName: {
+      fontSize: 14,
+      fontWeight: '800',
+    },
+
+    requestActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+  });
