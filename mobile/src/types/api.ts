@@ -43,9 +43,17 @@ export interface Project {
   id: string; title: string; category: string; location: string | null; organization: string;
   description: string; requirements: string | null; xpReward: number;
   hasApplied: boolean; applicationStatus: string | null; isCreator: boolean; _count: { applications: number };
+  githubOwner?: string | null; githubRepo?: string | null; githubFullName?: string | null; githubUrl?: string | null;
+  githubVisibility?: string | null; primaryLanguage?: string | null; isGithubBacked?: boolean;
+  license?: string | null; starterTemplate?: string | null;
+  githubStars?: number; githubForks?: number; contributorAvatars?: string[];
+  lastActivityAt?: string | null; lastActivityMessage?: string | null; lastActivityActor?: string | null;
 }
-export interface ProjectJoinRequest { id: string; status: 'PENDING' | 'APPROVED' | 'DECLINED'; createdAt: string; userId: string; firstName: string; lastName: string; email: string; profilePicture?: string | null; }
+export interface ProjectJoinRequest { id: string; status: 'PENDING' | 'INVITATION_SENT' | 'APPROVED' | 'DECLINED'; createdAt: string; userId: string; firstName: string; lastName: string; email: string; githubUsername?: string | null; message?: string | null; invitationSentAt?: string | null; acceptedAt?: string | null; profilePicture?: string | null; }
 export interface ProjectMessage { id: string; body: string; createdAt: string; userId: string; firstName: string; lastName: string; role: string; }
+export interface GithubConnection { connected: boolean; username: string | null; avatarUrl: string | null; }
+export interface GithubDeviceAuthorization { id: string; userCode: string; verificationUri: string; verificationUriComplete: string | null; intervalSeconds: number; expiresIn: number; }
+export interface GithubActivity { id: string; projectId: string; type: string; actorLogin: string | null; actorAvatarUrl: string | null; title: string; summary: string | null; url: string | null; occurredAt: string; }
 
 export interface Notification { id: string; title: string; message: string; type: string; read: boolean; createdAt: string; }
 

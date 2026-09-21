@@ -5,6 +5,7 @@ import { paramId } from '../lib/params.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { awardXp } from '../services/gamification.js';
+import { accessTokenForUser, githubConnection, githubRequest, GithubError } from '../services/github.js';
 
 const router = Router();
 
@@ -32,6 +33,10 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
   const projects = await query<{
     id: string;
     creatorId: string | null;
+    githubVisibility: string | null;
+    lastActivityAt: Date | null;
+    lastActivityMessage: string | null;
+    lastActivityActor: string | null;
     _count: { applications: number };
   }>(
     `SELECT
@@ -44,6 +49,19 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
        p."description",
        p."requirements",
        p."xpReward",
+       p."githubOwner",
+       p."githubRepo",
+       p."githubFullName",
+       p."githubUrl",
+       p."githubVisibility",
+       p."primaryLanguage",
+       p."githubStars",
+       p."githubForks",
+       p."contributorAvatars",
+       p."isGithubBacked",
+       p."lastActivityAt",
+       p."lastActivityMessage",
+       p."lastActivityActor",
        p."isActive",
        p."createdAt",
        json_build_object('applications', COUNT(pa."id")::int) AS "_count"
@@ -65,12 +83,20 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
   const appliedMap = new Map(userApplications.map((a) => [a.projectId, a.status]));
 
   res.json(
-    projects.map((project) => ({
-      ...project,
-      hasApplied: appliedMap.has(project.id),
-      applicationStatus: appliedMap.get(project.id) || null,
-      isCreator: project.creatorId === req.user!.userId,
-    })),
+    projects.map((project) => {
+      const applicationStatus = appliedMap.get(project.id) || null;
+      const isCreator = project.creatorId === req.user!.userId;
+      const canViewActivity = project.githubVisibility !== 'private' || isCreator || applicationStatus === 'APPROVED';
+      return {
+        ...project,
+        lastActivityAt: canViewActivity ? project.lastActivityAt : null,
+        lastActivityMessage: canViewActivity ? project.lastActivityMessage : null,
+        lastActivityActor: canViewActivity ? project.lastActivityActor : null,
+        hasApplied: appliedMap.has(project.id),
+        applicationStatus,
+        isCreator,
+      };
+    }),
   );
 });
 
@@ -159,7 +185,7 @@ router.get('/:id/applications', authenticate, async (req: AuthRequest, res) => {
   if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
   if (req.user!.role !== 'ADMIN' && project.creatorId !== req.user!.userId) { res.status(403).json({ error: 'Only the project owner can review join requests.' }); return; }
   const applications = await query(
-    `SELECT pa."id", pa."status", pa."createdAt", u."id" AS "userId", u."firstName", u."lastName", u."email", u."profilePicture"
+    `SELECT pa."id", pa."status", pa."createdAt", pa."message", pa."githubUsername", pa."invitationSentAt", pa."acceptedAt", u."id" AS "userId", u."firstName", u."lastName", u."email", u."profilePicture"
      FROM "ProjectApplication" pa JOIN "User" u ON u."id" = pa."userId"
      WHERE pa."projectId" = $1 ORDER BY CASE pa."status" WHEN 'PENDING' THEN 0 ELSE 1 END, pa."createdAt" DESC`,
     [projectId],
@@ -170,9 +196,32 @@ router.get('/:id/applications', authenticate, async (req: AuthRequest, res) => {
 const reviewApplicationSchema = z.object({ status: z.enum(['APPROVED', 'DECLINED']) });
 router.patch('/:id/applications/:applicationId', authenticate, validateBody(reviewApplicationSchema), async (req: AuthRequest, res) => {
   const projectId = paramId(req);
-  const project = await queryOne<{ creatorId: string | null; title: string; xpReward: number }>(`SELECT "creatorId", "title", "xpReward" FROM "Project" WHERE "id" = $1`, [projectId]);
+  const project = await queryOne<{ creatorId: string | null; title: string; xpReward: number; isGithubBacked: boolean; githubOwner: string | null; githubRepo: string | null }>(`SELECT "creatorId", "title", "xpReward", "isGithubBacked", "githubOwner", "githubRepo" FROM "Project" WHERE "id" = $1`, [projectId]);
   if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
   if (req.user!.role !== 'ADMIN' && project.creatorId !== req.user!.userId) { res.status(403).json({ error: 'Only the project owner can review join requests.' }); return; }
+  if (project.isGithubBacked && req.body.status === 'APPROVED') {
+    if (!project.githubOwner || !project.githubRepo || !project.creatorId) { res.status(409).json({ error: 'This GitHub repository is not configured correctly.' }); return; }
+    const application = await queryOne<{ id: string; userId: string; githubUsername: string | null }>(
+      `SELECT "id", "userId", "githubUsername" FROM "ProjectApplication" WHERE "id" = $1 AND "projectId" = $2 AND "status" = 'PENDING'`, [req.params.applicationId, projectId],
+    );
+    if (!application) { res.status(409).json({ error: 'This request has already been reviewed or does not exist.' }); return; }
+    if (!application.githubUsername) { res.status(422).json({ error: 'The requester has not connected GitHub.' }); return; }
+    try {
+      const { token } = await accessTokenForUser(project.creatorId);
+      const invitation = await githubRequest<{ id?: number }>(`/repos/${project.githubOwner}/${project.githubRepo}/collaborators/${encodeURIComponent(application.githubUsername)}`, token, { method: 'PUT', body: JSON.stringify({ permission: 'push' }) });
+      const updated = await queryOne(
+        `UPDATE "ProjectApplication" SET "status" = 'INVITATION_SENT', "invitationId" = $1, "invitationSentAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = $2 RETURNING *`, [invitation?.id || null, application.id],
+      );
+      await queryOne(`INSERT INTO "Notification" ("id", "userId", "title", "message", "type") VALUES ($1, $2, $3, $4, 'community') RETURNING "id"`, [newId(), application.userId, 'GitHub invitation sent', `Accept the GitHub invitation to contribute to ${project.title}.`]);
+      res.json(updated);
+    } catch (error) {
+      const message = error instanceof GithubError && error.status === 403
+        ? 'GitHub does not permit direct collaborator invites for this repository. Use the fork-and-pull-request workflow.'
+        : error instanceof Error ? error.message : 'Could not send the GitHub invitation.';
+      res.status(502).json({ error: message });
+    }
+    return;
+  }
   const application = await queryOne<{ id: string; userId: string; status: string }>(
     `UPDATE "ProjectApplication" SET "status" = $1, "updatedAt" = CURRENT_TIMESTAMP
      WHERE "id" = $2 AND "projectId" = $3 AND "status" = 'PENDING' RETURNING "id", "userId", "status"`,
@@ -183,8 +232,80 @@ router.patch('/:id/applications/:applicationId', authenticate, validateBody(revi
   res.json(application);
 });
 
-router.get('/:id', authenticate, async (req, res) => {
-  const project = await queryOne(
+const joinRequestSchema = z.object({ message: z.string().trim().max(2000).optional() });
+router.post('/:id/join-requests', authenticate, validateBody(joinRequestSchema), async (req: AuthRequest, res) => {
+  const project = await queryOne<{ id: string; title: string; isGithubBacked: boolean; isActive: boolean; creatorId: string | null }>(
+    `SELECT "id", "title", "isGithubBacked", "isActive", "creatorId" FROM "Project" WHERE "id" = $1`, [paramId(req)],
+  );
+  if (!project || !project.isActive) { res.status(404).json({ error: 'Project not found.' }); return; }
+  if (project.creatorId === req.user!.userId) { res.status(409).json({ error: 'You already own this project.' }); return; }
+  let username: string | null = null;
+  if (project.isGithubBacked) {
+    const connection = await githubConnection(req.user!.userId);
+    if (!connection || connection.revokedAt) { res.status(401).json({ error: 'Connect GitHub before requesting to join.', code: 'github_not_connected' }); return; }
+    username = connection.githubUsername;
+  }
+  try {
+    const application = await queryOne(
+      `INSERT INTO "ProjectApplication" ("id", "projectId", "userId", "githubUsername", "message", "deliverable") VALUES ($1, $2, $3, $4, $5, $5) RETURNING *`,
+      [newId(), project.id, req.user!.userId, username, nullable(req.body.message)],
+    );
+    res.status(201).json(application);
+  } catch (error) {
+    if (!isUniqueViolation(error)) console.error('Project join request error:', error);
+    res.status(409).json({ error: 'You already requested to join this project.' });
+  }
+});
+
+router.post('/:id/fork', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const project = await githubProjectForRequest(paramId(req), req.user!.userId);
+    const fork = await githubRequest<{ full_name: string; html_url: string }>(
+      `/repos/${project.githubOwner}/${project.githubRepo}/forks`, project.token, { method: 'POST', body: JSON.stringify({ default_branch_only: true }) },
+    );
+    res.status(201).json({ fullName: fork.full_name, url: fork.html_url });
+  } catch (error) {
+    res.status(error instanceof GithubError ? error.status : 502).json({ error: error instanceof Error ? error.message : 'Could not fork this repository.' });
+  }
+});
+
+async function githubProjectForRequest(projectId: string, userId: string) {
+  const project = await queryOne<{ id: string; githubOwner: string | null; githubRepo: string | null; isGithubBacked: boolean }>(`SELECT "id", "githubOwner", "githubRepo", "isGithubBacked" FROM "Project" WHERE "id" = $1`, [projectId]);
+  if (!project?.isGithubBacked || !project.githubOwner || !project.githubRepo) throw new GithubError('This is not a GitHub-backed project.', 404);
+  const { token } = await accessTokenForUser(userId);
+  return { ...project, token };
+}
+
+router.get('/:id/repository/:section(commits|issues|pulls|contributors|code)', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const project = await githubProjectForRequest(paramId(req), req.user!.userId);
+    const base = `/repos/${project.githubOwner}/${project.githubRepo}`;
+    const section = req.params.section;
+    const path = section === 'pulls' ? `${base}/pulls?state=open&per_page=50` : section === 'code' ? `${base}/contents` : `${base}/${section}?per_page=50`;
+    res.json(await githubRequest(path, project.token));
+  } catch (error) { res.status(error instanceof GithubError ? error.status : 502).json({ error: error instanceof Error ? error.message : 'Could not load repository data.' }); }
+});
+
+router.get('/:id/commits/:sha', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const project = await githubProjectForRequest(paramId(req), req.user!.userId);
+    res.json(await githubRequest(`/repos/${project.githubOwner}/${project.githubRepo}/commits/${encodeURIComponent(String(req.params.sha))}`, project.token));
+  } catch (error) { res.status(error instanceof GithubError ? error.status : 502).json({ error: error instanceof Error ? error.message : 'Could not load commit.' }); }
+});
+
+router.get('/:id/activity', authenticate, async (req: AuthRequest, res) => {
+  const project = await queryOne<{ creatorId: string | null; githubVisibility: string | null }>(`SELECT "creatorId", "githubVisibility" FROM "Project" WHERE "id" = $1`, [paramId(req)]);
+  if (!project) { res.status(404).json({ error: 'Project not found.' }); return; }
+  if (project.githubVisibility === 'private' && project.creatorId !== req.user!.userId) {
+    const membership = await queryOne(`SELECT "id" FROM "ProjectApplication" WHERE "projectId" = $1 AND "userId" = $2 AND "status" = 'APPROVED'`, [paramId(req), req.user!.userId]);
+    if (!membership) { res.status(403).json({ error: 'Join this private project before viewing its activity.' }); return; }
+  }
+  const events = await query(`SELECT * FROM "ActivityEvent" WHERE "projectId" = $1 ORDER BY "occurredAt" DESC LIMIT 100`, [paramId(req)]);
+  res.json(events);
+});
+
+router.get('/:id', authenticate, async (req: AuthRequest, res) => {
+  const project = await queryOne<{ creatorId: string | null; [key: string]: unknown }>(
     `SELECT *
      FROM "Project"
      WHERE "id" = $1`,
@@ -202,7 +323,11 @@ router.get('/:id', authenticate, async (req, res) => {
      LIMIT 100`,
     [paramId(req)],
   );
-  res.json({ ...project, applications });
+  const currentApplication = await queryOne<{ status: string }>(
+    `SELECT "status" FROM "ProjectApplication" WHERE "projectId" = $1 AND "userId" = $2`,
+    [paramId(req), req.user!.userId],
+  );
+  res.json({ ...project, applications, isCreator: project.creatorId === req.user!.userId, hasApplied: Boolean(currentApplication), applicationStatus: currentApplication?.status || null });
 });
 
 const applySchema = z.object({

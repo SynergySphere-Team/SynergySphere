@@ -118,7 +118,7 @@ function isDbUnavailable(error: unknown): boolean {
   return typeof error === 'object' &&
     error !== null &&
     'code' in error &&
-    (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === '57P03');
+    (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET' || error.code === 'ENOTFOUND' || error.code === '57P03');
 }
 
 router.post('/login', validateBody(loginSchema), async (req, res) => {

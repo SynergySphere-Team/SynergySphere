@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, authStorage, ApiError } from '@/services/api';
+import { registerCommunityPushNotifications } from '@/services/pushNotifications';
+import { github } from '@/services/github';
 import type { AuthResponse, User } from '@/types/api';
 
 type RegisterInput = { firstName: string; lastName: string; email: string; password: string; role?: 'STUDENT' | 'ORGANIZATION' };
@@ -17,13 +19,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     catch (error) { if (error instanceof ApiError && error.status === 401) await authStorage.clearToken(); setUser(null); }
   }, []);
   useEffect(() => { refresh().finally(() => setLoading(false)); }, [refresh]);
+  useEffect(() => { if (user) void registerCommunityPushNotifications(); }, [user]);
   const establishSession = async (response: AuthResponse) => { await authStorage.setToken(response.token); setUser(response.user); };
   const value = useMemo<AuthContextValue>(() => ({
     user, loading, refresh,
     login: async (email, password) => establishSession(await api.post<AuthResponse>('/auth/login', { email, password })),
     register: async (data) => establishSession(await api.post<AuthResponse>('/auth/register', data)),
     updateProfile: async (data) => setUser(await api.patch<User>('/auth/me', data)),
-    logout: async () => { try { await api.post('/auth/logout'); } finally { await authStorage.clearToken(); setUser(null); } },
+    logout: async () => { try { await api.post('/auth/logout'); } finally { await Promise.all([authStorage.clearToken(), github.clearLocalToken()]); setUser(null); } },
   }), [user, loading, refresh]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

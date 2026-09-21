@@ -7,18 +7,21 @@ import { Card, Stat } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
-import type { DashboardStats } from '@/types/api';
+import type { DashboardStats, GithubActivity } from '@/types/api';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors, theme } = useTheme();
   const [data, setData] = useState<DashboardStats | null>(null);
+  const [communityActivity, setCommunityActivity] = useState<GithubActivity[]>([]);
   const [error, setError] = useState('');
   const load = useCallback(async () => {
     try {
       setError('');
-      setData(await api.get<DashboardStats>('/dashboard/stats'));
+      const stats = await api.get<DashboardStats>('/dashboard/stats');
+      setData(stats);
+      api.get<GithubActivity[]>('/github/feed').then(setCommunityActivity).catch(() => setCommunityActivity([]));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load dashboard.');
     }
@@ -100,6 +103,17 @@ export default function HomeScreen() {
           </Pressable>
         ))}
       </Card>
+      {communityActivity.length ? <>
+        <Text style={[styles.section, { color: colors.text }]}>Community activity</Text>
+        <Card>
+          {communityActivity.slice(0, 4).map((event, index) => (
+            <View key={event.id} style={[styles.feedItem, index > 0 && [styles.workspaceDivider, { borderTopColor: colors.border }]]}>
+              <Text style={[styles.feedTitle, { color: colors.text }]}>{event.actorLogin ? `${event.actorLogin} · ` : ''}{event.title}</Text>
+              <Text style={[styles.workspaceDescription, { color: colors.muted }]}>{event.summary || event.type}</Text>
+            </View>
+          ))}
+        </Card>
+      </> : null}
     </Screen>
   );
 }
@@ -120,4 +134,6 @@ const styles = StyleSheet.create({
   workspaceBody: { flex: 1, gap: 3 },
   workspaceTitle: { fontSize: 16, fontWeight: '800' },
   workspaceDescription: { fontSize: 13, lineHeight: 18 },
+  feedItem: { gap: 3, paddingVertical: 10 },
+  feedTitle: { fontSize: 14, fontWeight: '800' },
 });
