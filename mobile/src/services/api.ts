@@ -25,11 +25,11 @@ export function getApiUrl(): string {
   if (typeof hostUri === 'string' && hostUri) {
     const host = hostUri.split(':')[0];
     if (host) {
-      return `http://${host}:4000/api`;
+      return `http://${host}:4001/api`;
     }
   }
 
-  return 'http://10.0.0.115:4000/api';
+  return 'http://10.0.0.115:4001/api';
 }
 
 export class ApiError extends Error {
