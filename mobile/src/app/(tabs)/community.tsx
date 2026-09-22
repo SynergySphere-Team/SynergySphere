@@ -5,6 +5,7 @@ import {
   Text,
   View,
 } from 'react-native';
+
 import { Image } from 'expo-image';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
@@ -14,6 +15,7 @@ import {
   Loading,
   Notice,
 } from '@/components/Screen';
+
 import {
   Button,
   Card,
@@ -25,79 +27,57 @@ import { api } from '@/services/api';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
-import type {
-  Project,
-  ProjectJoinRequest,
-} from '@/types/api';
+import type { Project } from '@/types/api';
 
-const categories = [
-  'SUSTAINABILITY',
-  'RECYCLING',
-  'ECO_TOURISM',
-  'GREEN_INFRASTRUCTURE',
-  'OTHER',
-] as const;
-
-const communityShortcuts = [
+const PROJECT_CATEGORIES = [
   {
+    value: 'SUSTAINABILITY',
+    label: 'Sustainability',
+    icon: 'earth-outline' as const,
+  },
+  {
+    value: 'RECYCLING',
+    label: 'Recycling',
+    icon: 'refresh-circle-outline' as const,
+  },
+  {
+    value: 'ECO_TOURISM',
     label: 'Eco-tourism',
-    subtitle: 'Opportunities',
-    category: 'ECO_TOURISM',
     icon: 'leaf-outline' as const,
   },
   {
+    value: 'GREEN_INFRASTRUCTURE',
     label: 'Green Infrastructure',
-    subtitle: 'Projects',
-    category: 'GREEN_INFRASTRUCTURE',
     icon: 'business-outline' as const,
   },
   {
-    label: 'Events',
-    subtitle: '& Webinars',
-    category: 'OTHER',
-    icon: 'calendar-outline' as const,
+    value: 'OTHER',
+    label: 'Other',
+    icon: 'folder-outline' as const,
   },
-  {
-    label: 'Discussions',
-    subtitle: 'Community',
-    category: 'OTHER',
-    icon: 'people-outline' as const,
-  },
-];
+] as const;
 
 export default function CommunityScreen() {
   const { user } = useAuth();
   const { colors, theme } = useTheme();
   const router = useRouter();
 
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] =
-    useState<string>('ALL');
+  const [projects, setProjects] =
+    useState<Project[]>([]);
 
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState('');
-
-  const [showCreate, setShowCreate] =
-    useState(false);
-
-  const [creating, setCreating] =
-    useState(false);
-
-  const [requests, setRequests] = useState<
-    Record<string, ProjectJoinRequest[]>
-  >({});
-
-  const [reviewing, setReviewing] =
+  const [search, setSearch] =
     useState('');
 
-  const [form, setForm] = useState({
-    title: '',
-    organization: '',
-    location: '',
-    description: '',
-    category: 'SUSTAINABILITY',
-  });
+  const [
+    selectedCategory,
+    setSelectedCategory,
+  ] = useState('ALL');
+
+  const [loaded, setLoaded] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
 
   const load = useCallback(
     async (
@@ -143,7 +123,7 @@ export default function CommunityScreen() {
         setError(
           e instanceof Error
             ? e.message
-            : 'Could not load projects.'
+            : 'Could not load community projects.'
         );
       } finally {
         setLoaded(true);
@@ -158,133 +138,33 @@ export default function CommunityScreen() {
 
   function handleSearch() {
     setSelectedCategory('ALL');
-    load(search, 'ALL');
+
+    load(
+      search,
+      'ALL'
+    );
   }
 
-  function handleShortcut(
+  function handleCategory(
     category: string
   ) {
     setSelectedCategory(category);
     setSearch('');
-    load('', category);
+
+    load(
+      '',
+      category
+    );
   }
 
   function showAllProjects() {
     setSelectedCategory('ALL');
     setSearch('');
-    load('', 'ALL');
-  }
 
-  async function createProject() {
-    if (
-      !form.title.trim() ||
-      !form.organization.trim() ||
-      !form.description.trim()
-    ) {
-      return;
-    }
-
-    setCreating(true);
-
-    try {
-      setError('');
-
-      await api.post('/projects', {
-        ...form,
-        title: form.title.trim(),
-        organization:
-          form.organization.trim(),
-        description:
-          form.description.trim(),
-        location:
-          form.location.trim() ||
-          undefined,
-      });
-
-      setForm({
-        title: '',
-        organization: '',
-        location: '',
-        description: '',
-        category: 'SUSTAINABILITY',
-      });
-
-      setShowCreate(false);
-
-      await load(
-        search,
-        selectedCategory
-      );
-    } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : 'Could not create this project.'
-      );
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  async function loadRequests(
-    projectId: string
-  ) {
-    try {
-      setError('');
-
-      const result =
-        await api.get<
-          ProjectJoinRequest[]
-        >(
-          `/projects/${projectId}/applications`
-        );
-
-      setRequests((current) => ({
-        ...current,
-        [projectId]: result,
-      }));
-    } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : 'Could not load join requests.'
-      );
-    }
-  }
-
-  async function reviewRequest(
-    projectId: string,
-    applicationId: string,
-    status:
-      | 'APPROVED'
-      | 'DECLINED'
-  ) {
-    setReviewing(applicationId);
-
-    try {
-      setError('');
-
-      await api.patch(
-        `/projects/${projectId}/applications/${applicationId}`,
-        { status }
-      );
-
-      await Promise.all([
-        loadRequests(projectId),
-        load(
-          search,
-          selectedCategory
-        ),
-      ]);
-    } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : 'Could not review this request.'
-      );
-    } finally {
-      setReviewing('');
-    }
+    load(
+      '',
+      'ALL'
+    );
   }
 
   const canCreate =
@@ -295,36 +175,38 @@ export default function CommunityScreen() {
     return <Loading />;
   }
 
-  const isLight =
-    theme === 'light';
-
-  const tagColor = isLight
-    ? '#1e6827'
-    : colors.primary;
+  const accentColor =
+    theme === 'light'
+      ? '#1e6827'
+      : colors.primary;
 
   const myProjects =
     projects.filter(
-      (item) => item.isCreator
+      (project) =>
+        project.isCreator
     );
 
   const projectRequests =
     projects.filter(
-      (item) =>
-        !item.isCreator &&
-        item.hasApplied
+      (project) =>
+        !project.isCreator &&
+        project.hasApplied
     );
 
   const featuredProjects =
     projects.filter(
-      (item) =>
-        !item.isCreator &&
-        !item.hasApplied
+      (project) =>
+        !project.isCreator
     );
 
   return (
     <Screen>
       {/* HEADER */}
-      <View style={styles.headerRow}>
+      <View
+        style={
+          styles.headerRow
+        }
+      >
         <Image
           source={require('../../../assets/images/community-logo.png')}
           style={
@@ -333,15 +215,21 @@ export default function CommunityScreen() {
           contentFit="contain"
         />
 
-        <View style={styles.headerText}>
-          <Heading subtitle="Join projects that create a practical community impact.">
+        <View
+          style={
+            styles.headerText
+          }
+        >
+          <Heading subtitle="Discover projects, collaborate and contribute to community initiatives.">
             Community
           </Heading>
         </View>
       </View>
 
       {error ? (
-        <Notice>{error}</Notice>
+        <Notice>
+          {error}
+        </Notice>
       ) : null}
 
       {/* SEARCH */}
@@ -349,7 +237,9 @@ export default function CommunityScreen() {
         <Field
           label="Find projects"
           value={search}
-          onChangeText={setSearch}
+          onChangeText={
+            setSearch
+          }
           placeholder="Search projects or organizations"
           onSubmitEditing={
             handleSearch
@@ -358,12 +248,14 @@ export default function CommunityScreen() {
 
         <Button
           title="Search"
-          onPress={handleSearch}
           secondary
+          onPress={
+            handleSearch
+          }
         />
       </Card>
 
-      {/* EXPLORE */}
+      {/* CATEGORY FILTERS */}
       <View
         style={
           styles.categorySection
@@ -378,11 +270,12 @@ export default function CommunityScreen() {
             style={[
               styles.sectionHeading,
               {
-                color: colors.text,
+                color:
+                  colors.text,
               },
             ]}
           >
-            Explore Community
+            Explore Categories
           </Text>
 
           {selectedCategory !==
@@ -394,10 +287,10 @@ export default function CommunityScreen() {
             >
               <Text
                 style={[
-                  styles.clearFilter,
+                  styles.showAll,
                   {
                     color:
-                      tagColor,
+                      accentColor,
                   },
                 ]}
               >
@@ -412,30 +305,35 @@ export default function CommunityScreen() {
             styles.categoryGrid
           }
         >
-          {communityShortcuts.map(
-            (item) => (
+          {PROJECT_CATEGORIES.map(
+            (category) => (
               <Pressable
-                key={item.label}
+                key={
+                  category.value
+                }
                 accessibilityRole="button"
-                accessibilityLabel={`${item.label} ${item.subtitle}`}
+                accessibilityLabel={`View ${category.label} projects`}
                 onPress={() =>
-                  handleShortcut(
-                    item.category
+                  handleCategory(
+                    category.value
                   )
                 }
                 style={({
                   pressed,
                 }) => [
                   styles.categoryCard,
+
                   {
                     backgroundColor:
                       colors.surface,
+
                     borderColor:
                       selectedCategory ===
-                      item.category
-                        ? tagColor
+                      category.value
+                        ? accentColor
                         : colors.border,
                   },
+
                   pressed &&
                     styles.categoryPressed,
                 ]}
@@ -451,11 +349,11 @@ export default function CommunityScreen() {
                 >
                   <Ionicons
                     name={
-                      item.icon
+                      category.icon
                     }
-                    size={23}
+                    size={22}
                     color={
-                      tagColor
+                      accentColor
                     }
                   />
                 </View>
@@ -469,20 +367,8 @@ export default function CommunityScreen() {
                     },
                   ]}
                 >
-                  {item.label}
-                </Text>
-
-                <Text
-                  style={[
-                    styles.categorySubtitle,
-                    {
-                      color:
-                        colors.muted,
-                    },
-                  ]}
-                >
                   {
-                    item.subtitle
+                    category.label
                   }
                 </Text>
               </Pressable>
@@ -493,168 +379,25 @@ export default function CommunityScreen() {
 
       {/* CREATE PROJECT */}
       {canCreate ? (
-        <>
-          <Button
-            title={
-              showCreate
-                ? 'Close project form'
-                : 'Create a community project'
-            }
-            secondary
-            onPress={() =>
-              setShowCreate(
-                (value) =>
-                  !value
-              )
-            }
-          />
-
-          {showCreate ? (
-            <Card>
-              <Text
-                style={[
-                  styles.title,
-                  {
-                    color:
-                      colors.text,
-                  },
-                ]}
-              >
-                Create a project
-              </Text>
-
-              <Field
-                label="Project title"
-                value={
-                  form.title
-                }
-                onChangeText={(
-                  title
-                ) =>
-                  setForm({
-                    ...form,
-                    title,
-                  })
-                }
-              />
-
-              <Field
-                label="Organization"
-                value={
-                  form.organization
-                }
-                onChangeText={(
-                  organization
-                ) =>
-                  setForm({
-                    ...form,
-                    organization,
-                  })
-                }
-              />
-
-              <Field
-                label="Location (optional)"
-                value={
-                  form.location
-                }
-                onChangeText={(
-                  location
-                ) =>
-                  setForm({
-                    ...form,
-                    location,
-                  })
-                }
-              />
-
-              <Field
-                label="Description"
-                value={
-                  form.description
-                }
-                onChangeText={(
-                  description
-                ) =>
-                  setForm({
-                    ...form,
-                    description,
-                  })
-                }
-                multiline
-              />
-
-              <Text
-                style={[
-                  styles.categoryLabel,
-                  {
-                    color:
-                      colors.text,
-                  },
-                ]}
-              >
-                Category
-              </Text>
-
-              <View
-                style={
-                  styles.categories
-                }
-              >
-                {categories.map(
-                  (category) => (
-                    <Button
-                      key={
-                        category
-                      }
-                      title={category.replaceAll(
-                        '_',
-                        ' '
-                      )}
-                      secondary={
-                        form.category !==
-                        category
-                      }
-                      onPress={() =>
-                        setForm({
-                          ...form,
-                          category,
-                        })
-                      }
-                    />
-                  )
-                )}
-              </View>
-
-              <Button
-                title={
-                  creating
-                    ? 'Creating project...'
-                    : 'Create project'
-                }
-                onPress={
-                  createProject
-                }
-                disabled={
-                  creating ||
-                  !form.title.trim() ||
-                  !form.organization.trim() ||
-                  !form.description.trim()
-                }
-              />
-            </Card>
-          ) : null}
-        </>
+        <Button
+          title="Create a Community Project"
+          onPress={() =>
+            router.push(
+              '/community/create' as never
+            )
+          }
+        />
       ) : null}
 
-      {/* MY PROJECTS */}
+      {/* MY COMMUNITY PROJECTS */}
       {canCreate ? (
         <>
           <Text
             style={[
               styles.sectionHeading,
               {
-                color: colors.text,
+                color:
+                  colors.text,
               },
             ]}
           >
@@ -664,10 +407,10 @@ export default function CommunityScreen() {
           {myProjects.length >
           0 ? (
             myProjects.map(
-              (item) => (
+              (project) => (
                 <Card
                   key={
-                    item.id
+                    project.id
                   }
                 >
                   <Text
@@ -675,19 +418,14 @@ export default function CommunityScreen() {
                       styles.tag,
                       {
                         color:
-                          tagColor,
+                          accentColor,
                       },
                     ]}
                   >
-                    {item.category.replaceAll(
+                    {project.category.replaceAll(
                       '_',
                       ' '
-                    )}{' '}
-                    •{' '}
-                    {
-                      item.xpReward
-                    }{' '}
-                    XP
+                    )}
                   </Text>
 
                   <Text
@@ -699,7 +437,9 @@ export default function CommunityScreen() {
                       },
                     ]}
                   >
-                    {item.title}
+                    {
+                      project.title
+                    }
                   </Text>
 
                   <Text
@@ -712,10 +452,11 @@ export default function CommunityScreen() {
                     ]}
                   >
                     {
-                      item.organization
+                      project.organization
                     }
-                    {item.location
-                      ? ` • ${item.location}`
+
+                    {project.location
+                      ? ` • ${project.location}`
                       : ''}
                   </Text>
 
@@ -729,148 +470,67 @@ export default function CommunityScreen() {
                     ]}
                   >
                     {
-                      item.description
+                      project.description
                     }
                   </Text>
 
-                  <Text
-                    style={[
-                      styles.hint,
+                  {project.requirements ? (
+                    <Text
+                      style={[
+                        styles.copy,
+                        {
+                          color:
+                            colors.muted,
+                        },
+                      ]}
+                    >
+                      Requirements:{' '}
                       {
-                        color:
-                          colors.muted,
-                      },
-                    ]}
+                        project.requirements
+                      }
+                    </Text>
+                  ) : null}
+
+                  <View
+                    style={
+                      styles.applicationRow
+                    }
                   >
-                    {
-                      item
-                        ._count
-                        ?.applications ??
-                      0
-                    }{' '}
-                    application(s)
-                  </Text>
+                    <Ionicons
+                      name="people-outline"
+                      size={16}
+                      color={
+                        colors.muted
+                      }
+                    />
+
+                    <Text
+                      style={[
+                        styles.applicationCount,
+                        {
+                          color:
+                            colors.muted,
+                        },
+                      ]}
+                    >
+                      {
+                        project._count
+                          ?.applications ??
+                        0
+                      }{' '}
+                      application(s)
+                    </Text>
+                  </View>
 
                   <Button
-                    title={
-                      requests[
-                        item.id
-                      ]
-                        ? 'Refresh join requests'
-                        : 'Review join requests'
-                    }
+                    title="Review Join Requests"
                     secondary
                     onPress={() =>
-                      loadRequests(
-                        item.id
+                      router.push(
+                        `/community/requests/${project.id}` as never
                       )
                     }
                   />
-
-                  {requests[
-                    item.id
-                  ]?.map(
-                    (
-                      request
-                    ) => (
-                      <View
-                        key={
-                          request.id
-                        }
-                        style={[
-                          styles.request,
-                          {
-                            borderTopColor:
-                              colors.border,
-                          },
-                        ]}
-                      >
-                        <View
-                          style={
-                            styles.requestCopy
-                          }
-                        >
-                          <Text
-                            style={[
-                              styles.requestName,
-                              {
-                                color:
-                                  colors.text,
-                              },
-                            ]}
-                          >
-                            {
-                              request.firstName
-                            }{' '}
-                            {
-                              request.lastName
-                            }
-                          </Text>
-
-                          <Text
-                            style={[
-                              styles.hint,
-                              {
-                                color:
-                                  colors.muted,
-                              },
-                            ]}
-                          >
-                            {
-                              request.email
-                            }{' '}
-                            •{' '}
-                            {
-                              request.status
-                            }
-                          </Text>
-                        </View>
-
-                        {request.status ===
-                        'PENDING' ? (
-                          <View
-                            style={
-                              styles.requestActions
-                            }
-                          >
-                            <Button
-                              title={
-                                reviewing ===
-                                request.id
-                                  ? 'Reviewing...'
-                                  : 'Allow'
-                              }
-                              onPress={() =>
-                                reviewRequest(
-                                  item.id,
-                                  request.id,
-                                  'APPROVED'
-                                )
-                              }
-                              disabled={Boolean(
-                                reviewing
-                              )}
-                            />
-
-                            <Button
-                              title="Decline"
-                              secondary
-                              onPress={() =>
-                                reviewRequest(
-                                  item.id,
-                                  request.id,
-                                  'DECLINED'
-                                )
-                              }
-                              disabled={Boolean(
-                                reviewing
-                              )}
-                            />
-                          </View>
-                        ) : null}
-                      </View>
-                    )
-                  )}
                 </Card>
               )
             )
@@ -885,10 +545,9 @@ export default function CommunityScreen() {
                   },
                 ]}
               >
-                You have not
-                created any
-                community
-                projects yet.
+                You have not created
+                any community projects
+                yet.
               </Text>
             </Card>
           )}
@@ -900,7 +559,8 @@ export default function CommunityScreen() {
         style={[
           styles.sectionHeading,
           {
-            color: colors.text,
+            color:
+              colors.text,
           },
         ]}
       >
@@ -910,10 +570,27 @@ export default function CommunityScreen() {
       {projectRequests.length >
       0 ? (
         projectRequests.map(
-          (item) => (
+          (project) => (
             <Card
-              key={item.id}
+              key={
+                project.id
+              }
             >
+              <Text
+                style={[
+                  styles.tag,
+                  {
+                    color:
+                      accentColor,
+                  },
+                ]}
+              >
+                {project.category.replaceAll(
+                  '_',
+                  ' '
+                )}
+              </Text>
+
               <Text
                 style={[
                   styles.title,
@@ -923,7 +600,9 @@ export default function CommunityScreen() {
                   },
                 ]}
               >
-                {item.title}
+                {
+                  project.title
+                }
               </Text>
 
               <Text
@@ -936,10 +615,11 @@ export default function CommunityScreen() {
                 ]}
               >
                 {
-                  item.organization
+                  project.organization
                 }
-                {item.location
-                  ? ` • ${item.location}`
+
+                {project.location
+                  ? ` • ${project.location}`
                   : ''}
               </Text>
 
@@ -948,20 +628,20 @@ export default function CommunityScreen() {
                   styles.statusText,
                   {
                     color:
-                      item.applicationStatus ===
+                      project.applicationStatus ===
                       'APPROVED'
-                        ? tagColor
-                        : item.applicationStatus ===
+                        ? accentColor
+                        : project.applicationStatus ===
                             'DECLINED'
                           ? '#B3261E'
-                          : colors.muted,
+                          : '#B7791F',
                   },
                 ]}
               >
-                {item.applicationStatus ===
+                {project.applicationStatus ===
                 'APPROVED'
                   ? 'Approved'
-                  : item.applicationStatus ===
+                  : project.applicationStatus ===
                       'DECLINED'
                     ? 'Declined'
                     : 'Pending'}
@@ -972,7 +652,7 @@ export default function CommunityScreen() {
                 secondary
                 onPress={() =>
                   router.push(
-                    `/community/${item.id}` as never
+                    `/community/${project.id}` as never
                   )
                 }
               />
@@ -990,9 +670,8 @@ export default function CommunityScreen() {
               },
             ]}
           >
-            You have no
-            project requests
-            yet.
+            You have no project
+            requests yet.
           </Text>
         </Card>
       )}
@@ -1002,7 +681,8 @@ export default function CommunityScreen() {
         style={[
           styles.sectionHeading,
           {
-            color: colors.text,
+            color:
+              colors.text,
           },
         ]}
       >
@@ -1012,28 +692,25 @@ export default function CommunityScreen() {
       {featuredProjects.length >
       0 ? (
         featuredProjects.map(
-          (item) => (
+          (project) => (
             <Card
-              key={item.id}
+              key={
+                project.id
+              }
             >
               <Text
                 style={[
                   styles.tag,
                   {
                     color:
-                      tagColor,
+                      accentColor,
                   },
                 ]}
               >
-                {item.category.replaceAll(
+                {project.category.replaceAll(
                   '_',
                   ' '
-                )}{' '}
-                •{' '}
-                {
-                  item.xpReward
-                }{' '}
-                XP
+                )}
               </Text>
 
               <Text
@@ -1045,8 +722,68 @@ export default function CommunityScreen() {
                   },
                 ]}
               >
-                {item.title}
+                {
+                  project.title
+                }
               </Text>
+
+              <View
+                style={
+                  styles.infoRow
+                }
+              >
+                <Ionicons
+                  name="business-outline"
+                  size={16}
+                  color={
+                    colors.muted
+                  }
+                />
+
+                <Text
+                  style={[
+                    styles.copy,
+                    {
+                      color:
+                        colors.muted,
+                    },
+                  ]}
+                >
+                  {
+                    project.organization
+                  }
+                </Text>
+              </View>
+
+              {project.location ? (
+                <View
+                  style={
+                    styles.infoRow
+                  }
+                >
+                  <Ionicons
+                    name="location-outline"
+                    size={16}
+                    color={
+                      colors.muted
+                    }
+                  />
+
+                  <Text
+                    style={[
+                      styles.copy,
+                      {
+                        color:
+                          colors.muted,
+                      },
+                    ]}
+                  >
+                    {
+                      project.location
+                    }
+                  </Text>
+                </View>
+              ) : null}
 
               <Text
                 style={[
@@ -1058,51 +795,80 @@ export default function CommunityScreen() {
                 ]}
               >
                 {
-                  item.organization
+                  project.description
                 }
-                {item.location
-                  ? ` • ${item.location}`
-                  : ''}
               </Text>
+
+              {project.requirements ? (
+                <Text
+                  style={[
+                    styles.copy,
+                    {
+                      color:
+                        colors.muted,
+                    },
+                  ]}
+                >
+                  Requirements:{' '}
+                  {
+                    project.requirements
+                  }
+                </Text>
+              ) : null}
 
               <Text
                 style={[
-                  styles.copy,
+                  styles.xpText,
                   {
                     color:
-                      colors.muted,
+                      accentColor,
                   },
                 ]}
               >
                 {
-                  item.description
-                }
+                  project.xpReward
+                }{' '}
+                XP
               </Text>
 
               <Button
-                title="View Opportunity"
+                title={
+                  project.hasApplied
+                    ? 'View Opportunity'
+                    : 'View & Apply'
+                }
                 onPress={() =>
                   router.push(
-                    `/community/${item.id}` as never
+                    `/community/${project.id}` as never
                   )
                 }
               />
 
-              <Text
-                style={[
-                  styles.hint,
-                  {
-                    color:
-                      colors.muted,
-                  },
-                ]}
-              >
-                View the
-                opportunity for
-                full details and
-                application
-                information.
-              </Text>
+              {project.hasApplied ? (
+                <Text
+                  style={[
+                    styles.statusText,
+                    {
+                      color:
+                        project.applicationStatus ===
+                        'APPROVED'
+                          ? accentColor
+                          : project.applicationStatus ===
+                              'DECLINED'
+                            ? '#B3261E'
+                            : '#B7791F',
+                    },
+                  ]}
+                >
+                  {project.applicationStatus ===
+                  'APPROVED'
+                    ? 'Application approved'
+                    : project.applicationStatus ===
+                        'DECLINED'
+                      ? 'Application declined'
+                      : 'Application pending'}
+                </Text>
+              ) : null}
             </Card>
           )
         )
@@ -1117,8 +883,7 @@ export default function CommunityScreen() {
               },
             ]}
           >
-            No featured
-            opportunities found
+            No opportunities available
           </Text>
 
           <Text
@@ -1130,19 +895,16 @@ export default function CommunityScreen() {
               },
             ]}
           >
-            You may already
-            have applied to the
-            available projects,
-            or the current
-            filter has no
-            matching
-            opportunities.
+            No active community
+            opportunities from other
+            users match the current
+            search or category.
           </Text>
 
           {selectedCategory !==
           'ALL' ? (
             <Button
-              title="Show all projects"
+              title="Show All Projects"
               secondary
               onPress={
                 showAllProjects
@@ -1192,7 +954,7 @@ const styles =
       marginTop: 12,
     },
 
-    clearFilter: {
+    showAll: {
       fontSize: 13,
       fontWeight: '800',
       marginTop: 12,
@@ -1208,42 +970,31 @@ const styles =
 
     categoryCard: {
       width: '48%',
-      minHeight: 125,
+      minHeight: 105,
       borderWidth: 1,
       borderRadius: 18,
       padding: 14,
       justifyContent:
         'center',
-      gap: 5,
+      gap: 7,
     },
 
     categoryIcon: {
-      width: 42,
-      height: 42,
+      width: 40,
+      height: 40,
       borderRadius: 12,
       alignItems: 'center',
       justifyContent:
         'center',
-      marginBottom: 5,
     },
 
     categoryTitle: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: '800',
-    },
-
-    categorySubtitle: {
-      fontSize: 12,
-      fontWeight: '500',
     },
 
     categoryPressed: {
       opacity: 0.7,
-    },
-
-    tag: {
-      fontSize: 12,
-      fontWeight: '800',
     },
 
     title: {
@@ -1251,13 +1002,36 @@ const styles =
       fontWeight: '800',
     },
 
-    copy: {
-      lineHeight: 20,
-      fontSize: 13,
+    tag: {
+      fontSize: 12,
+      fontWeight: '800',
     },
 
-    hint: {
+    copy: {
+      fontSize: 13,
+      lineHeight: 20,
+    },
+
+    infoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+
+    xpText: {
+      fontSize: 13,
+      fontWeight: '800',
+    },
+
+    applicationRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+
+    applicationCount: {
       fontSize: 12,
+      fontWeight: '600',
     },
 
     statusText: {
@@ -1269,34 +1043,5 @@ const styles =
     emptyTitle: {
       fontSize: 16,
       fontWeight: '800',
-    },
-
-    categoryLabel: {
-      fontSize: 13,
-      fontWeight: '700',
-    },
-
-    categories: {
-      gap: 7,
-    },
-
-    request: {
-      borderTopWidth: 1,
-      paddingTop: 10,
-      gap: 8,
-    },
-
-    requestCopy: {
-      gap: 2,
-    },
-
-    requestName: {
-      fontSize: 14,
-      fontWeight: '800',
-    },
-
-    requestActions: {
-      flexDirection: 'row',
-      gap: 8,
     },
   });

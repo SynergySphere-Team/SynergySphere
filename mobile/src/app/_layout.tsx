@@ -55,7 +55,18 @@ function AppLayout() {
           name="(tabs)"
           options={{ headerShown: false }}
         />
-
+        <Stack.Screen
+          name="community/create"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="community/requests/[id]"
+          options={{
+            headerShown: false,
+          }}
+        />
         <Stack.Screen
           name="community/[id]"
           options={{ headerShown: false }}

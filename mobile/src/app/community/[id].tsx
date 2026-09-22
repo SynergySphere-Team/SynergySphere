@@ -1,55 +1,133 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+
+import {
+  useLocalSearchParams,
+  useRouter,
+} from 'expo-router';
+
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { Screen, Loading, Notice } from '@/components/Screen';
-import { Button, Card, Heading } from '@/components/ui';
+import {
+  Screen,
+  Loading,
+  Notice,
+} from '@/components/Screen';
+
+import {
+  Button,
+  Card,
+  Heading,
+} from '@/components/ui';
+
 import { api } from '@/services/api';
 import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
+
+type ApplicationStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'DECLINED';
+
+type ProjectApplication = {
+  id: string;
+  status: ApplicationStatus;
+  userId: string;
+  createdAt: string;
+};
 
 type ProjectDetails = {
   id: string;
+  creatorId?: string | null;
+
   title: string;
   category: string;
   location: string | null;
   organization: string;
   description: string;
   requirements: string | null;
-  xpReward: number;
 
-  applications: {
-    id: string;
-    status: 'PENDING' | 'APPROVED' | 'DECLINED';
-    userId: string;
-    createdAt: string;
-  }[];
+  xpReward: number;
+  isActive?: boolean;
+
+  applications: ProjectApplication[];
 };
 
 export default function OpportunityDetailsScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } =
+    useLocalSearchParams<{
+      id: string;
+    }>();
+
   const router = useRouter();
-  const { colors, theme } = useTheme();
+
+  const { colors, theme } =
+    useTheme();
+
+  const { user } = useAuth();
 
   const [project, setProject] =
-    useState<ProjectDetails | null>(null);
+    useState<ProjectDetails | null>(
+      null
+    );
 
-  const [loading, setLoading] = useState(true);
-  const [applying, setApplying] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [loading, setLoading] =
+    useState(true);
 
-  const isLight = theme === 'light';
+  const [applying, setApplying] =
+    useState(false);
 
-  const accentColor = isLight
-    ? '#1e6827'
-    : colors.primary;
+  const [error, setError] =
+    useState('');
 
-  useEffect(() => {
-    async function loadProject() {
+  const [success, setSuccess] =
+    useState('');
+
+  const accentColor =
+    theme === 'light'
+      ? '#1e6827'
+      : colors.primary;
+
+  const currentUserId =
+    (
+      user as
+        | {
+            id?: string;
+            userId?: string;
+          }
+        | null
+        | undefined
+    )?.id ??
+    (
+      user as
+        | {
+            id?: string;
+            userId?: string;
+          }
+        | null
+        | undefined
+    )?.userId;
+
+  const loadProject =
+    useCallback(async () => {
       if (!id) {
-        setError('Project ID was not provided.');
+        setError(
+          'Project ID was not provided.'
+        );
+
         setLoading(false);
+
         return;
       }
 
@@ -71,13 +149,52 @@ export default function OpportunityDetailsScreen() {
       } finally {
         setLoading(false);
       }
-    }
+    }, [id]);
 
+  useEffect(() => {
     loadProject();
-  }, [id]);
+  }, [loadProject]);
+
+  const myApplication =
+    useMemo(() => {
+      if (
+        !project ||
+        !currentUserId
+      ) {
+        return undefined;
+      }
+
+      return project.applications?.find(
+        (application) =>
+          application.userId ===
+          currentUserId
+      );
+    }, [
+      project,
+      currentUserId,
+    ]);
+
+  const applicationStatus =
+    myApplication?.status ?? null;
+
+  const hasApplied =
+    Boolean(myApplication);
+
+  const isCreator =
+    Boolean(
+      project?.creatorId &&
+        currentUserId &&
+        project.creatorId ===
+          currentUserId
+    );
 
   async function applyToProject() {
-    if (!project) {
+    if (
+      !project ||
+      applying ||
+      hasApplied ||
+      isCreator
+    ) {
       return;
     }
 
@@ -92,13 +209,15 @@ export default function OpportunityDetailsScreen() {
       );
 
       setSuccess(
-        'Your request has been submitted successfully.'
+        'Your application has been submitted successfully.'
       );
+
+      await loadProject();
     } catch (e) {
       setError(
         e instanceof Error
           ? e.message
-          : 'Could not submit your request.'
+          : 'Could not submit your application.'
       );
     } finally {
       setApplying(false);
@@ -112,50 +231,108 @@ export default function OpportunityDetailsScreen() {
   if (!project) {
     return (
       <Screen>
-        <Notice>
-          {error || 'Project not found.'}
-        </Notice>
+        <Pressable
+          onPress={() =>
+            router.back()
+          }
+          style={({ pressed }) => [
+            styles.backButton,
+            pressed &&
+              styles.backButtonPressed,
+          ]}
+        >
+          <Ionicons
+            name="arrow-back"
+            size={20}
+            color={colors.text}
+          />
 
-        <Button
-          title="Back to Community"
-          secondary
-          onPress={() => router.back()}
-        />
+          <Text
+            style={[
+              styles.backButtonText,
+              {
+                color:
+                  colors.text,
+              },
+            ]}
+          >
+            Back
+          </Text>
+        </Pressable>
+
+        <Notice>
+          {error ||
+            'Project not found.'}
+        </Notice>
       </Screen>
     );
   }
 
   return (
     <Screen>
-      {/* BACK BUTTON */}
-      <Button
-        title="← Back to Community"
-        secondary
-        onPress={() => router.back()}
-      />
+      {/* SMALL BACK BUTTON */}
+      <Pressable
+        onPress={() =>
+          router.back()
+        }
+        style={({ pressed }) => [
+          styles.backButton,
+          pressed &&
+            styles.backButtonPressed,
+        ]}
+      >
+        <Ionicons
+          name="arrow-back"
+          size={20}
+          color={colors.text}
+        />
 
-      {/* PAGE HEADING */}
-      <Heading subtitle="Learn more before requesting to participate.">
+        <Text
+          style={[
+            styles.backButtonText,
+            {
+              color:
+                colors.text,
+            },
+          ]}
+        >
+          Back
+        </Text>
+      </Pressable>
+
+      {/* PAGE HEADER */}
+      <Heading subtitle="Review the project details before applying.">
         Opportunity Details
       </Heading>
 
       {error ? (
-        <Notice>{error}</Notice>
+        <Notice>
+          {error}
+        </Notice>
       ) : null}
 
       {success ? (
         <Card>
-          <View style={styles.successRow}>
+          <View
+            style={
+              styles.successRow
+            }
+          >
             <Ionicons
               name="checkmark-circle"
               size={24}
-              color={accentColor}
+              color={
+                accentColor
+              }
             />
 
             <Text
               style={[
                 styles.successText,
-                { color: accentColor },
+                {
+                  color:
+                    accentColor,
+                },
               ]}
             >
               {success}
@@ -164,9 +341,13 @@ export default function OpportunityDetailsScreen() {
         </Card>
       ) : null}
 
-      {/* MAIN OPPORTUNITY CARD */}
+      {/* MAIN PROJECT CARD */}
       <Card>
-        <View style={styles.categoryRow}>
+        <View
+          style={
+            styles.categoryRow
+          }
+        >
           <View
             style={[
               styles.categoryBadge,
@@ -179,13 +360,18 @@ export default function OpportunityDetailsScreen() {
             <Ionicons
               name="leaf-outline"
               size={16}
-              color={accentColor}
+              color={
+                accentColor
+              }
             />
 
             <Text
               style={[
                 styles.categoryText,
-                { color: accentColor },
+                {
+                  color:
+                    accentColor,
+                },
               ]}
             >
               {project.category.replaceAll(
@@ -198,7 +384,10 @@ export default function OpportunityDetailsScreen() {
           <Text
             style={[
               styles.xp,
-              { color: accentColor },
+              {
+                color:
+                  accentColor,
+              },
             ]}
           >
             {project.xpReward} XP
@@ -208,23 +397,35 @@ export default function OpportunityDetailsScreen() {
         <Text
           style={[
             styles.projectTitle,
-            { color: colors.text },
+            {
+              color:
+                colors.text,
+            },
           ]}
         >
           {project.title}
         </Text>
 
-        <View style={styles.infoRow}>
+        <View
+          style={
+            styles.infoRow
+          }
+        >
           <Ionicons
             name="business-outline"
             size={17}
-            color={colors.muted}
+            color={
+              colors.muted
+            }
           />
 
           <Text
             style={[
               styles.infoText,
-              { color: colors.muted },
+              {
+                color:
+                  colors.muted,
+              },
             ]}
           >
             {project.organization}
@@ -232,17 +433,26 @@ export default function OpportunityDetailsScreen() {
         </View>
 
         {project.location ? (
-          <View style={styles.infoRow}>
+          <View
+            style={
+              styles.infoRow
+            }
+          >
             <Ionicons
               name="location-outline"
               size={17}
-              color={colors.muted}
+              color={
+                colors.muted
+              }
             />
 
             <Text
               style={[
                 styles.infoText,
-                { color: colors.muted },
+                {
+                  color:
+                    colors.muted,
+                },
               ]}
             >
               {project.location}
@@ -251,21 +461,134 @@ export default function OpportunityDetailsScreen() {
         ) : null}
       </Card>
 
+      {/* APPLICATION STATUS */}
+      {hasApplied ? (
+        <Card>
+          <View
+            style={
+              styles.statusHeader
+            }
+          >
+            <Ionicons
+              name={
+                applicationStatus ===
+                'APPROVED'
+                  ? 'checkmark-circle'
+                  : applicationStatus ===
+                      'DECLINED'
+                    ? 'close-circle'
+                    : 'time-outline'
+              }
+              size={23}
+              color={
+                applicationStatus ===
+                'APPROVED'
+                  ? accentColor
+                  : applicationStatus ===
+                      'DECLINED'
+                    ? '#B3261E'
+                    : '#B7791F'
+              }
+            />
+
+            <View
+              style={
+                styles.statusCopy
+              }
+            >
+              <Text
+                style={[
+                  styles.statusHeading,
+                  {
+                    color:
+                      colors.text,
+                  },
+                ]}
+              >
+                Application Status
+              </Text>
+
+              <Text
+                style={[
+                  styles.statusValue,
+                  {
+                    color:
+                      applicationStatus ===
+                      'APPROVED'
+                        ? accentColor
+                        : applicationStatus ===
+                            'DECLINED'
+                          ? '#B3261E'
+                          : '#B7791F',
+                  },
+                ]}
+              >
+                {applicationStatus ===
+                'APPROVED'
+                  ? 'Approved'
+                  : applicationStatus ===
+                      'DECLINED'
+                    ? 'Declined'
+                    : 'Pending'}
+              </Text>
+            </View>
+          </View>
+
+          <Text
+            style={[
+              styles.description,
+              {
+                color:
+                  colors.muted,
+              },
+            ]}
+          >
+            {applicationStatus ===
+            'APPROVED'
+              ? 'Your request to participate in this project has been approved.'
+              : applicationStatus ===
+                  'DECLINED'
+                ? 'Your request to participate in this project was declined.'
+                : 'Your request has been submitted and is waiting for review.'}
+          </Text>
+        </Card>
+      ) : null}
+
       {/* OVERVIEW */}
       <Card>
-        <Text
-          style={[
-            styles.sectionTitle,
-            { color: colors.text },
-          ]}
+        <View
+          style={
+            styles.sectionHeadingRow
+          }
         >
-          Overview
-        </Text>
+          <Ionicons
+            name="information-circle-outline"
+            size={21}
+            color={
+              accentColor
+            }
+          />
+
+          <Text
+            style={[
+              styles.sectionTitle,
+              {
+                color:
+                  colors.text,
+              },
+            ]}
+          >
+            Overview
+          </Text>
+        </View>
 
         <Text
           style={[
             styles.description,
-            { color: colors.muted },
+            {
+              color:
+                colors.muted,
+            },
           ]}
         >
           {project.description}
@@ -274,17 +597,26 @@ export default function OpportunityDetailsScreen() {
 
       {/* REQUIREMENTS */}
       <Card>
-        <View style={styles.sectionHeadingRow}>
+        <View
+          style={
+            styles.sectionHeadingRow
+          }
+        >
           <Ionicons
             name="checkmark-circle-outline"
-            size={20}
-            color={accentColor}
+            size={21}
+            color={
+              accentColor
+            }
           />
 
           <Text
             style={[
               styles.sectionTitle,
-              { color: colors.text },
+              {
+                color:
+                  colors.text,
+              },
             ]}
           >
             Requirements
@@ -294,139 +626,283 @@ export default function OpportunityDetailsScreen() {
         <Text
           style={[
             styles.description,
-            { color: colors.muted },
+            {
+              color:
+                colors.muted,
+            },
           ]}
         >
           {project.requirements?.trim()
             ? project.requirements
-            : 'No specific requirements have been provided for this opportunity.'}
+            : 'No specific requirements were provided for this project.'}
         </Text>
       </Card>
 
-      {/* COMMUNITY IMPACT */}
+      {/* EXPERIENCE REWARD */}
       <Card>
-        <View style={styles.sectionHeadingRow}>
+        <View
+          style={
+            styles.sectionHeadingRow
+          }
+        >
           <Ionicons
-            name="people-outline"
-            size={20}
-            color={accentColor}
+            name="star-outline"
+            size={21}
+            color={
+              accentColor
+            }
           />
 
           <Text
             style={[
               styles.sectionTitle,
-              { color: colors.text },
+              {
+                color:
+                  colors.text,
+              },
             ]}
           >
-            Community Opportunity
+            Experience Reward
           </Text>
         </View>
 
         <Text
           style={[
-            styles.description,
-            { color: colors.muted },
+            styles.xpLarge,
+            {
+              color:
+                accentColor,
+            },
           ]}
         >
-          Participate in this project to gain
-          practical experience while contributing
-          to a community-focused initiative.
+          {project.xpReward} XP
         </Text>
       </Card>
 
-      {/* APPLY */}
-      {!success ? (
+      {/* ACTION AREA */}
+      {isCreator ? (
+        <Card>
+          <View
+            style={
+              styles.statusHeader
+            }
+          >
+            <Ionicons
+              name="person-circle-outline"
+              size={23}
+              color={
+                accentColor
+              }
+            />
+
+            <View
+              style={
+                styles.statusCopy
+              }
+            >
+              <Text
+                style={[
+                  styles.statusHeading,
+                  {
+                    color:
+                      colors.text,
+                  },
+                ]}
+              >
+                Your Project
+              </Text>
+
+              <Text
+                style={[
+                  styles.description,
+                  {
+                    color:
+                      colors.muted,
+                  },
+                ]}
+              >
+                You created this community project.
+              </Text>
+            </View>
+          </View>
+        </Card>
+      ) : hasApplied ? (
+        <View
+          style={
+            styles.applicationComplete
+          }
+        >
+          <Ionicons
+            name="checkmark-circle-outline"
+            size={20}
+            color={
+              colors.muted
+            }
+          />
+
+          <Text
+            style={[
+              styles.applicationCompleteText,
+              {
+                color:
+                  colors.muted,
+              },
+            ]}
+          >
+            Your application status is shown above.
+          </Text>
+        </View>
+      ) : (
         <Button
           title={
             applying
-              ? 'Submitting request...'
+              ? 'Submitting Application...'
               : 'Apply / Join Project'
           }
-          onPress={applyToProject}
-          disabled={applying}
-        />
-      ) : (
-        <Button
-          title="Back to Community"
-          secondary
-          onPress={() => router.back()}
+          onPress={
+            applyToProject
+          }
+          disabled={
+            applying
+          }
         />
       )}
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  categoryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 10,
-  },
+const styles =
+  StyleSheet.create({
+    backButton: {
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      paddingHorizontal: 4,
+      marginBottom: 4,
+    },
 
-  categoryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 14,
-  },
+    backButtonPressed: {
+      opacity: 0.6,
+    },
 
-  categoryText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
+    backButtonText: {
+      fontSize: 15,
+      fontWeight: '700',
+    },
 
-  xp: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
+    categoryRow: {
+      flexDirection: 'row',
+      justifyContent:
+        'space-between',
+      alignItems: 'center',
+      gap: 10,
+    },
 
-  projectTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    marginTop: 12,
-  },
+    categoryBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      borderRadius: 14,
+    },
 
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    marginTop: 8,
-  },
+    categoryText: {
+      fontSize: 11,
+      fontWeight: '800',
+    },
 
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-  },
+    xp: {
+      fontSize: 13,
+      fontWeight: '800',
+    },
 
-  sectionHeadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+    projectTitle: {
+      fontSize: 24,
+      fontWeight: '800',
+      marginTop: 12,
+    },
 
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-  },
+    infoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      marginTop: 8,
+    },
 
-  description: {
-    fontSize: 14,
-    lineHeight: 22,
-    marginTop: 8,
-  },
+    infoText: {
+      flex: 1,
+      fontSize: 13,
+    },
 
-  successRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
+    sectionHeadingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
 
-  successText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-});
+    sectionTitle: {
+      fontSize: 17,
+      fontWeight: '800',
+    },
+
+    description: {
+      fontSize: 14,
+      lineHeight: 21,
+      marginTop: 7,
+    },
+
+    successRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+
+    successText: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+
+    statusHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+
+    statusCopy: {
+      flex: 1,
+    },
+
+    statusHeading: {
+      fontSize: 15,
+      fontWeight: '800',
+    },
+
+    statusValue: {
+      fontSize: 14,
+      fontWeight: '800',
+      marginTop: 2,
+    },
+
+    xpLarge: {
+      fontSize: 20,
+      fontWeight: '800',
+      marginTop: 8,
+    },
+
+    applicationComplete: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+      paddingVertical: 10,
+    },
+
+    applicationCompleteText: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+  });
