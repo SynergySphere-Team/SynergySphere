@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { isUniqueViolation, newId, nullable, query, queryOne } from '../lib/db.js';
 import { paramId } from '../lib/params.js';
-import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { authenticate, type AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { awardXp } from '../services/gamification.js';
 import { accessTokenForUser, githubConnection, githubRequest, GithubError } from '../services/github.js';

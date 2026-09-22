@@ -311,7 +311,6 @@ const styles = StyleSheet.create({
   },
   cardHeroHeader: {
     alignItems: 'center',
-    textAlign: 'center',
     gap: 8,
   },
   githubLogoBadge: {

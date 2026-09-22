@@ -39,7 +39,7 @@ export async function githubRequest<T>(path: string, token: string, init: Reques
   const conditionalHeaders: Record<string, string> = cached?.etag ? { 'If-None-Match': cached.etag } : {};
   const response = await fetch(path.startsWith('http') ? path : `${GITHUB_API}${path}`, {
     ...init,
-    headers: githubHeaders(token, { ...conditionalHeaders, ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...(init.headers as Record<string, string> || {}) }),
+    headers: githubHeaders(token, { ...conditionalHeaders, ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...((init.headers as Record<string, string>) || {}) }),
   });
   if (response.status === 304 && cached) {
     cached.expiresAt = Date.now() + GET_CACHE_TTL_MS;

@@ -415,7 +415,7 @@ export default function ProjectWizardScreen() {
               ['Technology', form.language],
               ['License', form.license],
               ['Visibility', form.visibility === 'public' ? 'Public' : 'Private'],
-              ['Starter Template', form.starterTemplate.replace('_', ' ')],
+              ['Starter Template', form.starterTemplate.replaceAll('_', ' ')],
               ['Problem', form.problem],
               ['Audience', form.audience],
               ['Core Goal', form.goal],
