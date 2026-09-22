@@ -25,11 +25,11 @@ export function getApiUrl(): string {
   if (typeof hostUri === 'string' && hostUri) {
     const host = hostUri.split(':')[0];
     if (host) {
-      return `http://${host}:4000/api`;
+      return `http://${host}:4001/api`;
     }
   }
 
-  return 'http://10.0.0.115:4000/api';
+  return 'http://10.0.0.115:4001/api';
 }
 
 export class ApiError extends Error {
@@ -71,6 +71,7 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) }),
+  put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body: body === undefined ? undefined : JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
 

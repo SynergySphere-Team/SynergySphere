@@ -41,11 +41,19 @@ function getDatabaseUrl(): string {
   return DEFAULT_DEV_DATABASE_URL;
 }
 
+const databaseUrl = getDatabaseUrl();
+const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+
 export const pool = new Pool({
-  connectionString: getDatabaseUrl(),
+  connectionString: databaseUrl,
   max: Number(process.env.DB_POOL_SIZE || 10),
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
+  ...(isLocalhost ? {} : { ssl: { rejectUnauthorized: false } }),
+});
+
+(pool as { on?: (event: string, listener: (err: Error) => void) => void }).on?.('error', (err: Error) => {
+  console.error('Unexpected error on idle PostgreSQL client:', err.message);
 });
 
 export type DbClient = Pick<PoolClient, 'query'>;

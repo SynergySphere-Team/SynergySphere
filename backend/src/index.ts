@@ -16,10 +16,16 @@ import leaderboardRoutes from './routes/leaderboard.js';
 import adminRoutes from './routes/admin.js';
 import learningRoutes from './routes/learning.js';
 import curriculumRoutes from './routes/curriculum.js';
+import githubRoutes, { githubWebhookRoutes, pollGithubActivity } from './routes/github.js';
 import { pool } from './lib/db.js';
 
 const app = express();
 const PORT = process.env.PORT || 4001;
+
+// Trust one proxy hop (ngrok / load-balancer) so that express-rate-limit
+// can read the real client IP from X-Forwarded-For without throwing a
+// ValidationError (ERR_ERL_UNEXPECTED_X_FORWARDED_FOR).
+app.set('trust proxy', 1);
 
 const DEFAULT_DEV_ORIGINS = [
   'http://localhost:3000',
@@ -70,7 +76,14 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({
+  limit: '10mb',
+  verify(req, _res, buffer) {
+    if ((req as express.Request).originalUrl === '/api/github/webhooks') {
+      (req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
+    }
+  },
+}));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -86,6 +99,8 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+
+app.use('/api/github', githubWebhookRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'SynergySphere API', version: '1.0.0' });
@@ -104,6 +119,7 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/learning', learningRoutes);
 app.use('/api/curriculum', curriculumRoutes);
+app.use('/api/github', githubRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
@@ -120,12 +136,18 @@ const server = app.listen(PORT, () => {
     .then(() => console.log('Database connection OK'))
     .catch((error: NodeJS.ErrnoException) => {
       console.error('Database connection failed:', error.message);
-      if (error.code === 'ECONNREFUSED') {
-        console.error('Start PostgreSQL with: docker compose up -d');
+      if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET') {
+        console.error('Start PostgreSQL with: npm run db:up (or docker compose up -d)');
         console.error('Then initialize data with: npm run db:migrate && npm run db:seed');
       }
     });
 });
+
+const githubPollInterval = Math.max(Number(process.env.GITHUB_ACTIVITY_POLL_INTERVAL_MS) || 10 * 60 * 1000, 60_000);
+if (process.env.GITHUB_ACTIVITY_POLLING !== 'false') {
+  setTimeout(() => void pollGithubActivity().catch((error) => console.error('Initial GitHub activity sync failed:', error)), 10_000);
+  setInterval(() => void pollGithubActivity().catch((error) => console.error('GitHub activity sync failed:', error)), githubPollInterval);
+}
 
 server.on('error', (error: NodeJS.ErrnoException) => {
   if (error.code === 'EADDRINUSE') {

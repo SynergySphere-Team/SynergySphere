@@ -28,22 +28,36 @@ export default function TabsLayout() {
   );
 
   const handleSwipe = (direction: 'left' | 'right') => {
-    if (activeIndex === -1) return;
-    if (direction === 'left' && activeIndex < NAV_TAB_ITEMS.length - 1) {
-      router.push(NAV_TAB_ITEMS[activeIndex + 1].href as never);
-    } else if (direction === 'right' && activeIndex > 0) {
-      router.push(NAV_TAB_ITEMS[activeIndex - 1].href as never);
+    if (activeIndex !== -1) {
+      // Primary bottom tab cycling
+      if (direction === 'left' && activeIndex < NAV_TAB_ITEMS.length - 1) {
+        router.push(NAV_TAB_ITEMS[activeIndex + 1].href as never);
+      } else if (direction === 'right' && activeIndex > 0) {
+        router.push(NAV_TAB_ITEMS[activeIndex - 1].href as never);
+      }
+    } else {
+      // Sub-screen (detail view, wizard, github connect, settings, my work, etc.)
+      // Swiping right from the left side of the screen navigates back throughout the app
+      if (direction === 'right') {
+        if (router.canGoBack()) {
+          router.back();
+        } else if (pathname.startsWith('/project-') || pathname === '/github-connect' || pathname === '/my-work') {
+          router.replace('/(tabs)/community' as never);
+        } else {
+          router.replace('/(tabs)/explore' as never);
+        }
+      }
     }
   };
 
   const panGesture = Gesture.Pan()
     .runOnJS(true)
-    .activeOffsetX([-35, 35])
-    .failOffsetY([-25, 25])
+    .activeOffsetX([-25, 25])
+    .failOffsetY([-20, 20])
     .onEnd((event) => {
-      if (event.translationX < -60 || event.velocityX < -400) {
+      if (event.translationX < -50 || event.velocityX < -350) {
         handleSwipe('left');
-      } else if (event.translationX > 60 || event.velocityX > 400) {
+      } else if (event.translationX > 50 || event.velocityX > 350) {
         handleSwipe('right');
       }
     });
@@ -66,6 +80,11 @@ export default function TabsLayout() {
           <Tabs.Screen name="ai-assistant" options={{ href: null }} />
           <Tabs.Screen name="lecture-to-life" options={{ href: null }} />
           <Tabs.Screen name="community" options={{ href: null }} />
+          <Tabs.Screen name="github-connect" options={{ title: 'Connect GitHub', href: null }} />
+          <Tabs.Screen name="project-wizard" options={{ title: 'Create project', href: null }} />
+          <Tabs.Screen name="project-detail" options={{ title: 'Repository', href: null }} />
+          <Tabs.Screen name="join-requests" options={{ title: 'Join requests', href: null }} />
+          <Tabs.Screen name="my-work" options={{ title: 'My Work', href: null }} />
           <Tabs.Screen name="portfolio" options={{ href: null }} />
           <Tabs.Screen name="interviews" options={{ href: null }} />
           <Tabs.Screen name="leaderboard" options={{ href: null }} />

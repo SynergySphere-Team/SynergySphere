@@ -8,6 +8,7 @@ const destinations: { title: string; href: string; icon: keyof typeof Ionicons.g
   { title: 'AI Workspace', href: '/ai-assistant', icon: 'sparkles' },
   { title: 'LectureToLife', href: '/lecture-to-life', icon: 'school' },
   { title: 'Community', href: '/community', icon: 'people' },
+  { title: 'My Work', href: '/my-work', icon: 'git-pull-request' },
   { title: 'Portfolio', href: '/portfolio', icon: 'briefcase' },
   { title: 'Mock Interviews', href: '/interviews', icon: 'chatbubbles' },
   { title: 'Leaderboard', href: '/leaderboard', icon: 'trophy' },
