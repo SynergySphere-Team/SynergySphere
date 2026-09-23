@@ -29,7 +29,7 @@
 
 ## GitHub integration
 
-Device authorization uses `POST https://github.com/login/device/code` and `POST https://github.com/login/oauth/access_token`; the required scopes are `repo read:org`. The mobile client never handles a GitHub password. The backend stores the resulting token encrypted with AES-256-GCM.
+Device authorization uses `POST https://github.com/login/device/code` and `POST https://github.com/login/oauth/access_token`; the required scopes are `repo read:org`. The mobile client never handles a GitHub password. The backend stores the resulting token encrypted with AES-256-GCM. When running locally without `GITHUB_OAUTH_CLIENT_ID` configured, the backend automatically provides a development/demo flow allowing complete testing without external credentials.
 
 Repository creation uses `POST /user/repos`, Git Data endpoints `POST /repos/{owner}/{repo}/git/blobs`, `/git/trees`, `/git/commits`, and `/git/refs`, then `POST /repos/{owner}/{repo}/issues` and `POST /repos/{owner}/{repo}/hooks`.
 

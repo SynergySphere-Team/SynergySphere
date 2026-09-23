@@ -131,8 +131,10 @@ export default function GithubConnectScreen() {
       setStatus('waiting');
       // Start polling loop immediately (do NOT await browser open)
       poll(next);
-      // Launch verification URI in in-app browser or external browser
-      void github.openVerification(next);
+      // Launch verification URI in in-app browser or external browser (skip automatic popup in mock mode)
+      if (!next.userCode.startsWith('SSPH-') && !next.userCode.startsWith('MOCK-')) {
+        void github.openVerification(next);
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not start GitHub connection.');
       setStatus('idle');
@@ -189,7 +191,9 @@ export default function GithubConnectScreen() {
         {authorization ? (
           <View style={[styles.codeDisplayCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
             <Text style={[styles.codeInstructionLabel, { color: colors.muted }]}>
-              Enter this one-time code at GitHub
+              {authorization.userCode.startsWith('SSPH-') || authorization.userCode.startsWith('MOCK-')
+                ? 'Development Mode: Simulated authorization code'
+                : 'Enter this one-time code at GitHub'}
             </Text>
 
             <View style={styles.codeBoxesRow}>

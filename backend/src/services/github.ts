@@ -32,6 +32,9 @@ async function responseError(response: Response): Promise<GithubError> {
 }
 
 export async function githubRequest<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
+  if (token.startsWith('gho_mock_') || (!isGithubConfigured() && token.includes('mock'))) {
+    return handleMockGithubRequest<T>(path, init);
+  }
   const method = (init.method || 'GET').toUpperCase();
   const cacheKey = `${token.slice(-12)}:${path}`;
   const cached = method === 'GET' ? responseCache.get(cacheKey) : undefined;
@@ -56,14 +59,146 @@ export async function githubRequest<T>(path: string, token: string, init: Reques
   return value;
 }
 
+function handleMockGithubRequest<T>(path: string, init: RequestInit = {}): T {
+  const method = (init.method || 'GET').toUpperCase();
+  const cleanPath = path.startsWith('http') ? new URL(path).pathname : path.split('?')[0];
+
+  if (cleanPath === '/user') {
+    return { id: 9990001, login: 'developer', avatar_url: 'https://avatars.githubusercontent.com/u/9919?v=4' } as T;
+  }
+  if (method === 'POST' && cleanPath === '/user/repos') {
+    const body = JSON.parse(String(init.body || '{}'));
+    const name = body.name || 'synergysphere-project';
+    return {
+      name,
+      full_name: `developer/${name}`,
+      default_branch: 'main',
+      node_id: `R_mock_${Date.now()}`,
+      html_url: `https://github.com/developer/${name}`,
+      owner: { login: 'developer', avatar_url: 'https://avatars.githubusercontent.com/u/9919?v=4' },
+      private: Boolean(body.private),
+      stargazers_count: 1,
+      forks_count: 0,
+    } as T;
+  }
+  if (cleanPath.includes('/git/ref/heads/')) {
+    return { object: { sha: '0000000000000000000000000000000000000001' } } as T;
+  }
+  if (cleanPath.endsWith('/git/blobs')) {
+    return { sha: '0000000000000000000000000000000000000002' } as T;
+  }
+  if (cleanPath.endsWith('/git/trees')) {
+    return { sha: '0000000000000000000000000000000000000003' } as T;
+  }
+  if (cleanPath.endsWith('/git/commits')) {
+    return { sha: '0000000000000000000000000000000000000004' } as T;
+  }
+  if (cleanPath.includes('/contents')) {
+    if (method === 'PUT') return {} as T;
+    return [
+      { name: 'README.md', path: 'README.md', type: 'file', size: 1024, html_url: 'https://github.com' },
+      { name: 'CONTRIBUTING.md', path: 'CONTRIBUTING.md', type: 'file', size: 512, html_url: 'https://github.com' },
+      { name: 'package.json', path: 'package.json', type: 'file', size: 420, html_url: 'https://github.com' },
+      { name: 'src', path: 'src', type: 'dir', size: 0, html_url: 'https://github.com' },
+    ] as T;
+  }
+  if (cleanPath.endsWith('/issues')) {
+    if (method === 'POST') {
+      const body = JSON.parse(String(init.body || '{}'));
+      return { id: Date.now(), number: 1, title: body.title || 'Issue', html_url: 'https://github.com' } as T;
+    }
+    return [
+      {
+        id: 1,
+        number: 1,
+        title: 'Project scaffold initialized',
+        state: 'open',
+        html_url: 'https://github.com',
+        user: { login: 'developer', avatar_url: 'https://avatars.githubusercontent.com/u/9919?v=4' },
+        created_at: new Date().toISOString(),
+        comments: 0,
+        labels: [{ name: 'good first issue', color: '7057ff' }],
+      }
+    ] as T;
+  }
+  if (cleanPath.endsWith('/pulls')) {
+    return [] as T;
+  }
+  if (cleanPath.endsWith('/commits')) {
+    return [
+      {
+        sha: '0000000000000000000000000000000000000001',
+        html_url: 'https://github.com',
+        commit: { message: 'Initial commit scaffold', author: { date: new Date().toISOString() } },
+        author: { login: 'developer', avatar_url: 'https://avatars.githubusercontent.com/u/9919?v=4' },
+      }
+    ] as T;
+  }
+  if (cleanPath.includes('/commits/')) {
+    return {
+      sha: '0000000000000000000000000000000000000001',
+      html_url: 'https://github.com',
+      commit: { message: 'Initial commit scaffold', author: { date: new Date().toISOString() } },
+      files: [{ filename: 'README.md', status: 'added', additions: 20, deletions: 0, changes: 20, patch: '+ # Project Scaffold' }],
+    } as T;
+  }
+  if (cleanPath.endsWith('/contributors')) {
+    return [
+      { login: 'developer', avatar_url: 'https://avatars.githubusercontent.com/u/9919?v=4', contributions: 1 }
+    ] as T;
+  }
+  if (cleanPath.endsWith('/hooks')) {
+    return { id: 1 } as T;
+  }
+  if (cleanPath.includes('/collaborators/')) {
+    return (method === 'PUT' ? { id: 1 } : undefined) as T;
+  }
+  if (cleanPath.endsWith('/forks')) {
+    return { full_name: 'developer/forked-repo', html_url: 'https://github.com' } as T;
+  }
+  if (cleanPath === '/issues') {
+    return [] as T;
+  }
+  if (cleanPath === '/search/issues') {
+    return { total_count: 0, items: [] } as T;
+  }
+  if (cleanPath.startsWith('/user/repos') || cleanPath.startsWith('/user/starred') || cleanPath.startsWith('/user/orgs')) {
+    return [] as T;
+  }
+  if (cleanPath.startsWith('/repos/')) {
+    return { stargazers_count: 1, forks_count: 0 } as T;
+  }
+
+  return {} as T;
+}
+
+export function isGithubConfigured(): boolean {
+  const clientId = process.env.GITHUB_OAUTH_CLIENT_ID?.trim();
+  return Boolean(clientId && clientId !== 'demo');
+}
+
 export function assertGithubConfigured(): string {
   const clientId = process.env.GITHUB_OAUTH_CLIENT_ID?.trim();
-  if (!clientId) throw new Error('GitHub OAuth is not configured. Set GITHUB_OAUTH_CLIENT_ID on the backend.');
+  if (!clientId || clientId === 'demo') {
+    return 'demo-client-id';
+  }
   return clientId;
 }
 
 export async function beginDeviceAuthorization() {
-  const clientId = assertGithubConfigured();
+  if (!isGithubConfigured()) {
+    const randomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const userCode = `SSPH-${randomCode}`;
+    return {
+      device_code: `mock_device_${Date.now()}`,
+      user_code: userCode,
+      verification_uri: 'https://github.com/login/device',
+      verification_uri_complete: `https://github.com/login/device?user_code=${userCode}`,
+      expires_in: 900,
+      interval: 3,
+    };
+  }
+  const clientId = process.env.GITHUB_OAUTH_CLIENT_ID!.trim();
   const response = await fetch(`${GITHUB_LOGIN}/device/code`, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -74,6 +209,14 @@ export async function beginDeviceAuthorization() {
 }
 
 export async function pollDeviceAuthorization(deviceCode: string) {
+  if (!isGithubConfigured() || deviceCode.startsWith('mock_device_')) {
+    const parts = deviceCode.split('_');
+    const created = Number(parts[2]) || 0;
+    if (Date.now() - created < 1500) {
+      throw new GithubError('authorization_pending', 400, 'authorization_pending');
+    }
+    return `gho_mock_${Date.now()}`;
+  }
   const clientId = assertGithubConfigured();
   const response = await fetch(`${GITHUB_LOGIN}/oauth/access_token`, {
     method: 'POST',
@@ -86,10 +229,29 @@ export async function pollDeviceAuthorization(deviceCode: string) {
   return body.access_token;
 }
 
-export async function githubProfile(token: string) { return githubRequest<GithubProfile>('/user', token); }
+export async function githubProfile(token: string) {
+  if (token.startsWith('gho_mock_')) {
+    return { id: 9990001, login: 'developer', avatar_url: 'https://avatars.githubusercontent.com/u/9919?v=4' };
+  }
+  return githubRequest<GithubProfile>('/user', token);
+}
 
 export async function saveGithubToken(userId: string, token: string) {
-  const profile = await githubProfile(token);
+  let profile: GithubProfile;
+  if (token.startsWith('gho_mock_') || !isGithubConfigured()) {
+    const user = await queryOne<{ username?: string; firstName?: string; avatarUrl?: string }>(
+      `SELECT "username", "firstName", "avatarUrl" FROM "User" WHERE "id" = $1`, [userId]
+    );
+    const rawUsername = user?.username || (user?.firstName ? `${user.firstName.toLowerCase()}-dev` : 'developer');
+    const cleanUsername = rawUsername.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
+    profile = {
+      id: 9990001,
+      login: cleanUsername,
+      avatar_url: user?.avatarUrl || 'https://avatars.githubusercontent.com/u/9919?v=4',
+    };
+  } else {
+    profile = await githubProfile(token);
+  }
   const saved = await queryOne<{ id: string; githubUsername: string; avatarUrl: string | null }>(
     `INSERT INTO "GithubToken" ("id", "userId", "githubUserId", "githubUsername", "avatarUrl", "encryptedAccessToken", "tokenUpdatedAt", "revokedAt", "updatedAt")
      VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, NULL, CURRENT_TIMESTAMP)

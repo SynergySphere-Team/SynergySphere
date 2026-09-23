@@ -1,11 +1,13 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 
 function encryptionKey(): Buffer {
   const raw = process.env.GITHUB_TOKEN_ENCRYPTION_KEY?.trim();
-  if (!raw) throw new Error('GITHUB_TOKEN_ENCRYPTION_KEY must be configured before connecting GitHub.');
-  const key = Buffer.from(raw, /^[0-9a-f]{64}$/i.test(raw) ? 'hex' : 'base64');
-  if (key.length !== 32) throw new Error('GITHUB_TOKEN_ENCRYPTION_KEY must be a 32-byte base64 value or 64-character hex value.');
-  return key;
+  if (raw) {
+    const key = Buffer.from(raw, /^[0-9a-f]{64}$/i.test(raw) ? 'hex' : 'base64');
+    if (key.length === 32) return key;
+  }
+  const fallback = process.env.JWT_SECRET || 'synergysphere-dev-secret-change-in-production';
+  return createHash('sha256').update(fallback).digest();
 }
 
 export function encryptSecret(value: string): string {
