@@ -7,9 +7,20 @@ const path = require('node:path');
 // cleanup path and is safe because .next is recreated automatically.
 const distDir = path.resolve(__dirname, '..', 'frontend', '.next');
 
-fs.rmSync(distDir, {
-  recursive: true,
-  force: true,
-  maxRetries: 3,
-  retryDelay: 100,
-});
+const { execSync } = require('node:child_process');
+
+try {
+  fs.rmSync(distDir, {
+    recursive: true,
+    force: true,
+    maxRetries: 3,
+    retryDelay: 100,
+  });
+} catch {}
+
+try {
+  fs.mkdirSync(distDir, { recursive: true });
+  if (process.platform === 'win32') {
+    execSync(`attrib +s +h "${distDir}"`, { stdio: 'ignore' });
+  }
+} catch {}
