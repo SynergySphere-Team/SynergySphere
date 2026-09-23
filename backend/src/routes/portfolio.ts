@@ -91,7 +91,7 @@ router.post('/career-tools', validateBody(careerToolSchema), async (req: AuthReq
 
     const userName = `${user?.firstName ?? 'Student'} ${user?.lastName ?? 'Developer'}`;
     const skillsList = (inputSkills && inputSkills.length > 0)
-      ? inputSkills.map(([name, val]) => `${name} (${val}%)`).join(', ')
+      ? inputSkills.map(([name, val]: [string, number | string]) => `${name} (${val}%)`).join(', ')
       : 'Java (90%), Spring Boot (85%), SQL (80%), JavaScript (70%), React (60%)';
 
     const projectList = projects.length > 0
@@ -185,12 +185,13 @@ Provide:
       xp: user?.xp ?? 285,
     };
 
-    const fallbackFn = () => {
+    const fallbackFn = (): string => {
       switch (tool) {
         case 'resume': return generateResumeContent(ctx);
         case 'cv': return generateCvContent(ctx);
         case 'linkedin': return generateLinkedInContent(ctx);
         case 'jobs': return generateJobsContent(ctx);
+        default: return '';
       }
     };
 

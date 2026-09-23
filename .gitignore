@@ -44,6 +44,7 @@ coverage/
 # Misc
 *.tsbuildinfo
 next-env.d.ts
+.freebuff/
 
 # Android
 local.properties

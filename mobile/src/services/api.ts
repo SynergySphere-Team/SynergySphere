@@ -29,7 +29,7 @@ export function getApiUrl(): string {
     }
   }
 
-  return 'http://10.0.0.115:4001/api';
+  return 'http://192.168.0.198:4001/api';
 }
 
 export class ApiError extends Error {
