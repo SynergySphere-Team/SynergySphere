@@ -9,12 +9,20 @@ import { awardXp } from '../services/gamification.js';
 const router = Router();
 router.use(authenticate);
 
+const wellnessCheckInSchema = z.object({
+  stressLevel: z.number().min(1).max(10),
+  mood: z.number().min(1).max(10),
+  energyLevel: z.number().min(1).max(10),
+  notes: z.string().optional(),
+});
+
 const taskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   learnedNote: z.string().max(2000).optional().nullable(),
   status: z.enum(['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE']).optional(),
   dueDate: z.string().datetime().optional().nullable(),
+  wellnessCheckIn: wellnessCheckInSchema.optional(),
 });
 
 const focusSchema = z.object({
@@ -174,6 +182,28 @@ router.patch('/:id', validateBody(taskSchema.partial()), async (req: AuthRequest
 
   if (task && existing.status !== 'DONE' && task.status === 'DONE') {
     await awardXp(req.user!.userId, 10, 'Completed task: ' + task.title);
+  }
+
+  if (req.body.wellnessCheckIn) {
+    const wc = req.body.wellnessCheckIn;
+    await queryOne(
+      `INSERT INTO "Wellness" ("id", "userId", "stressLevel", "mood", "energyLevel", "notes", "moduleId", "taskId", "taskTitle", "taskStatus")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING "id"`,
+      [
+        newId(),
+        req.user!.userId,
+        wc.stressLevel,
+        wc.mood,
+        wc.energyLevel,
+        nullable(wc.notes),
+        'PRODUCTIVITY',
+        existing.id,
+        task?.title || existing.title,
+        task?.status || req.body.status || 'DONE',
+      ],
+    );
+    await awardXp(req.user!.userId, 10, 'Wellness check-in for completed task');
   }
 
   res.json(task);

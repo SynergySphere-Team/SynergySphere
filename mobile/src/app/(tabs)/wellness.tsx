@@ -25,6 +25,8 @@ function ScoreControl({ label, value, onChange }: { label: string; value: number
 export default function WellnessScreen() {
   const { colors, theme } = useTheme();
   const [entries, setEntries] = useState<WellnessEntry[]>([]);
+  const [moduleId, setModuleId] = useState('PRODUCTIVITY');
+  const [taskTitle, setTaskTitle] = useState('');
   const [stress, setStress] = useState(5);
   const [mood, setMood] = useState(5);
   const [energy, setEnergy] = useState(5);
@@ -60,9 +62,12 @@ export default function WellnessScreen() {
         stressLevel: stress,
         mood,
         energyLevel: energy,
+        moduleId,
+        ...(taskTitle.trim() ? { taskTitle: taskTitle.trim(), taskStatus: 'DONE' } : {}),
         ...(notes.trim() ? { notes: notes.trim() } : {}),
       });
       setNotes('');
+      setTaskTitle('');
       setSaved('Check-in saved. You earned 10 XP!');
       await load();
     } catch (e) {
@@ -81,6 +86,24 @@ export default function WellnessScreen() {
       {error ? <Notice>{error}</Notice> : null}
       {saved ? <Notice tone="success">{saved}</Notice> : null}
       <Card>
+        <Text style={[styles.label, { color: colors.text }]}>Linked Module</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {[
+            { id: 'PRODUCTIVITY', label: 'Tasks' },
+            { id: 'LEARNING_HUB', label: 'Learning' },
+            { id: 'AI_WORKSPACE', label: 'AI' },
+            { id: 'COMMUNITY', label: 'Community' },
+            { id: 'GENERAL', label: 'General' },
+          ].map((m) => (
+            <Button
+              key={m.id}
+              title={m.label}
+              secondary={moduleId !== m.id}
+              onPress={() => setModuleId(m.id)}
+            />
+          ))}
+        </View>
+        <Field label="Task / Activity (optional)" value={taskTitle} onChangeText={setTaskTitle} placeholder="What task did you work on?" />
         <ScoreControl label="Stress" value={stress} onChange={setStress} />
         <ScoreControl label="Mood" value={mood} onChange={setMood} />
         <ScoreControl label="Energy" value={energy} onChange={setEnergy} />
@@ -105,8 +128,20 @@ export default function WellnessScreen() {
       <Text style={[styles.history, { color: colors.text }]}>Recent check-ins</Text>
       {entries.slice(0, 7).map((entry) => (
         <Card key={entry.id}>
-          <Text style={[styles.date, { color: primaryAccent }]}>{new Date(entry.date).toLocaleDateString()}</Text>
-          <Text style={[styles.summary, { color: colors.muted }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={[styles.date, { color: primaryAccent }]}>{new Date(entry.date).toLocaleDateString()}</Text>
+            {entry.moduleId && entry.moduleId !== 'GENERAL' ? (
+              <Text style={{ fontSize: 11, color: primaryAccent, fontWeight: '700' }}>
+                {entry.moduleId.replace('_', ' ')}
+              </Text>
+            ) : null}
+          </View>
+          {(entry.linkedTaskTitle || entry.taskTitle) ? (
+            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text, marginTop: 2 }}>
+              ✓ Task: {entry.linkedTaskTitle || entry.taskTitle}
+            </Text>
+          ) : null}
+          <Text style={[styles.summary, { color: colors.muted, marginTop: 2 }]}>
             Stress {entry.stressLevel} · Mood {entry.mood} · Energy {entry.energyLevel}
           </Text>
           {entry.notes ? <Text style={[styles.summary, { color: colors.muted }]}>{entry.notes}</Text> : null}

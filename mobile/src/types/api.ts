@@ -34,6 +34,12 @@ export interface WellnessEntry {
   energyLevel: number;
   notes: string | null;
   date: string;
+  moduleId?: string | null;
+  taskId?: string | null;
+  taskTitle?: string | null;
+  taskStatus?: string | null;
+  linkedTaskTitle?: string | null;
+  linkedTaskStatus?: string | null;
 }
 
 export interface Challenge { id: string; title: string; difficulty: string; description: string; language: string | null; starterCode?: string | null; xpReward: number; }

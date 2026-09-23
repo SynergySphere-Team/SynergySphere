@@ -6,12 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/utils';
+import Link from 'next/link';
 import {
   BookOpen,
   CalendarDays,
   CheckCircle2,
   Clock,
   Flame,
+  Heart,
   Pause,
   Play,
   Plus,
@@ -64,6 +66,10 @@ export default function TasksPage() {
   const [error, setError] = useState('');
   const [editingLearned, setEditingLearned] = useState<string | null>(null);
   const [learnedDraft, setLearnedDraft] = useState('');
+  const [includeWellnessCheckIn, setIncludeWellnessCheckIn] = useState(true);
+  const [checkInStress, setCheckInStress] = useState(3);
+  const [checkInMood, setCheckInMood] = useState(8);
+  const [checkInEnergy, setCheckInEnergy] = useState(7);
 
   const [durationMinutes, setDurationMinutes] = useState(25);
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
@@ -213,7 +219,20 @@ export default function TasksPage() {
       setError('');
       await api(`/tasks/${taskId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ learnedNote: learnedDraft, status: 'DONE' }),
+        body: JSON.stringify({
+          learnedNote: learnedDraft,
+          status: 'DONE',
+          ...(includeWellnessCheckIn
+            ? {
+                wellnessCheckIn: {
+                  stressLevel: checkInStress,
+                  mood: checkInMood,
+                  energyLevel: checkInEnergy,
+                  notes: learnedDraft ? `Completed task: ${learnedDraft}` : undefined,
+                },
+              }
+            : {}),
+        }),
       });
       setEditingLearned(null);
       setLearnedDraft('');
@@ -317,15 +336,79 @@ export default function TasksPage() {
                             </button>
                           </div>
                           {editingLearned === task.id && (
-                            <div className="mt-2 space-y-2">
-                              <Input
-                                value={learnedDraft}
-                                onChange={(e) => setLearnedDraft(e.target.value)}
-                                placeholder="What did you learn from this task?"
-                              />
-                              <Button size="sm" className="w-full" onClick={() => saveLearnedNote(task.id)}>
-                                Save & Mark Complete
-                              </Button>
+                            <div className="mt-3 space-y-3 rounded-lg border border-primary/25 bg-black/40 p-3">
+                              <div>
+                                <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">What did you learn?</label>
+                                <Input
+                                  value={learnedDraft}
+                                  onChange={(e) => setLearnedDraft(e.target.value)}
+                                  placeholder="Key takeaway from this task..."
+                                  className="mt-1 text-xs"
+                                />
+                              </div>
+
+                              {/* Integrated Daily Wellness Check-in */}
+                              <div className="border-t border-white/[0.08] pt-2.5 space-y-2">
+                                <label className="flex items-center justify-between text-xs text-foreground cursor-pointer select-none">
+                                  <span className="flex items-center gap-1.5 font-medium text-pink-300">
+                                    <Heart className="h-3.5 w-3.5 text-pink-400" />
+                                    Daily Check-in for this task
+                                  </span>
+                                  <input
+                                    type="checkbox"
+                                    checked={includeWellnessCheckIn}
+                                    onChange={(e) => setIncludeWellnessCheckIn(e.target.checked)}
+                                    className="h-3.5 w-3.5 rounded accent-primary"
+                                  />
+                                </label>
+
+                                {includeWellnessCheckIn && (
+                                  <div className="space-y-1.5 rounded-md bg-secondary/30 p-2 text-xs">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-muted-foreground">Stress: {checkInStress}/10</span>
+                                      <input
+                                        type="range"
+                                        min={1}
+                                        max={10}
+                                        value={checkInStress}
+                                        onChange={(e) => setCheckInStress(Number(e.target.value))}
+                                        className="h-1.5 w-28 accent-pink-400"
+                                      />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-muted-foreground">Mood: {checkInMood}/10</span>
+                                      <input
+                                        type="range"
+                                        min={1}
+                                        max={10}
+                                        value={checkInMood}
+                                        onChange={(e) => setCheckInMood(Number(e.target.value))}
+                                        className="h-1.5 w-28 accent-purple-400"
+                                      />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-muted-foreground">Energy: {checkInEnergy}/10</span>
+                                      <input
+                                        type="range"
+                                        min={1}
+                                        max={10}
+                                        value={checkInEnergy}
+                                        onChange={(e) => setCheckInEnergy(Number(e.target.value))}
+                                        className="h-1.5 w-28 accent-teal-400"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex gap-2">
+                                <Button size="sm" className="flex-1 text-xs" onClick={() => saveLearnedNote(task.id)}>
+                                  Complete {includeWellnessCheckIn ? '(+20 XP)' : '(+10 XP)'}
+                                </Button>
+                                <Button size="sm" variant="secondary" className="text-xs" onClick={() => setEditingLearned(null)}>
+                                  Cancel
+                                </Button>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -437,11 +520,14 @@ export default function TasksPage() {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-primary" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Heart className="h-4 w-4 text-pink-400" />
                 Wellness
               </CardTitle>
+              <Link href="/wellness" className="text-xs text-primary hover:underline flex items-center gap-0.5">
+                Full Tracker →
+              </Link>
             </CardHeader>
             <CardContent>
               <div className="mb-2 flex items-center justify-between text-sm">
@@ -456,7 +542,7 @@ export default function TasksPage() {
               </div>
               <div className="mt-3 flex items-center gap-2 text-xs text-primary">
                 <CheckCircle2 className="h-4 w-4" />
-                {stats?.wellnessScore ? 'Based on your latest wellness check-in' : 'Log wellness to see your score'}
+                {stats?.wellnessScore ? 'Synced with your daily task check-ins' : 'Log a check-in to see your score'}
               </div>
             </CardContent>
           </Card>
