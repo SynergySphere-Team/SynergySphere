@@ -24,6 +24,7 @@ import {
 interface DashboardData {
   user: { firstName: string; lastName: string; xp: number; level: number };
   levelTitle: string;
+  streak?: number;
   stats: {
     tasksCompleted: number;
     challengesPassed: number;
@@ -74,12 +75,17 @@ export default function DashboardPage() {
     unreadNotifications: 2,
   };
 
+  const latestWellness = data?.wellnessTrend?.[data.wellnessTrend.length - 1];
+  const dynamicWellnessScore = latestWellness
+    ? `${Math.round(((10 - latestWellness.stressLevel) + latestWellness.mood + latestWellness.energyLevel) / 3 * 10)}%`
+    : '78%';
+
   const kpis = [
     { label: 'XP Earned', value: user?.xp ?? 2450, caption: '+160 this week', icon: Zap },
-    { label: 'Coding Streak', value: '14 Days', caption: 'Keep it up', icon: Code2 },
+    { label: 'Coding Streak', value: `${data?.streak ?? 1} Days`, caption: 'Keep it up', icon: Code2 },
     { label: 'Tasks Completed', value: stats.tasksCompleted, caption: '+5 from last week', icon: CheckCircle2 },
     { label: 'Projects Joined', value: stats.projectApplications, caption: 'Active contributions', icon: Users },
-    { label: 'Wellness Score', value: '78%', caption: 'Good balance', icon: HeartPulse },
+    { label: 'Wellness Score', value: dynamicWellnessScore, caption: 'Good balance', icon: HeartPulse },
     { label: 'Alerts', value: stats.unreadNotifications, caption: 'Need review', icon: Bell },
   ];
 

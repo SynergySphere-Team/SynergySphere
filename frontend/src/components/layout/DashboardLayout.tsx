@@ -1,18 +1,104 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { Bell, Flame, Search, Sparkles } from 'lucide-react';
+import { api } from '@/lib/utils';
+import {
+  Bell,
+  BookOpen,
+  CheckSquare,
+  Flame,
+  Search,
+  Sparkles,
+  Users,
+  X,
+  Loader2,
+} from 'lucide-react';
+
+interface SearchResults {
+  challenges: Array<{ id: string; title: string; difficulty: string }>;
+  projects: Array<{ id: string; title: string; category: string }>;
+  tasks: Array<{ id: string; title: string; status: string }>;
+}
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
 
+  const [dashboardData, setDashboardData] = useState<{
+    streak: number;
+    stats: { unreadNotifications: number };
+  } | null>(null);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [results, setResults] = useState<SearchResults>({ challenges: [], projects: [], tasks: [] });
+
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!loading && !user) router.push('/login');
   }, [user, loading, router]);
+
+  useEffect(() => {
+    if (user) {
+      api<{ streak: number; stats: { unreadNotifications: number } }>('/dashboard/stats')
+        .then(setDashboardData)
+        .catch(() => null);
+    }
+  }, [user]);
+
+  // Debounced search
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setResults({ challenges: [], projects: [], tasks: [] });
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timer = setTimeout(() => {
+      api<SearchResults>(`/dashboard/search?q=${encodeURIComponent(searchQuery.trim())}`)
+        .then((res) => {
+          setResults(res || { challenges: [], projects: [], tasks: [] });
+          setShowDropdown(true);
+        })
+        .catch(() => {
+          setResults({ challenges: [], projects: [], tasks: [] });
+        })
+        .finally(() => setIsSearching(false));
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && searchQuery.trim()) {
+      setShowDropdown(false);
+      router.push(`/tasks`);
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
+    }
+  };
+
+  const totalResultsCount =
+    results.challenges.length + results.projects.length + results.tasks.length;
 
   if (loading) {
     return (
@@ -30,32 +116,164 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen md:ml-56">
         <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-[#050a0d]/82 px-5 py-3 backdrop-blur-xl">
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-xs font-bold text-primary md:hidden">SS</div>
-            <div className="relative max-w-lg flex-1">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-xs font-bold text-primary md:hidden">
+              SS
+            </div>
+
+            {/* Global Search Bar */}
+            <div ref={searchContainerRef} className="relative max-w-lg flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 aria-label="Search"
-                className="h-9 w-full rounded-lg border border-white/[0.08] bg-black/25 pl-9 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  if (e.target.value) setShowDropdown(true);
+                }}
+                onFocus={() => {
+                  if (searchQuery.trim()) setShowDropdown(true);
+                }}
+                onKeyDown={handleKeyDown}
+                className="h-9 w-full rounded-lg border border-white/[0.08] bg-black/25 pl-9 pr-8 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
                 placeholder="Search for challenges, projects, notes..."
               />
+              {isSearching ? (
+                <Loader2 className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
+              ) : searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setShowDropdown(false);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+
+              {/* Autocomplete Dropdown */}
+              {showDropdown && searchQuery.trim() && (
+                <div className="absolute left-0 right-0 top-full mt-2 max-h-96 overflow-y-auto rounded-xl border border-white/[0.1] bg-[#0c141a]/95 p-2 shadow-2xl backdrop-blur-2xl z-50 divide-y divide-white/[0.06]">
+                  {totalResultsCount === 0 && !isSearching ? (
+                    <div className="p-4 text-center text-xs text-muted-foreground">
+                      No matching challenges, projects, or tasks found.
+                    </div>
+                  ) : (
+                    <>
+                      {/* Challenges */}
+                      {results.challenges.length > 0 && (
+                        <div className="py-2 first:pt-0">
+                          <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <BookOpen className="h-3 w-3 text-blue-400" />
+                            Challenges & Learning Hub
+                          </p>
+                          {results.challenges.map((c) => (
+                            <Link
+                              key={c.id}
+                              href="/learning-hub"
+                              onClick={() => setShowDropdown(false)}
+                              className="flex items-center justify-between rounded-lg px-2 py-1.5 text-xs text-foreground hover:bg-white/[0.06] transition"
+                            >
+                              <span className="font-medium text-white truncate">{c.title}</span>
+                              <span className="rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] text-blue-300 capitalize">
+                                {c.difficulty.toLowerCase()}
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Projects */}
+                      {results.projects.length > 0 && (
+                        <div className="py-2">
+                          <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <Users className="h-3 w-3 text-pink-400" />
+                            Community Projects
+                          </p>
+                          {results.projects.map((p) => (
+                            <Link
+                              key={p.id}
+                              href="/community"
+                              onClick={() => setShowDropdown(false)}
+                              className="flex items-center justify-between rounded-lg px-2 py-1.5 text-xs text-foreground hover:bg-white/[0.06] transition"
+                            >
+                              <span className="font-medium text-white truncate">{p.title}</span>
+                              <span className="rounded bg-pink-500/20 px-1.5 py-0.5 text-[10px] text-pink-300">
+                                {p.category}
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Tasks */}
+                      {results.tasks.length > 0 && (
+                        <div className="py-2 last:pb-0">
+                          <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <CheckSquare className="h-3 w-3 text-primary" />
+                            Productivity & Tasks
+                          </p>
+                          {results.tasks.map((t) => (
+                            <Link
+                              key={t.id}
+                              href="/tasks"
+                              onClick={() => setShowDropdown(false)}
+                              className="flex items-center justify-between rounded-lg px-2 py-1.5 text-xs text-foreground hover:bg-white/[0.06] transition"
+                            >
+                              <span className="font-medium text-white truncate">{t.title}</span>
+                              <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] text-primary">
+                                {t.status}
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
+
+            {/* Dynamic Activity Streak */}
             <div className="hidden items-center gap-2 rounded-lg border border-white/[0.08] bg-secondary/50 px-3 py-2 text-xs text-muted-foreground md:flex">
               <Flame className="h-4 w-4 text-amber-300" />
-              <span className="font-semibold text-white">14</span>
+              <span className="font-semibold text-white">{dashboardData?.streak ?? 1}</span>
               day streak
             </div>
-            <button className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] bg-secondary/50 text-muted-foreground transition hover:text-primary">
+
+            {/* Notifications Button */}
+            <Link
+              href="/notifications"
+              className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] bg-secondary/50 text-muted-foreground transition hover:text-primary"
+              title="Notifications"
+            >
               <Bell className="h-4 w-4" />
-            </button>
-            <div className="hidden items-center gap-3 rounded-lg border border-white/[0.08] bg-secondary/50 px-3 py-1.5 lg:flex">
+              {(dashboardData?.stats?.unreadNotifications ?? 0) > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow">
+                  {dashboardData?.stats.unreadNotifications}
+                </span>
+              )}
+            </Link>
+
+            {/* User Profile Pill */}
+            <Link
+              href="/portfolio"
+              className="hidden items-center gap-3 rounded-lg border border-white/[0.08] bg-secondary/50 px-3 py-1.5 lg:flex hover:border-white/20 transition"
+              title="View Profile / Portfolio"
+            >
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                {user.firstName?.[0]}{user.lastName?.[0]}
+                {user.firstName?.[0]}
+                {user.lastName?.[0]}
               </div>
               <div className="leading-tight">
-                <p className="text-xs font-semibold text-white">{user.firstName} {user.lastName}</p>
+                <p className="text-xs font-semibold text-white">
+                  {user.firstName} {user.lastName}
+                </p>
                 <p className="text-[11px] text-muted-foreground">Level {user.level}</p>
               </div>
-            </div>
+            </Link>
+
             <Sparkles className="hidden h-4 w-4 text-primary/70 xl:block" />
           </div>
         </header>
