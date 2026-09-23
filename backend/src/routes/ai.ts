@@ -51,27 +51,36 @@ router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => 
       ? `study pack "${ref.uploadFileName}"`
       : null;
 
+  const isExplicitLesson = Boolean(lessonId || uploadId);
   const systemPrompt = [
-    'You are the SynergySphere AI Workspace assistant for LectureToLife Programming Academy.',
-    'You help students debug code, explain concepts, suggest improvements, generate snippets, and explain errors.',
-    'Be concise, educational, encouraging, and match the lesson\'s difficulty level.',
+    'You are SynergySphere AI Workspace, an expert, supportive, and highly capable software engineering assistant and tutor.',
+    'Your goal is to provide deep, practical, accurate, and educational answers: explain programming concepts clearly, debug errors with root-cause analysis, provide optimized and idiomatic code snippets, and answer technical questions thoroughly.',
     '',
-    bundle.hasContext
+    bundle.hasContext && isExplicitLesson
       ? [
-          'GROUNDED CONTEXT (from LectureToLife Programming Academy / the student\'s study pack):',
+          'CURRENT STUDY LESSON / STUDY PACK CONTEXT:',
           bundle.contextBlock,
           '',
-          'STRICT RULES:',
-          '1. Ground every substantive claim in the GROUNDED CONTEXT above. Do not switch to a different curriculum.',
-          `2. When the matched lesson is relevant, name it using its full path: "${groundedLabel ?? 'the matched lesson'}".`,
-          '3. Reuse that lesson\'s key concepts, syntax, examples, quiz, and exercise instead of inventing your own material.',
-          '4. If the student\'s question is outside the provided context, say so explicitly first (e.g. "That is outside this lesson…"), then still answer helpfully and generally.',
-          '5. Refer to the student\'s completed lessons and study packs when they are relevant to the question.',
+          'GUIDELINES:',
+          `- The student is currently studying "${groundedLabel}". Align your explanation and terminology with this curriculum level.`,
+          '- Directly, specifically, and thoroughly answer the student\'s question or resolve their code issue.',
+          '- Provide clear explanations, modern best practices, and fresh tailored code examples. Never dump lesson notes verbatim.',
         ].join('\n')
-      : [
-          'No LessonToLife context matched this question.',
-          'Answer helpfully and generally, and suggest the student open a lesson in the Programming Academy or ask from inside a lesson so you can ground the answer.',
-        ].join('\n'),
+      : bundle.hasContext
+        ? [
+            'REFERENCE CURRICULUM CONTEXT (Optional background info from LectureToLife):',
+            bundle.contextBlock,
+            '',
+            'GUIDELINES:',
+            '- Directly and thoroughly answer the student\'s question using your full programming expertise and clear code examples.',
+            '- Focus 100% on solving and explaining the user\'s specific question, code, or debug request.',
+            '- You may naturally connect to the reference curriculum if relevant, but do not restrict yourself to it.',
+          ].join('\n')
+        : [
+            'GUIDELINES:',
+            '- Provide clear, idiomatic, accurate programming solutions with explanations and code examples.',
+            '- Format code snippets with proper markdown language tags.',
+          ].join('\n'),
   ].join('\n');
 
   const askingAboutCode =
