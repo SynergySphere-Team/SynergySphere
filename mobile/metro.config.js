@@ -1,5 +1,25 @@
 const path = require('path');
+const fs = require('fs');
 const { getDefaultConfig } = require('expo/metro-config');
+
+// Windows / OneDrive reparse point fix: Ensure @expo/metro-file-map handles EINVAL safely
+try {
+  const metroFileMapPath = require.resolve('@expo/metro-file-map/build/index.js');
+  let content = fs.readFileSync(metroFileMapPath, 'utf8');
+  if (!content.includes('EINVAL')) {
+    content = content.replace(
+      'fileMetadata[constants_1.default.SYMLINK] = (0, normalizePathSeparatorsToPosix_1.default)(this.#pathUtils.resolveSymlinkToNormal(normalPath, symlinkTarget));\n            });',
+      "fileMetadata[constants_1.default.SYMLINK] = (0, normalizePathSeparatorsToPosix_1.default)(this.#pathUtils.resolveSymlinkToNormal(normalPath, symlinkTarget));\n            }).catch((error) => {\n                if (['EINVAL', 'UNKNOWN', 'ENOTDIR'].includes(error.code ?? '')) {\n                    fileMetadata[constants_1.default.VISITED] = 1;\n                    fileMetadata[constants_1.default.SYMLINK] = 0;\n                    return;\n                }\n                throw error;\n            });"
+    );
+    content = content.replace(
+      "['ENOENT', 'EACCESS'].includes(error.code ?? '')",
+      "['ENOENT', 'EACCESS', 'EINVAL', 'UNKNOWN', 'ENOTDIR'].includes(error.code ?? '')"
+    );
+    fs.writeFileSync(metroFileMapPath, content, 'utf8');
+  }
+} catch {
+  // Non-fatal if read-only or not found
+}
 
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '..');
@@ -19,6 +39,22 @@ config.resolver.nodeModulesPaths = [
 ];
 
 config.resolver.disableHierarchicalLookup = true;
+
+// Exclude other workspaces and unnecessary folders from Metro file mapping
+const existingBlockList = Array.isArray(config.resolver.blockList)
+  ? config.resolver.blockList
+  : config.resolver.blockList
+  ? [config.resolver.blockList]
+  : [];
+
+config.resolver.blockList = [
+  ...existingBlockList,
+  new RegExp(`^${path.resolve(workspaceRoot, 'backend').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[/\\\\].*`),
+  new RegExp(`^${path.resolve(workspaceRoot, 'frontend').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[/\\\\].*`),
+  new RegExp(`^${path.resolve(workspaceRoot, 'docs').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[/\\\\].*`),
+  new RegExp(`^${path.resolve(workspaceRoot, 'build').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[/\\\\].*`),
+  new RegExp(`^${path.resolve(workspaceRoot, '.local-postgres').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[/\\\\].*`),
+];
 
 // Explicitly map react-native-screens and its subpaths so Metro can resolve
 // them correctly in the monorepo (fixes "react-native-screens/experimental" error)

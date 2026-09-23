@@ -130,23 +130,62 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Internal server error' });
 });
 
+let isDbConnected = false;
+
+async function checkDatabaseConnection(): Promise<boolean> {
+  try {
+    await pool.query('SELECT 1');
+    if (!isDbConnected) {
+      console.log('Database connection OK');
+    }
+    isDbConnected = true;
+    return true;
+  } catch (error: any) {
+    if (isDbConnected) {
+      console.warn('Database connection lost:', error.message);
+    } else {
+      console.warn('Database connection unavailable:', error.message);
+      if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET') {
+        console.warn('Start PostgreSQL with: npm run db:up (or docker compose up -d)');
+        console.warn('Then initialize data with: npm run db:migrate && npm run db:seed');
+      }
+    }
+    isDbConnected = false;
+    return false;
+  }
+}
+
 const server = app.listen(PORT, () => {
   console.log(`SynergySphere API running on http://localhost:${PORT}`);
-  pool.query('SELECT 1')
-    .then(() => console.log('Database connection OK'))
-    .catch((error: NodeJS.ErrnoException) => {
-      console.error('Database connection failed:', error.message);
-      if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET') {
-        console.error('Start PostgreSQL with: npm run db:up (or docker compose up -d)');
-        console.error('Then initialize data with: npm run db:migrate && npm run db:seed');
-      }
-    });
+  void checkDatabaseConnection();
 });
+
+// Periodically check DB connection if currently disconnected so it auto-recovers when DB starts
+setInterval(() => {
+  if (!isDbConnected) {
+    void checkDatabaseConnection();
+  }
+}, 15_000);
 
 const githubPollInterval = Math.max(Number(process.env.GITHUB_ACTIVITY_POLL_INTERVAL_MS) || 10 * 60 * 1000, 60_000);
 if (process.env.GITHUB_ACTIVITY_POLLING !== 'false') {
-  setTimeout(() => void pollGithubActivity().catch((error) => console.error('Initial GitHub activity sync failed:', error)), 10_000);
-  setInterval(() => void pollGithubActivity().catch((error) => console.error('GitHub activity sync failed:', error)), githubPollInterval);
+  const triggerGithubPoll = async (isInitial = false) => {
+    if (!isDbConnected) {
+      return;
+    }
+    try {
+      await pollGithubActivity();
+    } catch (error: any) {
+      if (error?.code === 'ECONNREFUSED' || error?.code === 'ECONNRESET') {
+        isDbConnected = false;
+        return;
+      }
+      console.error(isInitial ? 'Initial GitHub activity sync failed:' : 'GitHub activity sync failed:', error);
+    }
+  };
+
+  setTimeout(() => void triggerGithubPoll(true), 10_000);
+  setInterval(() => void triggerGithubPoll(false), githubPollInterval);
 }
 
 server.on('error', (error: NodeJS.ErrnoException) => {
