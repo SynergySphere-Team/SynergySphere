@@ -179,7 +179,8 @@ async function callOpenAI(
     });
 
     if (!response.ok) {
-      throw new Error('OpenAI request failed with status ' + response.status);
+      const errBody = await response.text();
+      throw new Error(`OpenAI request failed ${response.status}: ${errBody}`);
     }
 
     const data = await response.json() as { choices: Array<{ message: { content: string } }> };
