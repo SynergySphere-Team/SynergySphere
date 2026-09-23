@@ -70,8 +70,12 @@ async function callGemini(
 ): Promise<string> {
   const models = [
     process.env.GEMINI_MODEL,
-    'gemini-2.0-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-3.6-flash',
     'gemini-flash-latest',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
     'gemini-1.5-flash',
   ].filter((model, index, all): model is string => Boolean(model) && all.indexOf(model) === index);
 
@@ -80,7 +84,8 @@ async function callGemini(
     const result = await callGeminiModel(apiKey, model, systemPrompt, userMessage, history);
     if (result.ok) return result.text;
     lastError = result.error;
-    if (!/404|not found|NOT_FOUND/i.test(result.error)) {
+    // If not a retryable error (like bad API key / 400), don't keep trying models
+    if (!/404|not found|NOT_FOUND|503|UNAVAILABLE|429|RESOURCE_EXHAUSTED/i.test(result.error)) {
       throw new Error(result.error);
     }
   }
