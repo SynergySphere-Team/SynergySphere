@@ -91,11 +91,45 @@ interface RolePath {
   id: string;
   title: string;
   targetRole: string;
-  description: string;
-  durationWeeks: number;
-  tracks: string[];
-  challengeTargetCount: number;
-  interviewTopics: string[];
+  tagline: string;
+  subjectIds: string[];
+  totalLessons: number;
+  recommendedChallenges: Array<{ id: string }>;
+  interviewTags: string[];
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
+}
+
+function formatTrackName(track: string): string {
+  const names: Record<string, string> = {
+    nodejs: 'Node.js',
+    typescript: 'TypeScript',
+    javascript: 'JavaScript',
+    csharp: 'C#',
+    cpp: 'C++',
+  };
+  return names[track.toLowerCase()] ?? `${track.charAt(0).toUpperCase()}${track.slice(1)}`;
+}
+
+function normalizeRolePath(value: unknown): RolePath | null {
+  if (!value || typeof value !== 'object') return null;
+  const path = value as Partial<RolePath>;
+  if (typeof path.id !== 'string' || typeof path.title !== 'string') return null;
+
+  return {
+    id: path.id,
+    title: path.title,
+    targetRole: typeof path.targetRole === 'string' ? path.targetRole : 'Developer',
+    tagline: typeof path.tagline === 'string' ? path.tagline : '',
+    subjectIds: stringList(path.subjectIds),
+    totalLessons: typeof path.totalLessons === 'number' && Number.isFinite(path.totalLessons) ? path.totalLessons : 0,
+    recommendedChallenges: Array.isArray(path.recommendedChallenges)
+      ? path.recommendedChallenges.filter((challenge): challenge is { id: string } => Boolean(challenge) && typeof challenge === 'object' && typeof (challenge as { id?: unknown }).id === 'string')
+      : [],
+    interviewTags: stringList(path.interviewTags),
+  };
 }
 
 interface Flashcard {
@@ -154,8 +188,8 @@ export default function CodingScreen() {
       if (learningData.status === 'fulfilled') {
         setResources(learningData.value);
       }
-      if (rolePathsData.status === 'fulfilled' && rolePathsData.value?.paths) {
-        setRolePaths(rolePathsData.value.paths);
+      if (rolePathsData.status === 'fulfilled' && Array.isArray(rolePathsData.value?.paths)) {
+        setRolePaths(rolePathsData.value.paths.map(normalizeRolePath).filter((path): path is RolePath => path !== null));
       }
       if (flashcardsData.status === 'fulfilled' && flashcardsData.value?.flashcards) {
         setFlashcards(flashcardsData.value.flashcards);
@@ -743,30 +777,30 @@ export default function CodingScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>{path.title}</Text>
                 <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)' }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>{path.durationWeeks} Weeks</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>{path.totalLessons} Lessons</Text>
                 </View>
               </View>
-              <Text style={{ fontSize: 13, color: colors.muted, lineHeight: 18, marginBottom: 10 }}>{path.description}</Text>
+              <Text style={{ fontSize: 13, color: colors.muted, lineHeight: 18, marginBottom: 10 }}>{path.tagline}</Text>
 
               <View style={{ gap: 6 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Ionicons name="book-outline" size={14} color={primaryAccent} />
                   <Text style={{ fontSize: 12, color: colors.text }}>
-                    Tracks: <Text style={{ fontWeight: '600' }}>{path.tracks.join(', ')}</Text>
+                    Tracks: <Text style={{ fontWeight: '600' }}>{path.subjectIds.map(formatTrackName).join(', ') || 'Coming soon'}</Text>
                   </Text>
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Ionicons name="code-slash-outline" size={14} color={primaryAccent} />
                   <Text style={{ fontSize: 12, color: colors.text }}>
-                    Target: <Text style={{ fontWeight: '600' }}>{path.challengeTargetCount} Verified Challenges</Text>
+                    Target: <Text style={{ fontWeight: '600' }}>{path.recommendedChallenges.length} Verified Challenges</Text>
                   </Text>
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Ionicons name="mic-outline" size={14} color={primaryAccent} />
                   <Text style={{ fontSize: 12, color: colors.text }}>
-                    Interview Focus: <Text style={{ fontWeight: '600' }}>{path.interviewTopics.join(', ')}</Text>
+                    Interview Focus: <Text style={{ fontWeight: '600' }}>{path.interviewTags.map(formatTrackName).join(', ') || 'Coming soon'}</Text>
                   </Text>
                 </View>
               </View>
