@@ -50,7 +50,7 @@ Set `DATABASE_URL`, a strong `JWT_SECRET`, `PORT`, and `FRONTEND_URL` in `backen
 ```env
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/synergysphere
 JWT_SECRET=replace-with-a-long-random-secret
-PORT=4000
+PORT=4001
 FRONTEND_URL=http://localhost:3000
 ```
 
@@ -67,22 +67,20 @@ cp mobile/.env.example mobile/.env
 Set only the public API endpoint. On a physical device, use the computer’s LAN IP—not `localhost`:
 
 ```env
-EXPO_PUBLIC_API_URL=http://192.168.x.x:4000/api
+EXPO_PUBLIC_API_URL=http://192.168.x.x:4001/api
 ```
 
-Ensure the phone and computer are on the same network. Node’s Express listener accepts network connections by default; if a firewall is enabled, permit inbound connections to port 4000. For a deployed app, use an HTTPS API URL.
+Ensure the phone and computer are on the same network. Node’s Express listener accepts network connections by default; if a firewall is enabled, permit inbound connections to port 4001. For a deployed app, use an HTTPS API URL.
 
 ## Start development servers
 
-In separate terminals from the repository root:
+For mobile development, use one command from the repository root. It starts the Express API and Expo together:
 
 ```bash
-npm run dev:backend
-npm run dev:frontend
 npm run dev:mobile
 ```
 
-Or start both web processes together with `npm run dev`, then start `npm run dev:mobile` separately.
+For the web app, use `npm run dev` in a separate terminal. Do not also start `npm run dev:backend` while `npm run dev:mobile` is running, as both commands use port 4001.
 
 Open Expo Go and scan the QR code printed by Expo. If LAN discovery is unavailable, start Expo with a tunnel:
 
@@ -114,7 +112,7 @@ Web public configuration belongs in `frontend/.env.local` (`NEXT_PUBLIC_*` only 
 - **Expo Go shows "HTTP response error 500: UnexpectedServerError":**
   1. Always start Expo from within the mobile workspace: run `npm run dev:mobile` from the repository root, or `cd mobile && npx expo start -c`. Do not run `expo start` directly in the monorepo root.
   2. Ensure `mobile/app.json` does not contain an EAS `projectId` or `owner` linked to another developer's Expo account that your local Expo CLI is not authorized to sign certificates for. Run `eas project:init` if you want to link your own EAS project.
-- **Cannot reach API:** verify `EXPO_PUBLIC_API_URL` includes `/api`, use the LAN IP on real phones, and restart Expo after changing the env file.
+- **Cannot reach API:** first confirm that `npm run dev:mobile` shows `SynergySphere API running on http://localhost:4001`. Then verify `EXPO_PUBLIC_API_URL` includes `/api`, uses the computer’s current LAN IP on real phones, and restart Expo with `npm run start:clean --workspace=mobile` after changing the env file. The app no longer bundles a fixed LAN address.
 - **401 after a prior login:** the token may be expired or invalid; sign in again. The app clears expired tokens during session restoration.
 - **Database unavailable:** start Docker or verify `DATABASE_URL`, then run migrations.
 - **CORS in a browser build:** configure `FRONTEND_URL` or `FRONTEND_URLS` with the actual browser origin. Expo Go native requests do not send a browser origin.

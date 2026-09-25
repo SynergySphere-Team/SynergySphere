@@ -17,7 +17,7 @@ export interface ChatTurn {
   content: string;
 }
 
-const AI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS) || 25000;
+const AI_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS || process.env.OPENAI_TIMEOUT_MS) || 25000;
 
 /* ─────────────────────────── main export ─────────────────────────── */
 
@@ -72,11 +72,12 @@ async function callGemini(
     process.env.GEMINI_MODEL,
     'gemini-3.5-flash-lite',
     'gemini-3.5-flash',
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
     'gemini-3.6-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-flash-lite-latest',
     'gemini-flash-latest',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
   ].filter((model, index, all): model is string => Boolean(model) && all.indexOf(model) === index);
 
   let lastError = '';
