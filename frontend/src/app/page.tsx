@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -25,17 +26,45 @@ const pillars = [
   { icon: Briefcase, title: 'Career Readiness', desc: 'Interviews, portfolios, resumes, and progress.' },
 ];
 
-const metrics = [
-  ['XP Earned', '2,450', '+160 this week'],
-  ['Coding Streak', '14 Days', 'Keep it up'],
-  ['Tasks Done', '23', '+5 from last week'],
-  ['Wellness Score', '78%', 'Good balance'],
-];
-
 const partners = ['DUT', 'UNISA', 'WSU', 'NWU', 'VUT'];
 
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning, Developer';
+  if (hour < 17) return 'Good afternoon, Developer';
+  return 'Good evening, Developer';
+}
+
 function ProductPreview() {
-  const activity = [45, 68, 52, 80, 72, 88, 64];
+  const [stats, setStats] = useState<{
+    totalUsers: number;
+    challengesPassed: number;
+    projectsCompleted: number;
+    totalCurriculumLessons: number;
+  }>({
+    totalUsers: 1,
+    challengesPassed: 3,
+    projectsCompleted: 1,
+    totalCurriculumLessons: 800,
+  });
+
+  useEffect(() => {
+    fetch('/api/auth/platform-stats')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setStats(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  const metrics = [
+    { label: 'Curriculum Lessons', value: `${stats.totalCurriculumLessons}+`, caption: 'Across 11 tracks' },
+    { label: 'Challenges Passed', value: `${stats.challengesPassed}`, caption: 'Server-verified' },
+    { label: 'Open Projects', value: `${stats.projectsCompleted}`, caption: 'Community & GitHub' },
+    { label: 'Active Students', value: `${stats.totalUsers}`, caption: 'University cohorts' },
+  ];
+
+  const activity = [30, 65, 45, 90, 75, 50, 85];
 
   return (
     <div className="relative min-h-[520px] w-full overflow-hidden rounded-lg border border-white/[0.08] bg-[#071015] p-5 shadow-2xl shadow-black/40">
@@ -49,24 +78,26 @@ function ProductPreview() {
         >
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground">Student Command Center</p>
-              <h3 className="text-lg font-semibold text-white">Good morning, Lerato</h3>
+              <p className="text-xs text-muted-foreground">Developer OS</p>
+              <h3 className="text-lg font-semibold text-white">{getGreeting()}</h3>
             </div>
-            <span className="rounded-full bg-primary/[0.15] px-3 py-1 text-xs font-semibold text-primary">Live</span>
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              Student Platform
+            </span>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {metrics.map(([label, value, caption]) => (
-              <div key={label} className="rounded-lg border border-white/[0.07] bg-secondary/50 p-3">
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="mt-1 text-xl font-bold text-white">{value}</p>
-                <p className="text-[11px] text-primary">{caption}</p>
+            {metrics.map((m) => (
+              <div key={m.label} className="rounded-lg border border-white/[0.07] bg-secondary/50 p-3">
+                <p className="text-xs text-muted-foreground">{m.label}</p>
+                <p className="mt-1 text-xl font-bold text-white">{m.value}</p>
+                <p className="text-[11px] text-primary">{m.caption}</p>
               </div>
             ))}
           </div>
           <div className="mt-4 rounded-lg border border-white/[0.07] bg-black/25 p-4">
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-semibold text-white">Weekly Activity</p>
-              <p className="text-xs text-muted-foreground">Mon-Sun</p>
+              <p className="text-sm font-semibold text-white">Study Cadence</p>
+              <p className="text-xs text-muted-foreground">Weekly Activity</p>
             </div>
             <div className="flex h-28 items-end gap-2">
               {activity.map((height, index) => (
@@ -91,15 +122,18 @@ function ProductPreview() {
           >
             <div className="mb-3 flex items-center gap-2">
               <Cpu className="h-4 w-4 text-primary" />
-              <p className="text-sm font-semibold text-white">AI Workspace</p>
+              <p className="text-sm font-semibold text-white">Engineering Tickets &amp; PR Gym</p>
             </div>
             <div className="rounded-lg border border-white/[0.07] bg-[#071015] p-3 font-mono text-xs leading-6 text-muted-foreground">
-              <p><span className="text-primary">for</span> (let i = 0; i &lt; goals.length; i++) {'{'}</p>
-              <p className="pl-4">buildProject(goals[i]);</p>
+              <p><span className="text-primary">export async function</span> handleTransfer(tx) {'{'}</p>
+              <p className="pl-4">await db.query(<span className="text-emerald-400">&apos;BEGIN&apos;</span>);</p>
+              <p className="pl-4">await debitAccount(tx.from, tx.amount);</p>
+              <p className="pl-4">await creditAccount(tx.to, tx.amount);</p>
+              <p className="pl-4">await db.query(<span className="text-emerald-400">&apos;COMMIT&apos;</span>);</p>
               <p>{'}'}</p>
             </div>
             <p className="mt-3 rounded-lg bg-primary/10 p-3 text-xs text-primary">
-              Time complexity improved. Recommended next step: add tests.
+              ✓ Staff Review: Atomic transaction verified. Error rollback boundary correctly scoped.
             </p>
           </motion.div>
 
@@ -111,18 +145,18 @@ function ProductPreview() {
           >
             <div className="mb-3 flex items-center gap-2">
               <Target className="h-4 w-4 text-primary" />
-              <p className="text-sm font-semibold text-white">Learning Progress</p>
+              <p className="text-sm font-semibold text-white">Curriculum Role Paths</p>
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">
-              {['SkillUp', 'Projects', 'Community', 'Career'].map((item, index) => (
-                <div key={item} className="rounded-lg bg-secondary/50 p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-muted-foreground">{item}</span>
-                    <span className="font-semibold text-white">{[80, 65, 75, 60][index]}%</span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-black/40">
-                    <div className="h-full rounded-full bg-primary" style={{ width: `${[80, 65, 75, 60][index]}%` }} />
-                  </div>
+              {[
+                { name: 'Backend Intern', count: 'Java & SQL' },
+                { name: 'Frontend Intern', count: 'React & TS' },
+                { name: 'Full-Stack Track', count: 'Node & SQL' },
+                { name: 'DevOps & Git', count: 'CI/CD & Docker' },
+              ].map((item) => (
+                <div key={item.name} className="rounded-lg bg-secondary/50 p-3">
+                  <div className="mb-1 text-sm font-semibold text-white">{item.name}</div>
+                  <div className="text-[11px] text-muted-foreground">{item.count}</div>
                 </div>
               ))}
             </div>

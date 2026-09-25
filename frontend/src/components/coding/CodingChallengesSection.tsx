@@ -980,35 +980,47 @@ export function CodingChallengesSection({ showHeading = true }: CodingChallenges
     }
 
     try {
-      const res = await api<{ passed: boolean; xpEarned: number }>(
+      const res = await api<{
+        passed: boolean;
+        xpEarned: number;
+        testResults?: Array<{ label: string; passed: boolean; error?: string; expected?: any; got?: any }>;
+        output?: string;
+      }>(
         `/challenges/${selected.id}/submit`,
         {
           method: 'POST',
           body: JSON.stringify({
             code,
             language: selected.language,
-            testResults: localResults.length > 0 ? localResults.map((r) => ({ label: r.label, passed: r.passed })) : undefined,
           }),
         }
       );
 
-      if (!isLocallyRunnable(selected)) {
-        setTestResults([{
-          label: `${selected.language} — Submission`,
-          passed: res.passed,
-          expected: 'All checks pass',
-          got: res.passed ? 'Accepted ✓' : 'Wrong answer',
-        }]);
+      if (res.testResults && res.testResults.length > 0) {
+        setTestResults(
+          res.testResults.map((r) => ({
+            label: r.label,
+            passed: r.passed,
+            expected: r.expected,
+            got: r.got,
+            error: r.error,
+          }))
+        );
+      } else if (!isLocallyRunnable(selected)) {
+        setTestResults([
+          {
+            label: `${selected.language} — Server Judge`,
+            passed: res.passed,
+            expected: 'All server tests pass',
+            got: res.output || (res.passed ? 'Accepted ✓' : 'Failed test verification'),
+          },
+        ]);
       }
 
-      const finalPassed = isLocallyRunnable(selected) ? (allLocallyPassed && res.passed) : res.passed;
-      setSubmitResult({ passed: finalPassed, xpEarned: res.xpEarned });
-    } catch {
-      if (isLocallyRunnable(selected)) {
-        setSubmitResult({ passed: allLocallyPassed, xpEarned: allLocallyPassed ? selected.xpReward : 0 });
-      } else {
-        setSubmitResult({ passed: false, xpEarned: 0 });
-      }
+      setSubmitResult({ passed: res.passed, xpEarned: res.xpEarned });
+    } catch (err: any) {
+      setSubmitResult({ passed: false, xpEarned: 0 });
+      setPageError(err?.message || 'Submission failed. The server judge could not be contacted.');
     } finally {
       setSubmitting(false);
     }

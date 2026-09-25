@@ -631,7 +631,7 @@ export default function InterviewsPage() {
                         {result.weakAreas.map((area, i) => (
                           <Link
                             key={i}
-                            href={`/curriculum?search=${encodeURIComponent(area)}`}
+                            href={`/learning-hub?search=${encodeURIComponent(area)}`}
                             className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-950/40 px-2.5 py-1 text-xs text-amber-200 transition hover:bg-amber-900/60"
                           >
                             <span>{area}</span>

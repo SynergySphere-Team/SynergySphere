@@ -1,30 +1,34 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { StatCard } from '@/components/ui/StatCard';
+import { SkillBar } from '@/components/ui/SkillBar';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/context/AuthContext';
-import { api, getLevelTitle, getXpProgress } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { api, getLevelTitle } from '@/lib/utils';
 import {
-  ArrowUpRight,
-  Bell,
+  ArrowRight,
   BookOpen,
   CheckCircle2,
   Code2,
-  HeartPulse,
-  ListChecks,
+  Flame,
+  Layers,
+  Mic,
   Sparkles,
   Target,
   TrendingUp,
-  Users,
   Zap,
 } from 'lucide-react';
 
-interface DashboardData {
+interface DashboardStatsResponse {
   user: { firstName: string; lastName: string; xp: number; level: number };
   levelTitle: string;
-  streak?: number;
+  streak: number;
   stats: {
     tasksCompleted: number;
     challengesPassed: number;
@@ -33,213 +37,380 @@ interface DashboardData {
     projectApplications: number;
     unreadNotifications: number;
   };
-  wellnessTrend: Array<{ stressLevel: number; mood: number; energyLevel: number; date: string }>;
+  developerProfile?: {
+    hubSkills: Array<{
+      id: string;
+      name: string;
+      percent: number;
+      completedLessons: number;
+      totalLessons: number;
+      unlocked: boolean;
+    }>;
+    challenges: {
+      passedCount: number;
+      passedList: Array<{ id: string; title: string; difficulty: string }>;
+    };
+    weeklyActivity: {
+      days: Array<{ day: string; count: number; height: number }>;
+      totalEvents: number;
+    };
+    tasksSummary: {
+      completedThisWeek: number;
+      upcoming: Array<{
+        id: string;
+        title: string;
+        description: string | null;
+        dueDate: string | null;
+        status: string;
+      }>;
+    };
+    offerReadiness: {
+      role: string;
+      score: number;
+      checklist: Array<{ label: string; met: boolean; current: string }>;
+    };
+    nextActions: {
+      lesson: { id: string; title: string; subjectId: string; subjectName: string } | null;
+      challenge: { id: string; title: string; difficulty: string } | null;
+      interviewTopic: { id: string; name: string; reason: string } | null;
+    };
+    starBullets: Array<{ id: string; title: string; bullet: string }>;
+    stats: {
+      totalCompletedLessons: number;
+      hasRealProgress: boolean;
+    };
+  };
 }
 
-const activity = [35, 74, 46, 88, 66, 78, 58];
-const progress = [
-  ['SkillUp', 80],
-  ['LectureToLife', 64],
-  ['Productivity', 72],
-  ['Community', 75],
-  ['Career', 60],
-];
-
-const upcoming = [
-  ['Java Challenge', 'Arrays and hashmaps', 'Due today'],
-  ['Study Microservices', 'Summarize JDBC notes', 'Due tomorrow'],
-  ['Community Update', 'EcoSaver dashboard', 'Due in 2 days'],
-  ['Mock Interview', 'Backend developer', 'Due in 3 days'],
-];
-
-const recommendations = [
-  'Continue JDBC module based on your progress.',
-  'Practice binary trees to strengthen your SQL/API task pattern.',
-  'Review REST APIs before the mock interview.',
-];
+function getTimeOfDayGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [data, setData] = useState<DashboardStatsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api<DashboardData>('/dashboard/stats').then(setData).catch(() => setData(null));
+    api<DashboardStatsResponse>('/dashboard/stats')
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
   }, []);
 
-  const stats = data?.stats ?? {
-    tasksCompleted: 23,
-    challengesPassed: 18,
-    wellnessEntries: 9,
-    interviews: 3,
-    projectApplications: 5,
-    unreadNotifications: 2,
-  };
+  const greeting = getTimeOfDayGreeting();
+  const name = user?.firstName || 'Developer';
+  const profile = data?.developerProfile;
 
-  const latestWellness = data?.wellnessTrend?.[data.wellnessTrend.length - 1];
-  const dynamicWellnessScore = latestWellness
-    ? `${Math.round(((10 - latestWellness.stressLevel) + latestWellness.mood + latestWellness.energyLevel) / 3 * 10)}%`
-    : '78%';
+  // Real KPI numbers directly from the authoritative server profile
+  const totalXp = user?.xp ?? 0;
+  const currentStreak = data?.streak ?? 1;
+  const challengesPassed = profile?.challenges.passedCount ?? data?.stats.challengesPassed ?? 0;
+  const completedLessons = profile?.stats.totalCompletedLessons ?? 0;
 
-  const kpis = [
-    { label: 'XP Earned', value: user?.xp ?? 2450, caption: '+160 this week', icon: Zap },
-    { label: 'Coding Streak', value: `${data?.streak ?? 1} Days`, caption: 'Keep it up', icon: Code2 },
-    { label: 'Tasks Completed', value: stats.tasksCompleted, caption: '+5 from last week', icon: CheckCircle2 },
-    { label: 'Projects Joined', value: stats.projectApplications, caption: 'Active contributions', icon: Users },
-    { label: 'Wellness Score', value: dynamicWellnessScore, caption: 'Good balance', icon: HeartPulse },
-    { label: 'Alerts', value: stats.unreadNotifications, caption: 'Need review', icon: Bell },
+  // Hub tracks with progress or top featured tracks
+  const topTracks = (profile?.hubSkills || []).slice(0, 4);
+
+  // Next actions from profile gaps
+  const nextLesson = profile?.nextActions?.lesson;
+  const nextChallenge = profile?.nextActions?.challenge;
+  const nextInterview = profile?.nextActions?.interviewTopic;
+
+  // Real upcoming tasks from DB
+  const upcomingTasks = profile?.tasksSummary?.upcoming || [];
+  const weeklyDays = profile?.weeklyActivity?.days || [
+    { day: 'Mon', count: 0, height: 8 },
+    { day: 'Tue', count: 0, height: 8 },
+    { day: 'Wed', count: 0, height: 8 },
+    { day: 'Thu', count: 0, height: 8 },
+    { day: 'Fri', count: 0, height: 8 },
+    { day: 'Sat', count: 0, height: 8 },
+    { day: 'Sun', count: 0, height: 8 },
   ];
 
   return (
     <DashboardLayout>
-      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">Student Command Center</p>
-          <h1 className="text-2xl font-bold text-white md:text-3xl">
-            Good morning, {user?.firstName ?? 'Lerato'}!
-          </h1>
-          <p className="text-sm text-muted-foreground">Let&apos;s continue your journey of learning and building.</p>
-        </div>
-        <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-xs text-primary">
-          <Sparkles className="h-4 w-4" />
-          {getLevelTitle(user?.level || 1)} - Level {user?.level ?? 12}
-        </div>
+      <PageHeader
+        eyebrow="Developer Headquarters"
+        title={`${greeting}, ${name}`}
+        description="Your authentic engineering progress across verified curriculum lessons, server-evaluated coding challenges, and mock interviews."
+        actions={
+          <div className="flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-3.5 py-1.5 text-xs text-primary font-medium">
+            <Sparkles className="h-4 w-4" />
+            <span>{getLevelTitle(user?.level || 1)} • Level {user?.level || 1}</span>
+          </div>
+        }
+      />
+
+      {/* 3 Real Numbers + Level Progress */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Verified XP"
+          value={totalXp}
+          caption={`${completedLessons} curriculum lessons passed`}
+          icon={Zap}
+        />
+        <StatCard
+          label="Coding Streak"
+          value={`${currentStreak} ${currentStreak === 1 ? 'Day' : 'Days'}`}
+          caption="Active engineering habit"
+          icon={Flame}
+        />
+        <StatCard
+          label="Challenges Passed"
+          value={challengesPassed}
+          caption="Server-evaluated test suites"
+          icon={Code2}
+        />
+        <StatCard
+          label="Offer Readiness"
+          value={`${profile?.offerReadiness?.score ?? 0}%`}
+          caption={profile?.offerReadiness?.role || 'Junior Software Engineer'}
+          icon={Target}
+        />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-6">
-        {kpis.map((item, index) => (
-          <motion.div
-            key={item.label}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.04 }}
-            className="xl:col-span-1"
-          >
-            <Card className="h-full">
-              <CardContent className="pt-1">
-                <div className="mb-3 flex items-center justify-between">
-                  <div className="rounded-lg border border-primary/20 bg-primary/10 p-2">
-                    <item.icon className="h-4 w-4 text-primary" />
-                  </div>
-                  <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="text-xs text-muted-foreground">{item.label}</p>
-                <p className="mt-1 text-xl font-bold text-white">{item.value}</p>
-                <p className="mt-1 text-[11px] text-primary">{item.caption}</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.25fr_0.85fr]">
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle className="flex items-center gap-2">
+      {/* Next Actions & Offer Readiness Spine */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
+        {/* Next Action Card */}
+        <Card className="border-white/[0.08] bg-[#071015]/90">
+          <CardHeader className="flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2 text-white">
               <Target className="h-4 w-4 text-primary" />
-              Learning Progress
+              What to do next today
             </CardTitle>
-            <span className="rounded-lg border border-white/[0.08] bg-secondary/50 px-2 py-1 text-[11px] text-muted-foreground">This week</span>
+            <span className="rounded bg-primary/10 px-2 py-0.5 text-[11px] font-mono text-primary font-medium">
+              Profile Gap Queue
+            </span>
           </CardHeader>
-          <CardContent>
-            <div className="grid gap-5 lg:grid-cols-[0.8fr_1fr]">
-              <div className="relative mx-auto flex aspect-square w-full max-w-[260px] items-center justify-center rounded-full border border-primary/20 bg-black/25">
-                <div className="absolute inset-6 rounded-full border border-white/[0.08]" />
-                <div className="absolute inset-14 rounded-full border border-white/[0.08]" />
-                <div
-                  className="h-[68%] w-[68%] bg-primary/45"
-                  style={{ clipPath: 'polygon(50% 0%, 87% 24%, 78% 82%, 25% 90%, 9% 34%)' }}
-                />
-                <div className="absolute inset-0 flex items-center justify-center text-center">
-                  <div>
-                    <p className="text-2xl font-bold text-white">72%</p>
-                    <p className="text-[11px] text-muted-foreground">overall</p>
+          <CardContent className="space-y-3">
+            {/* Next Lesson */}
+            {nextLesson ? (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.07] bg-black/25 p-3 hover:border-primary/30 transition">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+                    <BookOpen className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Lesson • {nextLesson.subjectName}
+                    </p>
+                    <p className="truncate text-sm font-semibold text-white">{nextLesson.title}</p>
                   </div>
                 </div>
+                <Link href={`/learning-hub?subject=${nextLesson.subjectId}&lesson=${nextLesson.id}`}>
+                  <Button size="sm" variant="outline" className="gap-1 text-xs shrink-0">
+                    Study <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </Link>
               </div>
-              <div className="space-y-3">
-                {progress.map(([label, value]) => (
-                  <div key={label}>
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">{label}</span>
-                      <span className="font-semibold text-white">{value}%</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-black/35">
-                      <div className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-300" style={{ width: `${value}%` }} />
-                    </div>
+            ) : (
+              <div className="rounded-lg border border-white/[0.07] bg-black/25 p-3 text-xs text-muted-foreground">
+                All foundational lessons in active track completed!
+              </div>
+            )}
+
+            {/* Next Challenge */}
+            {nextChallenge ? (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.07] bg-black/25 p-3 hover:border-primary/30 transition">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+                    <Code2 className="h-4 w-4" />
                   </div>
-                ))}
-                <div className="pt-3">
-                  <p className="mb-1 text-xs text-muted-foreground">Level progress</p>
-                  <div className="h-2 overflow-hidden rounded-full bg-black/35">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${getXpProgress(user?.xp || 2450)}%` }}
-                      className="h-full rounded-full bg-primary"
-                    />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Challenge • {nextChallenge.difficulty}
+                    </p>
+                    <p className="truncate text-sm font-semibold text-white">{nextChallenge.title}</p>
                   </div>
                 </div>
+                <Link href="/coding">
+                  <Button size="sm" variant="outline" className="gap-1 text-xs shrink-0">
+                    Solve <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </Link>
               </div>
-            </div>
+            ) : null}
+
+            {/* Next Interview Question */}
+            {nextInterview && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.07] bg-black/25 p-3 hover:border-primary/30 transition">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-500/10 text-purple-400">
+                    <Mic className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Interview Practice • {nextInterview.name}
+                    </p>
+                    <p className="truncate text-sm font-semibold text-white">{nextInterview.reason}</p>
+                  </div>
+                </div>
+                <Link href="/interviews">
+                  <Button size="sm" variant="outline" className="gap-1 text-xs shrink-0">
+                    Practice <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ListChecks className="h-4 w-4 text-primary" />
-              Upcoming Tasks
+        {/* Offer Readiness Checklist */}
+        <Card className="border-white/[0.08] bg-[#071015]/90">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center justify-between text-white">
+              <span className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-primary" />
+                Intern Readiness
+              </span>
+              <span className="text-xs font-mono text-primary font-bold">
+                {profile?.offerReadiness?.score ?? 0}% Ready
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {upcoming.map(([title, desc, due]) => (
-              <div key={title} className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.07] bg-secondary/40 p-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{desc}</p>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-black/40">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-300 transition-all duration-500"
+                style={{ width: `${profile?.offerReadiness?.score ?? 0}%` }}
+              />
+            </div>
+            <div className="space-y-2 pt-1">
+              {(profile?.offerReadiness?.checklist || []).map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between rounded-lg border border-white/[0.05] bg-black/20 px-3 py-2 text-xs"
+                >
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <CheckCircle2
+                      className={`h-4 w-4 shrink-0 ${
+                        item.met ? 'text-primary' : 'text-muted-foreground/30'
+                      }`}
+                    />
+                    <span className={item.met ? 'text-white' : ''}>{item.label}</span>
+                  </span>
+                  <span className="font-mono text-[11px] font-semibold text-white shrink-0 ml-2">
+                    {item.current}
+                  </span>
                 </div>
-                <span className="shrink-0 text-[11px] text-primary">{due}</span>
-              </div>
-            ))}
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_0.9fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+      {/* Real Weekly Events & Learning Hub Progress */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr]">
+        {/* Weekly Activity (from real events) */}
+        <Card className="border-white/[0.08] bg-[#071015]/90">
+          <CardHeader className="flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2 text-white">
               <TrendingUp className="h-4 w-4 text-primary" />
-              Weekly Activity
+              Verified Weekly Activity
             </CardTitle>
+            <span className="text-xs text-muted-foreground">
+              {profile?.weeklyActivity?.totalEvents ?? 0} events this week
+            </span>
           </CardHeader>
           <CardContent>
-            <div className="flex h-40 items-end gap-3">
-              {activity.map((height, index) => (
-                <div key={index} className="flex flex-1 flex-col items-center gap-2">
-                  <div className="flex w-full items-end rounded-t bg-primary/10" style={{ height: `${height}%` }}>
-                    <div className="h-full w-full rounded-t bg-gradient-to-t from-primary/55 to-emerald-300" />
+            <div className="flex h-36 items-end gap-3 pt-4">
+              {weeklyDays.map((item) => (
+                <div key={item.day} className="flex flex-1 flex-col items-center gap-2">
+                  <div className="flex w-full items-end justify-center rounded-t bg-black/30" style={{ height: '100px' }}>
+                    <div
+                      className="w-full rounded-t bg-gradient-to-t from-primary/60 to-emerald-400 transition-all duration-500"
+                      style={{ height: `${item.height}%` }}
+                    />
                   </div>
-                  <span className="text-[11px] text-muted-foreground">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index]}</span>
+                  <span className="text-[11px] font-medium text-muted-foreground">{item.day}</span>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        {/* Learning Hub Verified Progress */}
+        <Card className="border-white/[0.08] bg-[#071015]/90">
+          <CardHeader className="flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2 text-white">
               <BookOpen className="h-4 w-4 text-primary" />
-              AI Recommendations
+              Learning Hub Skills
             </CardTitle>
+            <Link href="/learning-hub" className="text-xs text-primary hover:underline">
+              View all tracks →
+            </Link>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {recommendations.map((item) => (
-              <div key={item} className="flex items-start gap-3 rounded-lg border border-white/[0.07] bg-secondary/40 p-3">
-                <Zap className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <p className="text-sm leading-5 text-muted-foreground">{item}</p>
+          <CardContent className="space-y-3.5">
+            {topTracks.length > 0 ? (
+              topTracks.map((track) => (
+                <SkillBar
+                  key={track.id}
+                  name={track.name}
+                  percent={track.percent}
+                  subtitle={`${track.completedLessons} of ${track.totalLessons} lessons completed`}
+                  unlocked={track.unlocked}
+                />
+              ))
+            ) : (
+              <EmptyState
+                icon={BookOpen}
+                title="No lessons completed yet"
+                description="Start a module in the Learning Hub to begin building your verified skill record."
+                action={{ label: 'Explore Hub', href: '/learning-hub' }}
+              />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Real Upcoming Tasks (Honest Empty State) */}
+      <div className="mt-6">
+        <Card className="border-white/[0.08] bg-[#071015]/90">
+          <CardHeader className="flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2 text-white">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              Active Tasks
+            </CardTitle>
+            <Link href="/tasks">
+              <Button size="sm" variant="outline" className="text-xs">
+                Manage Tasks
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {upcomingTasks.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {upcomingTasks.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-start justify-between gap-3 rounded-lg border border-white/[0.07] bg-black/25 p-3.5"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{t.title}</p>
+                      {t.description && (
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{t.description}</p>
+                      )}
+                    </div>
+                    {t.dueDate && (
+                      <span className="shrink-0 text-[11px] font-mono font-medium text-primary">
+                        Due {t.dueDate}
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <EmptyState
+                icon={CheckCircle2}
+                title="No upcoming tasks scheduled"
+                description="Your task board is clear. Plan your study sessions and engineering milestones in Productivity."
+                action={{ label: 'Create a Task', href: '/tasks' }}
+              />
+            )}
           </CardContent>
         </Card>
       </div>

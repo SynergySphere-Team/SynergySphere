@@ -24,7 +24,62 @@ import {
 import { w3schoolsProgrammingDomain } from '../data/w3schoolsCurriculumData.js';
 
 const router = Router();
+
+// Public Developer Profile (No auth required for verified public evidence locker)
+router.get('/public/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const user = await queryOne<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      xp: number;
+      level: number;
+      createdAt: Date;
+    }>(
+      `SELECT "id", "firstName", "lastName", "xp", "level", "createdAt"
+       FROM "User"
+       WHERE "id" = $1`,
+      [userId],
+    );
+    if (!user) {
+      res.status(404).json({ error: 'Developer profile not found' });
+      return;
+    }
+    const signals = await getProfileSignals(userId);
+    res.json({ user, ...signals });
+  } catch (error) {
+    console.error('Public developer profile error:', error);
+    res.status(500).json({ error: 'Failed to fetch public developer profile' });
+  }
+});
+
 router.use(authenticate);
+
+// Unified authenticated Developer Profile endpoint
+router.get('/developer-profile', async (req: AuthRequest, res) => {
+  try {
+    const user = await queryOne<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      xp: number;
+      level: number;
+      createdAt: Date;
+    }>(
+      `SELECT "id", "firstName", "lastName", "email", "xp", "level", "createdAt"
+       FROM "User"
+       WHERE "id" = $1`,
+      [req.user!.userId],
+    );
+    const signals = await getProfileSignals(req.user!.userId);
+    res.json({ user, ...signals });
+  } catch (error) {
+    console.error('Error fetching developer profile:', error);
+    res.status(500).json({ error: 'Failed to fetch developer profile' });
+  }
+});
 
 // ── 1. Portfolio Items (CRUD) ──
 

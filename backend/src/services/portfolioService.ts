@@ -35,6 +35,37 @@ export interface ProfileSignalData {
   };
   bestInterviewScores: Array<{ topic: string; bestScore: number; attempts: number }>;
   interviewScores: Record<string, number>;
+  challenges: {
+    passedCount: number;
+    byLanguage: Record<string, number>;
+    byDifficulty: Record<string, number>;
+    passedList: Array<{ id: string; title: string; language: string | null; difficulty: string }>;
+  };
+  weeklyActivity: {
+    days: Array<{ day: string; count: number; height: number }>;
+    totalEvents: number;
+  };
+  tasksSummary: {
+    completedThisWeek: number;
+    upcoming: Array<{
+      id: string;
+      title: string;
+      description: string | null;
+      dueDate: string | null;
+      status: string;
+    }>;
+  };
+  offerReadiness: {
+    role: string;
+    score: number;
+    checklist: Array<{ label: string; met: boolean; current: string }>;
+  };
+  nextActions: {
+    lesson: { id: string; title: string; subjectId: string; subjectName: string } | null;
+    challenge: { id: string; title: string; language: string | null; difficulty: string } | null;
+    interviewTopic: { id: string; name: string; reason: string } | null;
+  };
+  starBullets: Array<{ id: string; title: string; bullet: string; source: string; createdAt: Date }>;
   joinedProjects: Array<{
     id: string;
     title: string;
@@ -163,12 +194,157 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
     [userId],
   ).catch(() => []);
 
+  // 7. Fetch Passed Challenges
+  const passedChallengeRows = await query<{
+    challengeId: string;
+    title: string;
+    language: string | null;
+    difficulty: string;
+  }>(
+    `SELECT DISTINCT ON (c."id") c."id" as "challengeId", c."title", c."language", c."difficulty"
+     FROM "ChallengeAttempt" ca
+     JOIN "Challenge" c ON c."id" = ca."challengeId"
+     WHERE ca."userId" = $1 AND ca."passed" = true
+     ORDER BY c."id", ca."createdAt" DESC`,
+    [userId],
+  ).catch(() => []);
+
+  const challengesByLang: Record<string, number> = {};
+  const challengesByDiff: Record<string, number> = {};
+  for (const c of passedChallengeRows) {
+    const l = c.language || 'Other';
+    challengesByLang[l] = (challengesByLang[l] || 0) + 1;
+    challengesByDiff[c.difficulty] = (challengesByDiff[c.difficulty] || 0) + 1;
+  }
+
+  // 8. Fetch Real Weekly Activity (last 7 days by day of week)
+  const activityRows = await query<{ day_num: number; cnt: number }>(
+    `SELECT EXTRACT(ISODOW FROM occurred)::int AS day_num, COUNT(*)::int AS cnt
+     FROM (
+       SELECT "createdAt" AS occurred FROM "ChallengeAttempt" WHERE "userId" = $1 AND "createdAt" >= CURRENT_DATE - INTERVAL '6 days'
+       UNION ALL
+       SELECT "updatedAt" AS occurred FROM "Task" WHERE "userId" = $1 AND "status" = 'DONE' AND "updatedAt" >= CURRENT_DATE - INTERVAL '6 days'
+       UNION ALL
+       SELECT "date" AS occurred FROM "Wellness" WHERE "userId" = $1 AND "date" >= CURRENT_DATE - INTERVAL '6 days'
+       UNION ALL
+       SELECT "createdAt" AS occurred FROM "InterviewAttempt" WHERE "userId" = $1 AND "createdAt" >= CURRENT_DATE - INTERVAL '6 days'
+     ) act
+     GROUP BY day_num`,
+    [userId],
+  ).catch(() => []);
+
+  const dayMap = new Map(activityRows.map((r) => [r.day_num, r.cnt]));
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  let maxCount = 1;
+  const days = dayNames.map((name, i) => {
+    const count = dayMap.get(i + 1) || 0;
+    if (count > maxCount) maxCount = count;
+    return { day: name, count, height: 0 };
+  });
+  days.forEach((d) => {
+    d.height = d.count > 0 ? Math.max(20, Math.round((d.count / maxCount) * 100)) : 8;
+  });
+  const totalEvents = days.reduce((sum, d) => sum + d.count, 0);
+
+  // 9. Fetch Tasks Summary (Done this week + upcoming tasks)
+  const doneThisWeek = await queryOne<{ count: number }>(
+    `SELECT COUNT(*)::int AS "count"
+     FROM "Task"
+     WHERE "userId" = $1 AND "status" = 'DONE' AND "updatedAt" >= CURRENT_DATE - INTERVAL '7 days'`,
+    [userId],
+  ).catch(() => ({ count: 0 }));
+
+  const upcomingRows = await query<{
+    id: string;
+    title: string;
+    description: string | null;
+    dueDate: Date | null;
+    status: string;
+  }>(
+    `SELECT "id", "title", "description", "dueDate", "status"
+     FROM "Task"
+     WHERE "userId" = $1 AND "status" != 'DONE'
+     ORDER BY "dueDate" ASC NULLS LAST, "createdAt" DESC
+     LIMIT 5`,
+    [userId],
+  ).catch(() => []);
+
+  // 10. Fetch Star Bullets
+  const starBullets = await query<{
+    id: string;
+    title: string;
+    bullet: string;
+    source: string;
+    createdAt: Date;
+  }>(
+    `SELECT "id", "title", "bullet", "source", "createdAt"
+     FROM "PortfolioBullet"
+     WHERE "userId" = $1
+     ORDER BY "createdAt" DESC`,
+    [userId],
+  ).catch(() => []);
+
+  // 11. Calculate Offer Readiness
   const interviewScores: Record<string, number> = {};
   for (const r of scoreRows) {
     if (r.topic) {
       interviewScores[r.topic] = Number(r.bestScore) || 0;
     }
   }
+
+  const javaHub = hubSkills.find((h) => h.id === 'java')?.percent || 0;
+  const sqlHub = hubSkills.find((h) => h.id === 'sql')?.percent || 0;
+  const jsHub = hubSkills.find((h) => h.id === 'javascript')?.percent || 0;
+  const javaOrSqlScore = Math.max(interviewScores['java'] || 0, interviewScores['sql'] || 0);
+
+  const checklist = [
+    { label: 'Java or SQL Track Progress >= 30%', met: javaHub >= 30 || sqlHub >= 30, current: `${Math.max(javaHub, sqlHub)}%` },
+    { label: 'Pass at least 3 Challenges', met: passedChallengeRows.length >= 3, current: `${passedChallengeRows.length}/3` },
+    { label: 'Technical Interview Score >= 70%', met: javaOrSqlScore >= 70, current: `${javaOrSqlScore}%` },
+    { label: 'Join 1 Open Source Project', met: joinedProjects.length >= 1, current: `${joinedProjects.length}/1` },
+  ];
+  const readinessScore = Math.round((checklist.filter((c) => c.met).length / checklist.length) * 100);
+
+  // 12. Determine Next Action from Profile Gaps
+  let nextLesson: { id: string; title: string; subjectId: string; subjectName: string } | null = null;
+  for (const subject of w3schoolsProgrammingDomain.subjects) {
+    for (const mod of subject.modules) {
+      for (const lesson of mod.lessons) {
+        if (!completedSet.has(lesson.id)) {
+          nextLesson = {
+            id: lesson.id,
+            title: lesson.title,
+            subjectId: subject.id,
+            subjectName: subject.name,
+          };
+          break;
+        }
+      }
+      if (nextLesson) break;
+    }
+    if (nextLesson) break;
+  }
+
+  const passedIds = new Set(passedChallengeRows.map((c) => c.challengeId));
+  const uncompletedChallenge = await queryOne<{
+    id: string;
+    title: string;
+    language: string | null;
+    difficulty: string;
+  }>(
+    `SELECT "id", "title", "language", "difficulty"
+     FROM "Challenge"
+     WHERE "id" != ALL($1::text[])
+     ORDER BY CASE "difficulty" WHEN 'EASY' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END
+     LIMIT 1`,
+    [Array.from(passedIds)],
+  ).catch(() => null);
+
+  const nextInterviewTopic = {
+    id: 'java',
+    name: 'Java Backend',
+    reason: javaOrSqlScore < 70 ? 'Strengthen core backend fundamentals' : 'Keep interview sharpness high',
+  };
 
   const totalCompletedLessons = completedSet.size;
 
@@ -189,6 +365,42 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
       attempts: Number(r.attempts) || 0,
     })),
     interviewScores,
+    challenges: {
+      passedCount: passedChallengeRows.length,
+      byLanguage: challengesByLang,
+      byDifficulty: challengesByDiff,
+      passedList: passedChallengeRows.map((c) => ({
+        id: c.challengeId,
+        title: c.title,
+        language: c.language,
+        difficulty: c.difficulty,
+      })),
+    },
+    weeklyActivity: {
+      days,
+      totalEvents,
+    },
+    tasksSummary: {
+      completedThisWeek: doneThisWeek?.count || 0,
+      upcoming: upcomingRows.map((t) => ({
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        dueDate: t.dueDate ? t.dueDate.toISOString().slice(0, 10) : null,
+        status: t.status,
+      })),
+    },
+    offerReadiness: {
+      role: profileRow?.targetRole || 'Junior Backend Developer',
+      score: readinessScore,
+      checklist,
+    },
+    nextActions: {
+      lesson: nextLesson,
+      challenge: uncompletedChallenge,
+      interviewTopic: nextInterviewTopic,
+    },
+    starBullets,
     joinedProjects,
     featuredProjects,
     stats: {

@@ -11,7 +11,8 @@
     "db:seed": "tsx src/scripts/seed.ts",
     "curriculum:verify": "tsx src/scripts/verifyCurriculum.ts",
     "ai:verify": "tsx src/scripts/verifyAiContext.ts",
-    "verify:upgrade": "tsx src/scripts/verifyFullUpgrade.ts"
+    "verify:upgrade": "tsx src/scripts/verifyFullUpgrade.ts",
+    "test": "tsx --test src/tests/api.test.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

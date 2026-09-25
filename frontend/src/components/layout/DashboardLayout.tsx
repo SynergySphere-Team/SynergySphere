@@ -22,6 +22,7 @@ interface SearchResults {
   challenges: Array<{ id: string; title: string; difficulty: string }>;
   projects: Array<{ id: string; title: string; category: string }>;
   tasks: Array<{ id: string; title: string; status: string }>;
+  lessons?: Array<{ id: string; title: string; subjectId: string; subjectName: string }>;
 }
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -37,7 +38,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [results, setResults] = useState<SearchResults>({ challenges: [], projects: [], tasks: [] });
+  const [results, setResults] = useState<SearchResults>({ challenges: [], projects: [], tasks: [], lessons: [] });
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -98,7 +99,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   };
 
   const totalResultsCount =
-    results.challenges.length + results.projects.length + results.tasks.length;
+    results.challenges.length + results.projects.length + results.tasks.length + (results.lessons?.length || 0);
 
   if (loading) {
     return (
@@ -113,7 +114,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="dashboard-grid min-h-screen bg-background text-foreground">
       <Sidebar />
-      <div className="min-h-screen md:ml-56">
+      <div className="min-h-screen md:ml-60">
         <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-[#050a0d]/82 px-5 py-3 backdrop-blur-xl">
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-xs font-bold text-primary md:hidden">
@@ -135,7 +136,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 }}
                 onKeyDown={handleKeyDown}
                 className="h-9 w-full rounded-lg border border-white/[0.08] bg-black/25 pl-9 pr-8 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
-                placeholder="Search for challenges, projects, notes..."
+                placeholder="Search lessons, challenges, projects, tasks..."
               />
               {isSearching ? (
                 <Loader2 className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
@@ -157,21 +158,44 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <div className="absolute left-0 right-0 top-full mt-2 max-h-96 overflow-y-auto rounded-xl border border-white/[0.1] bg-[#0c141a]/95 p-2 shadow-2xl backdrop-blur-2xl z-50 divide-y divide-white/[0.06]">
                   {totalResultsCount === 0 && !isSearching ? (
                     <div className="p-4 text-center text-xs text-muted-foreground">
-                      No matching challenges, projects, or tasks found.
+                      No matching lessons, challenges, projects, or tasks found.
                     </div>
                   ) : (
                     <>
-                      {/* Challenges */}
-                      {results.challenges.length > 0 && (
+                      {/* Curriculum Lessons */}
+                      {results.lessons && results.lessons.length > 0 && (
                         <div className="py-2 first:pt-0">
                           <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                            <BookOpen className="h-3 w-3 text-blue-400" />
-                            Challenges & Learning Hub
+                            <BookOpen className="h-3 w-3 text-emerald-400" />
+                            Curriculum Lessons
+                          </p>
+                          {results.lessons.map((l) => (
+                            <Link
+                              key={l.id}
+                              href={`/learning-hub?subject=${l.subjectId}&lesson=${l.id}`}
+                              onClick={() => setShowDropdown(false)}
+                              className="flex items-center justify-between rounded-lg px-2 py-1.5 text-xs text-foreground hover:bg-white/[0.06] transition"
+                            >
+                              <span className="font-medium text-white truncate">{l.title}</span>
+                              <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-300">
+                                {l.subjectName}
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Challenges */}
+                      {results.challenges.length > 0 && (
+                        <div className="py-2">
+                          <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <Sparkles className="h-3 w-3 text-blue-400" />
+                            Challenges
                           </p>
                           {results.challenges.map((c) => (
                             <Link
                               key={c.id}
-                              href="/learning-hub"
+                              href="/coding"
                               onClick={() => setShowDropdown(false)}
                               className="flex items-center justify-between rounded-lg px-2 py-1.5 text-xs text-foreground hover:bg-white/[0.06] transition"
                             >

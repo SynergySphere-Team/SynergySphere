@@ -236,11 +236,159 @@ async function main() {
     );
 
     const studentPassword = await bcrypt.hash('student123', 12);
+    let studentUser = await client.query(
+      `SELECT "id" FROM "User" WHERE "email" = 'student@synergysphere.com'`,
+    );
+
+    let studentId = studentUser.rows[0]?.id;
+    if (!studentId) {
+      studentId = newId();
+      await client.query(
+        `INSERT INTO "User" ("id", "firstName", "lastName", "email", "password", "role", "xp", "level")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [studentId, 'Demo', 'Student', 'student@synergysphere.com', studentPassword, 'STUDENT', 434, 2],
+      );
+    } else {
+      await client.query(
+        `UPDATE "User" SET "xp" = 434, "level" = 2, "password" = $1 WHERE "id" = $2`,
+        [studentPassword, studentId],
+      );
+    }
+
+    // 1. Seed 12 Completed Java Curriculum Lessons
+    const javaLessonsToSeed = [
+      'w3s-java-java-intro',
+      'w3s-java-java-get-started',
+      'w3s-java-java-syntax',
+      'w3s-java-java-variables',
+      'w3s-java-java-data-types',
+      'w3s-java-java-type-casting',
+      'w3s-java-java-operators',
+      'w3s-java-java-strings',
+      'w3s-java-java-math',
+      'w3s-java-java-booleans',
+      'w3s-java-java-if...else',
+      'w3s-java-java-switch',
+    ];
+
+    for (const lessonId of javaLessonsToSeed) {
+      await client.query(
+        `INSERT INTO "LectureLessonProgress" ("id", "userId", "lessonId", "completedAt")
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP - INTERVAL '1 day')
+         ON CONFLICT ("userId", "lessonId") DO NOTHING`,
+        [newId(), studentId, lessonId],
+      );
+    }
+
+    // 2. Seed 3 Passed Challenges
+    const challengesToPass = [
+      {
+        title: 'Hello World',
+        code: 'function greet() {\n  return "Hello, SynergySphere!";\n}',
+        xpEarned: 50,
+      },
+      {
+        title: 'Sum Array',
+        code: 'function sumArray(arr) {\n  return arr.reduce((a, b) => a + b, 0);\n}',
+        xpEarned: 50,
+      },
+      {
+        title: 'FizzBuzz',
+        code: 'function fizzBuzz(n) {\n  if (n % 15 === 0) return "FizzBuzz";\n  if (n % 3 === 0) return "Fizz";\n  if (n % 5 === 0) return "Buzz";\n  return n;\n}',
+        xpEarned: 75,
+      },
+    ];
+
+    for (const c of challengesToPass) {
+      const challengeRow = await client.query<{ id: string }>(
+        `SELECT "id" FROM "Challenge" WHERE "title" = $1 LIMIT 1`,
+        [c.title],
+      );
+      if (challengeRow.rows[0]) {
+        await client.query(
+          `INSERT INTO "ChallengeAttempt" ("id", "userId", "challengeId", "code", "passed", "xpEarned")
+           VALUES ($1, $2, $3, $4, true, $5)
+           ON CONFLICT DO NOTHING`,
+          [newId(), studentId, challengeRow.rows[0].id, c.code, c.xpEarned],
+        );
+      }
+    }
+
+    // 3. Seed 1 Completed Technical Interview
+    const interviewSessionId = newId();
     await client.query(
-      `INSERT INTO "User" ("id", "firstName", "lastName", "email", "password", "role", "xp", "level")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT ("email") DO NOTHING`,
-      [newId(), 'Demo', 'Student', 'student@synergysphere.com', studentPassword, 'STUDENT', 150, 1],
+      `INSERT INTO "Interview" ("id", "userId", "topic", "score", "feedback", "weakAreas", "questions")
+       VALUES ($1, $2, 'Java Backend', 82,
+         'Strong answer! Covered core OOP, memory management, and collection trade-offs with high technical precision.',
+         $3, $4)
+       ON CONFLICT DO NOTHING`,
+      [
+        interviewSessionId,
+        studentId,
+        JSON.stringify(['Java Threads & Concurrency', 'Spring Boot JDBC Transactions']),
+        JSON.stringify([
+          {
+            id: 'java-records',
+            prompt: 'Explain Java Records and how they differ from traditional POJOs.',
+            difficulty: 'medium',
+            rubric: ['Immutable data carriers', 'Auto-generated equals/hashCode/toString', 'Compact constructor'],
+          },
+        ]),
+      ],
+    );
+
+    // 4. Seed 1 Community Project Application
+    const projectRow = await client.query<{ id: string }>(
+      `SELECT "id" FROM "Project" WHERE "title" = 'Campus Recycling Dashboard' LIMIT 1`,
+    );
+    if (projectRow.rows[0]) {
+      await client.query(
+        `INSERT INTO "ProjectApplication" ("id", "projectId", "userId", "status", "message")
+         VALUES ($1, $2, $3, 'APPROVED', 'Interested in contributing FastAPI endpoint optimizations and sensor time-series caching.')
+         ON CONFLICT DO NOTHING`,
+        [newId(), projectRow.rows[0].id, studentId],
+      );
+    }
+
+    // 5. Seed Real Tasks
+    await client.query(
+      `INSERT INTO "Task" ("id", "userId", "title", "description", "status", "dueDate")
+       VALUES
+         ($1, $2, 'Master Java Collections & HashMap Internals', 'Complete ArrayList vs LinkedList analysis and write comparator tests.', 'DONE', CURRENT_DATE - INTERVAL '1 day'),
+         ($3, $2, 'Review Spring Boot JDBC Transactions', 'Follow take-home tutorial on database isolation levels and rollbacks.', 'IN_PROGRESS', CURRENT_DATE + INTERVAL '2 days')
+       ON CONFLICT DO NOTHING`,
+      [newId(), studentId, newId()],
+    );
+
+    // 6. Seed Wellness Log
+    await client.query(
+      `INSERT INTO "Wellness" ("id", "userId", "stressLevel", "mood", "energyLevel", "notes", "date")
+       VALUES ($1, $2, 3, 8, 8, 'Productive morning session completing Java exercises. Ready for interview practice.', CURRENT_TIMESTAMP)
+       ON CONFLICT DO NOTHING`,
+      [newId(), studentId],
+    );
+
+    // 7. Seed Portfolio Profile & Verified STAR Bullet
+    await client.query(
+      `INSERT INTO "PortfolioProfile" ("id", "userId", "headline", "about", "location", "targetRole", "githubUrl", "linkedinUrl")
+       VALUES ($1, $2, 'Aspiring Backend & Systems Developer',
+         'Junior software engineer focused on robust Java microservices, PostgreSQL query optimization, and RESTful APIs.',
+         'Johannesburg, South Africa', 'Junior Backend Developer',
+         'https://github.com/demostudent', 'https://linkedin.com/in/demostudent')
+       ON CONFLICT ("userId") DO UPDATE SET
+         "headline" = EXCLUDED."headline",
+         "about" = EXCLUDED."about",
+         "targetRole" = EXCLUDED."targetRole"`,
+      [newId(), studentId],
+    );
+
+    await client.query(
+      `INSERT INTO "PortfolioBullet" ("id", "userId", "title", "bullet", "source")
+       VALUES ($1, $2, 'Campus Recycling Telemetry Ingest',
+         'Integrated RESTful sensor payload ingest pipeline with route optimization service, improving campus waste collection dispatch efficiency by 24%.',
+         'COMMUNITY_PR')
+       ON CONFLICT DO NOTHING`,
+      [newId(), studentId],
     );
 
     await client.query('COMMIT');

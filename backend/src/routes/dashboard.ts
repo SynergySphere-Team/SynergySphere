@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { query, queryOne } from '../lib/db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { getProfileSignals } from '../services/portfolioService.js';
+import { w3schoolsProgrammingDomain } from '../data/w3schoolsCurriculumData.js';
 
 const router = Router();
 
@@ -18,6 +20,7 @@ router.get('/stats', async (req: AuthRequest, res) => {
       projectApps,
       unreadNotifications,
       recentWellness,
+      developerProfile,
     ] = await Promise.all([
       countTable('"Task"', 'WHERE "userId" = $1 AND "status" = $2', [userId, 'DONE']),
       countTable('"ChallengeAttempt"', 'WHERE "userId" = $1 AND "passed" = true', [userId]),
@@ -33,6 +36,7 @@ router.get('/stats', async (req: AuthRequest, res) => {
          LIMIT 7`,
         [userId],
       ),
+      getProfileSignals(userId),
     ]);
 
     const user = await queryOne<{ xp: number; level: number; firstName: string; lastName: string }>(
@@ -65,6 +69,7 @@ router.get('/stats', async (req: AuthRequest, res) => {
         unreadNotifications,
       },
       wellnessTrend: recentWellness.reverse(),
+      developerProfile,
     });
   } catch (error) {
     console.error('Dashboard stats error:', error);
@@ -76,10 +81,32 @@ router.get('/search', async (req: AuthRequest, res) => {
   try {
     const q = String(req.query.q || '').trim();
     if (!q) {
-      res.json({ challenges: [], projects: [], tasks: [] });
+      res.json({ challenges: [], projects: [], tasks: [], lessons: [] });
       return;
     }
     const term = `%${q}%`;
+    const qLower = q.toLowerCase();
+
+    // Search curriculum lessons
+    const lessons: Array<{ id: string; title: string; subjectId: string; subjectName: string }> = [];
+    for (const subject of w3schoolsProgrammingDomain.subjects) {
+      for (const mod of subject.modules) {
+        for (const lesson of mod.lessons) {
+          if (lesson.title.toLowerCase().includes(qLower) || subject.name.toLowerCase().includes(qLower)) {
+            lessons.push({
+              id: lesson.id,
+              title: lesson.title,
+              subjectId: subject.id,
+              subjectName: subject.name,
+            });
+            if (lessons.length >= 6) break;
+          }
+        }
+        if (lessons.length >= 6) break;
+      }
+      if (lessons.length >= 6) break;
+    }
+
     const [challenges, projects, tasks] = await Promise.all([
       query<{ id: string; title: string; difficulty: string }>(
         `SELECT "id", "title", "difficulty" FROM "Challenge" WHERE "title" ILIKE $1 OR "description" ILIKE $1 LIMIT 5`,
@@ -94,7 +121,7 @@ router.get('/search', async (req: AuthRequest, res) => {
         [req.user!.userId, term],
       ),
     ]);
-    res.json({ challenges, projects, tasks });
+    res.json({ challenges, projects, tasks, lessons });
   } catch (error) {
     console.error('Search error:', error);
     res.status(500).json({ error: 'Search failed' });

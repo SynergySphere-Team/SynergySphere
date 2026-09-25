@@ -52,7 +52,12 @@ export default function LoginPage() {
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@university.edu" />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium">Password</label>
+                <Link href="/reset-password" className="text-xs text-primary hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
               <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="Password" />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>

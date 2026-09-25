@@ -5,6 +5,7 @@ import { paramId } from '../lib/params.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { awardXp } from '../services/gamification.js';
+import { judgeChallengeSubmission } from '../services/judgeService.js';
 
 const router = Router();
 
@@ -34,14 +35,8 @@ router.get('/:id', authenticate, async (req, res) => {
 
 const attemptSchema = z.object({
   code: z.string().min(1).max(50000),
-  testResults: z
-    .array(
-      z.object({
-        label: z.string(),
-        passed: z.boolean(),
-      })
-    )
-    .optional(),
+  // Any client-supplied testResults are ignored; server judgment is authoritative
+  testResults: z.any().optional(),
 });
 
 router.post('/:id/submit', authenticate, validateBody(attemptSchema), async (req: AuthRequest, res) => {
@@ -62,14 +57,9 @@ router.post('/:id/submit', authenticate, validateBody(attemptSchema), async (req
     return;
   }
 
-  // If the frontend sends test results (from client-side execution), trust them.
-  // Otherwise fall back to the legacy string-match approach.
-  let passed: boolean;
-  if (req.body.testResults && req.body.testResults.length > 0) {
-    passed = req.body.testResults.every((r: { passed: boolean }) => r.passed);
-  } else {
-    passed = evaluateCodeFallback(req.body.code, challenge.solution || '');
-  }
+  // 1. Authoritative Server-Side Evaluation (Never trust client body)
+  const judgeResult = await judgeChallengeSubmission(challenge, req.body.code);
+  const passed = judgeResult.passed;
 
   const alreadyPassed = await queryOne<{ id: string }>(
     `SELECT "id"
@@ -92,20 +82,16 @@ router.post('/:id/submit', authenticate, validateBody(attemptSchema), async (req
     await updateSkill(req.user!.userId, challenge.language || 'General');
   }
 
-  res.json({ attempt, passed, xpEarned, alreadyPassed: Boolean(alreadyPassed) });
+  res.json({
+    attempt,
+    passed,
+    xpEarned,
+    alreadyPassed: Boolean(alreadyPassed),
+    testResults: judgeResult.testResults,
+    output: judgeResult.output,
+    error: judgeResult.error,
+  });
 });
-
-/**
- * Legacy fallback: normalised string comparison.
- * Only used when no test results are provided by the client.
- */
-function evaluateCodeFallback(submitted: string, solution: string): boolean {
-  if (!solution.trim()) return false;
-  const normalize = (s: string) => s.replace(/\s+/g, '').toLowerCase();
-  const normalizedSubmitted = normalize(submitted);
-  const normalizedSolution = normalize(solution);
-  return normalizedSubmitted.includes(normalizedSolution) || normalizedSubmitted === normalizedSolution;
-}
 
 async function updateSkill(userId: string, skillName: string) {
   await queryOne(
