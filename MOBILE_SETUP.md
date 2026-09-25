@@ -111,6 +111,9 @@ Web public configuration belongs in `frontend/.env.local` (`NEXT_PUBLIC_*` only 
 
 ## Troubleshooting
 
+- **Expo Go shows "HTTP response error 500: UnexpectedServerError":**
+  1. Always start Expo from within the mobile workspace: run `npm run dev:mobile` from the repository root, or `cd mobile && npx expo start -c`. Do not run `expo start` directly in the monorepo root.
+  2. Ensure `mobile/app.json` does not contain an EAS `projectId` or `owner` linked to another developer's Expo account that your local Expo CLI is not authorized to sign certificates for. Run `eas project:init` if you want to link your own EAS project.
 - **Cannot reach API:** verify `EXPO_PUBLIC_API_URL` includes `/api`, use the LAN IP on real phones, and restart Expo after changing the env file.
 - **401 after a prior login:** the token may be expired or invalid; sign in again. The app clears expired tokens during session restoration.
 - **Database unavailable:** start Docker or verify `DATABASE_URL`, then run migrations.
