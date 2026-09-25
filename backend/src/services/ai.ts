@@ -7,6 +7,7 @@
  *  3. Rule-based fallback (always works, no API key required)
  */
 
+import dotenv from 'dotenv';
 import {
   buildLectureMaterialsFromContent,
   extractLectureContent,
@@ -17,7 +18,17 @@ export interface ChatTurn {
   content: string;
 }
 
-const AI_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS || process.env.OPENAI_TIMEOUT_MS) || 25000;
+function refreshEnv(): void {
+  try {
+    dotenv.config({ override: true });
+  } catch {
+    // ignore
+  }
+}
+
+function getAiTimeout(): number {
+  return Number(process.env.AI_TIMEOUT_MS || process.env.OPENAI_TIMEOUT_MS) || 25000;
+}
 
 /* ─────────────────────────── main export ─────────────────────────── */
 
@@ -32,10 +43,11 @@ export async function generateAiResponse(
   history: ChatTurn[] = [],
   offlineFallback: () => string = () => fallbackResponse(systemPrompt, userMessage),
 ): Promise<string> {
+  refreshEnv();
   const priorTurns = usableHistory(history);
 
   // 1. Try Gemini first (free)
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const geminiKey = (process.env.GEMINI_API_KEY || '').trim();
   if (geminiKey) {
     try {
       const result = await callGemini(geminiKey, systemPrompt, userMessage, priorTurns);
@@ -46,7 +58,7 @@ export async function generateAiResponse(
   }
 
   // 2. Try OpenAI
-  const openaiKey = process.env.OPENAI_API_KEY;
+  const openaiKey = (process.env.OPENAI_API_KEY || '').trim();
   if (openaiKey) {
     try {
       const result = await callOpenAI(openaiKey, systemPrompt, userMessage, priorTurns);
@@ -70,9 +82,12 @@ async function callGemini(
 ): Promise<string> {
   const models = [
     process.env.GEMINI_MODEL,
+    'gemini-3.8-flash',
     'gemini-3.5-flash-lite',
     'gemini-3.5-flash',
-    'gemini-3.8-flash',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
     'gemini-3.7-flash',
     'gemini-3.6-flash',
     'gemini-3.1-flash-lite',
@@ -83,7 +98,10 @@ async function callGemini(
   let lastError = '';
   for (const model of models) {
     const result = await callGeminiModel(apiKey, model, systemPrompt, userMessage, history);
-    if (result.ok) return result.text;
+    if (result.ok) {
+      if (result.text) return result.text;
+      continue;
+    }
     lastError = result.error;
     // If not a retryable error (like bad API key / 400), don't keep trying models
     if (!/404|not found|NOT_FOUND|503|UNAVAILABLE|429|RESOURCE_EXHAUSTED/i.test(result.error)) {
@@ -103,7 +121,7 @@ async function callGeminiModel(
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), getAiTimeout());
 
   try {
     const response = await fetch(url, {
@@ -111,7 +129,7 @@ async function callGeminiModel(
       signal: controller.signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-          systemInstruction: {
+        systemInstruction: {
           parts: [{ text: systemPrompt }],
         },
         contents: [
@@ -140,10 +158,25 @@ async function callGeminiModel(
     }
 
     const data = await response.json() as {
-      candidates: Array<{ content: { parts: Array<{ text: string }> } }>;
+      candidates?: Array<{
+        finishReason?: string;
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
     };
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const text = parts
+      .map((part) => (typeof part.text === 'string' ? part.text : ''))
+      .join('')
+      .trim();
+
+    if (!text && data.candidates?.[0]?.finishReason) {
+      return {
+        ok: false,
+        error: `Gemini candidate returned empty text with finishReason: ${data.candidates[0].finishReason}`,
+      };
+    }
+
     return { ok: true, text };
   } finally {
     clearTimeout(timeout);
@@ -159,7 +192,7 @@ async function callOpenAI(
   history: ChatTurn[] = [],
 ): Promise<string> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), getAiTimeout());
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {

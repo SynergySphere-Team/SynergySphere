@@ -52,7 +52,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Practice',
     items: [
-      { href: '/coding', label: 'Challenges & Gym', icon: Code2 },
+      { href: '/coding', label: 'Challenges', icon: Code2 },
       { href: '/interviews', label: 'Interview Coach', icon: Mic },
     ],
   },
