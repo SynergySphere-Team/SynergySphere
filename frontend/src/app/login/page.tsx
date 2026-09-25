@@ -35,9 +35,9 @@ export default function LoginPage() {
       <Card className="relative w-full max-w-md">
         <CardHeader className="text-center">
           <img
-            src="/brand/synergysphere-logo.svg"
+            src="/brand/synergysphere-logo.png"
             alt="SynergySphere"
-            className="mx-auto mb-3 h-auto w-60 max-w-full"
+            className="mx-auto mb-3 h-16 w-16 rounded-2xl object-cover shadow-lg shadow-primary/20"
           />
           <CardTitle className="text-2xl">Welcome Back</CardTitle>
           <CardDescription>Sign in to your SynergySphere account</CardDescription>

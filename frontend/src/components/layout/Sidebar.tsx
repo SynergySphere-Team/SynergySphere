@@ -93,8 +93,8 @@ export function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-screen w-60 flex-col md:flex border-r border-white/[0.08] bg-[#050a0d]/95 backdrop-blur-xl">
       <div className="flex items-center gap-2.5 border-b border-white/[0.08] px-4 py-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/30 bg-primary/10 shadow-lg shadow-primary/20">
-          <Sparkles className="h-4 w-4 text-primary" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden border border-white/10 shadow-md shadow-primary/20">
+          <img src="/brand/synergysphere-logo.png" alt="SynergySphere" className="h-full w-full object-cover" />
         </div>
         <div className="min-w-0">
           <h1 className="truncate text-sm font-bold text-white tracking-tight">SynergySphere</h1>

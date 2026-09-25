@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Screen, Notice } from '@/components/Screen';
 import { Button, Field } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
@@ -36,7 +36,14 @@ export default function RegisterScreen() {
   return (
     <Screen>
       <View style={styles.hero}>
-        <Text style={[styles.brand, { color: brandGreen }]}>SynergySphere</Text>
+        <View style={styles.mark}>
+          <Image
+            source={require('../../../assets/images/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+        </View>
+        <Text style={[styles.brand, { color: colors.text }]}>SynergySphere</Text>
         <Text style={[styles.title, { color: colors.text }]}>Start your journey</Text>
       </View>
       <View style={styles.form}>
@@ -74,9 +81,11 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: { marginTop: 34, gap: 12 },
+  hero: { marginTop: 24, alignItems: 'center', gap: 6 },
+  mark: { width: 68, height: 68, borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  logoImage: { width: '100%', height: '100%' },
   brand: { fontSize: 24, fontWeight: '800' },
-  title: { fontSize: 31, fontWeight: '800' },
-  form: { marginTop: 30, gap: 14 },
+  title: { fontSize: 28, fontWeight: '800', textAlign: 'center' },
+  form: { marginTop: 24, gap: 14 },
   link: { textAlign: 'center', marginTop: 6, fontWeight: '700', fontSize: 14 },
 });

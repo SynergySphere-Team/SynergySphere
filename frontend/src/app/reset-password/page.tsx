@@ -133,9 +133,9 @@ export default function ResetPasswordPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#050a0d] p-4">
       <div className="w-full max-w-md">
-        <div className="mb-6 flex items-center justify-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary border border-primary/30">
-            <Sparkles className="h-4 w-4" />
+        <div className="mb-6 flex items-center justify-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl overflow-hidden border border-white/10 shadow-md">
+            <img src="/brand/synergysphere-logo.png" alt="SynergySphere" className="h-full w-full object-cover" />
           </div>
           <span className="text-base font-bold text-white tracking-tight">SynergySphere</span>
         </div>

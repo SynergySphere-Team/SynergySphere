@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Screen, Notice } from '@/components/Screen';
 import { Button, Field } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
@@ -35,16 +35,12 @@ export default function LoginScreen() {
     <Screen>
       <View style={styles.page}>
         <View style={styles.hero}>
-          <View
-            style={[
-              styles.mark,
-              {
-                backgroundColor: isLight ? '#E2F5DA' : colors.primaryDark,
-                borderColor: brandGreen,
-              },
-            ]}
-          >
-            <Text style={[styles.markText, { color: brandGreen }]}>S</Text>
+          <View style={styles.mark}>
+            <Image
+              source={require('../../../assets/images/logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
           <Text style={[styles.brand, { color: colors.text }]}>SynergySphere</Text>
           <Text style={[styles.tagline, { color: colors.muted }]}>Learn. Build. Thrive.</Text>
@@ -94,8 +90,8 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   page: { flex: 1, justifyContent: 'space-between', minHeight: 640, paddingVertical: 30 },
   hero: { marginTop: 24, alignItems: 'center', gap: 6 },
-  mark: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  markText: { fontSize: 34, fontWeight: '800' },
+  mark: { width: 72, height: 72, borderRadius: 20, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  logoImage: { width: '100%', height: '100%' },
   brand: { fontSize: 25, fontWeight: '800', marginTop: 8 },
   tagline: { fontSize: 14 },
   form: { gap: 15 },

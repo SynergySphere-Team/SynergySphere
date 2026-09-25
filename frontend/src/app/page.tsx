@@ -172,11 +172,11 @@ export default function HomePage() {
     <div className="min-h-screen overflow-hidden">
       <header className="fixed top-0 z-50 w-full border-b border-white/[0.08] bg-[#030608]/82 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
-              <Sparkles className="h-4 w-4 text-primary" />
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden border border-white/10 shadow-md">
+              <img src="/brand/synergysphere-logo.png" alt="SynergySphere" className="h-full w-full object-cover" />
             </div>
-            <span className="text-sm font-bold text-white">SynergySphere</span>
+            <span className="text-sm font-bold text-white tracking-tight">SynergySphere</span>
           </Link>
           <nav className="hidden items-center gap-6 text-xs text-muted-foreground md:flex">
             <a href="#features" className="transition hover:text-primary">Features</a>
