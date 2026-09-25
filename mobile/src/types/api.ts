@@ -54,6 +54,7 @@ export interface Project {
   license?: string | null; starterTemplate?: string | null;
   githubStars?: number; githubForks?: number; contributorAvatars?: string[];
   lastActivityAt?: string | null; lastActivityMessage?: string | null; lastActivityActor?: string | null;
+  techStack?: string | null; teamCapacity?: number | null; deliverableType?: string | null;
 }
 export interface ProjectJoinRequest { id: string; status: 'PENDING' | 'INVITATION_SENT' | 'APPROVED' | 'DECLINED'; createdAt: string; userId: string; firstName: string; lastName: string; email: string; githubUsername?: string | null; message?: string | null; invitationSentAt?: string | null; acceptedAt?: string | null; profilePicture?: string | null; }
 export interface ProjectMessage { id: string; body: string; createdAt: string; userId: string; firstName: string; lastName: string; role: string; }

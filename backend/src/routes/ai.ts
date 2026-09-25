@@ -118,76 +118,87 @@ router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => 
   });
 });
 
-const interviewSchema = z.object({
-  topic: z.enum(['Java', 'Python', 'SQL', 'Web Development']),
+import {
+  startInterviewSession,
+  generateLiveCritique,
+  evaluateInterviewSession,
+} from '../services/interviewService.js';
+import {
+  ALL_INTERVIEW_TRACKS,
+  QUESTION_BANK_BY_TOPIC,
+} from '../data/interviewBank/index.js';
+
+router.get('/interview/tracks', async (_req, res) => {
+  res.json({
+    tracks: ALL_INTERVIEW_TRACKS.map((t) => ({
+      ...t,
+      questionCount: t.componentTopics.reduce((sum, c) => sum + (QUESTION_BANK_BY_TOPIC[c]?.length || 0), 0),
+    })),
+  });
 });
 
-router.post('/interview/start', validateBody(interviewSchema), async (req: AuthRequest, res) => {
-  const prompt = 'Generate 5 technical interview questions for ' + req.body.topic + '. Return JSON array: [{"question":"...","difficulty":"easy|medium|hard"}]';
+const startInterviewSchema = z.object({
+  topic: z.string().min(1).max(100),
+  count: z.number().int().min(5).max(30).optional().default(10),
+  mode: z.enum(['mixed', 'conceptual', 'coding']).optional().default('mixed'),
+});
 
-  const raw = await generateAiResponse('You are a technical interviewer.', prompt);
-  let questions;
+router.post('/interview/start', validateBody(startInterviewSchema), async (req: AuthRequest, res) => {
   try {
-    const match = raw.match(/\[[\s\S]*\]/);
-    questions = match ? JSON.parse(match[0]) : [{ question: raw, difficulty: 'medium' }];
-  } catch {
-    questions = [{ question: 'Tell me about your experience with ' + req.body.topic, difficulty: 'easy' }];
+    const session = await startInterviewSession({
+      userId: req.user!.userId,
+      topic: req.body.topic,
+      count: req.body.count,
+      mode: req.body.mode,
+    });
+    res.status(201).json(session);
+  } catch (error) {
+    console.error('Error starting interview session:', error);
+    res.status(500).json({ error: (error as Error).message || 'Failed to start interview session' });
   }
-
-  const interview = await queryOne(
-    `INSERT INTO "Interview" ("id", "userId", "topic", "questions")
-     VALUES ($1, $2, $3, $4)
-     RETURNING *`,
-    [newId(), req.user!.userId, req.body.topic, JSON.stringify(questions)],
-  );
-
-  res.status(201).json(interview);
 });
 
-const answerSchema = z.object({
-  interviewId: z.string(),
-  answers: z.array(z.string().max(4000)).max(10),
+const critiqueSchema = z.object({
+  interviewId: z.string().min(1),
+  questionIndex: z.number().int().min(0).max(30),
+  answer: z.string().max(8000).optional().default(''),
+  scratchCode: z.string().max(16000).optional().default(''),
 });
 
-router.post('/interview/evaluate', validateBody(answerSchema), async (req: AuthRequest, res) => {
-  const interview = await queryOne<{ id: string; topic: string; questions: unknown; score: number | null }>(
-    `SELECT *
-     FROM "Interview"
-     WHERE "id" = $1 AND "userId" = $2`,
-    [req.body.interviewId, req.user!.userId],
-  );
-  if (!interview) {
-    res.status(404).json({ error: 'Interview not found' });
-    return;
-  }
-
-  const prompt = [
-    'Evaluate these interview answers for ' + interview.topic + '.',
-    'Questions: ' + JSON.stringify(interview.questions),
-    'Answers: ' + JSON.stringify(req.body.answers),
-    'Return JSON: {"score":0-100,"feedback":"...","weakAreas":["..."]}',
-  ].join('\n');
-
-  const raw = await generateAiResponse('You are a technical interviewer evaluator.', prompt);
-  let evaluation = { score: 70, feedback: 'Good effort!', weakAreas: ['Practice more'] };
+router.post('/interview/critique', validateBody(critiqueSchema), async (req: AuthRequest, res) => {
   try {
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (match) evaluation = JSON.parse(match[0]);
-  } catch { /* use defaults */ }
-
-  const updated = await queryOne(
-    `UPDATE "Interview"
-     SET "score" = $1, "feedback" = $2, "weakAreas" = $3
-     WHERE "id" = $4
-     RETURNING *`,
-    [evaluation.score, evaluation.feedback, JSON.stringify(evaluation.weakAreas), interview.id],
-  );
-
-  const alreadyScored = interview.score !== null;
-  if (!alreadyScored) {
-    await awardXp(req.user!.userId, 100, 'Completed mock interview: ' + interview.topic);
+    const critique = await generateLiveCritique({
+      interviewId: req.body.interviewId,
+      questionIndex: req.body.questionIndex,
+      answer: req.body.answer || '',
+      scratchCode: req.body.scratchCode,
+    });
+    res.json(critique);
+  } catch (error) {
+    console.error('Error generating critique:', error);
+    res.status(500).json({ error: (error as Error).message || 'Failed to critique answer' });
   }
-  res.json(updated);
+});
+
+const evaluateSchema = z.object({
+  interviewId: z.string().min(1),
+  answers: z.array(z.string().max(8000)).max(30),
+  scratchCodes: z.array(z.string().max(16000)).max(30).optional(),
+});
+
+router.post('/interview/evaluate', validateBody(evaluateSchema), async (req: AuthRequest, res) => {
+  try {
+    const evaluation = await evaluateInterviewSession({
+      interviewId: req.body.interviewId,
+      userId: req.user!.userId,
+      answers: req.body.answers,
+      scratchCodes: req.body.scratchCodes,
+    });
+    res.json(evaluation);
+  } catch (error) {
+    console.error('Error evaluating interview session:', error);
+    res.status(500).json({ error: (error as Error).message || 'Failed to evaluate interview' });
+  }
 });
 
 const lectureSchema = z.object({

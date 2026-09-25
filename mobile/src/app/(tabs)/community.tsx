@@ -31,6 +31,26 @@ import type { Project } from '@/types/api';
 
 const PROJECT_CATEGORIES = [
   {
+    value: 'OPEN_SOURCE',
+    label: 'Open Source',
+    icon: 'code-slash-outline' as const,
+  },
+  {
+    value: 'GREEN_SOFTWARE',
+    label: 'Green Software',
+    icon: 'leaf-outline' as const,
+  },
+  {
+    value: 'CIVIC_TECH',
+    label: 'Civic Tech',
+    icon: 'globe-outline' as const,
+  },
+  {
+    value: 'EDTECH',
+    label: 'EdTech',
+    icon: 'school-outline' as const,
+  },
+  {
     value: 'SUSTAINABILITY',
     label: 'Sustainability',
     icon: 'earth-outline' as const,
@@ -168,6 +188,7 @@ export default function CommunityScreen() {
   }
 
   const canCreate =
+    user?.role === 'STUDENT' ||
     user?.role === 'ORGANIZATION' ||
     user?.role === 'ADMIN';
 

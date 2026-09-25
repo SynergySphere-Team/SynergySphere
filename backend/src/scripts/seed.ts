@@ -108,40 +108,98 @@ async function main() {
 
     const projects = [
       {
+        title: 'Green Infrastructure Monitor',
+        category: 'GREEN_INFRASTRUCTURE',
+        location: 'Urban District / Remote',
+        organization: 'City Sustainability Office',
+        description: 'IoT telemetry ingest and real-time operational dashboard for urban green roofs and storm water sensors. Ingests ESP8266/MQTT sensor payloads, plots time-series metrics, triggers automated threshold alerts, and displays interactive Leaflet map overlays.',
+        requirements: 'Node.js/Java, PostgreSQL, React, WebSockets, Leaflet, TimescaleDB',
+        techStack: 'Node.js, PostgreSQL, React, WebSockets, Leaflet, TimescaleDB',
+        teamCapacity: 10,
+        deliverableType: 'IoT Telemetry Ingest & Real-Time Dashboard',
+        xpReward: 300,
+      },
+      {
         title: 'Campus Recycling Dashboard',
         category: 'RECYCLING',
         location: 'University Campus',
         organization: 'Green Earth NGO',
-        description: 'Build a web dashboard to track recycling rates across campus buildings.',
-        requirements: 'React, data visualization, REST API integration',
-        xpReward: 200,
+        description: 'Full-stack analytics and fill-level prediction service for smart campus waste receptacles. Features REST API ingest, route optimization calculation using OR-Tools, role-based departmental views, and CSV export for facilities managers.',
+        requirements: 'React, Python/FastAPI, SQL, REST APIs, Mapbox, Data Visualization',
+        techStack: 'React, Python/FastAPI, PostgreSQL, Chart.js, Mapbox',
+        teamCapacity: 8,
+        deliverableType: 'Full-Stack Analytics Web Application',
+        xpReward: 250,
       },
       {
         title: 'Eco-Tourism Booking Platform',
         category: 'ECO_TOURISM',
-        location: 'Coastal Region',
+        location: 'Coastal Region / Hybrid',
         organization: 'Sustainable Travel Foundation',
-        description: 'Create a booking platform for eco-friendly tourism experiences.',
-        requirements: 'Full-stack development, payment integration, responsive design',
+        description: 'Marketplace backend and responsive web app connecting travelers to certified conservation sanctuaries. Delivers real-time slot availability calendars, Stripe test-mode payments, role-based authorization, and verified carbon offset tracking.',
+        requirements: 'React, Node.js, PostgreSQL, Stripe API, JWT Auth',
+        techStack: 'React, Node.js, Express, PostgreSQL, Stripe API, Docker',
+        teamCapacity: 12,
+        deliverableType: 'E-Commerce Marketplace Web Platform',
         xpReward: 250,
       },
       {
-        title: 'Green Infrastructure Monitor',
-        category: 'GREEN_INFRASTRUCTURE',
-        location: 'Urban District',
-        organization: 'City Sustainability Office',
-        description: 'Develop IoT dashboard for monitoring green roof and rain garden performance.',
-        requirements: 'IoT data handling, real-time charts, alert system',
+        title: 'Carbon-Aware CI/CD Metric Collector',
+        category: 'GREEN_SOFTWARE',
+        location: 'Open Source / Remote',
+        organization: 'Green Software Foundation Initiative',
+        description: 'Developer tooling service tracking pipeline carbon intensity across GitHub Actions workflows. Queries real-time regional grid emissions APIs, visualizes pipeline footprints, and schedules compute jobs during green energy windows.',
+        requirements: 'TypeScript, Node.js, Docker, GitHub REST API, Prometheus, React',
+        techStack: 'TypeScript, Node.js, Docker, GitHub Actions, Prometheus, React',
+        teamCapacity: 6,
+        deliverableType: 'CLI Tool & Telemetry Dashboard',
         xpReward: 300,
+      },
+      {
+        title: 'Campus Wi-Fi & Lab Occupancy API',
+        category: 'CIVIC_TECH',
+        location: 'Main University Campus',
+        organization: 'Student Union IT Council',
+        description: 'Real-time room occupancy and study space availability engine. Aggregates anonymized Wi-Fi access point counts, exposes cached low-latency REST endpoints, and provides WebSocket live streams for student mobile apps.',
+        requirements: 'Java, Spring Boot, Redis, WebSockets, PostgreSQL, Docker',
+        techStack: 'Java, Spring Boot, Redis, WebSockets, PostgreSQL, Docker',
+        teamCapacity: 8,
+        deliverableType: 'High-Throughput Microservice API',
+        xpReward: 250,
+      },
+      {
+        title: 'Accessibility & Performance Audit Engine',
+        category: 'EDTECH',
+        location: 'Distributed / Hybrid',
+        organization: 'University Digital Accessibility Lab',
+        description: 'Automated crawler and compliance tracker evaluating university course portals against WCAG 2.1 AA and Lighthouse performance budgets. Generates remediation tickets and detailed compliance summaries.',
+        requirements: 'TypeScript, Next.js, Puppeteer, Axe-Core, PostgreSQL, Tailwind CSS',
+        techStack: 'TypeScript, Next.js, Puppeteer, Axe-Core, PostgreSQL',
+        teamCapacity: 10,
+        deliverableType: 'Automated Crawler & Compliance Dashboard',
+        xpReward: 280,
+      },
+      {
+        title: 'Good-First-Issues Community Bot',
+        category: 'OPEN_SOURCE',
+        location: 'Global / Remote',
+        organization: 'SynergySphere Open Source Guild',
+        description: 'Automated GitHub triage bot and contributor portal that curates beginner-friendly issues across student repositories, verifies PR milestones, and synchronizes contribution XP directly to student portfolios.',
+        requirements: 'Python, FastAPI, GitHub REST & GraphQL APIs, Redis, Webhooks',
+        techStack: 'Python, FastAPI, GitHub GraphQL API, Redis, Celery',
+        teamCapacity: 15,
+        deliverableType: 'GitHub App & Community Portal',
+        xpReward: 320,
       },
     ];
 
     for (const project of projects) {
       await client.query(
         `INSERT INTO "Project" (
-           "id", "title", "category", "location", "organization", "description", "requirements", "xpReward"
+           "id", "title", "category", "location", "organization", "description",
+           "requirements", "xpReward", "techStack", "teamCapacity", "deliverableType"
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT ("title")
          DO UPDATE SET
            "category" = EXCLUDED."category",
@@ -149,7 +207,10 @@ async function main() {
            "organization" = EXCLUDED."organization",
            "description" = EXCLUDED."description",
            "requirements" = EXCLUDED."requirements",
-           "xpReward" = EXCLUDED."xpReward"`,
+           "xpReward" = EXCLUDED."xpReward",
+           "techStack" = EXCLUDED."techStack",
+           "teamCapacity" = EXCLUDED."teamCapacity",
+           "deliverableType" = EXCLUDED."deliverableType"`,
         [
           newId(),
           project.title,
@@ -159,6 +220,9 @@ async function main() {
           project.description,
           project.requirements,
           project.xpReward,
+          project.techStack,
+          project.teamCapacity,
+          project.deliverableType,
         ],
       );
     }

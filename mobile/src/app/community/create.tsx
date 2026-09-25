@@ -27,6 +27,26 @@ import { useTheme } from '@/context/ThemeContext';
 
 const PROJECT_CATEGORIES = [
   {
+    value: 'OPEN_SOURCE',
+    label: 'Open Source',
+    icon: 'code-slash-outline' as const,
+  },
+  {
+    value: 'GREEN_SOFTWARE',
+    label: 'Green Software',
+    icon: 'leaf-outline' as const,
+  },
+  {
+    value: 'CIVIC_TECH',
+    label: 'Civic Tech',
+    icon: 'globe-outline' as const,
+  },
+  {
+    value: 'EDTECH',
+    label: 'EdTech',
+    icon: 'school-outline' as const,
+  },
+  {
     value: 'SUSTAINABILITY',
     label: 'Sustainability',
     icon: 'earth-outline' as const,
@@ -74,7 +94,10 @@ export default function CreateCommunityProjectScreen() {
       location: '',
       description: '',
       requirements: '',
-      category: 'SUSTAINABILITY',
+      techStack: '',
+      teamCapacity: '8',
+      deliverableType: 'API & Dashboard',
+      category: 'OPEN_SOURCE',
     });
 
   const accentColor =
@@ -120,6 +143,17 @@ export default function CreateCommunityProjectScreen() {
 
           requirements:
             form.requirements.trim() ||
+            undefined,
+
+          techStack:
+            form.techStack.trim() ||
+            undefined,
+
+          teamCapacity:
+            parseInt(form.teamCapacity, 10) || 8,
+
+          deliverableType:
+            form.deliverableType.trim() ||
             undefined,
 
           category:
@@ -336,6 +370,55 @@ export default function CreateCommunityProjectScreen() {
           }
           placeholder="e.g. React, REST APIs, teamwork"
           multiline
+        />
+
+        <Field
+          label="Tech Stack (comma-separated)"
+          value={
+            form.techStack
+          }
+          onChangeText={(
+            techStack
+          ) =>
+            setForm({
+              ...form,
+              techStack,
+            })
+          }
+          placeholder="e.g. Node.js, PostgreSQL, React, MQTT"
+        />
+
+        <Field
+          label="Expected Deliverable"
+          value={
+            form.deliverableType
+          }
+          onChangeText={(
+            deliverableType
+          ) =>
+            setForm({
+              ...form,
+              deliverableType,
+            })
+          }
+          placeholder="e.g. REST API & Analytics Dashboard"
+        />
+
+        <Field
+          label="Team Capacity"
+          value={
+            form.teamCapacity
+          }
+          onChangeText={(
+            teamCapacity
+          ) =>
+            setForm({
+              ...form,
+              teamCapacity,
+            })
+          }
+          keyboardType="numeric"
+          placeholder="e.g. 8"
         />
 
         {/* DIVIDER */}

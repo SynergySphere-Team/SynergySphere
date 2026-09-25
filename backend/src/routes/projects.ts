@@ -63,6 +63,9 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
        p."lastActivityMessage",
        p."lastActivityActor",
        p."isActive",
+       p."techStack",
+       p."teamCapacity",
+       p."deliverableType",
        p."createdAt",
        json_build_object('applications', COUNT(pa."id")::int) AS "_count"
      FROM "Project" p
@@ -374,25 +377,44 @@ router.post('/:id/apply', authenticate, validateBody(applySchema), async (req: A
 
 const projectSchema = z.object({
   title: z.string().min(1).max(200),
-  category: z.enum(['RECYCLING', 'ECO_TOURISM', 'GREEN_INFRASTRUCTURE', 'SUSTAINABILITY', 'OTHER']),
+  category: z.enum([
+    'RECYCLING',
+    'ECO_TOURISM',
+    'GREEN_INFRASTRUCTURE',
+    'SUSTAINABILITY',
+    'OPEN_SOURCE',
+    'GREEN_SOFTWARE',
+    'CIVIC_TECH',
+    'EDTECH',
+    'OTHER',
+  ]),
   location: z.string().max(200).optional(),
   organization: z.string().min(1).max(200),
   description: z.string().min(1).max(4000),
   requirements: z.string().max(2000).optional(),
   xpReward: z.number().int().min(0).max(10000).optional(),
+  techStack: z.string().max(500).optional(),
+  teamCapacity: z.number().int().min(1).max(100).optional().default(10),
+  deliverableType: z.string().max(200).optional().default('Software Solution'),
 });
 
 router.post('/', authenticate, validateBody(projectSchema), async (req: AuthRequest, res) => {
-  if (req.user!.role !== 'ORGANIZATION' && req.user!.role !== 'ADMIN') {
-    res.status(403).json({ error: 'Only organizations can create projects' });
+  if (req.user!.role !== 'ORGANIZATION' && req.user!.role !== 'ADMIN' && req.user!.role !== 'STUDENT') {
+    res.status(403).json({ error: 'You do not have permission to create projects' });
     return;
   }
   try {
+    const isStudent = req.user!.role === 'STUDENT';
+    const xpReward = isStudent
+      ? (req.body.xpReward ? Math.min(Math.max(req.body.xpReward, 150), 300) : 200)
+      : (req.body.xpReward ?? 200);
+
     const project = await queryOne(
-    `INSERT INTO "Project" (
-         "id", "creatorId", "title", "category", "location", "organization", "description", "requirements", "xpReward"
+      `INSERT INTO "Project" (
+         "id", "creatorId", "title", "category", "location", "organization", "description",
+         "requirements", "xpReward", "techStack", "teamCapacity", "deliverableType"
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         newId(),
@@ -403,9 +425,17 @@ router.post('/', authenticate, validateBody(projectSchema), async (req: AuthRequ
         req.body.organization,
         req.body.description,
         nullable(req.body.requirements),
-        req.body.xpReward ?? 200,
+        xpReward,
+        nullable(req.body.techStack),
+        req.body.teamCapacity ?? 10,
+        req.body.deliverableType || 'Software Solution',
       ],
     );
+
+    if (isStudent) {
+      await awardXp(req.user!.userId, 50, 'Created a community impact project');
+    }
+
     res.status(201).json(project);
   } catch (error) {
     if (!isUniqueViolation(error)) console.error('Project create error:', error);

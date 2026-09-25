@@ -83,6 +83,31 @@ export function CareerStudioModal({
   const [outputs, setOutputs] = useState<Record<string, string>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  // Live jobs state
+  const [jobsData, setJobsData] = useState<{
+    role: string;
+    location: string;
+    configured: boolean;
+    source: string;
+    jobs: {
+      id: string;
+      title: string;
+      company: string;
+      location: string;
+      postedAt: string;
+      salary?: string;
+      url: string;
+      matchPercent: number;
+      matchingSkills: string[];
+      missingSkills: string[];
+    }[];
+    searchLinks: {
+      linkedin: string;
+      indeed: string;
+      googleJobs: string;
+    };
+  } | null>(null);
+
   const fullName = `${user?.firstName ?? 'Student'} ${user?.lastName ?? 'Developer'}`;
   const skillsSummary = skills.map(([name, pct]) => `${name} (${pct}%)`).join(', ');
 
@@ -93,13 +118,36 @@ export function CareerStudioModal({
   }, [visible, initialTool]);
 
   useEffect(() => {
-    if (visible && activeTool !== 'jobs') {
-      const cacheKey = `${activeTool}_${targetRole}`;
-      if (!outputs[cacheKey]) {
-        void fetchCareerContent(activeTool, targetRole);
+    if (visible) {
+      if (activeTool === 'jobs') {
+        void fetchLiveJobs(targetRole);
+      } else {
+        const cacheKey = `${activeTool}_${targetRole}`;
+        if (!outputs[cacheKey]) {
+          void fetchCareerContent(activeTool, targetRole);
+        }
       }
     }
   }, [visible, activeTool, targetRole]);
+
+  async function fetchLiveJobs(role: string) {
+    setLoading(true);
+    try {
+      const res = await api.get<{
+        role: string;
+        location: string;
+        configured: boolean;
+        source: string;
+        jobs: any[];
+        searchLinks: { linkedin: string; indeed: string; googleJobs: string };
+      }>(`/portfolio/jobs?role=${encodeURIComponent(role)}`);
+      setJobsData(res);
+    } catch (e) {
+      console.warn('Jobs fetch error:', e);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function fetchCareerContent(toolId: CareerToolId, role: string) {
     if (toolId === 'jobs') return;
@@ -294,123 +342,108 @@ export function CareerStudioModal({
                   </View>
                   <Text style={[styles.intelDesc, { color: colors.muted }]}>
                     Computed from your verified skills: <Text style={{ color: colors.text, fontWeight: '700' }}>{skillsSummary}</Text>.
-                    Tap any search engine below to launch active hiring queries.
                   </Text>
                 </View>
 
-                {[
-                  {
-                    title: 'Junior Java / Spring Boot Developer',
-                    match: 96,
-                    salary: '$68,000 – $88,000',
-                    desc: 'Building and maintaining enterprise microservices, transactional APIs, and database-backed services.',
-                    matchingSkills: ['Java', 'Spring Boot', 'SQL', 'REST APIs'],
-                    nextSkills: ['Docker', 'Kafka', 'JUnit Mockito'],
-                    searchQuery: 'Junior Java Spring Boot Developer',
-                  },
-                  {
-                    title: 'Graduate Full-Stack Engineer',
-                    match: 92,
-                    salary: '$65,000 – $85,000',
-                    desc: 'End-to-end feature delivery spanning React client interfaces and Java/Node server endpoints.',
-                    matchingSkills: ['React', 'JavaScript', 'SQL', 'Git'],
-                    nextSkills: ['TypeScript', 'Next.js', 'GitHub Actions'],
-                    searchQuery: 'Graduate Full Stack Software Engineer',
-                  },
-                  {
-                    title: 'Backend API Engineer',
-                    match: 89,
-                    salary: '$70,000 – $90,000',
-                    desc: 'Architecting high-throughput REST APIs, query optimization, authentication, and data modeling.',
-                    matchingSkills: ['SQL', 'Database Design', 'Spring Boot'],
-                    nextSkills: ['Redis Caching', 'PostgreSQL Tuning', 'AWS'],
-                    searchQuery: 'Junior Backend API Engineer',
-                  },
-                  {
-                    title: 'Junior SQL / Database Developer',
-                    match: 84,
-                    salary: '$60,000 – $78,000',
-                    desc: 'Writing optimized SQL queries, database indexing, reporting pipelines, and schema migrations.',
-                    matchingSkills: ['SQL', 'Relational Schema Design', 'Database Joins'],
-                    nextSkills: ['Python ETL', 'PostgreSQL Stored Procs'],
-                    searchQuery: 'Junior SQL Database Developer',
-                  },
-                  {
-                    title: 'Software Engineering Intern',
-                    match: 98,
-                    salary: '$28 – $38 / hour',
-                    desc: 'Accelerated entry-level program with high full-time conversion. Verified project work provides immediate advantage.',
-                    matchingSkills: ['Algorithmic Logic', 'Java', 'React', 'Problem Solving'],
-                    nextSkills: ['Agile Team Sprints', 'Code Review Practices'],
-                    searchQuery: 'Software Engineering Intern Summer',
-                  },
-                  {
-                    title: 'Junior React / Frontend Developer',
-                    match: 78,
-                    salary: '$58,000 – $76,000',
-                    desc: 'Implementing responsive component hierarchies, state management, and modern client experiences.',
-                    matchingSkills: ['React', 'JavaScript', 'HTML5/CSS3'],
-                    nextSkills: ['Tailwind CSS', 'Redux/Zustand', 'Jest Testing'],
-                    searchQuery: 'Junior React Frontend Developer',
-                  },
-                ].map((job) => (
-                  <View key={job.title} style={[styles.jobCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                {!jobsData?.configured && (
+                  <View style={[styles.intelCard, { backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.3)' }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="information-circle-outline" size={16} color="#f59e0b" />
+                      <Text style={[styles.intelTitle, { color: '#f59e0b' }]}>Live Aggregator Notice</Text>
+                    </View>
+                    <Text style={[styles.intelDesc, { color: colors.muted }]}>
+                      Configure ADZUNA_APP_ID & ADZUNA_APP_KEY in backend/.env for real-time listings. In the meantime, use targeted 1-click hiring queries below.
+                    </Text>
+                    {jobsData?.searchLinks && (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                        <Pressable
+                          onPress={() => Linking.openURL(jobsData.searchLinks.linkedin)}
+                          style={[styles.searchBtn, { backgroundColor: 'rgba(0, 119, 181, 0.2)' }]}
+                        >
+                          <Ionicons name="logo-linkedin" size={13} color="#0077b5" />
+                          <Text style={[styles.searchBtnText, { color: '#38bdf8' }]}>LinkedIn Jobs</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => Linking.openURL(jobsData.searchLinks.indeed)}
+                          style={[styles.searchBtn, { backgroundColor: colors.surfaceElevated }]}
+                        >
+                          <Ionicons name="search" size={13} color={colors.text} />
+                          <Text style={[styles.searchBtnText, { color: colors.text }]}>Indeed</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => Linking.openURL(jobsData.searchLinks.googleJobs)}
+                          style={[styles.searchBtn, { backgroundColor: colors.surfaceElevated }]}
+                        >
+                          <Ionicons name="globe-outline" size={13} color={colors.text} />
+                          <Text style={[styles.searchBtnText, { color: colors.text }]}>Google Jobs</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {jobsData?.jobs && jobsData.jobs.map((job) => (
+                  <View key={job.id} style={[styles.jobCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <View style={styles.jobTopRow}>
-                      <Text style={[styles.jobTitle, { color: colors.text }]}>{job.title}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.jobTitle, { color: colors.text }]}>{job.title}</Text>
+                        <Text style={[styles.jobDesc, { color: colors.muted, marginTop: 2 }]}>
+                          {job.company} · {job.location}
+                        </Text>
+                      </View>
                       <View style={[styles.matchBadge, { backgroundColor: `${colors.primary}20` }]}>
-                        <Text style={[styles.matchBadgeText, { color: colors.primary }]}>{job.match}% Match</Text>
+                        <Text style={[styles.matchBadgeText, { color: colors.primary }]}>{job.matchPercent}% Match</Text>
                       </View>
                     </View>
-                    <Text style={[styles.jobDesc, { color: colors.muted }]}>{job.desc}</Text>
 
                     {/* Matching & Next Skills */}
-                    <View style={styles.skillBadgeGroup}>
-                      <Text style={[styles.skillGroupLabel, { color: colors.muted }]}>Matching:</Text>
-                      {job.matchingSkills.map((s) => (
-                        <View key={s} style={[styles.skillTag, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
-                          <Text style={[styles.skillTagText, { color: '#10b981' }]}>✓ {s}</Text>
-                        </View>
-                      ))}
-                    </View>
+                    {job.matchingSkills && job.matchingSkills.length > 0 && (
+                      <View style={styles.skillBadgeGroup}>
+                        <Text style={[styles.skillGroupLabel, { color: colors.muted }]}>Matching:</Text>
+                        {job.matchingSkills.map((s) => (
+                          <View key={s} style={[styles.skillTag, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                            <Text style={[styles.skillTagText, { color: '#10b981' }]}>✓ {s}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
 
-                    <View style={styles.skillBadgeGroup}>
-                      <Text style={[styles.skillGroupLabel, { color: colors.muted }]}>Next to learn:</Text>
-                      {job.nextSkills.map((s) => (
-                        <View key={s} style={[styles.skillTag, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
-                          <Text style={[styles.skillTagText, { color: '#f59e0b' }]}>+ {s}</Text>
-                        </View>
-                      ))}
-                    </View>
+                    {job.missingSkills && job.missingSkills.length > 0 && (
+                      <View style={styles.skillBadgeGroup}>
+                        <Text style={[styles.skillGroupLabel, { color: colors.muted }]}>Next:</Text>
+                        {job.missingSkills.map((s) => (
+                          <View key={s} style={[styles.skillTag, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
+                            <Text style={[styles.skillTagText, { color: '#f59e0b' }]}>+ {s}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
 
-                    <Text style={[styles.jobSalary, { color: colors.text }]}>
-                      Est. Salary: <Text style={{ color: colors.primary, fontWeight: '800' }}>{job.salary}</Text>
-                    </Text>
+                    {job.salary && (
+                      <Text style={[styles.jobSalary, { color: colors.text }]}>
+                        Est. Salary: <Text style={{ color: colors.primary, fontWeight: '800' }}>{job.salary}</Text>
+                      </Text>
+                    )}
 
-                    {/* 1-Click Search Buttons */}
+                    {/* Apply & Search Buttons */}
                     <View style={[styles.jobSearchRow, { borderTopColor: colors.border }]}>
                       <Pressable
-                        onPress={() => Linking.openURL(`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(job.searchQuery)}`)}
-                        style={[styles.searchBtn, { backgroundColor: 'rgba(0, 119, 181, 0.15)' }]}
+                        onPress={() => Linking.openURL(job.url)}
+                        style={[styles.searchBtn, { backgroundColor: colors.primary }]}
                       >
-                        <Ionicons name="logo-linkedin" size={13} color="#0077b5" />
-                        <Text style={[styles.searchBtnText, { color: '#38bdf8' }]}>LinkedIn</Text>
+                        <Ionicons name="open-outline" size={13} color={colors.primaryText} />
+                        <Text style={[styles.searchBtnText, { color: colors.primaryText, fontWeight: '700' }]}>View Listing</Text>
                       </Pressable>
 
-                      <Pressable
-                        onPress={() => Linking.openURL(`https://www.indeed.com/jobs?q=${encodeURIComponent(job.searchQuery)}`)}
-                        style={[styles.searchBtn, { backgroundColor: colors.surfaceElevated }]}
-                      >
-                        <Ionicons name="search" size={13} color={colors.text} />
-                        <Text style={[styles.searchBtnText, { color: colors.text }]}>Indeed</Text>
-                      </Pressable>
-
-                      <Pressable
-                        onPress={() => Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent(job.searchQuery + ' jobs')}&ibp=htl;jobs`)}
-                        style={[styles.searchBtn, { backgroundColor: colors.surfaceElevated }]}
-                      >
-                        <Ionicons name="globe-outline" size={13} color={colors.text} />
-                        <Text style={[styles.searchBtnText, { color: colors.text }]}>Google</Text>
-                      </Pressable>
+                      {jobsData?.searchLinks && (
+                        <Pressable
+                          onPress={() => Linking.openURL(jobsData.searchLinks.linkedin)}
+                          style={[styles.searchBtn, { backgroundColor: 'rgba(0, 119, 181, 0.15)' }]}
+                        >
+                          <Ionicons name="logo-linkedin" size={13} color="#0077b5" />
+                          <Text style={[styles.searchBtnText, { color: '#38bdf8' }]}>LinkedIn</Text>
+                        </Pressable>
+                      )}
                     </View>
                   </View>
                 ))}

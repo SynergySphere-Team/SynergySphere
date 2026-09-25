@@ -10,262 +10,285 @@ export interface CareerProfileContext {
     projectLink: string | null;
     githubLink: string | null;
   }>;
+  githubRepos?: Array<{
+    name: string;
+    description: string | null;
+    language: string | null;
+    stars: number;
+    url: string;
+  }>;
+  communityProjects?: Array<{
+    title: string;
+    organization: string;
+    category?: string;
+    status?: string;
+  }>;
+  completedLessons?: string[];
+  interviewScores?: Array<{ topic: string; score: number }>;
+  profileLinks?: {
+    githubUrl?: string | null;
+    linkedinUrl?: string | null;
+    headline?: string | null;
+    about?: string | null;
+    location?: string | null;
+  };
   level: number;
   xp: number;
 }
 
 export function generateResumeContent(ctx: CareerProfileContext): string {
-  const { userName, email, role, skillsList, projects, level, xp } = ctx;
+  const {
+    userName,
+    email,
+    role,
+    skillsList,
+    projects,
+    githubRepos = [],
+    communityProjects = [],
+    completedLessons = [],
+    interviewScores = [],
+    profileLinks = {},
+    level,
+    xp,
+  } = ctx;
 
-  const projectSection = projects.length > 0
-    ? projects.map((p) => `### ${p.title}
-${p.description ? `*Tech Stack: ${p.description}*` : '*Tech Stack: Java, Spring Boot, SQL, REST APIs*'}
-${p.projectLink ? `- Live Demo: ${p.projectLink}\n` : ''}${p.githubLink ? `- Source Code: ${p.githubLink}\n` : ''}- Architected and implemented end-to-end features ensuring high modularity, maintainability, and clean code principles.
-- Engineered transactional backend endpoints with structured exception handling, request validation, and sub-100ms response targets.
-- Integrated comprehensive test suites and automated deployment checks to ensure zero regressions across releases.`).join('\n\n')
-    : `### Student Management System API
-*Tech Stack: Java 17, Spring Boot, PostgreSQL, JWT, Docker*
-- Designed and built secure RESTful microservices managing student enrollment, authentication, and academic records.
-- Implemented JWT-based token security and role-based access control (RBAC) across administrative and student endpoints.
-- Optimized database indexing and query execution plans, reducing retrieval latency by 35% on high-volume queries.
+  const location = profileLinks.location || 'South Africa';
+  const headline = profileLinks.headline || `${role} · SynergySphere Level ${level} (${xp} XP)`;
+  const linkedinPart = profileLinks.linkedinUrl ? ` | 💼 [LinkedIn](${profileLinks.linkedinUrl})` : '';
+  const githubPart = profileLinks.githubUrl ? ` | 🐙 [GitHub](${profileLinks.githubUrl})` : '';
 
-### EcoTour Community Web Platform
-*Tech Stack: React, Node.js, Express, MongoDB, Tailwind CSS*
-- Developed responsive, accessible single-page application interface for eco-tourism booking and community reviews.
-- Built asynchronous REST APIs with caching and pagination, efficiently serving dynamic catalog entries.
-- Collaborated using Git workflows, continuous integration pipelines, and modular component design.`;
+  // 1. Projects Section: User Portfolio Projects + Top GitHub Repos + Community Projects
+  const projectItems: string[] = [];
+
+  for (const p of projects) {
+    projectItems.push(`### ${p.title}
+${p.description ? `*${p.description}*` : '*Full-stack software engineering project*'}
+${p.projectLink ? `- Live Deployment: ${p.projectLink}\n` : ''}${p.githubLink ? `- Repository: ${p.githubLink}\n` : ''}- Architected and implemented software components with modular design and clean code standards.
+- Designed database interactions and verified data integrity with end-to-end testing.`);
+  }
+
+  for (const repo of githubRepos.slice(0, 3)) {
+    // Only add if not already in portfolio
+    if (!projects.some((p) => p.title.toLowerCase() === repo.name.toLowerCase())) {
+      projectItems.push(`### ${repo.name} (Open Source Project)
+*Tech: ${repo.language || 'Software'} · ⭐ ${repo.stars} stars · [View Repository](${repo.url})*
+${repo.description ? `- ${repo.description}` : '- Actively maintained open-source code repository with version-controlled commits.'}
+- Implemented modular functions, structured documentation, and clean Git development flow.`);
+    }
+  }
+
+  for (const cp of communityProjects) {
+    projectItems.push(`### ${cp.title} — ${cp.organization}
+*Collaborative Software Initiative (${cp.status || 'Active Contributor'})*
+- Contributed to real-world software engineering with a cross-functional student engineering team.
+- Developed features adhering to code review guidelines and deliverable milestones.`);
+  }
+
+  const projectSection = projectItems.length > 0
+    ? projectItems.join('\n\n')
+    : `### Getting Started with Projects
+*Add a project in your SynergySphere Portfolio, connect your GitHub account, or join a Community Impact project to populate your verified project portfolio here.*`;
+
+  // 2. Education & Verified Learning
+  const verifiedEducation: string[] = [];
+  if (completedLessons.length > 0) {
+    verifiedEducation.push(`**SynergySphere Learning Hub — Verified Technical Curriculum**
+- Successfully completed ${completedLessons.length} verified lessons across core technical tracks:
+${completedLessons.slice(0, 8).map((l) => `  • ${l}`).join('\n')}${completedLessons.length > 8 ? `\n  • and ${completedLessons.length - 8} more modules` : ''}`);
+  }
+
+  if (interviewScores.length > 0) {
+    verifiedEducation.push(`**SynergySphere Technical Interview Assessments**
+- Verified live technical interview performance:
+${interviewScores.map((s) => `  • ${s.topic}: Score ${s.score}%`).join('\n')}`);
+  }
+
+  verifiedEducation.push(`**SynergySphere Platform Verification**
+- Rank: **Level ${level} Developer** (${xp} Verified Contribution XP)
+- Continuous evaluation in problem solving, curriculum mastery, and collaborative development.`);
 
   return `# ${userName}
-**${role}**
-📍 Johannesburg, South Africa | ✉️ ${email} | 🌐 Portfolio & GitHub Active
+**${headline}**
+📍 ${location} | ✉️ ${email}${githubPart}${linkedinPart}
 
 ---
 
 ## PROFESSIONAL SUMMARY
-Results-driven **${role}** with hands-on proficiency in **${skillsList}**. Demonstrated success designing, implementing, and deploying scalable software architectures, robust database models, and intuitive user interfaces. Adept at translating complex requirements into reliable, maintainable code through clean architecture, thorough testing, and modern DevOps best practices. Proven collaborator with strong problem-solving acumen demonstrated across competitive challenges and community software initiatives.
+Results-oriented **${role}** with verified technical proficiency in **${skillsList || 'Modern Software Development'}**. ${profileLinks.about || 'Demonstrates strong technical fundamentals, hands-on programming discipline, and structured problem-solving acumen verified through comprehensive curriculum progress and live assessments.'}
 
 ---
 
 ## TECHNICAL CORE COMPETENCIES
-- **Programming Languages:** Java, JavaScript, TypeScript, Python, SQL
-- **Frameworks & Libraries:** Spring Boot, Spring Security, React.js, Express.js, Node.js, Next.js
-- **Databases & Storage:** PostgreSQL, MySQL, MongoDB, Redis, Database Normalization & Query Tuning
-- **Tools & Methodologies:** Git, GitHub Actions, Docker, RESTful APIs, Agile/Scrum, CI/CD, Unit Testing (JUnit, Jest)
+- **Verified Languages & Frameworks:** ${skillsList || 'In Progress'}
+- **Software Engineering:** Object-Oriented Design, RESTful APIs, Clean Architecture, Version Control (Git/GitHub)
+- **Problem Solving & Reliability:** Algorithmic optimization, unit testing, structured debugging, database querying
 
 ---
 
-## FEATURED SOFTWARE PROJECTS
+## FEATURED SOFTWARE & COLLABORATIVE PROJECTS
 ${projectSection}
 
 ---
 
-## EDUCATION & CREDENTIALS
-**Bachelor of Science in Computer Science / Information Technology**
-*Accredited University / Technical Institution*
-- Coursework: Data Structures & Algorithms, Object-Oriented Design, Database Systems, Operating Systems, Computer Networks
-
-**SynergySphere Platform Verification**
-- Rank: **Level ${level} Developer** (${xp} Verified Contribution XP)
-- Certifications: Verified in Algorithmic Problem Solving, Full-Stack Development, and Community Open Source Collaboration
+## EDUCATION & VERIFIED CREDENTIALS
+${verifiedEducation.join('\n\n')}
 
 ---
-*Generated by SynergySphere Career Center · Ready for ATS parsing and direct employer submission*`;
+*Generated by SynergySphere Career Center · Formatted for ATS compliance and employer review*`;
 }
 
 export function generateCvContent(ctx: CareerProfileContext): string {
-  const { userName, email, role, skillsList, projects, level, xp } = ctx;
+  const {
+    userName,
+    email,
+    role,
+    skillsList,
+    projects,
+    githubRepos = [],
+    communityProjects = [],
+    completedLessons = [],
+    interviewScores = [],
+    profileLinks = {},
+    level,
+    xp,
+  } = ctx;
 
-  const projectDetails = projects.length > 0
-    ? projects.map((p) => `### ${p.title}
-- **Overview:** Full-lifecycle development of ${p.title}, addressing domain-specific operational challenges.
-- **Technologies Deployed:** ${p.description || 'Java, Spring Boot, PostgreSQL, REST APIs, React'}
-- **System Architecture:** Clean Architecture / Layered Architecture with decoupled persistence and presentation layers.
-- **Key Outcomes:** Deployed with high test coverage, robust database integrity constraints, and fully documented API specs.
-${p.githubLink ? `- **Repository:** ${p.githubLink}` : ''}`).join('\n\n')
-    : `### Enterprise Distributed Academic API
-- **Overview:** Engineered a resilient backend service facilitating secure student course registrations and grade calculations.
-- **Technologies Deployed:** Java 17, Spring Boot, Hibernate/JPA, PostgreSQL, Docker, Maven.
-- **System Architecture:** Layered Service-Repository architecture utilizing Data Transfer Objects (DTOs) and custom exception mappers.
-- **Key Outcomes:** Successfully handled simulated concurrent load of 500+ requests/sec with zero transaction deadlocks.
+  const location = profileLinks.location || 'South Africa';
 
-### Full-Stack Community Impact Platform
-- **Overview:** Web application designed to connect students with verified local community initiatives.
-- **Technologies Deployed:** TypeScript, React, Node.js, Tailwind CSS, PostgreSQL.
-- **System Architecture:** Component-driven SPA backed by RESTful JSON endpoints with secure session management.
-- **Key Outcomes:** Deployed to production with responsive mobile layouts and lighthouse accessibility score of 98.`;
+  const projectDetails: string[] = [];
+  for (const p of projects) {
+    projectDetails.push(`### ${p.title}
+- **Overview:** Engineered ${p.title} adhering to clean architecture and reliable data handling.
+- **Technical Description:** ${p.description || 'Full-stack application development.'}
+${p.projectLink ? `- **Live System:** ${p.projectLink}\n` : ''}${p.githubLink ? `- **Source Code:** ${p.githubLink}\n` : ''}- **Outcomes:** Implemented with modular design and verified local functionality.`);
+  }
+
+  for (const repo of githubRepos.slice(0, 3)) {
+    if (!projects.some((p) => p.title.toLowerCase() === repo.name.toLowerCase())) {
+      projectDetails.push(`### ${repo.name} (Public GitHub Project)
+- **Primary Language:** ${repo.language || 'Software Engineering'}
+- **Description:** ${repo.description || 'Open-source software repository.'}
+- **Repository URL:** ${repo.url}
+- **Community Recognition:** ${repo.stars} stars`);
+    }
+  }
+
+  for (const cp of communityProjects) {
+    projectDetails.push(`### ${cp.title}
+- **Organization:** ${cp.organization}
+- **Participation:** ${cp.status || 'Active Member'}
+- **Focus:** Collaborative IT solution for civic and climate impact.`);
+  }
+
+  const projectSection = projectDetails.length > 0
+    ? projectDetails.join('\n\n')
+    : `*No projects registered yet. Register your work in Portfolio or connect GitHub to showcase your achievements.*`;
 
   return `# CURRICULUM VITAE
 
 ## ${userName}
-**Candidate for: ${role}**
-Email: ${email} | Focus: Backend Architecture & Distributed Systems
+**${role}**
+Email: ${email} | Location: ${location}
+${profileLinks.linkedinUrl ? `LinkedIn: ${profileLinks.linkedinUrl} | ` : ''}${profileLinks.githubUrl ? `GitHub: ${profileLinks.githubUrl}` : ''}
 
 ---
 
-### 1. ACADEMIC & PROFESSIONAL PROFILE
-Dedicated computer scientist and software engineer specializing in backend systems development, database optimization, and scalable web architectures. Combines strong theoretical foundations in algorithms and computational theory with practical engineering experience in ${skillsList}. Actively engaged in open-source development and peer mentorship.
+### 1. PROFESSIONAL BIOGRAPHY
+${profileLinks.about || `Passionate software developer focused on building scalable, maintainable software systems. Demonstrates disciplined mastery in ${skillsList || 'computer science and software engineering'}.`}
 
 ---
 
-### 2. AREAS OF TECHNICAL EXPERTISE
-| Domain | Proficiencies |
-| :--- | :--- |
-| **Backend Engineering** | Java (Core, Collections, Concurrency), Spring Boot, REST APIs, Microservices |
-| **Frontend Engineering** | React, TypeScript, Modern JavaScript (ES6+), HTML5/CSS3, State Management |
-| **Data Architecture** | PostgreSQL, MySQL, Complex SQL Joins, Indexing Strategies, Transaction Management |
-| **Engineering Practices** | Object-Oriented Programming (OOP), SOLID Principles, Test-Driven Development, Git Version Control |
+### 2. CORE TECHNICAL COMPETENCIES
+- **Primary Technologies:** ${skillsList || 'General Engineering'}
+- **Development Lifecycle:** Git, Code Reviews, REST APIs, Database Optimization, Automated Testing
+- **SynergySphere Level:** Level ${level} (${xp} Verified Platform XP)
 
 ---
 
 ### 3. TECHNICAL PROJECT PORTFOLIO
-${projectDetails}
+${projectSection}
 
 ---
 
-### 4. FORMAL EDUCATION & SCHOLARSHIP
-**Bachelor of Science in Computer Science**
-- Key Courses: Data Structures & Algorithms (A), Database Design (A), Software Engineering (A), Computer Architecture, Operating Systems.
-- Academic Project: High-performance data processing pipeline utilizing multithreaded execution.
+### 4. VERIFIED CURRICULUM & CERTIFICATIONS
+${completedLessons.length > 0 ? `**Completed Learning Hub Modules (${completedLessons.length} lessons verified):**\n` + completedLessons.slice(0, 10).map((l) => `- ${l}`).join('\n') : '**Curriculum In Progress:** Actively completing modules in Learning Hub.'}
+
+${interviewScores.length > 0 ? `\n**Verified Technical Interview Scores:**\n` + interviewScores.map((s) => `- ${s.topic}: ${s.score}% mastery`).join('\n') : ''}
 
 ---
 
-### 5. HONORS, CERTIFICATIONS & CONTRIBUTIONS
-- **SynergySphere Level ${level} Honors:** Earned ${xp} XP through verified coding challenges, system builds, and collaborative code reviews.
-- **Open Source Contributor:** Authored and maintained repositories featured in community learning modules.
-- **Hackathon Finalist:** Developed civic technology prototypes under tight 48-hour delivery deadlines.
-
----
-
-### 6. PROFESSIONAL REFERENCES
-*Full academic and professional references, project codebases, and credentials available upon request.*`;
+### 5. PROFESSIONAL REFERENCES
+*Verified SynergySphere credentials, GitHub commit history, and references available upon request.*`;
 }
 
 export function generateLinkedInContent(ctx: CareerProfileContext): string {
-  const { userName, role, skillsList, projects } = ctx;
+  const { userName, role, skillsList, projects, githubRepos = [], profileLinks = {} } = ctx;
 
-  const topProject = projects[0]?.title || 'Student Management API & EcoTour Platform';
+  const topProject = projects[0]?.title || githubRepos[0]?.name || 'Full-Stack Software Engineering';
 
   return `# LINKEDIN PROFILE OPTIMIZATION KIT
 **Prepared for: ${userName} (${role})**
 
 ---
 
-## 🎯 1. OPTIMIZED HEADLINES (Select Your Preferred Style)
-
-### Option A: Impact & Core Stack (Recommended for Recruiter Search)
-> **${userName}** | ${role} | Java • Spring Boot • SQL • React | Building Scalable, High-Performance Software Solutions
-
-### Option B: Value-Driven & Passionate
-> Aspiring Software Engineer specializing in Robust Backend Systems, Clean Architecture & Modern Web Applications | Java & React Enthusiast
-
-### Option C: Student / Graduate Fast-Track
-> Computer Science Student & Developer | Passionate about Backend APIs, Microservices & Data-Driven Platforms | Seeking Software Engineering Opportunities
+### 1. OPTIMIZED HEADLINE (Choose one)
+- **Option A (Role & Skills):** ${role} | ${skillsList.slice(0, 70)} | Building Scalable Software
+- **Option B (Outcome-focused):** ${role} · Full-Stack & Systems Engineering · Verified SynergySphere Developer
+- **Option C (Minimalist):** Software Engineer | ${skillsList.split(',')[0] || 'Java'} & Web Systems
 
 ---
 
-## 📝 2. "ABOUT" SECTION (Ready to Copy-Paste)
+### 2. ABOUT SECTION (Copy & paste to your LinkedIn Summary)
+\`\`\`
+${profileLinks.about || `Hi, I'm ${userName}! I'm a ${role} focused on writing clean, efficient, and well-tested software.
 
-Hello! I'm a software developer with a relentless curiosity for how scalable systems work behind the scenes. 
+My core technical toolkit includes:
+${skillsList || 'Java, Python, SQL, JavaScript, React'}
 
-My primary technical focus is backend engineering with **Java and Spring Boot**, complemented by deep hands-on experience in **SQL databases, RESTful API design, and modern React interfaces**. I believe that great software isn't just about making things work—it's about writing clean, maintainable, and well-tested code that solves genuine real-world problems.
+I focus on:
+• Developing modular RESTful APIs and responsive frontends
+• Writing maintainable code backed by strong algorithms and database design
+• Continuous growth through hands-on projects and open-source contributions
 
-### What I Bring to the Table:
-- 💻 **Backend Architecture:** Designing robust REST APIs, secure authentication (JWT), and modular business logic.
-- 🗄️ **Database Design:** Crafting normalized PostgreSQL/MySQL schemas, indexing for performance, and managing complex queries.
-- 🌐 **Full-Stack Fluency:** Bridging frontend and backend seamlessly with React and modern web tooling.
-- 🚀 **Growth Mindset:** Constantly leveling up through technical challenges on SynergySphere, building side projects, and reading architecture case studies.
-
-Recent key project: **${topProject}**.
-
-I am currently looking to connect with engineering leaders, technical recruiters, and fellow developers. Let's talk tech, collaborate on open-source, or explore software engineering roles!
-
----
-
-## 💼 3. FEATURED PROJECT HIGHLIGHT (For LinkedIn "Projects" Section)
-
-**Project Title:** ${projects[0]?.title || 'Scalable Backend API & Web Application'}
-**Associated With:** SynergySphere Software Engineering Portfolio
-**Description:**
-- Architected an end-to-end software solution utilizing ${skillsList}.
-- Implemented robust data persistence with automated validation and structured error response schemas.
-- Documented complete API endpoints and achieved high reliability across all CRUD operations.
+Let's connect and discuss software engineering, new technologies, or upcoming opportunities!`}
+\`\`\`
 
 ---
 
-## 🔍 4. TOP 10 SKILLS TO ADD (Boosts Recruiter Search Ranking)
-1. **Java** (Top Backend Skill)
-2. **Spring Boot** (High-Demand Framework)
-3. **REST APIs** (Core Architecture)
-4. **PostgreSQL / SQL** (Data Layer)
-5. **React.js** (Frontend Standard)
-6. **Object-Oriented Programming (OOP)**
-7. **Git & GitHub** (Version Control)
-8. **Database Design & Schema Optimization**
-9. **Software Development Life Cycle (SDLC)**
-10. **Data Structures & Algorithms**
+### 3. FEATURED PROJECT HIGHLIGHT
+\`\`\`
+🚀 Featured Project: ${topProject}
+${projects[0]?.description || 'Engineered with clean architecture, tested workflows, and verified real-world functionality.'}
+${projects[0]?.githubLink ? `Check out the code: ${projects[0].githubLink}` : ''}
+\`\`\`
 
 ---
 
-## ✉️ 5. RECRUITER OUTREACH & CONNECTION NOTE (Under 300 Characters)
-> *"Hi [Name], I noticed your work at [Company] and wanted to connect! I'm a software developer specializing in Java, Spring Boot, and React with a strong focus on scalable backend systems. Would love to follow your team's updates!"*`;
+### 4. RECOMMENDED SKILLS TO PIN ON LINKEDIN
+${ctx.skillsArray && ctx.skillsArray.length > 0 ? ctx.skillsArray.map(([name]) => `• ${name}`).join('\n') : '• Java\n• Python\n• SQL\n• React\n• JavaScript'}`;
 }
 
 export function generateJobsContent(ctx: CareerProfileContext): string {
-  const { userName, role, skillsList } = ctx;
+  const { role, skillsList } = ctx;
 
-  return `# PERSONALIZED JOB RECOMMENDATIONS & CAREER MATRIX
-**Candidate Profile:** ${userName}
-**Skill Matrix:** ${skillsList}
-**Target Trajectory:** ${role}
-
----
-
-## 🎯 TOP MATCHED JOB ROLES
-
-### 1. Junior Java / Spring Boot Developer
-- **Match Score:** 🟢 **96% Match**
-- **Why It's a Strong Fit:** Your strongest proficiencies are Java and Spring Boot. Enterprise companies, banks, fintechs, and tech consultancies hire heavily for junior Java engineers to build and maintain transactional services.
-- **Your Matching Skills:** Java, Spring Boot, SQL, Object-Oriented Design, REST APIs
-- **Skills to Learn Next to Stand Out:** Docker containers, JUnit 5 Mockito, Kafka basics
-- **Typical Salary Range:** $65,000 – $88,000 / R380,000 – R520,000 (ZAR)
-- **Top Hiring Companies:** Discovery, Capitec, Amazon Web Services, BBD Software, Entelect
-
-### 2. Graduate Full-Stack Software Engineer
-- **Match Score:** 🟢 **92% Match**
-- **Why It's a Strong Fit:** You possess both backend depth (Java, Spring Boot, SQL) and frontend fluency (React, JavaScript), making you capable of delivering end-to-end features independently.
-- **Your Matching Skills:** React, JavaScript, SQL, Backend Integration, Git
-- **Skills to Learn Next to Stand Out:** TypeScript, Next.js, CI/CD with GitHub Actions
-- **Typical Salary Range:** $62,000 – $82,000 / R350,000 – R480,000 (ZAR)
-- **Top Hiring Companies:** Takealot, Yoco, Standard Bank Tech, Allan Gray, Retro Rabbit
-
-### 3. Junior Backend / API Engineer
-- **Match Score:** 🟢 **88% Match**
-- **Why It's a Strong Fit:** High demand for developers who understand HTTP protocols, database indexing, caching strategies, and secure JSON API endpoints.
-- **Your Matching Skills:** RESTful API Architecture, SQL Query Optimization, Data Modeling
-- **Skills to Learn Next to Stand Out:** Redis caching, PostgreSQL query profiling, Postman Newman testing
-- **Typical Salary Range:** $68,000 – $90,000 / R400,000 – R540,000 (ZAR)
-- **Top Hiring Companies:** Vodacom, MTN Group, Derivco, Luno, Peach Payments
-
-### 4. Junior Database / SQL Developer
-- **Match Score:** 🟡 **82% Match**
-- **Why It's a Strong Fit:** Your 80%+ SQL rating provides an immediate advantage in roles focused on data migrations, reporting pipelines, and transactional database administration.
-- **Your Matching Skills:** SQL (Joins, Aggregations, Grouping), Relational Modeling
-- **Skills to Learn Next to Stand Out:** Stored Procedures, Python for ETL, Power BI / Metabase
-- **Typical Salary Range:** $58,000 – $76,000 / R320,000 – R450,000 (ZAR)
-
-### 5. Software Engineering Intern / Apprentice
-- **Match Score:** 🟢 **98% Match**
-- **Why It's a Strong Fit:** High conversion rate into full-time roles. Your verified SynergySphere project work proves you can build practical systems beyond classroom theory.
-- **Interview Advantage:** You already have working code and version-controlled repositories to present during technical portfolio reviews.
+  return `# CAREER & JOB SEARCH STRATEGY
+**Target Role:** ${role}
+**Marketable Stack:** ${skillsList}
 
 ---
 
-## 💡 STRATEGIC INTERVIEW PREPARATION (High-Frequency Questions)
-1. **Java Core:** *"Explain how HashMap handles collision internally in Java 8+."*
-2. **Spring Boot:** *"What is the difference between @Component, @Service, and @Repository?"*
-3. **Database:** *"When would you choose a B-Tree index versus a Hash index in PostgreSQL?"*
-4. **Architecture:** *"How do you prevent SQL injection and secure sensitive endpoints in a REST API?"*
+### 1. TARGET ROLES & TITLES
+- Junior ${role}
+- Associate Software Engineer
+- Graduate Full-Stack Developer
+- Backend Developer Intern / Associate
 
----
-*Ready to search and apply directly with your optimized portfolio.*`;
+### 2. RECOMMENDED SEARCH KEYWORDS
+- \`"${role}" AND (${skillsList.split(',').slice(0, 2).join(' OR ')})\`
+- \`"Software Engineer" "Junior" "Remote"\`
+
+### 3. INTERVIEW PREPARATION CHECKLIST
+- [ ] Practice 10-question mock interviews in the SynergySphere Interview Hub
+- [ ] Ensure your top GitHub project has a detailed README and setup instructions
+- [ ] Complete remaining Learning Hub tracks to raise your profile signals`;
 }

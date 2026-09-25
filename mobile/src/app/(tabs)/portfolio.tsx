@@ -28,16 +28,21 @@ import {
   type CareerToolId,
 } from '@/components/portfolio/CareerStudioModal';
 
-const SKILLS_KEY = 'synergysphere.portfolio.skills';
-const LINKS_KEY = 'synergysphere.portfolio.links';
+interface HubSkillSignal {
+  id: string;
+  name: string;
+  completedLessons: number;
+  totalLessons: number;
+  percent: number;
+}
 
-const INITIAL_SKILLS: [string, number][] = [
-  ['Java', 90],
-  ['Spring Boot', 85],
-  ['SQL', 80],
-  ['JavaScript', 70],
-  ['React', 60],
-];
+interface ManualSkillSignal {
+  id: string;
+  name: string;
+  level: number;
+}
+
+const LINKS_KEY = 'synergysphere.portfolio.links';
 
 export default function PortfolioScreen() {
   const { colors, theme } = useTheme();
@@ -53,8 +58,9 @@ export default function PortfolioScreen() {
   const [links, setLinks] = useState({ github: '', linkedin: '' });
   const [showLinksModal, setShowLinksModal] = useState(false);
 
-  // Skills
-  const [skills, setSkills] = useState<[string, number][]>(INITIAL_SKILLS);
+  // Real Skills from Hub & DB
+  const [hubSkills, setHubSkills] = useState<HubSkillSignal[]>([]);
+  const [manualSkills, setManualSkills] = useState<ManualSkillSignal[]>([]);
   const [showSkillModal, setShowSkillModal] = useState(false);
 
   // Modals
@@ -63,10 +69,39 @@ export default function PortfolioScreen() {
 
   const fullName = `${user?.firstName ?? 'Student'} ${user?.lastName ?? 'Developer'}`;
 
-  // Load portfolio items from backend
+  // Combined skills for career studio
+  const effectiveSkills: [string, number][] = [
+    ...hubSkills.filter((h) => h.percent > 0).map((h): [string, number] => [h.name, h.percent]),
+    ...manualSkills.map((m): [string, number] => [m.name, m.level]),
+  ];
+
+  // Load portfolio items and profile signals from backend
   const load = useCallback(async () => {
     try {
-      setItems(await api.get<PortfolioItem[]>('/portfolio'));
+      const [portfolioRes, signalsRes] = await Promise.allSettled([
+        api.get<PortfolioItem[]>('/portfolio'),
+        api.get<{
+          profile: { githubUrl?: string; linkedinUrl?: string };
+          hubSkills: HubSkillSignal[];
+          manualSkills: ManualSkillSignal[];
+        }>('/portfolio/profile-signals'),
+      ]);
+
+      if (portfolioRes.status === 'fulfilled') {
+        setItems(portfolioRes.value);
+      }
+
+      if (signalsRes.status === 'fulfilled') {
+        const sig = signalsRes.value;
+        if (sig.hubSkills) setHubSkills(sig.hubSkills);
+        if (sig.manualSkills) setManualSkills(sig.manualSkills);
+        if (sig.profile) {
+          setLinks({
+            github: sig.profile.githubUrl || '',
+            linkedin: sig.profile.linkedinUrl || '',
+          });
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load your portfolio.');
     } finally {
@@ -74,33 +109,17 @@ export default function PortfolioScreen() {
     }
   }, []);
 
-  // Load stored links and skills
   useEffect(() => {
-    async function initStorage() {
-      try {
-        if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
-          const savedLinks = localStorage.getItem(LINKS_KEY);
-          if (savedLinks) setLinks(JSON.parse(savedLinks));
-          const savedSkills = localStorage.getItem(SKILLS_KEY);
-          if (savedSkills) setSkills(JSON.parse(savedSkills));
-        } else {
-          const savedLinks = await SecureStore.getItemAsync(LINKS_KEY);
-          if (savedLinks) setLinks(JSON.parse(savedLinks));
-          const savedSkills = await SecureStore.getItemAsync(SKILLS_KEY);
-          if (savedSkills) setSkills(JSON.parse(savedSkills));
-        }
-      } catch (err) {
-        console.warn('Portfolio storage read error:', err);
-      }
-    }
-
-    void initStorage();
     void load();
   }, [load]);
 
   async function saveLinks(newLinks: { github: string; linkedin: string }) {
     setLinks(newLinks);
     try {
+      await api.put('/portfolio/profile', {
+        githubUrl: newLinks.github,
+        linkedinUrl: newLinks.linkedin,
+      });
       const serialized = JSON.stringify(newLinks);
       if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
         localStorage.setItem(LINKS_KEY, serialized);
@@ -113,33 +132,23 @@ export default function PortfolioScreen() {
   }
 
   async function saveSkill(name: string, level: number) {
-    const updated: [string, number][] = [
-      ...skills.filter(([n]) => n.toLowerCase() !== name.toLowerCase()),
-      [name, level],
-    ];
-    setSkills(updated);
     try {
-      const serialized = JSON.stringify(updated);
-      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
-        localStorage.setItem(SKILLS_KEY, serialized);
-      } else {
-        await SecureStore.setItemAsync(SKILLS_KEY, serialized);
-      }
-    } catch (e) {
-      console.warn('Error saving skill:', e);
+      const added = await api.post<ManualSkillSignal>('/portfolio/skills', {
+        name,
+        level,
+        category: 'Manual',
+      });
+      setManualSkills((prev) => [...prev.filter((s) => s.name.toLowerCase() !== name.toLowerCase()), added]);
+    } catch {
+      const fallback: ManualSkillSignal = { id: `local-${Date.now()}`, name, level };
+      setManualSkills((prev) => [...prev.filter((s) => s.name.toLowerCase() !== name.toLowerCase()), fallback]);
     }
   }
 
-  async function removeSkill(skillName: string) {
-    const updated = skills.filter(([n]) => n !== skillName);
-    setSkills(updated);
+  async function removeSkill(skillId: string) {
+    setManualSkills((prev) => prev.filter((s) => s.id !== skillId));
     try {
-      const serialized = JSON.stringify(updated);
-      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
-        localStorage.setItem(SKILLS_KEY, serialized);
-      } else {
-        await SecureStore.setItemAsync(SKILLS_KEY, serialized);
-      }
+      await api.delete(`/portfolio/skills/${skillId}`);
     } catch (e) {
       console.warn('Error deleting skill:', e);
     }
@@ -408,35 +417,72 @@ export default function PortfolioScreen() {
         <View style={styles.sectionHeaderRow}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Ionicons name="code-slash" size={18} color={colors.primary} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Skills & Proficiencies</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Learning Hub Verified Skills</Text>
           </View>
           <Pressable
             onPress={() => setShowSkillModal(true)}
             style={[styles.addSkillBtn, { backgroundColor: `${colors.primary}20` }]}
           >
             <Ionicons name="add" size={14} color={colors.primary} />
-            <Text style={[styles.addSkillText, { color: colors.primary }]}>Add Skill</Text>
+            <Text style={[styles.addSkillText, { color: colors.primary }]}>Custom Skill</Text>
           </Pressable>
         </View>
 
         <Card>
           <View style={{ gap: 14 }}>
-            {skills.map(([skill, val]) => (
-              <View key={skill} style={styles.skillItem}>
-                <View style={styles.skillHeader}>
-                  <Text style={[styles.skillName, { color: colors.text }]}>{skill}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <Text style={[styles.skillPercent, { color: colors.primary }]}>{val}%</Text>
-                    <Pressable onPress={() => removeSkill(skill)} hitSlop={6}>
-                      <Ionicons name="close-circle-outline" size={16} color={colors.muted} />
-                    </Pressable>
+            {hubSkills.filter((h) => h.percent > 0).length > 0 ? (
+              hubSkills
+                .filter((h) => h.percent > 0)
+                .map((skill) => (
+                  <View key={skill.id} style={styles.skillItem}>
+                    <View style={styles.skillHeader}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
+                        <Text style={[styles.skillName, { color: colors.text }]}>{skill.name}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={{ fontSize: 11, color: colors.muted }}>
+                          {skill.completedLessons}/{skill.totalLessons}
+                        </Text>
+                        <Text style={[styles.skillPercent, { color: colors.primary }]}>{skill.percent}%</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.progressTrack, { backgroundColor: colors.surfaceElevated }]}>
+                      <View style={[styles.progressFill, { width: `${Math.max(5, skill.percent)}%`, backgroundColor: colors.primary }]} />
+                    </View>
                   </View>
-                </View>
-                <View style={[styles.progressTrack, { backgroundColor: colors.surfaceElevated }]}>
-                  <View style={[styles.progressFill, { width: `${val}%`, backgroundColor: colors.primary }]} />
-                </View>
+                ))
+            ) : (
+              <View style={{ paddingVertical: 8, alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, color: colors.muted, textAlign: 'center' }}>
+                  No completed Learning Hub lessons yet. Complete curriculum tracks to unlock verified skill bars.
+                </Text>
               </View>
-            ))}
+            )}
+
+            {manualSkills.length > 0 && (
+              <View style={{ paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border, gap: 12 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.muted, textTransform: 'uppercase' }}>
+                  Custom &amp; Additional Skills
+                </Text>
+                {manualSkills.map((s) => (
+                  <View key={s.id} style={styles.skillItem}>
+                    <View style={styles.skillHeader}>
+                      <Text style={[styles.skillName, { color: colors.text }]}>{s.name}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Text style={[styles.skillPercent, { color: colors.primary }]}>{s.level}%</Text>
+                        <Pressable onPress={() => removeSkill(s.id)} hitSlop={6}>
+                          <Ionicons name="close-circle-outline" size={16} color={colors.muted} />
+                        </Pressable>
+                      </View>
+                    </View>
+                    <View style={[styles.progressTrack, { backgroundColor: colors.surfaceElevated }]}>
+                      <View style={[styles.progressFill, { width: `${s.level}%`, backgroundColor: colors.primary }]} />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         </Card>
       </View>
@@ -460,7 +506,7 @@ export default function PortfolioScreen() {
         onClose={() => setShowPublicModal(false)}
         user={user}
         items={items}
-        skills={skills}
+        skills={effectiveSkills}
         links={links}
       />
 
@@ -469,7 +515,7 @@ export default function PortfolioScreen() {
         onClose={() => setActiveCareerTool(null)}
         initialTool={activeCareerTool ?? 'resume'}
         user={user}
-        skills={skills}
+        skills={effectiveSkills}
         linkedinUrl={links.linkedin}
       />
     </Screen>
