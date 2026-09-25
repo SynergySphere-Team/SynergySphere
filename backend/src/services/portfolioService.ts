@@ -34,6 +34,21 @@ export interface ProfileSignalData {
     targetRole: string | null;
   };
   bestInterviewScores: Array<{ topic: string; bestScore: number; attempts: number }>;
+  interviewScores: Record<string, number>;
+  joinedProjects: Array<{
+    id: string;
+    title: string;
+    role: string;
+    status: string;
+    category?: string;
+  }>;
+  featuredProjects: Array<{
+    id: string;
+    title: string;
+    description: string;
+    projectLink?: string;
+    githubLink?: string;
+  }>;
   stats: {
     totalCompletedLessons: number;
     hasRealProgress: boolean;
@@ -118,6 +133,43 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
     [userId],
   ).catch(() => []);
 
+  // 5. Fetch joined community projects
+  const joinedProjects = await query<{
+    id: string;
+    title: string;
+    role: string;
+    status: string;
+    category?: string;
+  }>(
+    `SELECT p."id", p."title", 'Contributor' as "role", pa."status", p."category"
+     FROM "ProjectApplication" pa
+     JOIN "Project" p ON p."id" = pa."projectId"
+     WHERE pa."userId" = $1`,
+    [userId],
+  ).catch(() => []);
+
+  // 6. Fetch portfolio projects
+  const featuredProjects = await query<{
+    id: string;
+    title: string;
+    description: string;
+    projectLink?: string;
+    githubLink?: string;
+  }>(
+    `SELECT "id", "title", "description", "projectLink", "githubLink"
+     FROM "Portfolio"
+     WHERE "userId" = $1
+     ORDER BY "createdAt" DESC`,
+    [userId],
+  ).catch(() => []);
+
+  const interviewScores: Record<string, number> = {};
+  for (const r of scoreRows) {
+    if (r.topic) {
+      interviewScores[r.topic] = Number(r.bestScore) || 0;
+    }
+  }
+
   const totalCompletedLessons = completedSet.size;
 
   return {
@@ -136,6 +188,9 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
       bestScore: Number(r.bestScore) || 0,
       attempts: Number(r.attempts) || 0,
     })),
+    interviewScores,
+    joinedProjects,
+    featuredProjects,
     stats: {
       totalCompletedLessons,
       hasRealProgress: totalCompletedLessons > 0,

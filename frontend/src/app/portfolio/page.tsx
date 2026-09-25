@@ -61,32 +61,33 @@ interface ManualSkillSignal {
 }
 
 interface ProfileSignalsResponse {
-  profile: {
-    githubUrl?: string;
-    linkedinUrl?: string;
-    headline?: string;
-    about?: string;
-    location?: string;
-    targetRole?: string;
+  profile?: {
+    githubUrl?: string | null;
+    linkedinUrl?: string | null;
+    headline?: string | null;
+    about?: string | null;
+    location?: string | null;
+    targetRole?: string | null;
   };
-  hubSkills: HubSkillSignal[];
-  manualSkills: ManualSkillSignal[];
-  interviewScores: Record<string, number>;
-  featuredProjects: {
+  hubSkills?: HubSkillSignal[];
+  manualSkills?: ManualSkillSignal[];
+  interviewScores?: Record<string, number>;
+  bestInterviewScores?: Array<{ topic: string; bestScore: number; attempts: number }>;
+  featuredProjects?: {
     id: string;
     title: string;
     description: string;
     projectLink?: string;
     githubLink?: string;
   }[];
-  joinedProjects: {
+  joinedProjects?: {
     id: string;
     title: string;
     role: string;
     status: string;
     category?: string;
   }[];
-  githubRepos: {
+  githubRepos?: {
     name: string;
     description?: string;
     language?: string;
@@ -831,14 +832,22 @@ export default function PortfolioPage() {
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>Community Projects Joined</span>
-                    <span className="text-white font-medium">{signals.joinedProjects.length}</span>
+                    <span className="text-white font-medium">{signals.joinedProjects?.length ?? 0}</span>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>Interview Best Score</span>
                     <span className="text-white font-medium">
-                      {Object.keys(signals.interviewScores).length > 0
-                        ? `${Math.max(...Object.values(signals.interviewScores))}%`
-                        : 'None yet'}
+                      {(() => {
+                        if (signals.bestInterviewScores && signals.bestInterviewScores.length > 0) {
+                          const maxScore = Math.max(...signals.bestInterviewScores.map((s) => s.bestScore));
+                          return maxScore > 0 ? `${maxScore}%` : 'None yet';
+                        }
+                        if (signals.interviewScores && Object.keys(signals.interviewScores).length > 0) {
+                          const maxScore = Math.max(...Object.values(signals.interviewScores));
+                          return maxScore > 0 ? `${maxScore}%` : 'None yet';
+                        }
+                        return 'None yet';
+                      })()}
                     </span>
                   </div>
                 </CardContent>
