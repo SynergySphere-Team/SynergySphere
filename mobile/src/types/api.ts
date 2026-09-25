@@ -21,10 +21,53 @@ export interface Task {
   createdAt: string;
 }
 
+export interface DeveloperProfile {
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+    xp: number;
+    level: number;
+  };
+  hubSkills: Array<{
+    id: string;
+    name: string;
+    completedLessons: number;
+    totalLessons: number;
+    percent: number;
+    unlocked: boolean;
+  }>;
+  challenges: {
+    passedTotal: number;
+    byDifficulty: { EASY: number; MEDIUM: number; HARD: number };
+    byLanguage: Record<string, number>;
+  };
+  weeklyActivity: Array<{ day: string; count: number; height: number }>;
+  tasksSummary: {
+    completedThisWeek: number;
+    totalPending: number;
+    upcoming: Array<{ id: string; title: string; dueDate: string | null; status: string }>;
+  };
+  offerReadiness: {
+    role: string;
+    overallScore: number;
+    checklist: Array<{ label: string; passed: boolean; detail: string }>;
+  };
+  nextActions: {
+    nextLesson?: { id: string; title: string; track: string; url: string };
+    nextChallenge?: { id: string; title: string; language: string; difficulty: string };
+    nextInterviewTopic?: { topic: string; reason: string };
+  };
+  starBullets?: Array<{ id: string; bullet: string; role: string; source: string }>;
+}
+
 export interface DashboardStats {
   user: Pick<User, 'firstName' | 'lastName' | 'xp' | 'level'> | null;
   levelTitle: string;
   stats: { tasksCompleted: number; challengesPassed: number; wellnessEntries: number; unreadNotifications: number };
+  developerProfile?: DeveloperProfile;
 }
 
 export interface WellnessEntry {

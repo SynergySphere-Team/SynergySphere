@@ -250,7 +250,7 @@ export function PublicPortfolioModal({
       .map(([s, v]) => `${s} (${v}%)`)
       .join(', ')}\n\nFeatured Projects:\n${items
       .map((p) => `• ${p.title}${p.projectLink ? ` (${p.projectLink})` : ''}`)
-      .join('\n')}\n\nSynergySphere Verified Level ${user?.level ?? 1} (${user?.xp ?? 285} XP)`;
+      .join('\n')}\n\nVerified Level ${user?.level ?? 1} (${user?.xp ?? 0} XP)\nVerified Credentials: https://synergysphere.com/u/${user?.id || 'demo'}`;
 
     if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
       await navigator.clipboard.writeText(summary);
@@ -300,7 +300,7 @@ export function PublicPortfolioModal({
                   <Text style={[styles.statBadgeText, { color: colors.text }]}>Level {user?.level ?? 1}</Text>
                 </View>
                 <View style={[styles.statBadge, { backgroundColor: colors.surfaceElevated }]}>
-                  <Text style={[styles.statBadgeText, { color: colors.text }]}>{user?.xp ?? 285} XP</Text>
+                  <Text style={[styles.statBadgeText, { color: colors.text }]}>{user?.xp ?? 0} XP</Text>
                 </View>
                 {links.github ? (
                   <View style={[styles.statBadge, { backgroundColor: colors.surfaceElevated }]}>

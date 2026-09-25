@@ -87,12 +87,30 @@ const BUILTIN_CHALLENGES: BuiltinChallenge[] = [
   },
 ];
 
+interface RolePath {
+  id: string;
+  title: string;
+  targetRole: string;
+  description: string;
+  durationWeeks: number;
+  tracks: string[];
+  challengeTargetCount: number;
+  interviewTopics: string[];
+}
+
+interface Flashcard {
+  id: string;
+  front: string;
+  back: string;
+  topic: string;
+}
+
 export default function CodingScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
 
-  // Mode: Academy vs Challenges
-  const [mode, setMode] = useState<'academy' | 'challenges'>('academy');
+  // Mode: Academy vs Challenges vs Role Paths
+  const [mode, setMode] = useState<'academy' | 'challenges' | 'rolepaths'>('academy');
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
 
   // Challenges state
@@ -110,15 +128,24 @@ export default function CodingScreen() {
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
 
+  // Role paths and daily flashcards
+  const [rolePaths, setRolePaths] = useState<RolePath[]>([]);
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [flashcardMessage, setFlashcardMessage] = useState('');
+
   // Tutorials quiz state
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     try {
-      const [challengesData, learningData] = await Promise.allSettled([
+      const [challengesData, learningData, rolePathsData, flashcardsData] = await Promise.allSettled([
         api.get<Challenge[]>('/challenges'),
         api.get<LearningResource[]>('/learning'),
+        api.get<{ paths: RolePath[] }>('/curriculum/role-paths'),
+        api.get<{ flashcards: Flashcard[]; totalDue: number }>('/curriculum/flashcards/daily-review'),
       ]);
 
       if (challengesData.status === 'fulfilled' && challengesData.value.length > 0) {
@@ -126,6 +153,12 @@ export default function CodingScreen() {
       }
       if (learningData.status === 'fulfilled') {
         setResources(learningData.value);
+      }
+      if (rolePathsData.status === 'fulfilled' && rolePathsData.value?.paths) {
+        setRolePaths(rolePathsData.value.paths);
+      }
+      if (flashcardsData.status === 'fulfilled' && flashcardsData.value?.flashcards) {
+        setFlashcards(flashcardsData.value.flashcards);
       }
     } catch {
       // Fallbacks used
@@ -164,32 +197,90 @@ export default function CodingScreen() {
     setCode(selectedChallenge.starterCode || '');
     setTestOutput(null);
     setResult('');
+    setError('');
   }
 
-  function handleRunTests() {
+  async function handleRunTests() {
+    if (!selectedChallenge || !code.trim()) return;
     setTesting(true);
     setTestOutput(null);
-    setTimeout(() => {
+    try {
+      const response = await api.post<{
+        passed: boolean;
+        output: string;
+        error?: string;
+      }>(`/challenges/${selectedChallenge.id}/test`, {
+        code,
+        language: selectedChallenge.language || 'JavaScript',
+      });
+      const statusIcon = response.passed ? '✓' : '✗';
+      setTestOutput(
+        `${statusIcon} Server Judge: ${response.passed ? 'PASSED' : 'FAILED'}\n${response.output || ''}${
+          response.error ? `\nError: ${response.error}` : ''
+        }`
+      );
+    } catch (err: any) {
+      setTestOutput(`✗ Execution Error: ${err?.message || 'Could not verify solution with server judge.'}`);
+    } finally {
       setTesting(false);
-      setTestOutput('✓ Test Case 1: PASSED (Execution: 12ms)\n✓ Test Case 2: PASSED (Execution: 8ms)\n✓ All assertions satisfied.');
-    }, 600);
+    }
   }
 
   async function submitSolution() {
     if (!selectedChallenge || !code.trim()) return;
     setSubmitting(true);
     setError('');
+    setResult('');
     try {
-      const response = await api.post<{ passed: boolean; xpEarned: number }>(
+      const response = await api.post<{
+        passed: boolean;
+        xpEarned: number;
+        output?: string;
+        testResults?: Array<{ label: string; passed: boolean; error?: string }>;
+      }>(
         `/challenges/${selectedChallenge.id}/submit`,
-        { code },
+        { code, language: selectedChallenge.language || 'JavaScript' },
       );
-      setResult(response.passed ? `Passed! You earned +${response.xpEarned} XP.` : 'Submitted. Review the test case output and try again.');
-    } catch {
-      // Fallback submission reward
-      setResult(`Submitted! You earned +${selectedChallenge.xpReward} XP for completing this challenge.`);
+
+      if (response.passed) {
+        setResult(`🎉 All server tests passed! You earned +${response.xpEarned} XP.`);
+      } else {
+        const details =
+          response.testResults
+            ?.map((t) => `${t.passed ? '✓' : '✗'} ${t.label}${t.error ? `: ${t.error}` : ''}`)
+            .join('\n') || response.output || 'Solution did not pass all hidden server tests.';
+        setError(`Failed server validation:\n${details}`);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Submission failed. The server judge could not be reached.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleRateFlashcard(rating: 1 | 3 | 5) {
+    const card = flashcards[currentFlashcardIndex];
+    if (!card) return;
+    try {
+      await api.post('/curriculum/flashcards/review', {
+        cardId: card.id,
+        rating,
+      });
+      setFlashcardMessage(rating === 5 ? '✓ Easy — scheduled for later' : '✓ Reviewed — queued according to SM-2');
+      setTimeout(() => {
+        setFlashcardMessage('');
+        setIsFlipped(false);
+        if (currentFlashcardIndex + 1 < flashcards.length) {
+          setCurrentFlashcardIndex((prev) => prev + 1);
+        } else {
+          setFlashcardMessage('🎉 Daily review complete! All spaced cards mastered.');
+        }
+      }, 700);
+    } catch {
+      setIsFlipped(false);
+      if (currentFlashcardIndex + 1 < flashcards.length) {
+        setCurrentFlashcardIndex((prev) => prev + 1);
+      }
     }
   }
 
@@ -267,6 +358,31 @@ export default function CodingScreen() {
             ]}
           >
             Coding Challenges
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setMode('rolepaths')}
+          style={({ pressed }) => [
+            styles.modeTab,
+            mode === 'rolepaths'
+              ? [styles.modeTabActive, { backgroundColor: primaryAccent }]
+              : [styles.modeTabInactive, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }],
+            pressed && styles.pressed,
+          ]}
+        >
+          <Ionicons
+            name="git-network-outline"
+            size={16}
+            color={mode === 'rolepaths' ? '#ffffff' : colors.muted}
+          />
+          <Text
+            style={[
+              styles.modeTabText,
+              { color: mode === 'rolepaths' ? '#ffffff' : colors.text },
+            ]}
+          >
+            Role Paths
           </Text>
         </Pressable>
       </View>
@@ -540,6 +656,122 @@ export default function CodingScreen() {
               })}
             </>
           ) : null}
+        </>
+      ) : null}
+
+      {/* Mode: Role Paths & Spaced Flashcards */}
+      {mode === 'rolepaths' ? (
+        <>
+          {/* Daily Spaced Repetition (SM-2) */}
+          <Text style={[styles.section, { color: colors.text }]}>Daily Spaced Review (SM-2)</Text>
+          <Card>
+            {flashcardMessage ? (
+              <Notice tone="success">{flashcardMessage}</Notice>
+            ) : null}
+
+            {flashcards.length > 0 && currentFlashcardIndex < flashcards.length ? (
+              <View style={{ gap: 10 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>
+                    Card {currentFlashcardIndex + 1} of {flashcards.length} · {flashcards[currentFlashcardIndex].topic}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>Tap to flip</Text>
+                </View>
+
+                <Pressable
+                  onPress={() => setIsFlipped(!isFlipped)}
+                  style={{
+                    minHeight: 120,
+                    borderRadius: 10,
+                    padding: 14,
+                    borderWidth: 1,
+                    borderColor: isFlipped ? primaryAccent : colors.border,
+                    backgroundColor: colors.surfaceElevated,
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.muted, marginBottom: 4 }}>
+                    {isFlipped ? 'ANSWER' : 'QUESTION'}
+                  </Text>
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, lineHeight: 22 }}>
+                    {isFlipped ? flashcards[currentFlashcardIndex].back : flashcards[currentFlashcardIndex].front}
+                  </Text>
+                </Pressable>
+
+                {isFlipped ? (
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                    <Button
+                      title="Hard (1)"
+                      secondary
+                      onPress={() => handleRateFlashcard(1)}
+                    />
+                    <Button
+                      title="Good (3)"
+                      secondary
+                      onPress={() => handleRateFlashcard(3)}
+                    />
+                    <Button
+                      title="Easy (5)"
+                      onPress={() => handleRateFlashcard(5)}
+                    />
+                  </View>
+                ) : (
+                  <Button
+                    title="Reveal Answer"
+                    secondary
+                    onPress={() => setIsFlipped(true)}
+                  />
+                )}
+              </View>
+            ) : (
+              <View style={{ paddingVertical: 14, alignItems: 'center' }}>
+                <Ionicons name="checkmark-circle-outline" size={32} color={primaryAccent} />
+                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 6 }}>
+                  No Reviews Due Today
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.muted, textAlign: 'center', marginTop: 2 }}>
+                  Your spaced repetition queue is clear. Return tomorrow for your 10-minute review!
+                </Text>
+              </View>
+            )}
+          </Card>
+
+          {/* Curated Role Paths */}
+          <Text style={[styles.section, { color: colors.text }]}>Curated Career Role Paths</Text>
+          {rolePaths.map((path) => (
+            <Card key={path.id}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>{path.title}</Text>
+                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>{path.durationWeeks} Weeks</Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 13, color: colors.muted, lineHeight: 18, marginBottom: 10 }}>{path.description}</Text>
+
+              <View style={{ gap: 6 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="book-outline" size={14} color={primaryAccent} />
+                  <Text style={{ fontSize: 12, color: colors.text }}>
+                    Tracks: <Text style={{ fontWeight: '600' }}>{path.tracks.join(', ')}</Text>
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="code-slash-outline" size={14} color={primaryAccent} />
+                  <Text style={{ fontSize: 12, color: colors.text }}>
+                    Target: <Text style={{ fontWeight: '600' }}>{path.challengeTargetCount} Verified Challenges</Text>
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="mic-outline" size={14} color={primaryAccent} />
+                  <Text style={{ fontSize: 12, color: colors.text }}>
+                    Interview Focus: <Text style={{ fontWeight: '600' }}>{path.interviewTopics.join(', ')}</Text>
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          ))}
         </>
       ) : null}
     </Screen>

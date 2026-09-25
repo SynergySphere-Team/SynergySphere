@@ -21,36 +21,12 @@ function getXpProgress(xp: number): number {
   return Math.min(100, Math.max(0, (xp % 1000) / 10));
 }
 
-const activityDays = [
-  { day: 'Mon', value: 35 },
-  { day: 'Tue', value: 74 },
-  { day: 'Wed', value: 46 },
-  { day: 'Thu', value: 88 },
-  { day: 'Fri', value: 66 },
-  { day: 'Sat', value: 78 },
-  { day: 'Sun', value: 58 },
-];
-
-const learningTracks = [
-  { label: 'SkillUp', value: 80 },
-  { label: 'LectureToLife', value: 64 },
-  { label: 'Productivity', value: 72 },
-  { label: 'Community', value: 75 },
-  { label: 'Career', value: 60 },
-];
-
-const upcomingTasks = [
-  { title: 'Java Challenge', desc: 'Arrays and hashmaps', due: 'Due today', route: '/coding' },
-  { title: 'Study Microservices', desc: 'Summarize JDBC notes', due: 'Due tomorrow', route: '/lecture-to-life' },
-  { title: 'Community Update', desc: 'EcoSaver dashboard', due: 'Due in 2 days', route: '/community' },
-  { title: 'Mock Interview', desc: 'Backend developer', due: 'Due in 3 days', route: '/interviews' },
-];
-
-const aiRecommendations = [
-  'Continue JDBC module based on your progress.',
-  'Practice binary trees to strengthen your SQL/API task pattern.',
-  'Review REST APIs before the mock interview.',
-];
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -84,30 +60,48 @@ export default function HomeScreen() {
   const levelTitle = data?.levelTitle || getLevelTitle(userLevel);
   const xpProgress = getXpProgress(userXp);
 
-  const stats = data?.stats ?? {
-    tasksCompleted: 23,
-    challengesPassed: 18,
-    wellnessEntries: 9,
-    unreadNotifications: 2,
-  };
+  const profile = data?.developerProfile;
+
+  // Real 3 core metrics
+  const challengesPassed = profile?.challenges?.passedTotal ?? data?.stats?.challengesPassed ?? 0;
+  const tasksCompletedThisWeek = profile?.tasksSummary?.completedThisWeek ?? data?.stats?.tasksCompleted ?? 0;
+  const lessonsCompleted = profile?.hubSkills
+    ? profile.hubSkills.reduce((sum, s) => sum + s.completedLessons, 0)
+    : 0;
 
   const kpis = [
-    { label: 'XP Earned', value: `${userXp} XP`, caption: '+160 this week', icon: 'flash' as const },
-    { label: 'Coding Streak', value: '14 Days', caption: 'Keep it up', icon: 'code-slash' as const },
-    { label: 'Tasks Completed', value: stats.tasksCompleted.toString(), caption: 'Well ahead', icon: 'checkmark-circle' as const },
-    { label: 'Challenges', value: stats.challengesPassed.toString(), caption: 'Active solutions', icon: 'trophy' as const },
-    { label: 'Wellness Score', value: '78%', caption: 'Good balance', icon: 'heart' as const },
-    { label: 'Alerts', value: stats.unreadNotifications.toString(), caption: 'Need review', icon: 'notifications' as const },
+    { label: 'Challenges Passed', value: challengesPassed.toString(), caption: 'Server-verified', icon: 'trophy' as const },
+    { label: 'Tasks This Week', value: tasksCompletedThisWeek.toString(), caption: 'Completed', icon: 'checkmark-circle' as const },
+    { label: 'Lessons Mastered', value: lessonsCompleted.toString(), caption: 'Across 11 tracks', icon: 'book' as const },
   ];
 
+  // Real weekly activity (7 days)
+  const activityDays = profile?.weeklyActivity && profile.weeklyActivity.length === 7
+    ? profile.weeklyActivity
+    : [
+        { day: 'Mon', count: 0, height: 10 },
+        { day: 'Tue', count: 0, height: 10 },
+        { day: 'Wed', count: 0, height: 10 },
+        { day: 'Thu', count: 0, height: 10 },
+        { day: 'Fri', count: 0, height: 10 },
+        { day: 'Sat', count: 0, height: 10 },
+        { day: 'Sun', count: 0, height: 10 },
+      ];
+
+  // Real learning tracks from Hub
+  const hubTracks = profile?.hubSkills?.slice(0, 4) || [];
+
+  // Real upcoming tasks
+  const upcomingTasks = profile?.tasksSummary?.upcoming || [];
+
   const workspaces: { title: string; description: string; route: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-    { title: 'Learning Hub', description: 'Interactive programming curriculum & challenges.', route: '/coding', icon: 'code-slash' },
-    { title: 'AI Workspace', description: 'Get explanations, reviews, and debugging help.', route: '/ai-assistant', icon: 'sparkles' },
-    { title: 'LectureToLife', description: 'Turn lecture notes into study materials.', route: '/lecture-to-life', icon: 'school' },
-    { title: 'Community', description: 'Find and apply to impact projects.', route: '/community', icon: 'people' },
-    { title: 'Portfolio', description: 'Build your career project showcase.', route: '/portfolio', icon: 'briefcase' },
-    { title: 'Mock Interviews', description: 'Practice technical interview questions.', route: '/interviews', icon: 'chatbubbles' },
-    { title: 'Leaderboard', description: 'See the SynergySphere rankings.', route: '/leaderboard', icon: 'trophy' },
+    { title: 'Learning Hub', description: 'Curriculum tracks, role paths & flashcards.', route: '/coding', icon: 'code-slash' },
+    { title: 'AI Workspace', description: 'Staff Engineer tutor, review gym & chat.', route: '/ai-assistant', icon: 'sparkles' },
+    { title: 'Interview Coach', description: '10+ question sessions & live rubrics.', route: '/interviews', icon: 'chatbubbles' },
+    { title: 'Community & GitHub', description: 'Join open projects & contribute PRs.', route: '/community', icon: 'people' },
+    { title: 'Portfolio Evidence', description: 'Verified credentials & public share link.', route: '/portfolio', icon: 'briefcase' },
+    { title: 'Tasks & Productivity', description: 'Weekly deadlines & focus timer.', route: '/tasks', icon: 'checkbox' },
+    { title: 'Settings & Security', description: 'Profile, notifications, theme & account.', route: '/settings', icon: 'settings' },
   ];
   if (user?.role === 'ADMIN') {
     workspaces.push({
@@ -123,7 +117,7 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={styles.head}>
         <View style={styles.headTop}>
-          <Text style={[styles.subBrand, { color: primaryAccent }]}>STUDENT COMMAND CENTER</Text>
+          <Text style={[styles.subBrand, { color: primaryAccent }]}>DEVELOPER OS</Text>
           <View style={[styles.levelBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', borderColor: primaryAccent }]}>
             <Ionicons name="sparkles" size={12} color={primaryAccent} />
             <Text style={[styles.levelBadgeText, { color: primaryAccent }]}>
@@ -132,10 +126,10 @@ export default function HomeScreen() {
           </View>
         </View>
         <Text style={[styles.greeting, { color: colors.text }]}>
-          Good day, {user?.firstName ?? 'Learner'}!
+          {getGreeting()}, {user?.firstName ?? 'Developer'}!
         </Text>
         <Text style={[styles.slogan, { color: colors.muted }]}>
-          Let's continue your journey of learning and building.
+          Your verified engineering progress and daily junior developer loop.
         </Text>
       </View>
 
@@ -159,8 +153,8 @@ export default function HomeScreen() {
         </View>
       </Card>
 
-      {/* KPI Cards Grid */}
-      <Text style={[styles.section, { color: colors.text }]}>Platform KPIs</Text>
+      {/* 3 Real Measured KPIs */}
+      <Text style={[styles.section, { color: colors.text }]}>Measured Engineering Activity</Text>
       <View style={styles.kpiGrid}>
         {kpis.map((kpi) => (
           <View
@@ -171,7 +165,6 @@ export default function HomeScreen() {
               <View style={[styles.kpiIcon, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
                 <Ionicons name={kpi.icon} size={15} color={primaryAccent} />
               </View>
-              <Ionicons name="arrow-up-outline" size={13} color={colors.muted} />
             </View>
             <Text style={[styles.kpiLabel, { color: colors.muted }]}>{kpi.label}</Text>
             <Text style={[styles.kpiValue, { color: colors.text }]}>{kpi.value}</Text>
@@ -180,8 +173,104 @@ export default function HomeScreen() {
         ))}
       </View>
 
-      {/* Weekly Activity Visualizer */}
-      <Text style={[styles.section, { color: colors.text }]}>Weekly Activity</Text>
+      {/* Next Actions Card (Spine) */}
+      {profile?.nextActions && (
+        <>
+          <Text style={[styles.section, { color: colors.text }]}>Next Action Queue</Text>
+          <Card>
+            <View style={{ gap: 12 }}>
+              {profile.nextActions.nextLesson && (
+                <Pressable
+                  onPress={() => router.push('/coding' as never)}
+                  style={styles.nextActionItem}
+                >
+                  <View style={[styles.nextActionIcon, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
+                    <Ionicons name="book-outline" size={16} color={primaryAccent} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.nextActionType, { color: primaryAccent }]}>Curriculum Lesson</Text>
+                    <Text style={[styles.nextActionTitle, { color: colors.text }]}>{profile.nextActions.nextLesson.title}</Text>
+                    <Text style={[styles.nextActionSubtitle, { color: colors.muted }]}>{profile.nextActions.nextLesson.track} Track</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                </Pressable>
+              )}
+
+              {profile.nextActions.nextChallenge && (
+                <Pressable
+                  onPress={() => router.push('/coding' as never)}
+                  style={styles.nextActionItem}
+                >
+                  <View style={[styles.nextActionIcon, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
+                    <Ionicons name="code-slash-outline" size={16} color={primaryAccent} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.nextActionType, { color: primaryAccent }]}>Coding Challenge</Text>
+                    <Text style={[styles.nextActionTitle, { color: colors.text }]}>{profile.nextActions.nextChallenge.title}</Text>
+                    <Text style={[styles.nextActionSubtitle, { color: colors.muted }]}>{profile.nextActions.nextChallenge.difficulty} · {profile.nextActions.nextChallenge.language}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                </Pressable>
+              )}
+
+              {profile.nextActions.nextInterviewTopic && (
+                <Pressable
+                  onPress={() => router.push('/interviews' as never)}
+                  style={styles.nextActionItem}
+                >
+                  <View style={[styles.nextActionIcon, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
+                    <Ionicons name="mic-outline" size={16} color={primaryAccent} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.nextActionType, { color: primaryAccent }]}>Interview Focus</Text>
+                    <Text style={[styles.nextActionTitle, { color: colors.text }]}>{profile.nextActions.nextInterviewTopic.topic}</Text>
+                    <Text style={[styles.nextActionSubtitle, { color: colors.muted }]}>{profile.nextActions.nextInterviewTopic.reason}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                </Pressable>
+              )}
+            </View>
+          </Card>
+        </>
+      )}
+
+      {/* Offer Readiness Card */}
+      {profile?.offerReadiness && (
+        <>
+          <Text style={[styles.section, { color: colors.text }]}>Offer Readiness Score</Text>
+          <Card>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <View>
+                <Text style={[styles.trackName, { color: colors.text }]}>{profile.offerReadiness.role}</Text>
+                <Text style={{ fontSize: 11, color: colors.muted }}>Objective criteria for junior roles</Text>
+              </View>
+              <Text style={{ fontSize: 20, fontWeight: '800', color: primaryAccent }}>
+                {profile.offerReadiness.overallScore}%
+              </Text>
+            </View>
+            <View style={[styles.progressBarTrack, { backgroundColor: colors.surfaceElevated, marginBottom: 12 }]}>
+              <View style={[styles.progressBarFill, { width: `${profile.offerReadiness.overallScore}%`, backgroundColor: primaryAccent }]} />
+            </View>
+            <View style={{ gap: 8 }}>
+              {profile.offerReadiness.checklist.map((item, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons
+                    name={item.passed ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={16}
+                    color={item.passed ? primaryAccent : colors.muted}
+                  />
+                  <Text style={{ fontSize: 12, color: item.passed ? colors.text : colors.muted, flex: 1 }}>
+                    {item.label}: <Text style={{ fontWeight: '600' }}>{item.detail}</Text>
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </Card>
+        </>
+      )}
+
+      {/* Weekly Activity Visualizer from Real Events */}
+      <Text style={[styles.section, { color: colors.text }]}>Weekly Study Cadence</Text>
       <Card>
         <View style={styles.activityContainer}>
           {activityDays.map((item) => (
@@ -191,7 +280,7 @@ export default function HomeScreen() {
                   style={[
                     styles.barFill,
                     {
-                      height: `${item.value}%`,
+                      height: `${Math.max(item.height, 8)}%`,
                       backgroundColor: primaryAccent,
                     },
                   ]}
@@ -203,71 +292,67 @@ export default function HomeScreen() {
         </View>
       </Card>
 
-      {/* Learning Progress Tracks */}
-      <Text style={[styles.section, { color: colors.text }]}>Learning Tracks Progress</Text>
-      <Card>
-        <View style={styles.tracksHeader}>
-          <Text style={[styles.overallScore, { color: primaryAccent }]}>72%</Text>
-          <Text style={[styles.overallLabel, { color: colors.muted }]}>Overall curriculum mastery</Text>
-        </View>
-        <View style={styles.tracksList}>
-          {learningTracks.map((track) => (
-            <View key={track.label} style={styles.trackItem}>
-              <View style={styles.trackLabels}>
-                <Text style={[styles.trackName, { color: colors.text }]}>{track.label}</Text>
-                <Text style={[styles.trackPercent, { color: primaryAccent }]}>{track.value}%</Text>
-              </View>
-              <View style={[styles.trackTrack, { backgroundColor: colors.surfaceElevated }]}>
-                <View style={[styles.trackFill, { width: `${track.value}%`, backgroundColor: primaryAccent }]} />
-              </View>
+      {/* Real Learning Progress Tracks */}
+      {hubTracks.length > 0 && (
+        <>
+          <Text style={[styles.section, { color: colors.text }]}>Curriculum Progress</Text>
+          <Card>
+            <View style={styles.tracksList}>
+              {hubTracks.map((track) => (
+                <View key={track.id} style={styles.trackItem}>
+                  <View style={styles.trackLabels}>
+                    <Text style={[styles.trackName, { color: colors.text }]}>{track.name}</Text>
+                    <Text style={[styles.trackPercent, { color: primaryAccent }]}>
+                      {track.completedLessons}/{track.totalLessons} ({track.percent}%)
+                    </Text>
+                  </View>
+                  <View style={[styles.trackTrack, { backgroundColor: colors.surfaceElevated }]}>
+                    <View style={[styles.trackFill, { width: `${track.percent}%`, backgroundColor: primaryAccent }]} />
+                  </View>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
-      </Card>
+          </Card>
+        </>
+      )}
 
-      {/* Upcoming Tasks & Milestones */}
-      <Text style={[styles.section, { color: colors.text }]}>Upcoming Tasks & Milestones</Text>
+      {/* Honest Upcoming Tasks & Milestones */}
+      <Text style={[styles.section, { color: colors.text }]}>Upcoming Tasks</Text>
       <Card>
-        {upcomingTasks.map((task, idx) => (
-          <Pressable
-            key={task.title}
-            onPress={() => router.push(task.route as never)}
-            style={({ pressed }) => [
-              styles.taskRow,
-              idx > 0 && [styles.taskDivider, { borderTopColor: colors.border }],
-              pressed && styles.workspacePressed,
-            ]}
-          >
-            <View style={styles.taskBody}>
-              <Text style={[styles.taskTitle, { color: colors.text }]}>{task.title}</Text>
-              <Text style={[styles.taskDesc, { color: colors.muted }]}>{task.desc}</Text>
-            </View>
-            <View style={[styles.dueBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
-              <Text style={[styles.dueText, { color: primaryAccent }]}>{task.due}</Text>
-            </View>
-          </Pressable>
-        ))}
-      </Card>
-
-      {/* AI Recommendations */}
-      <Text style={[styles.section, { color: colors.text }]}>AI Recommendations</Text>
-      <Card>
-        {aiRecommendations.map((rec, idx) => (
-          <View
-            key={idx}
-            style={[
-              styles.recRow,
-              idx > 0 && [styles.taskDivider, { borderTopColor: colors.border }],
-            ]}
-          >
-            <Ionicons name="bulb-outline" size={18} color={primaryAccent} style={styles.recIcon} />
-            <Text style={[styles.recText, { color: colors.text }]}>{rec}</Text>
+        {upcomingTasks.length > 0 ? (
+          upcomingTasks.map((task, idx) => (
+            <Pressable
+              key={task.id}
+              onPress={() => router.push('/tasks' as never)}
+              style={({ pressed }) => [
+                styles.taskRow,
+                idx > 0 && [styles.taskDivider, { borderTopColor: colors.border }],
+                pressed && styles.workspacePressed,
+              ]}
+            >
+              <View style={styles.taskBody}>
+                <Text style={[styles.taskTitle, { color: colors.text }]}>{task.title}</Text>
+                <Text style={[styles.taskDesc, { color: colors.muted }]}>
+                  {task.dueDate ? `Due ${new Date(task.dueDate).toLocaleDateString()}` : 'No due date'}
+                </Text>
+              </View>
+              <View style={[styles.dueBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
+                <Text style={[styles.dueText, { color: primaryAccent }]}>{task.status}</Text>
+              </View>
+            </Pressable>
+          ))
+        ) : (
+          <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+            <Ionicons name="checkmark-done-circle-outline" size={28} color={primaryAccent} />
+            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>
+              No pending tasks due. You are all caught up!
+            </Text>
           </View>
-        ))}
+        )}
       </Card>
 
       {/* Workspaces / Navigation */}
-      <Text style={[styles.section, { color: colors.text }]}>Your Workspaces</Text>
+      <Text style={[styles.section, { color: colors.text }]}>Platform Workspaces</Text>
       <Card>
         {workspaces.map((workspace, index) => (
           <Pressable
@@ -374,4 +459,9 @@ const styles = StyleSheet.create({
   workspaceDescription: { fontSize: 12, lineHeight: 16 },
   feedItem: { gap: 3, paddingVertical: 10 },
   feedTitle: { fontSize: 14, fontWeight: '800' },
+  nextActionItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
+  nextActionIcon: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  nextActionType: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  nextActionTitle: { fontSize: 13, fontWeight: '700' },
+  nextActionSubtitle: { fontSize: 11 },
 });

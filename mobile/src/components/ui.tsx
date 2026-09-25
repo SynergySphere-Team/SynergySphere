@@ -7,7 +7,19 @@ export function Card({ children }: { children: ReactNode }) {
   return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>{children}</View>;
 }
 
-export function Button({ title, onPress, disabled = false, secondary = false }: { title: string; onPress(): void; disabled?: boolean; secondary?: boolean }) {
+export function Button({
+  title,
+  onPress,
+  disabled = false,
+  secondary = false,
+  danger = false,
+}: {
+  title: string;
+  onPress(): void;
+  disabled?: boolean;
+  secondary?: boolean;
+  danger?: boolean;
+}) {
   const { colors } = useTheme();
   return (
     <Pressable
@@ -15,7 +27,7 @@ export function Button({ title, onPress, disabled = false, secondary = false }: 
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: colors.primary },
+        { backgroundColor: danger ? colors.danger : colors.primary },
         secondary && [styles.secondary, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }],
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
