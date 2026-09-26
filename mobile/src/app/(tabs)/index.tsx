@@ -269,6 +269,89 @@ export default function HomeScreen() {
         </>
       )}
 
+      {/* Interview Preparation Card (Prompt 51) */}
+      <Text style={[styles.section, { color: colors.text }]}>Interview Preparation</Text>
+      <Card>
+        <View style={{ gap: 10 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={[styles.kpiIcon, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
+                <Ionicons name="chatbubbles" size={15} color={primaryAccent} />
+              </View>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>Developer Interview Coach</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ fontSize: 10, color: colors.muted }}>Completed</Text>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>
+                  {data?.interviewPrep?.interviewsCompleted ?? data?.stats?.interviews ?? 0}
+                </Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ fontSize: 10, color: colors.muted }}>Practised</Text>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: primaryAccent }}>
+                  {data?.interviewPrep?.questionsAnswered ?? ((data?.stats?.interviews ?? 0) * 6)} Qs
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={{ backgroundColor: colors.surfaceElevated, padding: 10, borderRadius: 8, gap: 4 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.muted, textTransform: 'uppercase' }}>Current Focus</Text>
+              <View style={[styles.dueBadge, { backgroundColor: `${primaryAccent}20` }]}>
+                <Text style={[styles.dueText, { color: primaryAccent }]}>
+                  {data?.interviewPrep?.recommendedPractice?.[0]?.status || 'Needs Practice'}
+                </Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+              {data?.interviewPrep?.currentFocus || 'SQL JOINs & Relational Queries'}
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.muted }}>
+              {data?.interviewPrep?.recommendedPractice?.[0]?.reason || 'You struggled with JOIN questions in your recent interviews.'}
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 2 }}>
+            <Pressable
+              onPress={() => router.push({ pathname: '/interviews', params: { autoPractice: data?.interviewPrep?.currentFocus || 'SQL JOINs' } } as never)}
+              style={({ pressed }) => [
+                {
+                  flex: 1,
+                  backgroundColor: primaryAccent,
+                  paddingVertical: 9,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+            >
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>Practise Now</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/interviews' as never)}
+              style={({ pressed }) => [
+                {
+                  flex: 1,
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  paddingVertical: 9,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+            >
+              <Text style={{ color: colors.text, fontSize: 12, fontWeight: '700' }}>Start Interview</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Card>
+
       {/* Weekly Activity Visualizer from Real Events */}
       <Text style={[styles.section, { color: colors.text }]}>Weekly Study Cadence</Text>
       <Card>

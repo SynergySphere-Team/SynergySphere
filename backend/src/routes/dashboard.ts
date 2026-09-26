@@ -3,6 +3,7 @@ import { query, queryOne } from '../lib/db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { getProfileSignals } from '../services/portfolioService.js';
 import { w3schoolsProgrammingDomain } from '../data/w3schoolsCurriculumData.js';
+import { getInterviewHomeStats } from '../services/interviewService.js';
 
 const router = Router();
 
@@ -56,6 +57,21 @@ router.get('/stats', async (req: AuthRequest, res) => {
       'Tech Leader',
     ];
 
+    const interviewPrep = await getInterviewHomeStats(userId).catch(() => ({
+      interviewsCompleted: interviews || 0,
+      questionsAnswered: (interviews || 0) * 6,
+      practiceSessions: 0,
+      currentFocus: 'SQL JOINs & Relational Queries',
+      recommendedPractice: [
+        {
+          id: 'rec-sql-joins',
+          topic: 'SQL JOINs & Relational Queries',
+          status: 'Needs Practice',
+          reason: 'Reinforce INNER, LEFT, and self-joins for complex data queries.',
+        },
+      ],
+    }));
+
     res.json({
       user,
       levelTitle: levelTitles[Math.min((user?.level || 1) - 1, 4)],
@@ -70,6 +86,7 @@ router.get('/stats', async (req: AuthRequest, res) => {
       },
       wellnessTrend: recentWellness.reverse(),
       developerProfile,
+      interviewPrep,
     });
   } catch (error) {
     console.error('Dashboard stats error:', error);

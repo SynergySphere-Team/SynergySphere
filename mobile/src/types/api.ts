@@ -66,8 +66,9 @@ export interface DeveloperProfile {
 export interface DashboardStats {
   user: Pick<User, 'firstName' | 'lastName' | 'xp' | 'level'> | null;
   levelTitle: string;
-  stats: { tasksCompleted: number; challengesPassed: number; wellnessEntries: number; unreadNotifications: number };
+  stats: { tasksCompleted: number; challengesPassed: number; wellnessEntries: number; unreadNotifications: number; interviews?: number };
   developerProfile?: DeveloperProfile;
+  interviewPrep?: InterviewPrepStats;
 }
 
 export interface WellnessEntry {
@@ -120,3 +121,138 @@ export interface LectureUpload {
 }
 export interface ProductivityStats { tasksCompletedToday: number; totalTasksCompleted: number; focusSessionsToday: number; focusMinutesToday: number; focusHoursToday: string; wellnessScore: number | null; statusCounts: Record<string, number>; learnedTasks: { id: string; title: string; learnedNote: string | null }[]; }
 export interface AdminOverview { totalUsers: number; activeUsers: number; dailyLogins: number; challengesCompleted: number; projectApplications: number; avgInterviewScore: number; avgStressLevel: number; avgMood: number; avgEnergy: number; recentUsers: { firstName: string; lastName: string; email: string; role: string; createdAt: string }[]; }
+
+export interface InterviewPrepStats {
+  interviewsCompleted: number;
+  questionsAnswered: number;
+  practiceSessions: number;
+  currentFocus: string;
+  recommendedPractice: Array<{
+    id: string;
+    topic: string;
+    status: 'Not Started' | 'Needs Practice' | 'Developing' | 'Improving' | 'Strong';
+    reason: string;
+  }>;
+}
+
+export interface DimensionEvaluation {
+  rating: 'Strong' | 'Improving' | 'Developing' | 'Needs Practice';
+  score: number;
+  feedback: string;
+}
+
+export interface MultiDimensionalEvaluation {
+  technicalKnowledge: DimensionEvaluation;
+  problemSolving: DimensionEvaluation;
+  communication: DimensionEvaluation;
+  coding: DimensionEvaluation;
+  accuracy: DimensionEvaluation;
+  timeManagement: DimensionEvaluation;
+  requirementUnderstanding: DimensionEvaluation;
+  codeQuality: DimensionEvaluation;
+  architecture: DimensionEvaluation;
+}
+
+export interface QuestionReviewItem {
+  questionId: string;
+  questionIndex: number;
+  question: string;
+  candidateAnswer: string;
+  expectedConcepts: string[];
+  sampleAnswer: string;
+  feedback: string;
+  commonMistakes: string[];
+  keyConcept: string;
+  score: number;
+  topicToPractice: string;
+}
+
+export interface InterviewEvaluationResult {
+  score: number;
+  feedback: string;
+  dimensions: MultiDimensionalEvaluation;
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: string[];
+  questionScores: Array<{
+    questionId: string;
+    questionIndex: number;
+    score: number;
+    feedback: string;
+    rubricMatches: string[];
+    missedPoints: string[];
+  }>;
+  questionReviews: QuestionReviewItem[];
+  weakAreas: string[];
+  xpEarned: number;
+  xpAwarded?: number;
+  questionsAnswered: number;
+  questionsCorrect: number;
+  hintsUsed: number;
+  durationMinutes: number;
+}
+
+export interface RecommendedPracticeItem {
+  id: string;
+  topic: string;
+  category: string;
+  status: 'Not Started' | 'Needs Practice' | 'Developing' | 'Improving' | 'Strong';
+  reason: string;
+  priorityScore: number;
+  attempts: number;
+  hintsUsed: number;
+  lastPractisedAt?: string;
+}
+
+export interface FocusedPracticeSession {
+  sessionId: string;
+  topic: string;
+  category: string;
+  difficulty: string;
+  quickReview: {
+    concept: string;
+    example: string;
+    whyItMatters: string;
+    deepDive?: string;
+  };
+  questions: Array<{
+    id: string;
+    prompt: string;
+    difficulty: string;
+    questionType: string;
+    hints: string[];
+    sampleAnswer?: string;
+    expectedConcepts?: string[];
+  }>;
+  miniAssessment: {
+    id: string;
+    prompt: string;
+    difficulty: string;
+    rubric: string[];
+    expectedConcepts: string[];
+  };
+}
+
+export interface PracticeCompletionResult {
+  topic: string;
+  questionsCompleted: number;
+  totalQuestions: number;
+  previousStatus: 'Not Started' | 'Needs Practice' | 'Developing' | 'Improving' | 'Strong';
+  currentStatus: 'Not Started' | 'Needs Practice' | 'Developing' | 'Improving' | 'Strong';
+  whatYouLearned: string[];
+  stillNeedsPractice: string[];
+  nextRecommendedPractice: {
+    topic: string;
+    reason: string;
+  };
+  xpAwarded: number;
+}
+
+export interface LearningPathItem {
+  id: string;
+  title: string;
+  progress: number;
+  steps: string[];
+  currentStep: string;
+}
+
