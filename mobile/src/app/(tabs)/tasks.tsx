@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Pressable, StyleSheet, Text, TextInput, Vibration, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Screen, Loading, Notice } from '@/components/Screen';
@@ -14,7 +14,9 @@ import {
 } from '@/services/notifications';
 import type { ProductivityStats, Task } from '@/types/api';
 
-const PRESETS = [15, 25, 45, 60];
+const MIN_MINUTES = 1;
+const MAX_MINUTES = 240;
+const DEFAULT_MINUTES = 25;
 
 const nextStatus: Record<Task['status'], Task['status']> = {
   TODO: 'IN_PROGRESS',
@@ -38,9 +40,10 @@ export default function TasksScreen() {
   const [stats, setStats] = useState<ProductivityStats | null>(null);
   const [learned, setLearned] = useState<Record<string, string>>({});
 
-  // Focus Timer States
-  const [selectedMinutes, setSelectedMinutes] = useState(25);
-  const [timeLeft, setTimeLeft] = useState(25 * 60);
+  // Focus Timer States with Dynamic Custom Duration
+  const [durationInput, setDurationInput] = useState(String(DEFAULT_MINUTES));
+  const [selectedMinutes, setSelectedMinutes] = useState(DEFAULT_MINUTES);
+  const [timeLeft, setTimeLeft] = useState(DEFAULT_MINUTES * 60);
   const [timerState, setTimerState] = useState<'idle' | 'running' | 'paused' | 'finished'>('idle');
   const [activeNotificationId, setActiveNotificationId] = useState<string | null>(null);
 
@@ -133,6 +136,61 @@ export default function TasksScreen() {
     };
   }, []);
 
+  // Duration input handlers with validation
+  function applyDuration(mins: number) {
+    const clamped = Math.max(MIN_MINUTES, Math.min(MAX_MINUTES, Math.round(mins)));
+    setSelectedMinutes(clamped);
+    setDurationInput(String(clamped));
+    if (timerState !== 'running') {
+      setTimeLeft(clamped * 60);
+      setTimerState('idle');
+      if (activeNotificationId) {
+        cancelFocusNotification(activeNotificationId);
+        setActiveNotificationId(null);
+      }
+    }
+  }
+
+  function handleInputChange(text: string) {
+    const digitsOnly = text.replace(/[^0-9]/g, '');
+    setDurationInput(digitsOnly);
+
+    if (!digitsOnly) {
+      return; // Allow user to clear text without resetting immediately
+    }
+
+    const val = parseInt(digitsOnly, 10);
+    if (!isNaN(val)) {
+      const clamped = Math.max(MIN_MINUTES, Math.min(MAX_MINUTES, val));
+      setSelectedMinutes(clamped);
+      if (timerState !== 'running') {
+        setTimeLeft(clamped * 60);
+        setTimerState('idle');
+        if (activeNotificationId) {
+          cancelFocusNotification(activeNotificationId);
+          setActiveNotificationId(null);
+        }
+      }
+    }
+  }
+
+  function handleInputBlur() {
+    const val = parseInt(durationInput, 10);
+    if (isNaN(val) || val < MIN_MINUTES) {
+      applyDuration(DEFAULT_MINUTES);
+    } else if (val > MAX_MINUTES) {
+      applyDuration(MAX_MINUTES);
+    } else {
+      applyDuration(val);
+    }
+  }
+
+  function adjustDuration(delta: number) {
+    if (timerState === 'running') return;
+    const current = parseInt(durationInput, 10) || selectedMinutes;
+    applyDuration(current + delta);
+  }
+
   async function startTimer() {
     setError('');
     setSuccess('');
@@ -194,17 +252,6 @@ export default function TasksScreen() {
 
     if (activeNotificationId) {
       await cancelFocusNotification(activeNotificationId);
-      setActiveNotificationId(null);
-    }
-  }
-
-  function selectPreset(mins: number) {
-    if (timerState === 'running') return;
-    setSelectedMinutes(mins);
-    setTimeLeft(mins * 60);
-    setTimerState('idle');
-    if (activeNotificationId) {
-      cancelFocusNotification(activeNotificationId);
       setActiveNotificationId(null);
     }
   }
@@ -325,44 +372,111 @@ export default function TasksScreen() {
           </View>
         </View>
 
-        {/* Presets Row */}
-        <View style={styles.presetsRow}>
-          {PRESETS.map((preset) => {
-            const isActive = selectedMinutes === preset;
-            return (
+        {/* Dynamic Custom Duration Input Controls */}
+        {timerState !== 'running' ? (
+          <View style={styles.customDurationSection}>
+            <Text style={[styles.durationLabel, { color: colors.muted }]}>
+              Set Duration (1 – 240 mins)
+            </Text>
+            <View style={styles.durationInputRow}>
+              {/* Rapid -5m step */}
               <Pressable
-                key={preset}
-                onPress={() => selectPreset(preset)}
-                style={[
-                  styles.presetPill,
+                onPress={() => adjustDuration(-5)}
+                style={({ pressed }) => [
+                  styles.quickStepBtn,
                   {
-                    backgroundColor: isActive
-                      ? brandGreen
-                      : isLight
-                      ? '#F1F5F9'
-                      : colors.surfaceElevated,
+                    backgroundColor: isLight ? '#F1F5F9' : colors.surfaceElevated,
+                    borderColor: isLight ? '#D1D5DB' : colors.border,
                   },
+                  pressed && styles.btnPressed,
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel="Decrease 5 minutes"
               >
-                <Text
-                  style={[
-                    styles.presetText,
-                    {
-                      color: isActive
-                        ? '#FFFFFF'
-                        : isLight
-                        ? '#334155'
-                        : colors.text,
-                      fontWeight: isActive ? '800' : '600',
-                    },
-                  ]}
-                >
-                  {preset}m
+                <Text style={[styles.quickStepText, { color: isLight ? '#374151' : colors.text }]}>
+                  -5m
                 </Text>
               </Pressable>
-            );
-          })}
-        </View>
+
+              {/* Step -1m button */}
+              <Pressable
+                onPress={() => adjustDuration(-1)}
+                style={({ pressed }) => [
+                  styles.iconStepBtn,
+                  {
+                    backgroundColor: '#FFFFFF',
+                    borderColor: '#D1D5DB',
+                  },
+                  pressed && styles.btnPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Decrease 1 minute"
+              >
+                <Ionicons name="remove" size={18} color="#374151" />
+              </Pressable>
+
+              {/* Editable Numerical Input */}
+              <View style={styles.editableFieldWrapper}>
+                <TextInput
+                  value={durationInput}
+                  onChangeText={handleInputChange}
+                  onBlur={handleInputBlur}
+                  keyboardType="number-pad"
+                  maxLength={3}
+                  selectTextOnFocus
+                  style={styles.editableTextInput}
+                  placeholder="25"
+                  placeholderTextColor="#9CA3AF"
+                  accessibilityLabel="Custom focus duration in minutes"
+                />
+                <Text style={styles.inputUnitSuffix}>min</Text>
+              </View>
+
+              {/* Step +1m button */}
+              <Pressable
+                onPress={() => adjustDuration(1)}
+                style={({ pressed }) => [
+                  styles.iconStepBtn,
+                  {
+                    backgroundColor: '#FFFFFF',
+                    borderColor: '#D1D5DB',
+                  },
+                  pressed && styles.btnPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Increase 1 minute"
+              >
+                <Ionicons name="add" size={18} color="#374151" />
+              </Pressable>
+
+              {/* Rapid +5m step */}
+              <Pressable
+                onPress={() => adjustDuration(5)}
+                style={({ pressed }) => [
+                  styles.quickStepBtn,
+                  {
+                    backgroundColor: isLight ? '#F1F5F9' : colors.surfaceElevated,
+                    borderColor: isLight ? '#D1D5DB' : colors.border,
+                  },
+                  pressed && styles.btnPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Increase 5 minutes"
+              >
+                <Text style={[styles.quickStepText, { color: isLight ? '#374151' : colors.text }]}>
+                  +5m
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.runningBanner}>
+            <Ionicons name="flame" size={16} color={brandGreen} />
+            <Text style={[styles.runningBannerText, { color: brandGreen }]}>
+              Focus session in progress ({selectedMinutes}m target)
+            </Text>
+          </View>
+        )}
 
         {/* Timer Control Buttons */}
         <View style={styles.timerActionsRow}>
@@ -629,21 +743,85 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginTop: 4,
   },
-  presetsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  customDurationSection: {
+    alignItems: 'center',
+    marginBottom: 20,
     gap: 8,
-    marginBottom: 18,
   },
-  presetPill: {
-    flex: 1,
-    height: 42,
+  durationLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  durationInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+  },
+  quickStepBtn: {
+    paddingHorizontal: 10,
+    height: 44,
     borderRadius: 10,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  presetText: {
+  quickStepText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  iconStepBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editableFieldWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    height: 44,
+    minWidth: 96,
+  },
+  editableTextInput: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+    textAlign: 'center',
+    paddingVertical: 0,
+    minWidth: 40,
+  },
+  inputUnitSuffix: {
     fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginLeft: 4,
+  },
+  runningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  runningBannerText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  btnPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.96 }],
   },
   timerActionsRow: {
     flexDirection: 'row',

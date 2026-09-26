@@ -14,6 +14,7 @@ import {
   Clock,
   Flame,
   Heart,
+  Minus,
   Pause,
   Play,
   Plus,
@@ -168,7 +169,7 @@ export default function TasksPage() {
   }, [durationMinutes, secondsLeft, timerStatus]);
 
   function updateDuration(minutes: number) {
-    const clamped = Math.min(120, Math.max(1, minutes));
+    const clamped = Math.min(240, Math.max(1, minutes));
     setDurationMinutes(clamped);
     if (timerStatus === 'idle') {
       setSecondsLeft(clamped * 60);
