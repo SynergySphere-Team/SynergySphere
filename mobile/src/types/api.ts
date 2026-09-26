@@ -256,3 +256,59 @@ export interface LearningPathItem {
   currentStep: string;
 }
 
+export interface CommunityChannel {
+  id: string;
+  name: string;
+  description: string | null;
+  type: 'chat' | 'qa';
+  emoji: string;
+  messageCount: string | number;
+  postCount: string | number;
+}
+
+export interface CommunityChatMessage {
+  id: string;
+  body: string;
+  createdAt: string;
+  editedAt: string | null;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  replyToId: string | null;
+  replyToBody: string | null;
+  replyToFirstName: string | null;
+  replyToLastName: string | null;
+}
+
+export interface CommunityQAPost {
+  id: string;
+  title: string;
+  body: string;
+  tags: string | null;
+  isSolved: boolean;
+  createdAt: string;
+  updatedAt?: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  replyCount: number;
+}
+
+export interface CommunityQAReply {
+  id: string;
+  body: string;
+  isAccepted: boolean;
+  createdAt: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  replyToId: string | null;
+  replyToBody: string | null;
+  replyToFirstName: string | null;
+  replyToLastName: string | null;
+}
+
+export interface CommunityPostDetail extends CommunityQAPost {
+  replies: CommunityQAReply[];
+}
+

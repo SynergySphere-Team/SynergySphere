@@ -28,6 +28,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
 import type { Project } from '@/types/api';
+import { CommunityChat } from '@/components/community/CommunityChat';
 
 const PROJECT_CATEGORIES = [
   {
@@ -81,6 +82,8 @@ export default function CommunityScreen() {
   const { user } = useAuth();
   const { colors, theme } = useTheme();
   const router = useRouter();
+
+  const [activeTab, setActiveTab] = useState<'chat' | 'initiatives'>('chat');
 
   const [projects, setProjects] =
     useState<Project[]>([]);
@@ -241,20 +244,95 @@ export default function CommunityScreen() {
             styles.headerText
           }
         >
-          <Heading subtitle="Discover projects, collaborate and contribute to community initiatives.">
+          <Heading subtitle="Chat with peers, ask questions, and collaborate on software initiatives.">
             Community
           </Heading>
         </View>
       </View>
 
-      {error ? (
-        <Notice>
-          {error}
-        </Notice>
-      ) : null}
+      {/* TAB SWITCHER */}
+      <View
+        style={[
+          styles.tabSwitcher,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Switch to Community Chat"
+          onPress={() => setActiveTab('chat')}
+          style={[
+            styles.tabButton,
+            activeTab === 'chat' && [
+              styles.tabButtonActive,
+              { backgroundColor: accentColor },
+            ],
+          ]}
+        >
+          <Ionicons
+            name="chatbubbles"
+            size={16}
+            color={activeTab === 'chat' ? '#07180d' : colors.muted}
+          />
+          <Text
+            style={[
+              styles.tabButtonText,
+              {
+                color: activeTab === 'chat' ? '#07180d' : colors.text,
+                fontWeight: activeTab === 'chat' ? '800' : '600',
+              },
+            ]}
+          >
+            Community Chat
+          </Text>
+        </Pressable>
 
-      {/* SEARCH */}
-      <Card>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Switch to Software Initiatives"
+          onPress={() => setActiveTab('initiatives')}
+          style={[
+            styles.tabButton,
+            activeTab === 'initiatives' && [
+              styles.tabButtonActive,
+              { backgroundColor: accentColor },
+            ],
+          ]}
+        >
+          <Ionicons
+            name="layers"
+            size={16}
+            color={activeTab === 'initiatives' ? '#07180d' : colors.muted}
+          />
+          <Text
+            style={[
+              styles.tabButtonText,
+              {
+                color: activeTab === 'initiatives' ? '#07180d' : colors.text,
+                fontWeight: activeTab === 'initiatives' ? '800' : '600',
+              },
+            ]}
+          >
+            Initiatives
+          </Text>
+        </Pressable>
+      </View>
+
+      {activeTab === 'chat' ? (
+        <CommunityChat />
+      ) : (
+        <>
+          {error ? (
+            <Notice>
+              {error}
+            </Notice>
+          ) : null}
+
+          {/* SEARCH */}
+          <Card>
         <Field
           label="Find projects"
           value={search}
@@ -934,12 +1012,41 @@ export default function CommunityScreen() {
           ) : null}
         </Card>
       )}
+        </>
+      )}
     </Screen>
   );
 }
 
 const styles =
   StyleSheet.create({
+    tabSwitcher: {
+      flexDirection: 'row',
+      borderRadius: 14,
+      borderWidth: 1,
+      padding: 4,
+      gap: 6,
+      marginBottom: 8,
+    },
+    tabButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+      paddingVertical: 9,
+      borderRadius: 10,
+    },
+    tabButtonActive: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    tabButtonText: {
+      fontSize: 13,
+    },
     headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
