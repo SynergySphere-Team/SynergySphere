@@ -17,6 +17,7 @@ import adminRoutes from './routes/admin.js';
 import learningRoutes from './routes/learning.js';
 import curriculumRoutes from './routes/curriculum.js';
 import githubRoutes, { githubWebhookRoutes, pollGithubActivity } from './routes/github.js';
+import communityChatRoutes from './routes/communityChat.js';
 import { pool } from './lib/db.js';
 
 const app = express();
@@ -120,6 +121,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/learning', learningRoutes);
 app.use('/api/curriculum', curriculumRoutes);
 app.use('/api/github', githubRoutes);
+app.use('/api/community-chat', communityChatRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
