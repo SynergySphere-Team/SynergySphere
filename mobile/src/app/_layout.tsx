@@ -27,49 +27,78 @@ function AppLayout() {
   return (
     <AuthProvider>
       <StatusBar
-        style={theme === 'dark' ? 'light' : 'dark'}
+        style={
+          theme === 'dark'
+            ? 'light'
+            : 'dark'
+        }
       />
 
       <Stack
         screenOptions={{
           headerStyle: {
-            backgroundColor: colors.background,
+            backgroundColor:
+              colors.background,
           },
-          headerTintColor: colors.text,
+
+          headerTintColor:
+            colors.text,
+
           contentStyle: {
-            backgroundColor: colors.background,
+            backgroundColor:
+              colors.background,
           },
         }}
       >
         <Stack.Screen
           name="index"
-          options={{ headerShown: false }}
+          options={{
+            headerShown: false,
+          }}
         />
 
         <Stack.Screen
           name="(auth)"
-          options={{ headerShown: false }}
+          options={{
+            headerShown: false,
+          }}
         />
 
         <Stack.Screen
           name="(tabs)"
-          options={{ headerShown: false }}
+          options={{
+            headerShown: false,
+          }}
         />
+
+        {/* COMMUNITY */}
+
         <Stack.Screen
           name="community/create"
           options={{
             headerShown: false,
           }}
         />
+
         <Stack.Screen
           name="community/requests/[id]"
           options={{
             headerShown: false,
           }}
         />
+
+        <Stack.Screen
+          name="community/manage/[id]"
+          options={{
+            headerShown: false,
+          }}
+        />
+
         <Stack.Screen
           name="community/[id]"
-          options={{ headerShown: false }}
+          options={{
+            headerShown: false,
+          }}
         />
       </Stack>
     </AuthProvider>

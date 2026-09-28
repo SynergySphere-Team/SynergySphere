@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -73,31 +74,193 @@ const PROJECT_CATEGORIES = [
   },
 ] as const;
 
+type ProjectCategory =
+  (typeof PROJECT_CATEGORIES)[number]['value'];
+
+type CreateProjectForm = {
+  title: string;
+  organization: string;
+  location: string;
+  description: string;
+  requirements: string;
+
+  skillsNeeded: string;
+  techStack: string;
+
+  durationWeeks: string;
+  applicationDeadline: string;
+  teamCapacity: string;
+  deliverableType: string;
+
+  imageUrl: string;
+  projectUrl: string;
+  githubRepositoryUrl: string;
+
+  category: ProjectCategory;
+};
+
+function dateInputToIso(
+  value: string
+) {
+  const trimmed =
+    value.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})$/.exec(
+      trimmed
+    );
+
+  if (!match) {
+    return null;
+  }
+
+  const year =
+    Number(match[1]);
+
+  const month =
+    Number(match[2]);
+
+  const day =
+    Number(match[3]);
+
+  const date =
+    new Date(
+      year,
+      month - 1,
+      day,
+      23,
+      59,
+      59,
+      999
+    );
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !==
+      month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return date.toISOString();
+}
+
+function isHttpUrl(
+  value: string
+) {
+  const trimmed =
+    value.trim();
+
+  if (!trimmed) {
+    return true;
+  }
+
+  try {
+    const parsed =
+      new URL(trimmed);
+
+    return (
+      parsed.protocol ===
+        'http:' ||
+      parsed.protocol ===
+        'https:'
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isGithubRepositoryUrl(
+  value: string
+) {
+  const trimmed =
+    value.trim();
+
+  if (!trimmed) {
+    return true;
+  }
+
+  try {
+    const parsed =
+      new URL(trimmed);
+
+    const parts =
+      parsed.pathname
+        .split('/')
+        .filter(Boolean);
+
+    return (
+      parsed.protocol ===
+        'https:' &&
+      parsed.hostname.toLowerCase() ===
+        'github.com' &&
+      parts.length === 2
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default function CreateCommunityProjectScreen() {
-  const router = useRouter();
+  const router =
+    useRouter();
 
   const {
     colors,
     theme,
   } = useTheme();
 
-  const [creating, setCreating] =
+  const [
+    creating,
+    setCreating,
+  ] =
     useState(false);
 
-  const [error, setError] =
+  const [
+    error,
+    setError,
+  ] =
     useState('');
 
-  const [form, setForm] =
-    useState({
+  const [
+    createdProjectId,
+    setCreatedProjectId,
+  ] =
+    useState<string | null>(
+      null
+    );
+
+  const [
+    form,
+    setForm,
+  ] =
+    useState<CreateProjectForm>({
       title: '',
       organization: '',
       location: '',
       description: '',
       requirements: '',
+
+      skillsNeeded: '',
       techStack: '',
-      teamCapacity: '8',
-      deliverableType: 'API & Dashboard',
-      category: 'OPEN_SOURCE',
+
+      durationWeeks: '',
+      applicationDeadline: '',
+      teamCapacity: '10',
+      deliverableType:
+        'Software Solution',
+
+      imageUrl: '',
+      projectUrl: '',
+      githubRepositoryUrl: '',
+
+      category:
+        'OPEN_SOURCE',
     });
 
   const accentColor =
@@ -113,19 +276,141 @@ export default function CreateCommunityProjectScreen() {
         form.category
     );
 
+  function updateForm<
+    K extends keyof CreateProjectForm,
+  >(
+    key: K,
+    value:
+      CreateProjectForm[K]
+  ) {
+    setForm(
+      (
+        current
+      ) => ({
+        ...current,
+        [key]: value,
+      })
+    );
+  }
+
   async function createProject() {
     if (
       !formValid ||
-      creating
+      creating ||
+      createdProjectId
     ) {
       return;
     }
 
-    setCreating(true);
     setError('');
 
+    let durationWeeks:
+      | number
+      | undefined;
+
+    if (
+      form.durationWeeks.trim()
+    ) {
+      durationWeeks =
+        Number(
+          form.durationWeeks
+        );
+
+      if (
+        !Number.isInteger(
+          durationWeeks
+        ) ||
+        durationWeeks < 1 ||
+        durationWeeks > 104
+      ) {
+        setError(
+          'Duration must be between 1 and 104 weeks.'
+        );
+        return;
+      }
+    }
+
+    let teamCapacity:
+      | number
+      | undefined;
+
+    if (
+      form.teamCapacity.trim()
+    ) {
+      teamCapacity =
+        Number(
+          form.teamCapacity
+        );
+
+      if (
+        !Number.isInteger(
+          teamCapacity
+        ) ||
+        teamCapacity < 1 ||
+        teamCapacity > 100
+      ) {
+        setError(
+          'Team capacity must be between 1 and 100.'
+        );
+        return;
+      }
+    }
+
+    const applicationDeadline =
+      dateInputToIso(
+        form.applicationDeadline
+      );
+
+    if (
+      applicationDeadline ===
+      null
+    ) {
+      setError(
+        'Application deadline must use YYYY-MM-DD format.'
+      );
+      return;
+    }
+
+    if (
+      !isHttpUrl(
+        form.imageUrl
+      )
+    ) {
+      setError(
+        'Project image URL must be a valid http or https URL.'
+      );
+      return;
+    }
+
+    if (
+      !isHttpUrl(
+        form.projectUrl
+      )
+    ) {
+      setError(
+        'Project / demo URL must be a valid http or https URL.'
+      );
+      return;
+    }
+
+    if (
+      !isGithubRepositoryUrl(
+        form.githubRepositoryUrl
+      )
+    ) {
+      setError(
+        'GitHub repository URL must look like https://github.com/owner/repository.'
+      );
+      return;
+    }
+
     try {
-      await api.post(
+      setCreating(true);
+
+      const createdProject =
+        await api.post<{
+          id: string;
+        }>(
         '/projects',
         {
           title:
@@ -145,15 +430,30 @@ export default function CreateCommunityProjectScreen() {
             form.requirements.trim() ||
             undefined,
 
+          skillsNeeded:
+            form.skillsNeeded.trim() ||
+            undefined,
+
           techStack:
             form.techStack.trim() ||
             undefined,
 
-          teamCapacity:
-            parseInt(form.teamCapacity, 10) || 8,
+          durationWeeks,
+
+          applicationDeadline,
+
+          teamCapacity,
 
           deliverableType:
             form.deliverableType.trim() ||
+            'Software Solution',
+
+          imageUrl:
+            form.imageUrl.trim() ||
+            undefined,
+
+          projectUrl:
+            form.projectUrl.trim() ||
             undefined,
 
           category:
@@ -161,8 +461,37 @@ export default function CreateCommunityProjectScreen() {
         }
       );
 
+      setCreatedProjectId(
+        createdProject.id
+      );
+
+      const repositoryUrl =
+        form.githubRepositoryUrl.trim();
+
+      if (repositoryUrl) {
+        try {
+          await api.patch(
+            `/projects/${createdProject.id}/github`,
+            {
+              repositoryUrl,
+            }
+          );
+        } catch (githubError) {
+          setError(
+            `Project created successfully, but the GitHub repository could not be linked: ${
+              githubError instanceof Error
+                ? githubError.message
+                : 'Unknown GitHub error.'
+            } You can link it from Manage Project.`
+          );
+
+          setCreating(false);
+          return;
+        }
+      }
+
       router.replace(
-        '/community' as never
+        `/community/manage/${createdProject.id}` as never
       );
     } catch (e) {
       setError(
@@ -177,14 +506,17 @@ export default function CreateCommunityProjectScreen() {
 
   return (
     <Screen>
-      {/* SMALL BACK BUTTON */}
+      {/* BACK */}
+
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Go back"
         onPress={() =>
           router.back()
         }
-        style={({ pressed }) => [
+        style={({
+          pressed,
+        }) => [
           styles.backButton,
 
           pressed &&
@@ -213,7 +545,8 @@ export default function CreateCommunityProjectScreen() {
       </Pressable>
 
       {/* HEADER */}
-      <Heading subtitle="Create a project that students can discover and apply to through Community.">
+
+      <Heading subtitle="Create a complete community initiative that students can discover, join and showcase through SynergySphere.">
         Create Community Project
       </Heading>
 
@@ -223,34 +556,19 @@ export default function CreateCommunityProjectScreen() {
         </Notice>
       ) : null}
 
-      {/* SINGLE MAIN FORM CARD */}
-      <Card>
-        {/* PROJECT INFORMATION */}
-        <View
-          style={
-            styles.sectionHeader
-          }
-        >
-          <Ionicons
-            name="information-circle-outline"
-            size={20}
-            color={
-              accentColor
-            }
-          />
+      {/* PROJECT INFORMATION */}
 
-          <Text
-            style={[
-              styles.sectionTitle,
-              {
-                color:
-                  colors.text,
-              },
-            ]}
-          >
-            Project Information
-          </Text>
-        </View>
+      <Card>
+        <SectionHeader
+          icon="information-circle-outline"
+          title="Project Information"
+          color={
+            colors.text
+          }
+          accent={
+            accentColor
+          }
+        />
 
         <Field
           label="Project title"
@@ -258,12 +576,12 @@ export default function CreateCommunityProjectScreen() {
             form.title
           }
           onChangeText={(
-            title
+            value
           ) =>
-            setForm({
-              ...form,
-              title,
-            })
+            updateForm(
+              'title',
+              value
+            )
           }
           placeholder="Enter a clear project title"
         />
@@ -274,14 +592,14 @@ export default function CreateCommunityProjectScreen() {
             form.organization
           }
           onChangeText={(
-            organization
+            value
           ) =>
-            setForm({
-              ...form,
-              organization,
-            })
+            updateForm(
+              'organization',
+              value
+            )
           }
-          placeholder="Organization or project owner"
+          placeholder="Organization, team or project owner"
         />
 
         <Field
@@ -290,53 +608,30 @@ export default function CreateCommunityProjectScreen() {
             form.location
           }
           onChangeText={(
-            location
+            value
           ) =>
-            setForm({
-              ...form,
-              location,
-            })
+            updateForm(
+              'location',
+              value
+            )
           }
           placeholder="e.g. Johannesburg or Remote"
         />
+      </Card>
 
-        {/* DIVIDER */}
-        <View
-          style={[
-            styles.divider,
-            {
-              backgroundColor:
-                colors.border,
-            },
-          ]}
-        />
+      {/* PROJECT DETAILS */}
 
-        {/* PROJECT DETAILS */}
-        <View
-          style={
-            styles.sectionHeader
+      <Card>
+        <SectionHeader
+          icon="document-text-outline"
+          title="Project Details"
+          color={
+            colors.text
           }
-        >
-          <Ionicons
-            name="document-text-outline"
-            size={20}
-            color={
-              accentColor
-            }
-          />
-
-          <Text
-            style={[
-              styles.sectionTitle,
-              {
-                color:
-                  colors.text,
-              },
-            ]}
-          >
-            Project Details
-          </Text>
-        </View>
+          accent={
+            accentColor
+          }
+        />
 
         <Field
           label="Description"
@@ -344,12 +639,12 @@ export default function CreateCommunityProjectScreen() {
             form.description
           }
           onChangeText={(
-            description
+            value
           ) =>
-            setForm({
-              ...form,
-              description,
-            })
+            updateForm(
+              'description',
+              value
+            )
           }
           placeholder="Explain the purpose, goals and expected contribution"
           multiline
@@ -361,31 +656,64 @@ export default function CreateCommunityProjectScreen() {
             form.requirements
           }
           onChangeText={(
-            requirements
+            value
           ) =>
-            setForm({
-              ...form,
-              requirements,
-            })
+            updateForm(
+              'requirements',
+              value
+            )
           }
-          placeholder="e.g. React, REST APIs, teamwork"
+          placeholder="General participation requirements"
+          multiline
+        />
+      </Card>
+
+      {/* SKILLS AND TECHNOLOGY */}
+
+      <Card>
+        <SectionHeader
+          icon="construct-outline"
+          title="Skills & Technology"
+          color={
+            colors.text
+          }
+          accent={
+            accentColor
+          }
+        />
+
+        <Field
+          label="Skills Needed (optional)"
+          value={
+            form.skillsNeeded
+          }
+          onChangeText={(
+            value
+          ) =>
+            updateForm(
+              'skillsNeeded',
+              value
+            )
+          }
+          placeholder="e.g. UI design, teamwork, API integration"
           multiline
         />
 
         <Field
-          label="Tech Stack (comma-separated)"
+          label="Tech Stack (optional)"
           value={
             form.techStack
           }
           onChangeText={(
-            techStack
+            value
           ) =>
-            setForm({
-              ...form,
-              techStack,
-            })
+            updateForm(
+              'techStack',
+              value
+            )
           }
-          placeholder="e.g. Node.js, PostgreSQL, React, MQTT"
+          placeholder="e.g. React Native, Node.js, PostgreSQL"
+          multiline
         />
 
         <Field
@@ -394,14 +722,62 @@ export default function CreateCommunityProjectScreen() {
             form.deliverableType
           }
           onChangeText={(
-            deliverableType
+            value
           ) =>
-            setForm({
-              ...form,
-              deliverableType,
-            })
+            updateForm(
+              'deliverableType',
+              value
+            )
           }
-          placeholder="e.g. REST API & Analytics Dashboard"
+          placeholder="e.g. Mobile Application"
+        />
+      </Card>
+
+      {/* TIMELINE AND CAPACITY */}
+
+      <Card>
+        <SectionHeader
+          icon="calendar-outline"
+          title="Timeline & Capacity"
+          color={
+            colors.text
+          }
+          accent={
+            accentColor
+          }
+        />
+
+        <Field
+          label="Duration in weeks (optional)"
+          value={
+            form.durationWeeks
+          }
+          onChangeText={(
+            value
+          ) =>
+            updateForm(
+              'durationWeeks',
+              value
+            )
+          }
+          keyboardType="numeric"
+          placeholder="e.g. 8"
+        />
+
+        <Field
+          label="Application deadline (optional)"
+          value={
+            form.applicationDeadline
+          }
+          onChangeText={(
+            value
+          ) =>
+            updateForm(
+              'applicationDeadline',
+              value
+            )
+          }
+          placeholder="YYYY-MM-DD"
         />
 
         <Field
@@ -410,54 +786,16 @@ export default function CreateCommunityProjectScreen() {
             form.teamCapacity
           }
           onChangeText={(
-            teamCapacity
+            value
           ) =>
-            setForm({
-              ...form,
-              teamCapacity,
-            })
+            updateForm(
+              'teamCapacity',
+              value
+            )
           }
           keyboardType="numeric"
-          placeholder="e.g. 8"
+          placeholder="e.g. 10"
         />
-
-        {/* DIVIDER */}
-        <View
-          style={[
-            styles.divider,
-            {
-              backgroundColor:
-                colors.border,
-            },
-          ]}
-        />
-
-        {/* CATEGORY */}
-        <View
-          style={
-            styles.sectionHeader
-          }
-        >
-          <Ionicons
-            name="grid-outline"
-            size={20}
-            color={
-              accentColor
-            }
-          />
-
-          <Text
-            style={[
-              styles.sectionTitle,
-              {
-                color:
-                  colors.text,
-              },
-            ]}
-          >
-            Category
-          </Text>
-        </View>
 
         <Text
           style={[
@@ -468,7 +806,190 @@ export default function CreateCommunityProjectScreen() {
             },
           ]}
         >
-          Select the category that best describes this project.
+          XP is assigned by
+          SynergySphere when the
+          project is created.
+        </Text>
+      </Card>
+
+      {/* MEDIA AND LINKS */}
+
+      <Card>
+        <SectionHeader
+          icon="image-outline"
+          title="Project Media & Links"
+          color={
+            colors.text
+          }
+          accent={
+            accentColor
+          }
+        />
+
+        <Field
+          label="Project image URL (optional)"
+          value={
+            form.imageUrl
+          }
+          onChangeText={(
+            value
+          ) =>
+            updateForm(
+              'imageUrl',
+              value
+            )
+          }
+          keyboardType="url"
+          placeholder="https://..."
+        />
+
+        {form.imageUrl.trim() &&
+        isHttpUrl(
+          form.imageUrl
+        ) ? (
+          <Image
+            source={{
+              uri:
+                form.imageUrl.trim(),
+            }}
+            contentFit="cover"
+            style={
+              styles.imagePreview
+            }
+          />
+        ) : null}
+
+        <Field
+          label="Project / demo URL (optional)"
+          value={
+            form.projectUrl
+          }
+          onChangeText={(
+            value
+          ) =>
+            updateForm(
+              'projectUrl',
+              value
+            )
+          }
+          keyboardType="url"
+          placeholder="https://..."
+        />
+
+        <Text
+          style={[
+            styles.helperText,
+            {
+              color:
+                colors.muted,
+            },
+          ]}
+        >
+          Use the project URL for a
+          live website, deployed app,
+          demo, documentation or
+          presentation.
+        </Text>
+      </Card>
+
+      {/* GITHUB */}
+
+      <Card>
+        <SectionHeader
+          icon="logo-github"
+          title="GitHub Repository"
+          color={
+            colors.text
+          }
+          accent={
+            accentColor
+          }
+        />
+
+        <Field
+          label="Repository URL (optional)"
+          value={
+            form.githubRepositoryUrl
+          }
+          onChangeText={(
+            value
+          ) =>
+            updateForm(
+              'githubRepositoryUrl',
+              value
+            )
+          }
+          keyboardType="url"
+          placeholder="https://github.com/owner/repository"
+        />
+
+        <View
+          style={[
+            styles.infoBox,
+            {
+              backgroundColor:
+                colors.surfaceElevated,
+
+              borderColor:
+                colors.border,
+            },
+          ]}
+        >
+          <Ionicons
+            name="git-branch-outline"
+            size={21}
+            color={
+              accentColor
+            }
+          />
+
+          <Text
+            style={[
+              styles.infoBoxText,
+              {
+                color:
+                  colors.muted,
+              },
+            ]}
+          >
+            If you add a repository,
+            SynergySphere will create
+            the Community project
+            first and then
+            automatically link this
+            GitHub repository. Your
+            GitHub account must
+            already be connected.
+          </Text>
+        </View>
+      </Card>
+
+      {/* CATEGORY */}
+
+      <Card>
+        <SectionHeader
+          icon="grid-outline"
+          title="Category"
+          color={
+            colors.text
+          }
+          accent={
+            accentColor
+          }
+        />
+
+        <Text
+          style={[
+            styles.helperText,
+            {
+              color:
+                colors.muted,
+            },
+          ]}
+        >
+          Select the category that
+          best describes this
+          project.
         </Text>
 
         <View
@@ -490,12 +1011,10 @@ export default function CreateCommunityProjectScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`Select ${category.label}`}
                   onPress={() =>
-                    setForm({
-                      ...form,
-
-                      category:
-                        category.value,
-                    })
+                    updateForm(
+                      'category',
+                      category.value
+                    )
                   }
                   style={({
                     pressed,
@@ -558,21 +1077,47 @@ export default function CreateCommunityProjectScreen() {
         </View>
       </Card>
 
-      {/* CREATE BUTTON */}
-      <Button
-        title={
-          creating
-            ? 'Creating Project...'
-            : 'Create Project'
-        }
-        onPress={
-          createProject
-        }
-        disabled={
-          creating ||
-          !formValid
-        }
-      />
+      {/* CREATE */}
+
+      {createdProjectId ? (
+        <>
+          <Button
+            title="Open Manage Project"
+            onPress={() =>
+              router.replace(
+                `/community/manage/${createdProjectId}` as never
+              )
+            }
+          />
+
+          <Button
+            title="Back to Community"
+            secondary
+            onPress={() =>
+              router.replace(
+                '/community' as never
+              )
+            }
+          />
+        </>
+      ) : (
+        <Button
+          title={
+            creating
+              ? form.githubRepositoryUrl.trim()
+                ? 'Creating & Linking GitHub...'
+                : 'Creating Project...'
+              : 'Create Project'
+          }
+          onPress={
+            createProject
+          }
+          disabled={
+            creating ||
+            !formValid
+          }
+        />
+      )}
 
       <Text
         style={[
@@ -584,9 +1129,61 @@ export default function CreateCommunityProjectScreen() {
         ]}
       >
         Project title, organization,
-        description and category are required.
+        description and category are
+        required. GitHub is optional.
       </Text>
     </Screen>
+  );
+}
+
+type SectionHeaderProps = {
+  icon:
+    | 'information-circle-outline'
+    | 'document-text-outline'
+    | 'construct-outline'
+    | 'calendar-outline'
+    | 'image-outline'
+    | 'logo-github'
+    | 'grid-outline';
+
+  title: string;
+  color: string;
+  accent: string;
+};
+
+function SectionHeader({
+  icon,
+  title,
+  color,
+  accent,
+}: SectionHeaderProps) {
+  return (
+    <View
+      style={
+        styles.sectionHeader
+      }
+    >
+      <Ionicons
+        name={
+          icon
+        }
+        size={20}
+        color={
+          accent
+        }
+      />
+
+      <Text
+        style={[
+          styles.sectionTitle,
+          {
+            color,
+          },
+        ]}
+      >
+        {title}
+      </Text>
+    </View>
   );
 }
 
@@ -605,6 +1202,7 @@ const styles =
       gap: 5,
 
       paddingVertical: 4,
+
       paddingHorizontal: 2,
 
       marginBottom: 0,
@@ -642,10 +1240,32 @@ const styles =
       marginBottom: 2,
     },
 
-    divider: {
-      height: 1,
+    imagePreview: {
       width: '100%',
-      marginVertical: 6,
+      height: 170,
+      borderRadius: 14,
+    },
+
+    infoBox: {
+      flexDirection:
+        'row',
+
+      alignItems:
+        'flex-start',
+
+      gap: 9,
+
+      borderWidth: 1,
+
+      borderRadius: 13,
+
+      padding: 12,
+    },
+
+    infoBoxText: {
+      flex: 1,
+      fontSize: 12,
+      lineHeight: 18,
     },
 
     categoryGrid: {
@@ -673,9 +1293,7 @@ const styles =
 
     categoryText: {
       flex: 1,
-
       fontSize: 13,
-
       fontWeight: '700',
     },
 

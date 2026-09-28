@@ -1,978 +1,1595 @@
-import { useCallback, useEffect, useState } from 'react';
 import {
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
+
+import {
+  ActivityIndicator,
+  Linking,
+  Modal,
   Pressable,
+  SafeAreaView,
+  ScrollView,
+  Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
-import { Image } from 'expo-image';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
-
-import {
-  Screen,
-  Loading,
-  Notice,
-} from '@/components/Screen';
-
-import {
-  Button,
-  Card,
-  Field,
-  Heading,
-} from '@/components/ui';
+import { Image } from 'expo-image';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { api } from '@/services/api';
-import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
+import { CommunityInitiatives } from '@/components/community/CommunityInitiatives';
 
-import type { Project } from '@/types/api';
-import { CommunityChat } from '@/components/community/CommunityChat';
+type CommunityChannel = {
+  id: string;
+  name: string;
+  description?: string | null;
+  type?: string | null;
+};
 
-const PROJECT_CATEGORIES = [
-  {
-    value: 'OPEN_SOURCE',
-    label: 'Open Source',
-    icon: 'code-slash-outline' as const,
-  },
-  {
-    value: 'GREEN_SOFTWARE',
-    label: 'Green Software',
-    icon: 'leaf-outline' as const,
-  },
-  {
-    value: 'CIVIC_TECH',
-    label: 'Civic Tech',
-    icon: 'globe-outline' as const,
-  },
-  {
-    value: 'EDTECH',
-    label: 'EdTech',
-    icon: 'school-outline' as const,
-  },
-  {
-    value: 'SUSTAINABILITY',
-    label: 'Sustainability',
-    icon: 'earth-outline' as const,
-  },
-  {
-    value: 'RECYCLING',
-    label: 'Recycling',
-    icon: 'refresh-circle-outline' as const,
-  },
-  {
-    value: 'ECO_TOURISM',
-    label: 'Eco-tourism',
-    icon: 'leaf-outline' as const,
-  },
-  {
-    value: 'GREEN_INFRASTRUCTURE',
-    label: 'Green Infrastructure',
-    icon: 'business-outline' as const,
-  },
-  {
-    value: 'OTHER',
-    label: 'Other',
-    icon: 'folder-outline' as const,
-  },
-] as const;
+type CommunityMessage = {
+  id: string;
+  userId: string;
+  body: string;
+  createdAt: string;
+  firstName?: string | null;
+  lastName?: string | null;
+};
 
-export default function CommunityScreen() {
-  const { user } = useAuth();
-  const { colors, theme } = useTheme();
-  const router = useRouter();
+type FeedPost = {
+  id: string;
+  userId: string;
+  body: string;
+  linkUrl?: string | null;
+  postType?: 'POST' | 'QUESTION' | 'PROJECT';
+  createdAt: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  role?: string | null;
+  profilePicture?: string | null;
+  likeCount?: number;
+  commentCount?: number;
+  likedByMe?: boolean;
+};
 
-  const [activeTab, setActiveTab] = useState<'chat' | 'initiatives'>('chat');
+type FeedComment = {
+  id: string;
+  postId: string;
+  userId: string;
+  body: string;
+  createdAt: string;
+  firstName?: string | null;
+  lastName?: string | null;
+};
 
-  const [projects, setProjects] =
-    useState<Project[]>([]);
+function displayName(
+  firstName?: string | null,
+  lastName?: string | null,
+) {
+  return (
+    [firstName, lastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    'Community member'
+  );
+}
 
-  const [search, setSearch] =
-    useState('');
+function initials(
+  firstName?: string | null,
+  lastName?: string | null,
+) {
+  return (
+    [firstName?.[0], lastName?.[0]]
+      .filter(Boolean)
+      .join('')
+      .toUpperCase() ||
+    'S'
+  );
+}
 
-  const [
-    selectedCategory,
-    setSelectedCategory,
-  ] = useState('ALL');
+function timeLabel(value: string) {
+  const date = new Date(value);
 
-  const [loaded, setLoaded] =
-    useState(false);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
 
-  const [error, setError] =
-    useState('');
-
-  const load = useCallback(
-    async (
-      query = '',
-      category = 'ALL'
-    ) => {
-      try {
-        setError('');
-
-        const params: string[] = [];
-
-        if (query.trim()) {
-          params.push(
-            `search=${encodeURIComponent(
-              query.trim()
-            )}`
-          );
-        }
-
-        if (
-          category &&
-          category !== 'ALL'
-        ) {
-          params.push(
-            `category=${encodeURIComponent(
-              category
-            )}`
-          );
-        }
-
-        const queryString =
-          params.length > 0
-            ? `?${params.join('&')}`
-            : '';
-
-        const result =
-          await api.get<Project[]>(
-            `/projects${queryString}`
-          );
-
-        setProjects(result);
-      } catch (e) {
-        setError(
-          e instanceof Error
-            ? e.message
-            : 'Could not load community projects.'
-        );
-      } finally {
-        setLoaded(true);
-      }
-    },
-    []
+  const seconds = Math.max(
+    0,
+    Math.floor(
+      (Date.now() -
+        date.getTime()) /
+        1000,
+    ),
   );
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  function handleSearch() {
-    setSelectedCategory('ALL');
-
-    load(
-      search,
-      'ALL'
-    );
+  if (seconds < 60) {
+    return 'Just now';
   }
 
-  function handleCategory(
-    category: string
-  ) {
-    setSelectedCategory(category);
-    setSearch('');
+  const minutes =
+    Math.floor(seconds / 60);
 
-    load(
-      '',
-      category
-    );
+  if (minutes < 60) {
+    return `${minutes}m`;
   }
 
-  function showAllProjects() {
-    setSelectedCategory('ALL');
-    setSearch('');
+  const hours =
+    Math.floor(minutes / 60);
 
-    load(
-      '',
-      'ALL'
-    );
+  if (hours < 24) {
+    return `${hours}h`;
   }
 
-  const canCreate =
-    user?.role === 'STUDENT' ||
-    user?.role === 'ORGANIZATION' ||
-    user?.role === 'ADMIN';
+  const days =
+    Math.floor(hours / 24);
 
-  if (!loaded) {
-    return <Loading />;
+  if (days < 7) {
+    return `${days}d`;
   }
+
+  return date.toLocaleDateString();
+}
+
+function Avatar({
+  firstName,
+  lastName,
+  picture,
+  size = 38,
+}: {
+  firstName?: string | null;
+  lastName?: string | null;
+  picture?: string | null;
+  size?: number;
+}) {
+  const {
+    colors,
+    theme,
+  } = useTheme();
 
   const accentColor =
     theme === 'light'
       ? '#1e6827'
       : colors.primary;
 
-  const myProjects =
-    projects.filter(
-      (project) =>
-        project.isCreator
+  if (picture) {
+    return (
+      <Image
+        source={{
+          uri: picture,
+        }}
+        contentFit="cover"
+        style={{
+          width: size,
+          height: size,
+          borderRadius:
+            size / 2,
+        }}
+      />
     );
-
-  const projectRequests =
-    projects.filter(
-      (project) =>
-        !project.isCreator &&
-        project.hasApplied
-    );
-
-  const featuredProjects =
-    projects.filter(
-      (project) =>
-        !project.isCreator
-    );
+  }
 
   return (
-    <Screen>
-      {/* HEADER */}
-      <View
-        style={
-          styles.headerRow
-        }
-      >
-        <Image
-          source={require('../../../assets/images/community-logo.png')}
-          style={
-            styles.communityLogo
-          }
-          contentFit="contain"
-        />
-
-        <View
-          style={
-            styles.headerText
-          }
-        >
-          <Heading subtitle="Chat with peers, ask questions, and collaborate on software initiatives.">
-            Community
-          </Heading>
-        </View>
-      </View>
-
-      {/* TAB SWITCHER */}
-      <View
-        style={[
-          styles.tabSwitcher,
-          {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-          },
-        ]}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Switch to Community Chat"
-          onPress={() => setActiveTab('chat')}
-          style={[
-            styles.tabButton,
-            activeTab === 'chat' && [
-              styles.tabButtonActive,
-              { backgroundColor: accentColor },
-            ],
-          ]}
-        >
-          <Ionicons
-            name="chatbubbles"
-            size={16}
-            color={activeTab === 'chat' ? '#07180d' : colors.muted}
-          />
-          <Text
-            style={[
-              styles.tabButtonText,
-              {
-                color: activeTab === 'chat' ? '#07180d' : colors.text,
-                fontWeight: activeTab === 'chat' ? '800' : '600',
-              },
-            ]}
-          >
-            Community Chat
-          </Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Switch to Software Initiatives"
-          onPress={() => setActiveTab('initiatives')}
-          style={[
-            styles.tabButton,
-            activeTab === 'initiatives' && [
-              styles.tabButtonActive,
-              { backgroundColor: accentColor },
-            ],
-          ]}
-        >
-          <Ionicons
-            name="layers"
-            size={16}
-            color={activeTab === 'initiatives' ? '#07180d' : colors.muted}
-          />
-          <Text
-            style={[
-              styles.tabButtonText,
-              {
-                color: activeTab === 'initiatives' ? '#07180d' : colors.text,
-                fontWeight: activeTab === 'initiatives' ? '800' : '600',
-              },
-            ]}
-          >
-            Initiatives
-          </Text>
-        </Pressable>
-      </View>
-
-      {activeTab === 'chat' ? (
-        <CommunityChat />
-      ) : (
-        <>
-          {error ? (
-            <Notice>
-              {error}
-            </Notice>
-          ) : null}
-
-          {/* SEARCH */}
-          <Card>
-        <Field
-          label="Find projects"
-          value={search}
-          onChangeText={
-            setSearch
-          }
-          placeholder="Search projects or organizations"
-          onSubmitEditing={
-            handleSearch
-          }
-        />
-
-        <Button
-          title="Search"
-          secondary
-          onPress={
-            handleSearch
-          }
-        />
-      </Card>
-
-      {/* CATEGORY FILTERS */}
-      <View
-        style={
-          styles.categorySection
-        }
-      >
-        <View
-          style={
-            styles.sectionHeaderRow
-          }
-        >
-          <Text
-            style={[
-              styles.sectionHeading,
-              {
-                color:
-                  colors.text,
-              },
-            ]}
-          >
-            Explore Categories
-          </Text>
-
-          {selectedCategory !==
-          'ALL' ? (
-            <Pressable
-              onPress={
-                showAllProjects
-              }
-            >
-              <Text
-                style={[
-                  styles.showAll,
-                  {
-                    color:
-                      accentColor,
-                  },
-                ]}
-              >
-                Show all
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-
-        <View
-          style={
-            styles.categoryGrid
-          }
-        >
-          {PROJECT_CATEGORIES.map(
-            (category) => (
-              <Pressable
-                key={
-                  category.value
-                }
-                accessibilityRole="button"
-                accessibilityLabel={`View ${category.label} projects`}
-                onPress={() =>
-                  handleCategory(
-                    category.value
-                  )
-                }
-                style={({
-                  pressed,
-                }) => [
-                  styles.categoryCard,
-
-                  {
-                    backgroundColor:
-                      colors.surface,
-
-                    borderColor:
-                      selectedCategory ===
-                      category.value
-                        ? accentColor
-                        : colors.border,
-                  },
-
-                  pressed &&
-                    styles.categoryPressed,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.categoryIcon,
-                    {
-                      backgroundColor:
-                        colors.surfaceElevated,
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name={
-                      category.icon
-                    }
-                    size={22}
-                    color={
-                      accentColor
-                    }
-                  />
-                </View>
-
-                <Text
-                  style={[
-                    styles.categoryTitle,
-                    {
-                      color:
-                        colors.text,
-                    },
-                  ]}
-                >
-                  {
-                    category.label
-                  }
-                </Text>
-              </Pressable>
-            )
-          )}
-        </View>
-      </View>
-
-      {/* CREATE PROJECT */}
-      {canCreate ? (
-        <Button
-          title="Create a Community Project"
-          onPress={() =>
-            router.push(
-              '/community/create' as never
-            )
-          }
-        />
-      ) : null}
-
-      {/* MY COMMUNITY PROJECTS */}
-      {canCreate ? (
-        <>
-          <Text
-            style={[
-              styles.sectionHeading,
-              {
-                color:
-                  colors.text,
-              },
-            ]}
-          >
-            My Community Projects
-          </Text>
-
-          {myProjects.length >
-          0 ? (
-            myProjects.map(
-              (project) => (
-                <Card
-                  key={
-                    project.id
-                  }
-                >
-                  <Text
-                    style={[
-                      styles.tag,
-                      {
-                        color:
-                          accentColor,
-                      },
-                    ]}
-                  >
-                    {project.category.replaceAll(
-                      '_',
-                      ' '
-                    )}
-                  </Text>
-
-                  <Text
-                    style={[
-                      styles.title,
-                      {
-                        color:
-                          colors.text,
-                      },
-                    ]}
-                  >
-                    {
-                      project.title
-                    }
-                  </Text>
-
-                  <Text
-                    style={[
-                      styles.copy,
-                      {
-                        color:
-                          colors.muted,
-                      },
-                    ]}
-                  >
-                    {
-                      project.organization
-                    }
-
-                    {project.location
-                      ? ` • ${project.location}`
-                      : ''}
-                  </Text>
-
-                  <Text
-                    style={[
-                      styles.copy,
-                      {
-                        color:
-                          colors.muted,
-                      },
-                    ]}
-                  >
-                    {
-                      project.description
-                    }
-                  </Text>
-
-                  {project.requirements ? (
-                    <Text
-                      style={[
-                        styles.copy,
-                        {
-                          color:
-                            colors.muted,
-                        },
-                      ]}
-                    >
-                      Requirements:{' '}
-                      {
-                        project.requirements
-                      }
-                    </Text>
-                  ) : null}
-
-                  <View
-                    style={
-                      styles.applicationRow
-                    }
-                  >
-                    <Ionicons
-                      name="people-outline"
-                      size={16}
-                      color={
-                        colors.muted
-                      }
-                    />
-
-                    <Text
-                      style={[
-                        styles.applicationCount,
-                        {
-                          color:
-                            colors.muted,
-                        },
-                      ]}
-                    >
-                      {
-                        project._count
-                          ?.applications ??
-                        0
-                      }{' '}
-                      application(s)
-                    </Text>
-                  </View>
-
-                  <Button
-                    title="Review Join Requests"
-                    secondary
-                    onPress={() =>
-                      router.push(
-                        `/community/requests/${project.id}` as never
-                      )
-                    }
-                  />
-                </Card>
-              )
-            )
-          ) : (
-            <Card>
-              <Text
-                style={[
-                  styles.copy,
-                  {
-                    color:
-                      colors.muted,
-                  },
-                ]}
-              >
-                You have not created
-                any community projects
-                yet.
-              </Text>
-            </Card>
-          )}
-        </>
-      ) : null}
-
-      {/* PROJECT REQUESTS */}
+    <View
+      style={[
+        styles.avatar,
+        {
+          width: size,
+          height: size,
+          borderRadius:
+            size / 2,
+          backgroundColor:
+            colors.surfaceElevated,
+          borderColor:
+            colors.border,
+        },
+      ]}
+    >
       <Text
-        style={[
-          styles.sectionHeading,
+        style={{
+          color:
+            accentColor,
+          fontWeight:
+            '900',
+        }}
+      >
+        {initials(
+          firstName,
+          lastName,
+        )}
+      </Text>
+    </View>
+  );
+}
+
+function LiveChat() {
+  const { user } = useAuth();
+
+  const {
+    colors,
+    theme,
+  } = useTheme();
+
+  const accentColor =
+    theme === 'light'
+      ? '#1e6827'
+      : colors.primary;
+
+  const [
+    channels,
+    setChannels,
+  ] =
+    useState<
+      CommunityChannel[]
+    >([]);
+
+  const [
+    activeChannel,
+    setActiveChannel,
+  ] =
+    useState<
+      CommunityChannel | null
+    >(null);
+
+  const [
+    messages,
+    setMessages,
+  ] =
+    useState<
+      CommunityMessage[]
+    >([]);
+
+  const [
+    loadingChannels,
+    setLoadingChannels,
+  ] =
+    useState(true);
+
+  const [
+    loadingMessages,
+    setLoadingMessages,
+  ] =
+    useState(false);
+
+  const [
+    sending,
+    setSending,
+  ] =
+    useState(false);
+
+  const [
+    draft,
+    setDraft,
+  ] =
+    useState('');
+
+  const [
+    error,
+    setError,
+  ] =
+    useState('');
+
+  const loadChannels =
+    useCallback(
+      async () => {
+        try {
+          setError('');
+
+          const result =
+            await api.get<
+              CommunityChannel[]
+            >(
+              '/community-chat/channels',
+            );
+
+          const safeChannels =
+            Array.isArray(result)
+              ? result
+              : [];
+
+          setChannels(
+            safeChannels,
+          );
+
+          setActiveChannel(
+            (
+              current,
+            ) => {
+              if (
+                current &&
+                safeChannels.some(
+                  (
+                    channel,
+                  ) =>
+                    channel.id ===
+                    current.id,
+                )
+              ) {
+                return current;
+              }
+
+              return (
+                safeChannels.find(
+                  (
+                    channel,
+                  ) =>
+                    channel.type !==
+                    'qa',
+                ) ??
+                safeChannels[0] ??
+                null
+              );
+            },
+          );
+        } catch (e) {
+          setChannels([]);
+          setActiveChannel(
+            null,
+          );
+
+          setError(
+            e instanceof Error
+              ? e.message
+              : 'Could not load Community channels.',
+          );
+        } finally {
+          setLoadingChannels(
+            false,
+          );
+        }
+      },
+      [],
+    );
+
+  const loadMessages =
+    useCallback(
+      async (
+        channelId: string,
+      ) => {
+        try {
+          setLoadingMessages(
+            true,
+          );
+
+          setError('');
+
+          const result =
+            await api.get<
+              CommunityMessage[]
+            >(
+              `/community-chat/channels/${channelId}/messages`,
+            );
+
+          setMessages(
+            Array.isArray(result)
+              ? result
+              : [],
+          );
+        } catch (e) {
+          setMessages([]);
+
+          setError(
+            e instanceof Error
+              ? e.message
+              : 'Could not load messages.',
+          );
+        } finally {
+          setLoadingMessages(
+            false,
+          );
+        }
+      },
+      [],
+    );
+
+  useEffect(() => {
+    loadChannels();
+  }, [loadChannels]);
+
+  useEffect(() => {
+    if (!activeChannel) {
+      setMessages([]);
+      return;
+    }
+
+    setDraft('');
+
+    loadMessages(
+      activeChannel.id,
+    );
+  }, [
+    activeChannel,
+    loadMessages,
+  ]);
+
+  async function sendMessage() {
+    const body =
+      draft.trim();
+
+    if (
+      !body ||
+      !activeChannel ||
+      sending
+    ) {
+      return;
+    }
+
+    try {
+      setSending(true);
+      setError('');
+
+      const created =
+        await api.post<
+          CommunityMessage
+        >(
+          `/community-chat/channels/${activeChannel.id}/messages`,
           {
-            color:
-              colors.text,
+            body,
+          },
+        );
+
+      if (
+        created &&
+        created.id
+      ) {
+        setMessages(
+          (
+            current,
+          ) => [
+            ...current,
+            created,
+          ],
+        );
+      } else {
+        await loadMessages(
+          activeChannel.id,
+        );
+      }
+
+      setDraft('');
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : 'Could not send your message.',
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <View
+      style={[
+        styles.chatCard,
+        {
+          backgroundColor:
+            colors.surface,
+          borderColor:
+            colors.border,
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.chatHeading,
+          {
+            borderBottomColor:
+              colors.border,
           },
         ]}
       >
-        Project Requests
-      </Text>
-
-      {projectRequests.length >
-      0 ? (
-        projectRequests.map(
-          (project) => (
-            <Card
-              key={
-                project.id
-              }
-            >
-              <Text
-                style={[
-                  styles.tag,
-                  {
-                    color:
-                      accentColor,
-                  },
-                ]}
-              >
-                {project.category.replaceAll(
-                  '_',
-                  ' '
-                )}
-              </Text>
-
-              <Text
-                style={[
-                  styles.title,
-                  {
-                    color:
-                      colors.text,
-                  },
-                ]}
-              >
-                {
-                  project.title
-                }
-              </Text>
-
-              <Text
-                style={[
-                  styles.copy,
-                  {
-                    color:
-                      colors.muted,
-                  },
-                ]}
-              >
-                {
-                  project.organization
-                }
-
-                {project.location
-                  ? ` • ${project.location}`
-                  : ''}
-              </Text>
-
-              <Text
-                style={[
-                  styles.statusText,
-                  {
-                    color:
-                      project.applicationStatus ===
-                      'APPROVED'
-                        ? accentColor
-                        : project.applicationStatus ===
-                            'DECLINED'
-                          ? '#B3261E'
-                          : '#B7791F',
-                  },
-                ]}
-              >
-                {project.applicationStatus ===
-                'APPROVED'
-                  ? 'Approved'
-                  : project.applicationStatus ===
-                      'DECLINED'
-                    ? 'Declined'
-                    : 'Pending'}
-              </Text>
-
-              <Button
-                title="View Opportunity"
-                secondary
-                onPress={() =>
-                  router.push(
-                    `/community/${project.id}` as never
-                  )
-                }
-              />
-            </Card>
-          )
-        )
-      ) : (
-        <Card>
+        <View
+          style={{
+            flex: 1,
+            gap: 3,
+          }}
+        >
           <Text
             style={[
-              styles.copy,
+              styles.cardTitle,
+              {
+                color:
+                  colors.text,
+              },
+            ]}
+          >
+            Live Chat
+          </Text>
+
+          <Text
+            style={[
+              styles.cardText,
               {
                 color:
                   colors.muted,
               },
             ]}
           >
-            You have no project
-            requests yet.
+            Choose a channel and chat with the Community.
           </Text>
-        </Card>
-      )}
+        </View>
 
-      {/* FEATURED OPPORTUNITIES */}
-      <Text
+        {activeChannel ? (
+          <Pressable
+            accessibilityLabel="Refresh messages"
+            onPress={() =>
+              loadMessages(
+                activeChannel.id,
+              )
+            }
+            style={[
+              styles.iconButton,
+              {
+                backgroundColor:
+                  colors.surfaceElevated,
+              },
+            ]}
+          >
+            <Ionicons
+              name="refresh-outline"
+              size={18}
+              color={
+                accentColor
+              }
+            />
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View
         style={[
-          styles.sectionHeading,
+          styles.channelsSection,
           {
-            color:
-              colors.text,
+            borderBottomColor:
+              colors.border,
           },
         ]}
       >
-        Featured Opportunities
-      </Text>
-
-      {featuredProjects.length >
-      0 ? (
-        featuredProjects.map(
-          (project) => (
-            <Card
-              key={
-                project.id
+        {loadingChannels ? (
+          <View
+            style={
+              styles.loadingRow
+            }
+          >
+            <ActivityIndicator
+              size="small"
+              color={
+                accentColor
               }
+            />
+
+            <Text
+              style={{
+                color:
+                  colors.muted,
+              }}
             >
-              <Text
-                style={[
-                  styles.tag,
-                  {
-                    color:
-                      accentColor,
-                  },
-                ]}
-              >
-                {project.category.replaceAll(
-                  '_',
-                  ' '
-                )}
-              </Text>
+              Loading channels...
+            </Text>
+          </View>
+        ) : channels.length ===
+          0 ? (
+          <Text
+            style={[
+              styles.cardText,
+              {
+                color:
+                  colors.muted,
+                paddingHorizontal:
+                  12,
+              },
+            ]}
+          >
+            No Community channels are available yet.
+          </Text>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={
+              false
+            }
+            contentContainerStyle={
+              styles.channelRow
+            }
+          >
+            {channels.map(
+              (
+                channel,
+              ) => {
+                const active =
+                  activeChannel?.id ===
+                  channel.id;
 
-              <Text
-                style={[
-                  styles.title,
-                  {
-                    color:
-                      colors.text,
-                  },
-                ]}
-              >
-                {
-                  project.title
-                }
-              </Text>
-
-              <View
-                style={
-                  styles.infoRow
-                }
-              >
-                <Ionicons
-                  name="business-outline"
-                  size={16}
-                  color={
-                    colors.muted
-                  }
-                />
-
-                <Text
-                  style={[
-                    styles.copy,
-                    {
-                      color:
-                        colors.muted,
-                    },
-                  ]}
-                >
-                  {
-                    project.organization
-                  }
-                </Text>
-              </View>
-
-              {project.location ? (
-                <View
-                  style={
-                    styles.infoRow
-                  }
-                >
-                  <Ionicons
-                    name="location-outline"
-                    size={16}
-                    color={
-                      colors.muted
+                return (
+                  <Pressable
+                    key={
+                      channel.id
                     }
-                  />
-
-                  <Text
+                    onPress={() =>
+                      setActiveChannel(
+                        channel,
+                      )
+                    }
                     style={[
-                      styles.copy,
+                      styles.channelPill,
                       {
-                        color:
-                          colors.muted,
+                        backgroundColor:
+                          active
+                            ? colors.surfaceElevated
+                            : colors.surface,
+
+                        borderColor:
+                          active
+                            ? accentColor
+                            : colors.border,
                       },
                     ]}
                   >
-                    {
-                      project.location
-                    }
-                  </Text>
-                </View>
-              ) : null}
-
-              <Text
-                style={[
-                  styles.copy,
-                  {
-                    color:
-                      colors.muted,
-                  },
-                ]}
-              >
-                {
-                  project.description
-                }
-              </Text>
-
-              {project.requirements ? (
-                <Text
-                  style={[
-                    styles.copy,
-                    {
-                      color:
-                        colors.muted,
-                    },
-                  ]}
-                >
-                  Requirements:{' '}
-                  {
-                    project.requirements
-                  }
-                </Text>
-              ) : null}
-
-              <Text
-                style={[
-                  styles.xpText,
-                  {
-                    color:
-                      accentColor,
-                  },
-                ]}
-              >
-                {
-                  project.xpReward
-                }{' '}
-                XP
-              </Text>
-
-              <Button
-                title={
-                  project.hasApplied
-                    ? 'View Opportunity'
-                    : 'View & Apply'
-                }
-                onPress={() =>
-                  router.push(
-                    `/community/${project.id}` as never
-                  )
-                }
-              />
-
-              {project.hasApplied ? (
-                <Text
-                  style={[
-                    styles.statusText,
-                    {
-                      color:
-                        project.applicationStatus ===
-                        'APPROVED'
+                    <Ionicons
+                      name={
+                        channel.type ===
+                        'qa'
+                          ? 'help-circle-outline'
+                          : 'chatbubble-ellipses-outline'
+                      }
+                      size={
+                        14
+                      }
+                      color={
+                        active
                           ? accentColor
-                          : project.applicationStatus ===
-                              'DECLINED'
-                            ? '#B3261E'
-                            : '#B7791F',
-                    },
-                  ]}
-                >
-                  {project.applicationStatus ===
-                  'APPROVED'
-                    ? 'Application approved'
-                    : project.applicationStatus ===
-                        'DECLINED'
-                      ? 'Application declined'
-                      : 'Application pending'}
-                </Text>
-              ) : null}
-            </Card>
+                          : colors.muted
+                      }
+                    />
+
+                    <Text
+                      style={[
+                        styles.channelText,
+                        {
+                          color:
+                            active
+                              ? accentColor
+                              : colors.text,
+                        },
+                      ]}
+                    >
+                      #
+                      {
+                        channel.name
+                      }
+                    </Text>
+                  </Pressable>
+                );
+              },
+            )}
+          </ScrollView>
+        )}
+      </View>
+
+      {error ? (
+        <View
+          style={[
+            styles.errorBox,
+            {
+              backgroundColor:
+                colors.surfaceElevated,
+              borderBottomColor:
+                colors.border,
+            },
+          ]}
+        >
+          <Ionicons
+            name="alert-circle-outline"
+            size={17}
+            color="#B3261E"
+          />
+
+          <Text
+            style={[
+              styles.errorText,
+              {
+                color:
+                  colors.text,
+              },
+            ]}
+          >
+            {error}
+          </Text>
+
+          <Pressable
+            onPress={() =>
+              setError('')
+            }
+          >
+            <Ionicons
+              name="close"
+              size={17}
+              color={
+                colors.muted
+              }
+            />
+          </Pressable>
+        </View>
+      ) : null}
+
+      <View
+        style={
+          styles.messagesArea
+        }
+      >
+        {!activeChannel ? (
+          <View
+            style={
+              styles.emptyState
+            }
+          >
+            <Ionicons
+              name="chatbubbles-outline"
+              size={32}
+              color={
+                accentColor
+              }
+            />
+
+            <Text
+              style={[
+                styles.emptyTitle,
+                {
+                  color:
+                    colors.text,
+                },
+              ]}
+            >
+              Choose a channel
+            </Text>
+          </View>
+        ) : loadingMessages ? (
+          <View
+            style={
+              styles.emptyState
+            }
+          >
+            <ActivityIndicator
+              color={
+                accentColor
+              }
+            />
+
+            <Text
+              style={{
+                color:
+                  colors.muted,
+              }}
+            >
+              Loading messages...
+            </Text>
+          </View>
+        ) : messages.length ===
+          0 ? (
+          <View
+            style={
+              styles.emptyState
+            }
+          >
+            <Ionicons
+              name="chatbubble-outline"
+              size={32}
+              color={
+                accentColor
+              }
+            />
+
+            <Text
+              style={[
+                styles.emptyTitle,
+                {
+                  color:
+                    colors.text,
+                },
+              ]}
+            >
+              Welcome to #
+              {
+                activeChannel.name
+              }
+            </Text>
+
+            <Text
+              style={[
+                styles.cardText,
+                {
+                  color:
+                    colors.muted,
+                },
+              ]}
+            >
+              Be the first person to send a message.
+            </Text>
+          </View>
+        ) : (
+          <ScrollView
+            style={
+              styles.messageScroll
+            }
+            contentContainerStyle={
+              styles.messageList
+            }
+            showsVerticalScrollIndicator={
+              false
+            }
+          >
+            {messages.map(
+              (
+                message,
+              ) => {
+                const mine =
+                  Boolean(
+                    user?.id &&
+                      message.userId ===
+                        user.id,
+                  );
+
+                return (
+                  <View
+                    key={
+                      message.id
+                    }
+                    style={[
+                      styles.messageBlock,
+                      mine && {
+                        alignItems:
+                          'flex-end',
+                      },
+                    ]}
+                  >
+                    <View
+                      style={
+                        styles.messageMeta
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.messageAuthor,
+                          {
+                            color:
+                              colors.text,
+                          },
+                        ]}
+                      >
+                        {mine
+                          ? 'You'
+                          : displayName(
+                              message.firstName,
+                              message.lastName,
+                            )}
+                      </Text>
+
+                      <Text
+                        style={[
+                          styles.messageTime,
+                          {
+                            color:
+                              colors.muted,
+                          },
+                        ]}
+                      >
+                        {timeLabel(
+                          message.createdAt,
+                        )}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.messageBubble,
+                        {
+                          backgroundColor:
+                            mine
+                              ? colors.surfaceElevated
+                              : colors.surface,
+
+                          borderColor:
+                            mine
+                              ? accentColor
+                              : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.messageText,
+                          {
+                            color:
+                              colors.text,
+                          },
+                        ]}
+                      >
+                        {
+                          message.body
+                        }
+                      </Text>
+                    </View>
+                  </View>
+                );
+              },
+            )}
+          </ScrollView>
+        )}
+      </View>
+
+      <View
+        style={[
+          styles.composer,
+          {
+            borderTopColor:
+              colors.border,
+          },
+        ]}
+      >
+        <TextInput
+          value={draft}
+          onChangeText={
+            setDraft
+          }
+          multiline
+          editable={
+            Boolean(
+              activeChannel,
+            ) &&
+            !sending
+          }
+          placeholder={
+            activeChannel
+              ? `Message #${activeChannel.name}...`
+              : 'Choose a channel first'
+          }
+          placeholderTextColor={
+            colors.muted
+          }
+          style={[
+            styles.messageInput,
+            {
+              color:
+                colors.text,
+              backgroundColor:
+                colors.surfaceElevated,
+              borderColor:
+                colors.border,
+            },
+          ]}
+        />
+
+        <Pressable
+          accessibilityLabel="Send message"
+          onPress={
+            sendMessage
+          }
+          disabled={
+            !draft.trim() ||
+            !activeChannel ||
+            sending
+          }
+          style={[
+            styles.sendButton,
+            {
+              backgroundColor:
+                accentColor,
+
+              opacity:
+                !draft.trim() ||
+                !activeChannel ||
+                sending
+                  ? 0.45
+                  : 1,
+            },
+          ]}
+        >
+          {sending ? (
+            <ActivityIndicator
+              size="small"
+              color="#FFFFFF"
+            />
+          ) : (
+            <Ionicons
+              name="send"
+              size={17}
+              color="#FFFFFF"
+            />
+          )}
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function CommunityPosts() {
+  const { user } = useAuth();
+
+  const {
+    colors,
+    theme,
+  } = useTheme();
+
+  const accentColor =
+    theme === 'light'
+      ? '#1e6827'
+      : colors.primary;
+
+  const [
+    posts,
+    setPosts,
+  ] =
+    useState<
+      FeedPost[]
+    >([]);
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(true);
+
+  const [
+    error,
+    setError,
+  ] =
+    useState('');
+
+  const [
+    composerOpen,
+    setComposerOpen,
+  ] =
+    useState(false);
+
+  const [
+    postBody,
+    setPostBody,
+  ] =
+    useState('');
+
+  const [
+    linkUrl,
+    setLinkUrl,
+  ] =
+    useState('');
+
+  const [
+    posting,
+    setPosting,
+  ] =
+    useState(false);
+
+  const [
+    commentsOpen,
+    setCommentsOpen,
+  ] =
+    useState<
+      Record<
+        string,
+        boolean
+      >
+    >({});
+
+  const [
+    commentsByPost,
+    setCommentsByPost,
+  ] =
+    useState<
+      Record<
+        string,
+        FeedComment[]
+      >
+    >({});
+
+  const [
+    commentDrafts,
+    setCommentDrafts,
+  ] =
+    useState<
+      Record<
+        string,
+        string
+      >
+    >({});
+
+  const loadFeed =
+    useCallback(
+      async () => {
+        try {
+          setError('');
+
+          const result =
+            await api.get<
+              FeedPost[]
+            >(
+              '/community-chat/feed?take=50',
+            );
+
+          setPosts(
+            Array.isArray(result)
+              ? result
+              : [],
+          );
+        } catch (e) {
+          setPosts([]);
+
+          setError(
+            e instanceof Error
+              ? e.message
+              : 'Could not load Community posts.',
+          );
+        } finally {
+          setLoading(false);
+        }
+      },
+      [],
+    );
+
+  useEffect(() => {
+    loadFeed();
+  }, [loadFeed]);
+
+  async function createPost() {
+    const body =
+      postBody.trim();
+
+    if (
+      !body ||
+      posting
+    ) {
+      return;
+    }
+
+    if (
+      linkUrl.trim() &&
+      !/^https?:\/\//i.test(
+        linkUrl.trim(),
+      )
+    ) {
+      setError(
+        'Links must begin with http:// or https://.',
+      );
+
+      return;
+    }
+
+    try {
+      setPosting(true);
+      setError('');
+
+      const created =
+        await api.post<
+          FeedPost
+        >(
+          '/community-chat/feed',
+          {
+            body,
+            postType:
+              'POST',
+            linkUrl:
+              linkUrl.trim() ||
+              undefined,
+          },
+        );
+
+      if (
+        created &&
+        created.id
+      ) {
+        setPosts(
+          (
+            current,
+          ) => [
+            created,
+            ...current,
+          ],
+        );
+      } else {
+        await loadFeed();
+      }
+
+      setPostBody('');
+      setLinkUrl('');
+      setComposerOpen(
+        false,
+      );
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : 'Could not publish this post.',
+      );
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  async function toggleLike(
+    post: FeedPost,
+  ) {
+    try {
+      const result =
+        await api.post<{
+          liked: boolean;
+          likeCount: number;
+        }>(
+          `/community-chat/feed/${post.id}/like`,
+          {},
+        );
+
+      setPosts(
+        (
+          current,
+        ) =>
+          current.map(
+            (
+              item,
+            ) =>
+              item.id ===
+              post.id
+                ? {
+                    ...item,
+                    likedByMe:
+                      result.liked,
+                    likeCount:
+                      result.likeCount,
+                  }
+                : item,
+          ),
+      );
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : 'Could not update this like.',
+      );
+    }
+  }
+
+  async function toggleComments(
+    post: FeedPost,
+  ) {
+    const next =
+      !commentsOpen[
+        post.id
+      ];
+
+    setCommentsOpen(
+      (
+        current,
+      ) => ({
+        ...current,
+        [post.id]:
+          next,
+      }),
+    );
+
+    if (
+      next &&
+      !commentsByPost[
+        post.id
+      ]
+    ) {
+      try {
+        const result =
+          await api.get<
+            FeedComment[]
+          >(
+            `/community-chat/feed/${post.id}/comments`,
+          );
+
+        setCommentsByPost(
+          (
+            current,
+          ) => ({
+            ...current,
+            [post.id]:
+              Array.isArray(
+                result,
+              )
+                ? result
+                : [],
+          }),
+        );
+      } catch (e) {
+        setError(
+          e instanceof Error
+            ? e.message
+            : 'Could not load comments.',
+        );
+      }
+    }
+  }
+
+  async function addComment(
+    post: FeedPost,
+  ) {
+    const body =
+      (
+        commentDrafts[
+          post.id
+        ] ?? ''
+      ).trim();
+
+    if (!body) {
+      return;
+    }
+
+    try {
+      const created =
+        await api.post<
+          FeedComment
+        >(
+          `/community-chat/feed/${post.id}/comments`,
+          {
+            body,
+          },
+        );
+
+      setCommentsByPost(
+        (
+          current,
+        ) => ({
+          ...current,
+          [post.id]: [
+            ...(current[
+              post.id
+            ] ?? []),
+            created,
+          ],
+        }),
+      );
+
+      setCommentDrafts(
+        (
+          current,
+        ) => ({
+          ...current,
+          [post.id]:
+            '',
+        }),
+      );
+
+      setPosts(
+        (
+          current,
+        ) =>
+          current.map(
+            (
+              item,
+            ) =>
+              item.id ===
+              post.id
+                ? {
+                    ...item,
+                    commentCount:
+                      (item.commentCount ??
+                        0) +
+                      1,
+                  }
+                : item,
+          ),
+      );
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : 'Could not add your comment.',
+      );
+    }
+  }
+
+  async function sharePost(
+    post: FeedPost,
+  ) {
+    try {
+      await Share.share({
+        message:
+          `${displayName(
+            post.firstName,
+            post.lastName,
+          )} on SynergySphere:\n\n${post.body}` +
+          (post.linkUrl
+            ? `\n${post.linkUrl}`
+            : ''),
+      });
+    } catch {
+      // User can dismiss share sheet.
+    }
+  }
+
+  return (
+    <View
+      style={
+        styles.postsWrap
+      }
+    >
+      {error ? (
+        <View
+          style={[
+            styles.errorBox,
+            {
+              backgroundColor:
+                colors.surfaceElevated,
+              borderColor:
+                colors.border,
+              borderWidth: 1,
+              borderRadius:
+                12,
+            },
+          ]}
+        >
+          <Ionicons
+            name="alert-circle-outline"
+            size={17}
+            color="#B3261E"
+          />
+
+          <Text
+            style={[
+              styles.errorText,
+              {
+                color:
+                  colors.text,
+              },
+            ]}
+          >
+            {error}
+          </Text>
+
+          <Pressable
+            onPress={() =>
+              setError('')
+            }
+          >
+            <Ionicons
+              name="close"
+              size={17}
+              color={
+                colors.muted
+              }
+            />
+          </Pressable>
+        </View>
+      ) : null}
+
+      <Pressable
+        onPress={() =>
+          setComposerOpen(
+            true,
           )
-        )
-      ) : (
-        <Card>
+        }
+        style={[
+          styles.startPost,
+          {
+            backgroundColor:
+              colors.surface,
+            borderColor:
+              colors.border,
+          },
+        ]}
+      >
+        <Avatar
+          size={42}
+        />
+
+        <View
+          style={[
+            styles.startPostInput,
+            {
+              backgroundColor:
+                colors.surfaceElevated,
+              borderColor:
+                colors.border,
+            },
+          ]}
+        >
+          <Text
+            style={{
+              color:
+                colors.muted,
+            }}
+          >
+            Share something with the community...
+          </Text>
+        </View>
+      </Pressable>
+
+      <View
+        style={
+          styles.feedHeading
+        }
+      >
+        <View>
+          <Text
+            style={[
+              styles.cardTitle,
+              {
+                color:
+                  colors.text,
+              },
+            ]}
+          >
+            Community Posts
+          </Text>
+
+          <Text
+            style={[
+              styles.cardText,
+              {
+                color:
+                  colors.muted,
+              },
+            ]}
+          >
+            Share updates, questions and links.
+          </Text>
+        </View>
+
+        <Pressable
+          onPress={
+            loadFeed
+          }
+          style={[
+            styles.iconButton,
+            {
+              backgroundColor:
+                colors.surfaceElevated,
+            },
+          ]}
+        >
+          <Ionicons
+            name="refresh-outline"
+            size={18}
+            color={
+              accentColor
+            }
+          />
+        </Pressable>
+      </View>
+
+      {loading ? (
+        <View
+          style={
+            styles.postsLoading
+          }
+        >
+          <ActivityIndicator
+            color={
+              accentColor
+            }
+          />
+        </View>
+      ) : posts.length ===
+        0 ? (
+        <View
+          style={[
+            styles.emptyPostsCard,
+            {
+              backgroundColor:
+                colors.surface,
+              borderColor:
+                colors.border,
+            },
+          ]}
+        >
+          <Ionicons
+            name="people-circle-outline"
+            size={36}
+            color={
+              accentColor
+            }
+          />
+
           <Text
             style={[
               styles.emptyTitle,
@@ -982,71 +1599,988 @@ export default function CommunityScreen() {
               },
             ]}
           >
-            No opportunities available
+            No posts yet
           </Text>
 
           <Text
             style={[
-              styles.copy,
+              styles.cardText,
               {
                 color:
                   colors.muted,
               },
             ]}
           >
-            No active community
-            opportunities from other
-            users match the current
-            search or category.
+            Be the first to share something.
           </Text>
+        </View>
+      ) : (
+        posts.map(
+          (
+            post,
+          ) => (
+            <View
+              key={
+                post.id
+              }
+              style={[
+                styles.postCard,
+                {
+                  backgroundColor:
+                    colors.surface,
+                  borderColor:
+                    colors.border,
+                },
+              ]}
+            >
+              <View
+                style={
+                  styles.postAuthorRow
+                }
+              >
+                <Avatar
+                  firstName={
+                    post.firstName
+                  }
+                  lastName={
+                    post.lastName
+                  }
+                  picture={
+                    post.profilePicture
+                  }
+                  size={42}
+                />
 
-          {selectedCategory !==
-          'ALL' ? (
-            <Button
-              title="Show All Projects"
-              secondary
+                <View
+                  style={{
+                    flex: 1,
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.postAuthor,
+                      {
+                        color:
+                          colors.text,
+                      },
+                    ]}
+                  >
+                    {displayName(
+                      post.firstName,
+                      post.lastName,
+                    )}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.cardText,
+                      {
+                        color:
+                          colors.muted,
+                      },
+                    ]}
+                  >
+                    {post.role ||
+                      'Student'}{' '}
+                    •{' '}
+                    {timeLabel(
+                      post.createdAt,
+                    )}
+                  </Text>
+                </View>
+              </View>
+
+              <Text
+                style={[
+                  styles.postBody,
+                  {
+                    color:
+                      colors.text,
+                  },
+                ]}
+              >
+                {
+                  post.body
+                }
+              </Text>
+
+              {post.linkUrl ? (
+                <Pressable
+                  onPress={() =>
+                    Linking.openURL(
+                      post.linkUrl!,
+                    )
+                  }
+                  style={[
+                    styles.linkCard,
+                    {
+                      backgroundColor:
+                        colors.surfaceElevated,
+                      borderColor:
+                        colors.border,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="link-outline"
+                    size={17}
+                    color={
+                      accentColor
+                    }
+                  />
+
+                  <Text
+                    numberOfLines={
+                      2
+                    }
+                    style={{
+                      flex: 1,
+                      color:
+                        accentColor,
+                      fontSize:
+                        12,
+                    }}
+                  >
+                    {
+                      post.linkUrl
+                    }
+                  </Text>
+                </Pressable>
+              ) : null}
+
+              <View
+                style={[
+                  styles.actions,
+                  {
+                    borderTopColor:
+                      colors.border,
+                  },
+                ]}
+              >
+                <Pressable
+                  onPress={() =>
+                    toggleLike(
+                      post,
+                    )
+                  }
+                  style={
+                    styles.actionButton
+                  }
+                >
+                  <Ionicons
+                    name={
+                      post.likedByMe
+                        ? 'heart'
+                        : 'heart-outline'
+                    }
+                    size={
+                      19
+                    }
+                    color={
+                      post.likedByMe
+                        ? accentColor
+                        : colors.muted
+                    }
+                  />
+
+                  <Text
+                    style={{
+                      color:
+                        post.likedByMe
+                          ? accentColor
+                          : colors.muted,
+                      fontSize:
+                        11,
+                    }}
+                  >
+                    {post.likeCount ??
+                      0}{' '}
+                    Like
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() =>
+                    toggleComments(
+                      post,
+                    )
+                  }
+                  style={
+                    styles.actionButton
+                  }
+                >
+                  <Ionicons
+                    name="chatbubble-outline"
+                    size={
+                      18
+                    }
+                    color={
+                      colors.muted
+                    }
+                  />
+
+                  <Text
+                    style={{
+                      color:
+                        colors.muted,
+                      fontSize:
+                        11,
+                    }}
+                  >
+                    {post.commentCount ??
+                      0}{' '}
+                    Comment
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() =>
+                    sharePost(
+                      post,
+                    )
+                  }
+                  style={
+                    styles.actionButton
+                  }
+                >
+                  <Ionicons
+                    name="share-social-outline"
+                    size={
+                      18
+                    }
+                    color={
+                      colors.muted
+                    }
+                  />
+
+                  <Text
+                    style={{
+                      color:
+                        colors.muted,
+                      fontSize:
+                        11,
+                    }}
+                  >
+                    Share
+                  </Text>
+                </Pressable>
+              </View>
+
+              {commentsOpen[
+                post.id
+              ] ? (
+                <View
+                  style={[
+                    styles.comments,
+                    {
+                      borderTopColor:
+                        colors.border,
+                    },
+                  ]}
+                >
+                  {(commentsByPost[
+                    post.id
+                  ] ?? []).map(
+                    (
+                      comment,
+                    ) => (
+                      <View
+                        key={
+                          comment.id
+                        }
+                        style={
+                          styles.commentRow
+                        }
+                      >
+                        <Avatar
+                          firstName={
+                            comment.firstName
+                          }
+                          lastName={
+                            comment.lastName
+                          }
+                          size={
+                            30
+                          }
+                        />
+
+                        <View
+                          style={[
+                            styles.commentBubble,
+                            {
+                              backgroundColor:
+                                colors.surfaceElevated,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={{
+                              color:
+                                colors.text,
+                              fontSize:
+                                11,
+                              fontWeight:
+                                '800',
+                            }}
+                          >
+                            {displayName(
+                              comment.firstName,
+                              comment.lastName,
+                            )}
+                          </Text>
+
+                          <Text
+                            style={{
+                              color:
+                                colors.text,
+                              fontSize:
+                                12,
+                            }}
+                          >
+                            {
+                              comment.body
+                            }
+                          </Text>
+                        </View>
+                      </View>
+                    ),
+                  )}
+
+                  <View
+                    style={
+                      styles.commentComposer
+                    }
+                  >
+                    <TextInput
+                      value={
+                        commentDrafts[
+                          post.id
+                        ] ?? ''
+                      }
+                      onChangeText={(
+                        value,
+                      ) =>
+                        setCommentDrafts(
+                          (
+                            current,
+                          ) => ({
+                            ...current,
+                            [post.id]:
+                              value,
+                          }),
+                        )
+                      }
+                      placeholder="Write a comment..."
+                      placeholderTextColor={
+                        colors.muted
+                      }
+                      style={[
+                        styles.commentInput,
+                        {
+                          color:
+                            colors.text,
+                          backgroundColor:
+                            colors.surfaceElevated,
+                          borderColor:
+                            colors.border,
+                        },
+                      ]}
+                    />
+
+                    <Pressable
+                      onPress={() =>
+                        addComment(
+                          post,
+                        )
+                      }
+                      style={[
+                        styles.commentSend,
+                        {
+                          backgroundColor:
+                            accentColor,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name="send"
+                        size={15}
+                        color="#FFFFFF"
+                      />
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          ),
+        )
+      )}
+
+      <Modal
+        visible={
+          composerOpen
+        }
+        transparent
+        animationType="slide"
+        onRequestClose={() =>
+          setComposerOpen(
+            false,
+          )
+        }
+      >
+        <View
+          style={
+            styles.modalOverlay
+          }
+        >
+          <Pressable
+            style={
+              StyleSheet.absoluteFill
+            }
+            onPress={() =>
+              setComposerOpen(
+                false,
+              )
+            }
+          />
+
+          <View
+            style={[
+              styles.modalSheet,
+              {
+                backgroundColor:
+                  colors.surface,
+                borderColor:
+                  colors.border,
+              },
+            ]}
+          >
+            <View
+              style={
+                styles.modalHeader
+              }
+            >
+              <Text
+                style={[
+                  styles.modalTitle,
+                  {
+                    color:
+                      colors.text,
+                  },
+                ]}
+              >
+                Create a post
+              </Text>
+
+              <Pressable
+                onPress={() =>
+                  setComposerOpen(
+                    false,
+                  )
+                }
+              >
+                <Ionicons
+                  name="close"
+                  size={22}
+                  color={
+                    colors.text
+                  }
+                />
+              </Pressable>
+            </View>
+
+            <TextInput
+              autoFocus
+              multiline
+              value={
+                postBody
+              }
+              onChangeText={
+                setPostBody
+              }
+              placeholder="What would you like to share?"
+              placeholderTextColor={
+                colors.muted
+              }
+              style={[
+                styles.postInput,
+                {
+                  color:
+                    colors.text,
+                  backgroundColor:
+                    colors.surfaceElevated,
+                  borderColor:
+                    colors.border,
+                },
+              ]}
+            />
+
+            <TextInput
+              value={
+                linkUrl
+              }
+              onChangeText={
+                setLinkUrl
+              }
+              autoCapitalize="none"
+              keyboardType="url"
+              placeholder="Optional link: https://..."
+              placeholderTextColor={
+                colors.muted
+              }
+              style={[
+                styles.linkInput,
+                {
+                  color:
+                    colors.text,
+                  backgroundColor:
+                    colors.surfaceElevated,
+                  borderColor:
+                    colors.border,
+                },
+              ]}
+            />
+
+            <Pressable
               onPress={
-                showAllProjects
+                createPost
+              }
+              disabled={
+                !postBody.trim() ||
+                posting
+              }
+              style={[
+                styles.publishButton,
+                {
+                  backgroundColor:
+                    accentColor,
+
+                  opacity:
+                    !postBody.trim() ||
+                    posting
+                      ? 0.45
+                      : 1,
+                },
+              ]}
+            >
+              {posting ? (
+                <ActivityIndicator
+                  color="#FFFFFF"
+                />
+              ) : (
+                <>
+                  <Text
+                    style={
+                      styles.publishText
+                    }
+                  >
+                    Post
+                  </Text>
+
+                  <Ionicons
+                    name="send"
+                    size={16}
+                    color="#FFFFFF"
+                  />
+                </>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+export default function CommunityScreen() {
+  const router = useRouter();
+
+  const {
+    colors,
+    theme,
+  } = useTheme();
+
+  const [
+    unreadNotifications,
+    setUnreadNotifications,
+  ] = useState(0);
+
+  const loadUnreadNotifications =
+    useCallback(async () => {
+      try {
+        const result =
+          await api.get<{
+            count: number;
+          }>(
+            '/notifications/unread-count',
+          );
+
+        setUnreadNotifications(
+          Number(result?.count ?? 0),
+        );
+      } catch {
+        // Notifications must never prevent Community from opening.
+      }
+    }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUnreadNotifications();
+    }, [loadUnreadNotifications]),
+  );
+
+  const accentColor =
+    theme === 'light'
+      ? '#1e6827'
+      : colors.primary;
+
+  const [
+    activeTab,
+    setActiveTab,
+  ] =
+    useState<
+      'chat' | 'initiatives'
+    >('chat');
+
+  const [
+    chatView,
+    setChatView,
+  ] =
+    useState<
+      'live' | 'posts'
+    >('live');
+
+  return (
+    <SafeAreaView
+      style={[
+        styles.screen,
+        {
+          backgroundColor:
+            colors.background,
+        },
+      ]}
+    >
+      <ScrollView
+        style={{
+          flex: 1,
+        }}
+        contentContainerStyle={
+          styles.content
+        }
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={
+          false
+        }
+      >
+        <View style={styles.headerRow}>
+          <Image
+            source={require('../../../assets/images/community-logo.png')}
+            style={styles.communityLogo}
+            contentFit="contain"
+          />
+
+          <View style={styles.headerText}>
+            <Text
+              style={[
+                styles.title,
+                {
+                  color:
+                    colors.text,
+                },
+              ]}
+            >
+              Community
+            </Text>
+
+            <Text
+              style={[
+                styles.subtitle,
+                {
+                  color:
+                    colors.muted,
+                },
+              ]}
+            >
+              Chat with peers, ask questions, and collaborate on software initiatives.
+            </Text>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              unreadNotifications > 0
+                ? `${unreadNotifications} unread notifications`
+                : 'Notifications'
+            }
+            onPress={() =>
+              router.push(
+                '/notifications' as never,
+              )
+            }
+            style={({ pressed }) => [
+              styles.notificationButton,
+              {
+                backgroundColor:
+                  colors.surface,
+                borderColor:
+                  colors.border,
+              },
+              pressed && {
+                opacity: 0.7,
+              },
+            ]}
+          >
+            <Ionicons
+              name="notifications-outline"
+              size={22}
+              color={accentColor}
+            />
+
+            {unreadNotifications > 0 ? (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {unreadNotifications > 99
+                    ? '99+'
+                    : unreadNotifications}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        </View>
+
+        <View
+          style={[
+            styles.tabBar,
+            {
+              backgroundColor:
+                colors.surface,
+              borderColor:
+                colors.border,
+            },
+          ]}
+        >
+          <Pressable
+            onPress={() =>
+              setActiveTab(
+                'chat',
+              )
+            }
+            style={[
+              styles.tabButton,
+              activeTab ===
+                'chat' && [
+                styles.tabButtonActive,
+                {
+                  backgroundColor:
+                    accentColor,
+                },
+              ],
+            ]}
+          >
+            <Ionicons
+              name="chatbubbles-outline"
+              size={17}
+              color={
+                activeTab ===
+                'chat'
+                  ? '#07180d'
+                  : colors.muted
               }
             />
-          ) : null}
-        </Card>
-      )}
-        </>
-      )}
-    </Screen>
+
+            <Text
+              style={[
+                styles.tabText,
+                {
+                  color:
+                    activeTab ===
+                    'chat'
+                      ? '#07180d'
+                      : colors.text,
+                },
+              ]}
+            >
+              Community Chat
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() =>
+              setActiveTab(
+                'initiatives',
+              )
+            }
+            style={[
+              styles.tabButton,
+              activeTab ===
+                'initiatives' && [
+                styles.tabButtonActive,
+                {
+                  backgroundColor:
+                    accentColor,
+                },
+              ],
+            ]}
+          >
+            <Ionicons
+              name="layers-outline"
+              size={17}
+              color={
+                activeTab ===
+                'initiatives'
+                  ? '#07180d'
+                  : colors.muted
+              }
+            />
+
+            <Text
+              style={[
+                styles.tabText,
+                {
+                  color:
+                    activeTab ===
+                    'initiatives'
+                      ? '#07180d'
+                      : colors.text,
+                },
+              ]}
+            >
+              Initiatives
+            </Text>
+          </Pressable>
+        </View>
+
+        {activeTab ===
+        'chat' ? (
+          <>
+            <View
+              style={[
+                styles.innerTabBar,
+                {
+                  backgroundColor:
+                    colors.surface,
+                  borderColor:
+                    colors.border,
+                },
+              ]}
+            >
+              <Pressable
+                onPress={() =>
+                  setChatView(
+                    'live',
+                  )
+                }
+                style={[
+                  styles.innerTabButton,
+                  chatView ===
+                    'live' && {
+                    backgroundColor:
+                      colors.surfaceElevated,
+                    borderColor:
+                      accentColor,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="chatbubbles-outline"
+                  size={16}
+                  color={
+                    chatView ===
+                    'live'
+                      ? accentColor
+                      : colors.muted
+                  }
+                />
+
+                <Text
+                  style={[
+                    styles.innerTabText,
+                    {
+                      color:
+                        chatView ===
+                        'live'
+                          ? accentColor
+                          : colors.text,
+                    },
+                  ]}
+                >
+                  Live Chat
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() =>
+                  setChatView(
+                    'posts',
+                  )
+                }
+                style={[
+                  styles.innerTabButton,
+                  chatView ===
+                    'posts' && {
+                    backgroundColor:
+                      colors.surfaceElevated,
+                    borderColor:
+                      accentColor,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="newspaper-outline"
+                  size={16}
+                  color={
+                    chatView ===
+                    'posts'
+                      ? accentColor
+                      : colors.muted
+                  }
+                />
+
+                <Text
+                  style={[
+                    styles.innerTabText,
+                    {
+                      color:
+                        chatView ===
+                        'posts'
+                          ? accentColor
+                          : colors.text,
+                    },
+                  ]}
+                >
+                  Community Posts
+                </Text>
+              </Pressable>
+            </View>
+
+            {chatView ===
+            'live' ? (
+              <LiveChat />
+            ) : (
+              <CommunityPosts />
+            )}
+          </>
+        ) : (
+          <CommunityInitiatives />
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles =
   StyleSheet.create({
-    tabSwitcher: {
-      flexDirection: 'row',
-      borderRadius: 14,
-      borderWidth: 1,
-      padding: 4,
-      gap: 6,
-      marginBottom: 8,
-    },
-    tabButton: {
+    screen: {
       flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 7,
-      paddingVertical: 9,
-      borderRadius: 10,
     },
-    tabButtonActive: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 2,
+
+    content: {
+      paddingHorizontal:
+        16,
+      paddingTop: 18,
+      paddingBottom: 110,
+      gap: 14,
     },
-    tabButtonText: {
-      fontSize: 13,
-    },
+
     headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1061,115 +2595,483 @@ const styles =
 
     headerText: {
       flex: 1,
+      gap: 3,
     },
 
-    categorySection: {
-      gap: 12,
-      marginTop: 4,
-      marginBottom: 10,
-    },
-
-    sectionHeaderRow: {
-      flexDirection: 'row',
-      justifyContent:
-        'space-between',
-      alignItems: 'center',
-    },
-
-    sectionHeading: {
-      fontSize: 18,
-      fontWeight: '800',
-      marginTop: 12,
-    },
-
-    showAll: {
-      fontSize: 13,
-      fontWeight: '800',
-      marginTop: 12,
-    },
-
-    categoryGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent:
-        'space-between',
-      gap: 12,
-    },
-
-    categoryCard: {
-      width: '48%',
-      minHeight: 105,
+    notificationButton: {
+      width: 46,
+      height: 46,
       borderWidth: 1,
-      borderRadius: 18,
-      padding: 14,
-      justifyContent:
-        'center',
-      gap: 7,
-    },
-
-    categoryIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
+      borderRadius: 23,
       alignItems: 'center',
-      justifyContent:
-        'center',
+      justifyContent: 'center',
+      position: 'relative',
+      flexShrink: 0,
     },
 
-    categoryTitle: {
-      fontSize: 13,
-      fontWeight: '800',
+    notificationBadge: {
+      position: 'absolute',
+      top: -5,
+      right: -5,
+      minWidth: 19,
+      height: 19,
+      borderRadius: 10,
+      paddingHorizontal: 4,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#B3261E',
     },
 
-    categoryPressed: {
-      opacity: 0.7,
+    notificationBadgeText: {
+      color: '#FFFFFF',
+      fontSize: 10,
+      fontWeight: '900',
     },
 
     title: {
-      fontSize: 17,
+      fontSize: 24,
+      fontWeight: '900',
+    },
+
+    subtitle: {
+      fontSize: 13,
+      lineHeight: 19,
+    },
+
+    tabBar: {
+      flexDirection: 'row',
+      borderRadius: 14,
+      borderWidth: 1,
+      padding: 4,
+      gap: 6,
+      marginBottom: 8,
+    },
+
+    tabButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+      paddingVertical: 9,
+      paddingHorizontal: 8,
+      borderRadius: 10,
+    },
+
+    tabButtonActive: {
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 1,
+      },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+
+    tabText: {
+      fontSize: 13,
       fontWeight: '800',
     },
 
-    tag: {
+    innerTabBar: {
+      flexDirection: 'row',
+      borderWidth: 1,
+      borderRadius: 14,
+      padding: 4,
+      gap: 4,
+    },
+
+    innerTabButton: {
+      flex: 1,
+      minHeight: 40,
+      borderWidth: 1,
+      borderColor: 'transparent',
+      borderRadius: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+
+    innerTabText: {
       fontSize: 12,
       fontWeight: '800',
     },
 
-    copy: {
-      fontSize: 13,
-      lineHeight: 20,
+    chatCard: {
+      borderWidth: 1,
+      borderRadius: 18,
+      overflow: 'hidden',
+      minHeight: 510,
     },
 
-    infoRow: {
+    chatHeading: {
+      minHeight: 70,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      borderBottomWidth: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: 10,
     },
 
-    xpText: {
-      fontSize: 13,
+    cardTitle: {
+      fontSize: 18,
+      fontWeight: '900',
+    },
+
+    cardText: {
+      fontSize: 12,
+      lineHeight: 17,
+    },
+
+    iconButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    channelsSection: {
+      minHeight: 55,
+      borderBottomWidth: 1,
+      justifyContent: 'center',
+      paddingVertical: 8,
+    },
+
+    loadingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 12,
+    },
+
+    channelRow: {
+      paddingHorizontal: 10,
+      gap: 7,
+      alignItems: 'center',
+    },
+
+    channelPill: {
+      minHeight: 35,
+      borderWidth: 1,
+      borderRadius: 18,
+      paddingHorizontal: 11,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+
+    channelText: {
+      fontSize: 11,
       fontWeight: '800',
     },
 
-    applicationRow: {
+    errorBox: {
+      minHeight: 42,
+      borderBottomWidth: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: 7,
+      paddingHorizontal: 11,
     },
 
-    applicationCount: {
-      fontSize: 12,
-      fontWeight: '600',
+    errorText: {
+      flex: 1,
+      fontSize: 11,
     },
 
-    statusText: {
-      fontSize: 13,
-      fontWeight: '700',
-      marginTop: 4,
+    messagesArea: {
+      height: 310,
+    },
+
+    emptyState: {
+      flex: 1,
+      minHeight: 230,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      padding: 20,
     },
 
     emptyTitle: {
-      fontSize: 16,
+      fontSize: 15,
+      fontWeight: '900',
+      textAlign: 'center',
+    },
+
+    messageScroll: {
+      flex: 1,
+    },
+
+    messageList: {
+      padding: 12,
+      gap: 11,
+    },
+
+    messageBlock: {
+      alignItems: 'flex-start',
+      gap: 4,
+    },
+
+    messageMeta: {
+      flexDirection: 'row',
+      gap: 6,
+      alignItems: 'center',
+    },
+
+    messageAuthor: {
+      fontSize: 10,
       fontWeight: '800',
+    },
+
+    messageTime: {
+      fontSize: 9,
+    },
+
+    messageBubble: {
+      maxWidth: '88%',
+      borderWidth: 1,
+      borderRadius: 14,
+      paddingHorizontal: 11,
+      paddingVertical: 8,
+    },
+
+    messageText: {
+      fontSize: 13,
+      lineHeight: 18,
+    },
+
+    composer: {
+      minHeight: 62,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 8,
+      padding: 9,
+    },
+
+    messageInput: {
+      flex: 1,
+      minHeight: 42,
+      maxHeight: 90,
+      borderWidth: 1,
+      borderRadius: 15,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      fontSize: 12,
+      textAlignVertical: 'top',
+    },
+
+    sendButton: {
+      width: 42,
+      height: 42,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    avatar: {
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    postsWrap: {
+      gap: 12,
+    },
+
+    startPost: {
+      borderWidth: 1,
+      borderRadius: 16,
+      padding: 11,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 9,
+    },
+
+    startPostInput: {
+      flex: 1,
+      minHeight: 42,
+      borderWidth: 1,
+      borderRadius: 21,
+      justifyContent: 'center',
+      paddingHorizontal: 13,
+    },
+
+    feedHeading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+
+    postsLoading: {
+      minHeight: 120,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    emptyPostsCard: {
+      minHeight: 180,
+      borderWidth: 1,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      padding: 20,
+    },
+
+    postCard: {
+      borderWidth: 1,
+      borderRadius: 16,
+      padding: 12,
+      gap: 11,
+    },
+
+    postAuthorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 9,
+    },
+
+    postAuthor: {
+      fontSize: 13,
+      fontWeight: '900',
+    },
+
+    postBody: {
+      fontSize: 13,
+      lineHeight: 19,
+    },
+
+    linkCard: {
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: 9,
+      flexDirection: 'row',
+      gap: 8,
+      alignItems: 'center',
+    },
+
+    actions: {
+      borderTopWidth: 1,
+      paddingTop: 9,
+      flexDirection: 'row',
+    },
+
+    actionButton: {
+      flex: 1,
+      minHeight: 34,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 5,
+    },
+
+    comments: {
+      borderTopWidth: 1,
+      paddingTop: 9,
+      gap: 8,
+    },
+
+    commentRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 7,
+    },
+
+    commentBubble: {
+      flex: 1,
+      borderRadius: 11,
+      padding: 8,
+      gap: 2,
+    },
+
+    commentComposer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+    },
+
+    commentInput: {
+      flex: 1,
+      minHeight: 39,
+      borderWidth: 1,
+      borderRadius: 15,
+      paddingHorizontal: 11,
+      fontSize: 12,
+    },
+
+    commentSend: {
+      width: 39,
+      height: 39,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    modalOverlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor:
+        'rgba(0,0,0,0.45)',
+    },
+
+    modalSheet: {
+      borderTopWidth: 1,
+      borderTopLeftRadius: 22,
+      borderTopRightRadius: 22,
+      padding: 16,
+      gap: 12,
+    },
+
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+
+    modalTitle: {
+      fontSize: 17,
+      fontWeight: '900',
+    },
+
+    postInput: {
+      minHeight: 120,
+      borderWidth: 1,
+      borderRadius: 14,
+      padding: 12,
+      textAlignVertical: 'top',
+    },
+
+    linkInput: {
+      minHeight: 44,
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+    },
+
+    publishButton: {
+      minHeight: 46,
+      borderRadius: 23,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+    },
+
+    publishText: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '900',
+    },
+
+    placeholderCard: {
+      borderWidth: 1,
+      borderRadius: 18,
+      padding: 18,
+      gap: 8,
     },
   });

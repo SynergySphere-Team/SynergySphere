@@ -6,6 +6,7 @@ import {
 } from 'react';
 
 import {
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -17,6 +18,7 @@ import {
   useRouter,
 } from 'expo-router';
 
+import { Image } from 'expo-image';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import {
@@ -38,7 +40,10 @@ import { useAuth } from '@/context/AuthContext';
 type ApplicationStatus =
   | 'PENDING'
   | 'APPROVED'
-  | 'DECLINED';
+  | 'DECLINED'
+  | 'INVITATION_SENT'
+  | 'ACCEPTED'
+  | 'COMPLETED';
 
 type ProjectApplication = {
   id: string;
@@ -61,8 +66,121 @@ type ProjectDetails = {
   xpReward: number;
   isActive?: boolean;
 
+  techStack?: string | null;
+  teamCapacity?: number | null;
+  deliverableType?: string | null;
+
+  skillsNeeded?: string | null;
+  durationWeeks?: number | null;
+  applicationDeadline?: string | null;
+
+  imageUrl?: string | null;
+  projectUrl?: string | null;
+
+  githubUrl?: string | null;
+  githubFullName?: string | null;
+  githubOwner?: string | null;
+  githubRepo?: string | null;
+  githubVisibility?: string | null;
+  primaryLanguage?: string | null;
+  githubStars?: number | null;
+  githubForks?: number | null;
+  isGithubBacked?: boolean;
+
   applications: ProjectApplication[];
+
+  isCreator?: boolean;
+  hasApplied?: boolean;
+  applicationStatus?: ApplicationStatus | null;
 };
+
+function formatCategory(value: string) {
+  return value
+    .replaceAll('_', ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) =>
+      letter.toUpperCase()
+    );
+}
+
+function formatDeadline(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function getStatusDetails(
+  status: ApplicationStatus | null
+) {
+  switch (status) {
+    case 'APPROVED':
+      return {
+        label: 'Approved',
+        message:
+          'Your request to participate in this project has been approved.',
+        icon: 'checkmark-circle' as const,
+        tone: 'success' as const,
+      };
+
+    case 'DECLINED':
+      return {
+        label: 'Declined',
+        message:
+          'Your request to participate in this project was declined.',
+        icon: 'close-circle' as const,
+        tone: 'danger' as const,
+      };
+
+    case 'INVITATION_SENT':
+      return {
+        label: 'GitHub Invitation Sent',
+        message:
+          'Your request was approved and a GitHub repository invitation has been sent.',
+        icon: 'logo-github' as const,
+        tone: 'success' as const,
+      };
+
+    case 'ACCEPTED':
+      return {
+        label: 'Joined',
+        message:
+          'You have joined this project and can participate in the project work.',
+        icon: 'people-circle' as const,
+        tone: 'success' as const,
+      };
+
+    case 'COMPLETED':
+      return {
+        label: 'Completed',
+        message:
+          'Your participation in this project has been marked as completed.',
+        icon: 'ribbon' as const,
+        tone: 'success' as const,
+      };
+
+    case 'PENDING':
+    default:
+      return {
+        label: 'Pending',
+        message:
+          'Your request has been submitted and is waiting for review.',
+        icon: 'time-outline' as const,
+        tone: 'warning' as const,
+      };
+  }
+}
 
 export default function OpportunityDetailsScreen() {
   const { id } =
@@ -72,26 +190,43 @@ export default function OpportunityDetailsScreen() {
 
   const router = useRouter();
 
-  const { colors, theme } =
-    useTheme();
+  const {
+    colors,
+    theme,
+  } = useTheme();
 
   const { user } = useAuth();
 
-  const [project, setProject] =
+  const [
+    project,
+    setProject,
+  ] =
     useState<ProjectDetails | null>(
       null
     );
 
-  const [loading, setLoading] =
+  const [
+    loading,
+    setLoading,
+  ] =
     useState(true);
 
-  const [applying, setApplying] =
+  const [
+    applying,
+    setApplying,
+  ] =
     useState(false);
 
-  const [error, setError] =
+  const [
+    error,
+    setError,
+  ] =
     useState('');
 
-  const [success, setSuccess] =
+  const [
+    success,
+    setSuccess,
+  ] =
     useState('');
 
   const accentColor =
@@ -119,37 +254,50 @@ export default function OpportunityDetailsScreen() {
         | undefined
     )?.userId;
 
+  const role =
+    String(
+      user?.role ?? ''
+    ).toUpperCase();
+
+  const isStudent =
+    role === 'STUDENT';
+
+  const isAdmin =
+    role === 'ADMIN';
+
   const loadProject =
-    useCallback(async () => {
-      if (!id) {
-        setError(
-          'Project ID was not provided.'
-        );
-
-        setLoading(false);
-
-        return;
-      }
-
-      try {
-        setError('');
-
-        const result =
-          await api.get<ProjectDetails>(
-            `/projects/${id}`
+    useCallback(
+      async () => {
+        if (!id) {
+          setError(
+            'Project ID was not provided.'
           );
 
-        setProject(result);
-      } catch (e) {
-        setError(
-          e instanceof Error
-            ? e.message
-            : 'Could not load this opportunity.'
-        );
-      } finally {
-        setLoading(false);
-      }
-    }, [id]);
+          setLoading(false);
+          return;
+        }
+
+        try {
+          setError('');
+
+          const result =
+            await api.get<ProjectDetails>(
+              `/projects/${id}`
+            );
+
+          setProject(result);
+        } catch (e) {
+          setError(
+            e instanceof Error
+              ? e.message
+              : 'Could not load this opportunity.'
+          );
+        } finally {
+          setLoading(false);
+        }
+      },
+      [id]
+    );
 
   useEffect(() => {
     loadProject();
@@ -157,10 +305,24 @@ export default function OpportunityDetailsScreen() {
 
   const myApplication =
     useMemo(() => {
+      if (!project) {
+        return undefined;
+      }
+
       if (
-        !project ||
-        !currentUserId
+        project.applicationStatus
       ) {
+        return {
+          id: 'current',
+          status:
+            project.applicationStatus,
+          userId:
+            currentUserId ?? '',
+          createdAt: '',
+        } satisfies ProjectApplication;
+      }
+
+      if (!currentUserId) {
         return undefined;
       }
 
@@ -178,22 +340,75 @@ export default function OpportunityDetailsScreen() {
     myApplication?.status ?? null;
 
   const hasApplied =
-    Boolean(myApplication);
+    Boolean(
+      project?.hasApplied ||
+        myApplication
+    );
 
   const isCreator =
     Boolean(
-      project?.creatorId &&
-        currentUserId &&
-        project.creatorId ===
-          currentUserId
+      project?.isCreator ||
+        (
+          project?.creatorId &&
+          currentUserId &&
+          project.creatorId ===
+            currentUserId
+        )
     );
+
+  const canManage =
+    isCreator ||
+    isAdmin;
+
+  const deadlineDate =
+    project?.applicationDeadline
+      ? new Date(
+          project.applicationDeadline
+        )
+      : null;
+
+  const applicationsClosed =
+    Boolean(
+      deadlineDate &&
+        !Number.isNaN(
+          deadlineDate.getTime()
+        ) &&
+        deadlineDate.getTime() <
+          Date.now()
+    );
+
+  const canApply =
+    Boolean(
+      project &&
+        isStudent &&
+        !isCreator &&
+        !hasApplied &&
+        project.isActive !==
+          false &&
+        !applicationsClosed &&
+        !applying
+    );
+
+  const statusDetails =
+    applicationStatus
+      ? getStatusDetails(
+          applicationStatus
+        )
+      : null;
+
+  const statusColor =
+    statusDetails?.tone ===
+    'danger'
+      ? '#B3261E'
+      : statusDetails?.tone ===
+        'warning'
+        ? '#B7791F'
+        : accentColor;
 
   async function applyToProject() {
     if (
       !project ||
-      applying ||
-      hasApplied ||
-      isCreator
+      !canApply
     ) {
       return;
     }
@@ -224,6 +439,32 @@ export default function OpportunityDetailsScreen() {
     }
   }
 
+  async function openUrl(
+    url: string
+  ) {
+    try {
+      const supported =
+        await Linking.canOpenURL(
+          url
+        );
+
+      if (!supported) {
+        setError(
+          'This link could not be opened.'
+        );
+        return;
+      }
+
+      await Linking.openURL(
+        url
+      );
+    } catch {
+      setError(
+        'This link could not be opened.'
+      );
+    }
+  }
+
   if (loading) {
     return <Loading />;
   }
@@ -232,24 +473,30 @@ export default function OpportunityDetailsScreen() {
     return (
       <Screen>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
           onPress={() =>
             router.back()
           }
-          style={({ pressed }) => [
+          style={({
+            pressed,
+          }) => [
             styles.backButton,
             pressed &&
-              styles.backButtonPressed,
+              styles.pressed,
           ]}
         >
           <Ionicons
             name="arrow-back"
             size={20}
-            color={colors.text}
+            color={
+              colors.text
+            }
           />
 
           <Text
             style={[
-              styles.backButtonText,
+              styles.backText,
               {
                 color:
                   colors.text,
@@ -268,28 +515,40 @@ export default function OpportunityDetailsScreen() {
     );
   }
 
+  const formattedDeadline =
+    formatDeadline(
+      project.applicationDeadline
+    );
+
   return (
     <Screen>
-      {/* SMALL BACK BUTTON */}
+      {/* BACK */}
+
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
         onPress={() =>
           router.back()
         }
-        style={({ pressed }) => [
+        style={({
+          pressed,
+        }) => [
           styles.backButton,
           pressed &&
-            styles.backButtonPressed,
+            styles.pressed,
         ]}
       >
         <Ionicons
           name="arrow-back"
           size={20}
-          color={colors.text}
+          color={
+            colors.text
+          }
         />
 
         <Text
           style={[
-            styles.backButtonText,
+            styles.backText,
             {
               color:
                 colors.text,
@@ -300,8 +559,15 @@ export default function OpportunityDetailsScreen() {
         </Text>
       </Pressable>
 
-      {/* PAGE HEADER */}
-      <Heading subtitle="Review the project details before applying.">
+      {/* HEADER */}
+
+      <Heading
+        subtitle={
+          canManage
+            ? 'View the full project information and manage this initiative.'
+            : 'Review the complete project information before joining.'
+        }
+      >
         Opportunity Details
       </Heading>
 
@@ -315,12 +581,12 @@ export default function OpportunityDetailsScreen() {
         <Card>
           <View
             style={
-              styles.successRow
+              styles.messageRow
             }
           >
             <Ionicons
               name="checkmark-circle"
-              size={24}
+              size={23}
               color={
                 accentColor
               }
@@ -341,7 +607,23 @@ export default function OpportunityDetailsScreen() {
         </Card>
       ) : null}
 
-      {/* MAIN PROJECT CARD */}
+      {/* PROJECT IMAGE */}
+
+      {project.imageUrl ? (
+        <Image
+          source={{
+            uri:
+              project.imageUrl,
+          }}
+          contentFit="cover"
+          style={
+            styles.heroImage
+          }
+        />
+      ) : null}
+
+      {/* PROJECT SUMMARY */}
+
       <Card>
         <View
           style={
@@ -358,7 +640,7 @@ export default function OpportunityDetailsScreen() {
             ]}
           >
             <Ionicons
-              name="leaf-outline"
+              name="layers-outline"
               size={16}
               color={
                 accentColor
@@ -374,9 +656,8 @@ export default function OpportunityDetailsScreen() {
                 },
               ]}
             >
-              {project.category.replaceAll(
-                '_',
-                ' '
+              {formatCategory(
+                project.category
               )}
             </Text>
           </View>
@@ -459,35 +740,69 @@ export default function OpportunityDetailsScreen() {
             </Text>
           </View>
         ) : null}
+
+        <View
+          style={
+            styles.infoRow
+          }
+        >
+          <Ionicons
+            name={
+              project.isActive ===
+              false
+                ? 'pause-circle-outline'
+                : 'checkmark-circle-outline'
+            }
+            size={17}
+            color={
+              project.isActive ===
+              false
+                ? '#B7791F'
+                : accentColor
+            }
+          />
+
+          <Text
+            style={[
+              styles.infoText,
+              {
+                color:
+                  project.isActive ===
+                  false
+                    ? '#B7791F'
+                    : accentColor,
+
+                fontWeight:
+                  '700',
+              },
+            ]}
+          >
+            {project.isActive ===
+            false
+              ? 'Inactive project'
+              : 'Active project'}
+          </Text>
+        </View>
       </Card>
 
       {/* APPLICATION STATUS */}
-      {hasApplied ? (
+
+      {isStudent &&
+      hasApplied &&
+      statusDetails ? (
         <Card>
           <View
             style={
-              styles.statusHeader
+              styles.statusRow
             }
           >
             <Ionicons
               name={
-                applicationStatus ===
-                'APPROVED'
-                  ? 'checkmark-circle'
-                  : applicationStatus ===
-                      'DECLINED'
-                    ? 'close-circle'
-                    : 'time-outline'
+                statusDetails.icon
               }
-              size={23}
+              size={24}
               color={
-                applicationStatus ===
-                'APPROVED'
-                  ? accentColor
-                  : applicationStatus ===
-                      'DECLINED'
-                    ? '#B3261E'
-                    : '#B7791F'
+                statusColor
               }
             />
 
@@ -513,78 +828,50 @@ export default function OpportunityDetailsScreen() {
                   styles.statusValue,
                   {
                     color:
-                      applicationStatus ===
-                      'APPROVED'
-                        ? accentColor
-                        : applicationStatus ===
-                            'DECLINED'
-                          ? '#B3261E'
-                          : '#B7791F',
+                      statusColor,
                   },
                 ]}
               >
-                {applicationStatus ===
-                'APPROVED'
-                  ? 'Approved'
-                  : applicationStatus ===
-                      'DECLINED'
-                    ? 'Declined'
-                    : 'Pending'}
+                {
+                  statusDetails.label
+                }
               </Text>
             </View>
           </View>
 
           <Text
             style={[
-              styles.description,
+              styles.bodyText,
               {
                 color:
                   colors.muted,
               },
             ]}
           >
-            {applicationStatus ===
-            'APPROVED'
-              ? 'Your request to participate in this project has been approved.'
-              : applicationStatus ===
-                  'DECLINED'
-                ? 'Your request to participate in this project was declined.'
-                : 'Your request has been submitted and is waiting for review.'}
+            {
+              statusDetails.message
+            }
           </Text>
         </Card>
       ) : null}
 
       {/* OVERVIEW */}
-      <Card>
-        <View
-          style={
-            styles.sectionHeadingRow
-          }
-        >
-          <Ionicons
-            name="information-circle-outline"
-            size={21}
-            color={
-              accentColor
-            }
-          />
 
-          <Text
-            style={[
-              styles.sectionTitle,
-              {
-                color:
-                  colors.text,
-              },
-            ]}
-          >
-            Overview
-          </Text>
-        </View>
+      <Card>
+        <SectionHeading
+          icon="information-circle-outline"
+          title="Overview"
+          color={
+            colors.text
+          }
+          accent={
+            accentColor
+          }
+        />
 
         <Text
           style={[
-            styles.description,
+            styles.bodyText,
             {
               color:
                 colors.muted,
@@ -595,37 +882,153 @@ export default function OpportunityDetailsScreen() {
         </Text>
       </Card>
 
-      {/* REQUIREMENTS */}
-      <Card>
-        <View
-          style={
-            styles.sectionHeadingRow
-          }
-        >
-          <Ionicons
-            name="checkmark-circle-outline"
-            size={21}
-            color={
-              accentColor
-            }
-          />
+      {/* PROJECT DETAILS */}
 
-          <Text
-            style={[
-              styles.sectionTitle,
-              {
-                color:
-                  colors.text,
-              },
-            ]}
-          >
-            Requirements
-          </Text>
-        </View>
+      <Card>
+        <SectionHeading
+          icon="calendar-outline"
+          title="Project Details"
+          color={
+            colors.text
+          }
+          accent={
+            accentColor
+          }
+        />
+
+        <DetailRow
+          icon="time-outline"
+          label="Duration"
+          value={
+            project.durationWeeks
+              ? `${project.durationWeeks} week${
+                  project.durationWeeks ===
+                  1
+                    ? ''
+                    : 's'
+                }`
+              : 'Flexible / not specified'
+          }
+          textColor={
+            colors.text
+          }
+          mutedColor={
+            colors.muted
+          }
+        />
+
+        <DetailRow
+          icon="calendar-number-outline"
+          label="Application Deadline"
+          value={
+            formattedDeadline ??
+            'No deadline specified'
+          }
+          textColor={
+            colors.text
+          }
+          mutedColor={
+            colors.muted
+          }
+        />
+
+        <DetailRow
+          icon="people-outline"
+          label="Team Capacity"
+          value={
+            project.teamCapacity
+              ? `${project.teamCapacity} participant${
+                  project.teamCapacity ===
+                  1
+                    ? ''
+                    : 's'
+                }`
+              : 'Not specified'
+          }
+          textColor={
+            colors.text
+          }
+          mutedColor={
+            colors.muted
+          }
+        />
+
+        <DetailRow
+          icon="cube-outline"
+          label="Deliverable Type"
+          value={
+            project.deliverableType ||
+            'Software Solution'
+          }
+          textColor={
+            colors.text
+          }
+          mutedColor={
+            colors.muted
+          }
+        />
+      </Card>
+
+      {/* SKILLS */}
+
+      <Card>
+        <SectionHeading
+          icon="construct-outline"
+          title="Skills & Technology"
+          color={
+            colors.text
+          }
+          accent={
+            accentColor
+          }
+        />
+
+        <DetailTextBlock
+          label="Skills Needed"
+          value={
+            project.skillsNeeded
+          }
+          fallback="No specific skills were listed."
+          textColor={
+            colors.text
+          }
+          mutedColor={
+            colors.muted
+          }
+        />
+
+        <DetailTextBlock
+          label="Tech Stack"
+          value={
+            project.techStack
+          }
+          fallback="No technology stack was specified."
+          textColor={
+            colors.text
+          }
+          mutedColor={
+            colors.muted
+          }
+        />
+      </Card>
+
+      {/* REQUIREMENTS */}
+
+      <Card>
+        <SectionHeading
+          icon="checkmark-circle-outline"
+          title="Requirements"
+          color={
+            colors.text
+          }
+          accent={
+            accentColor
+          }
+        />
 
         <Text
           style={[
-            styles.description,
+            styles.bodyText,
             {
               color:
                 colors.muted,
@@ -638,33 +1041,219 @@ export default function OpportunityDetailsScreen() {
         </Text>
       </Card>
 
-      {/* EXPERIENCE REWARD */}
-      <Card>
-        <View
-          style={
-            styles.sectionHeadingRow
-          }
-        >
-          <Ionicons
-            name="star-outline"
-            size={21}
+      {/* LINKS */}
+
+      {(project.projectUrl ||
+        project.githubUrl ||
+        project.isGithubBacked) ? (
+        <Card>
+          <SectionHeading
+            icon="link-outline"
+            title="Project Links"
             color={
+              colors.text
+            }
+            accent={
               accentColor
             }
           />
 
-          <Text
-            style={[
-              styles.sectionTitle,
-              {
-                color:
-                  colors.text,
-              },
-            ]}
-          >
-            Experience Reward
-          </Text>
-        </View>
+          {project.githubUrl ? (
+            <View
+              style={
+                styles.linkBlock
+              }
+            >
+              <View
+                style={
+                  styles.linkTitleRow
+                }
+              >
+                <Ionicons
+                  name="logo-github"
+                  size={20}
+                  color={
+                    colors.text
+                  }
+                />
+
+                <View
+                  style={
+                    styles.linkTitleCopy
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.detailLabel,
+                      {
+                        color:
+                          colors.text,
+                      },
+                    ]}
+                  >
+                    GitHub Repository
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.smallText,
+                      {
+                        color:
+                          colors.muted,
+                      },
+                    ]}
+                  >
+                    {project.githubFullName ||
+                      [
+                        project.githubOwner,
+                        project.githubRepo,
+                      ]
+                        .filter(Boolean)
+                        .join('/') ||
+                      'Linked repository'}
+                  </Text>
+                </View>
+              </View>
+
+              {(project.primaryLanguage ||
+                project.githubVisibility) ? (
+                <Text
+                  style={[
+                    styles.smallText,
+                    {
+                      color:
+                        colors.muted,
+                    },
+                  ]}
+                >
+                  {[
+                    project.primaryLanguage,
+                    project.githubVisibility
+                      ? `${project.githubVisibility} repository`
+                      : null,
+                    typeof project.githubStars ===
+                    'number'
+                      ? `${project.githubStars} stars`
+                      : null,
+                    typeof project.githubForks ===
+                    'number'
+                      ? `${project.githubForks} forks`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' • ')}
+                </Text>
+              ) : null}
+
+              <Button
+                title="Open GitHub Repository"
+                secondary
+                onPress={() =>
+                  openUrl(
+                    project.githubUrl!
+                  )
+                }
+              />
+            </View>
+          ) : project.isGithubBacked ? (
+            <Text
+              style={[
+                styles.bodyText,
+                {
+                  color:
+                    colors.muted,
+                },
+              ]}
+            >
+              This is a GitHub-backed
+              project, but no public
+              repository URL is
+              available.
+            </Text>
+          ) : null}
+
+          {project.projectUrl ? (
+            <View
+              style={
+                styles.linkBlock
+              }
+            >
+              <View
+                style={
+                  styles.linkTitleRow
+                }
+              >
+                <Ionicons
+                  name="globe-outline"
+                  size={20}
+                  color={
+                    accentColor
+                  }
+                />
+
+                <View
+                  style={
+                    styles.linkTitleCopy
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.detailLabel,
+                      {
+                        color:
+                          colors.text,
+                      },
+                    ]}
+                  >
+                    Project / Demo
+                  </Text>
+
+                  <Text
+                    numberOfLines={
+                      1
+                    }
+                    style={[
+                      styles.smallText,
+                      {
+                        color:
+                          colors.muted,
+                      },
+                    ]}
+                  >
+                    {
+                      project.projectUrl
+                    }
+                  </Text>
+                </View>
+              </View>
+
+              <Button
+                title="Open Project Link"
+                secondary
+                onPress={() =>
+                  openUrl(
+                    project.projectUrl!
+                  )
+                }
+              />
+            </View>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {/* EXPERIENCE */}
+
+      <Card>
+        <SectionHeading
+          icon="star-outline"
+          title="Experience Reward"
+          color={
+            colors.text
+          }
+          accent={
+            accentColor
+          }
+        />
 
         <Text
           style={[
@@ -677,22 +1266,38 @@ export default function OpportunityDetailsScreen() {
         >
           {project.xpReward} XP
         </Text>
+
+        <Text
+          style={[
+            styles.smallText,
+            {
+              color:
+                colors.muted,
+            },
+          ]}
+        >
+          Experience points are
+          awarded according to the
+          project's participation
+          and completion rules.
+        </Text>
       </Card>
 
-      {/* ACTION AREA */}
-      {isCreator ? (
+      {/* DEADLINE / INACTIVE NOTICE */}
+
+      {!hasApplied &&
+      isStudent &&
+      applicationsClosed ? (
         <Card>
           <View
             style={
-              styles.statusHeader
+              styles.warningRow
             }
           >
             <Ionicons
-              name="person-circle-outline"
-              size={23}
-              color={
-                accentColor
-              }
+              name="calendar-outline"
+              size={22}
+              color="#B7791F"
             />
 
             <View
@@ -709,24 +1314,103 @@ export default function OpportunityDetailsScreen() {
                   },
                 ]}
               >
-                Your Project
+                Applications Closed
               </Text>
 
               <Text
                 style={[
-                  styles.description,
+                  styles.smallText,
                   {
                     color:
                       colors.muted,
                   },
                 ]}
               >
-                You created this community project.
+                The application
+                deadline for this
+                project has passed.
               </Text>
             </View>
           </View>
         </Card>
-      ) : hasApplied ? (
+      ) : null}
+
+      {!hasApplied &&
+      isStudent &&
+      project.isActive ===
+        false ? (
+        <Card>
+          <View
+            style={
+              styles.warningRow
+            }
+          >
+            <Ionicons
+              name="pause-circle-outline"
+              size={22}
+              color="#B7791F"
+            />
+
+            <View
+              style={
+                styles.statusCopy
+              }
+            >
+              <Text
+                style={[
+                  styles.statusHeading,
+                  {
+                    color:
+                      colors.text,
+                  },
+                ]}
+              >
+                Project Inactive
+              </Text>
+
+              <Text
+                style={[
+                  styles.smallText,
+                  {
+                    color:
+                      colors.muted,
+                  },
+                ]}
+              >
+                This project is not
+                currently accepting
+                applications.
+              </Text>
+            </View>
+          </View>
+        </Card>
+      ) : null}
+
+      {/* ACTION AREA */}
+
+      {canManage ? (
+        <>
+          <Button
+            title="Manage Project"
+            onPress={() =>
+              router.push(
+                `/community/manage/${project.id}` as never
+              )
+            }
+          />
+
+          <Button
+            title="Review Join Requests"
+            secondary
+            onPress={() =>
+              router.push(
+                `/community/requests/${project.id}` as never
+              )
+            }
+          />
+        </>
+      ) : isStudent &&
+        hasApplied ? (
         <View
           style={
             styles.applicationComplete
@@ -749,10 +1433,14 @@ export default function OpportunityDetailsScreen() {
               },
             ]}
           >
-            Your application status is shown above.
+            Your application status
+            is shown above.
           </Text>
         </View>
-      ) : (
+      ) : isStudent &&
+        !applicationsClosed &&
+        project.isActive !==
+          false ? (
         <Button
           title={
             applying
@@ -763,55 +1451,283 @@ export default function OpportunityDetailsScreen() {
             applyToProject
           }
           disabled={
-            applying
+            !canApply
           }
         />
-      )}
+      ) : !isStudent ? (
+        <Card>
+          <View
+            style={
+              styles.viewOnlyRow
+            }
+          >
+            <Ionicons
+              name="eye-outline"
+              size={21}
+              color={
+                colors.muted
+              }
+            />
+
+            <Text
+              style={[
+                styles.viewOnlyText,
+                {
+                  color:
+                    colors.muted,
+                },
+              ]}
+            >
+              This account can view
+              the opportunity. Student
+              accounts can apply to
+              participate.
+            </Text>
+          </View>
+        </Card>
+      ) : null}
     </Screen>
+  );
+}
+
+type SectionHeadingProps = {
+  icon:
+    | 'information-circle-outline'
+    | 'calendar-outline'
+    | 'construct-outline'
+    | 'checkmark-circle-outline'
+    | 'link-outline'
+    | 'star-outline';
+
+  title: string;
+  color: string;
+  accent: string;
+};
+
+function SectionHeading({
+  icon,
+  title,
+  color,
+  accent,
+}: SectionHeadingProps) {
+  return (
+    <View
+      style={
+        styles.sectionHeadingRow
+      }
+    >
+      <Ionicons
+        name={
+          icon
+        }
+        size={21}
+        color={
+          accent
+        }
+      />
+
+      <Text
+        style={[
+          styles.sectionTitle,
+          {
+            color,
+          },
+        ]}
+      >
+        {title}
+      </Text>
+    </View>
+  );
+}
+
+type DetailRowProps = {
+  icon:
+    | 'time-outline'
+    | 'calendar-number-outline'
+    | 'people-outline'
+    | 'cube-outline';
+
+  label: string;
+  value: string;
+  textColor: string;
+  mutedColor: string;
+};
+
+function DetailRow({
+  icon,
+  label,
+  value,
+  textColor,
+  mutedColor,
+}: DetailRowProps) {
+  return (
+    <View
+      style={
+        styles.detailRow
+      }
+    >
+      <Ionicons
+        name={
+          icon
+        }
+        size={19}
+        color={
+          mutedColor
+        }
+      />
+
+      <View
+        style={
+          styles.detailCopy
+        }
+      >
+        <Text
+          style={[
+            styles.detailLabel,
+            {
+              color:
+                textColor,
+            },
+          ]}
+        >
+          {label}
+        </Text>
+
+        <Text
+          style={[
+            styles.detailValue,
+            {
+              color:
+                mutedColor,
+            },
+          ]}
+        >
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+type DetailTextBlockProps = {
+  label: string;
+  value?: string | null;
+  fallback: string;
+  textColor: string;
+  mutedColor: string;
+};
+
+function DetailTextBlock({
+  label,
+  value,
+  fallback,
+  textColor,
+  mutedColor,
+}: DetailTextBlockProps) {
+  return (
+    <View
+      style={
+        styles.textBlock
+      }
+    >
+      <Text
+        style={[
+          styles.detailLabel,
+          {
+            color:
+              textColor,
+          },
+        ]}
+      >
+        {label}
+      </Text>
+
+      <Text
+        style={[
+          styles.bodyText,
+          {
+            color:
+              mutedColor,
+          },
+        ]}
+      >
+        {value?.trim()
+          ? value
+          : fallback}
+      </Text>
+    </View>
   );
 }
 
 const styles =
   StyleSheet.create({
     backButton: {
-      alignSelf: 'flex-start',
-      flexDirection: 'row',
-      alignItems: 'center',
+      alignSelf:
+        'flex-start',
+
+      flexDirection:
+        'row',
+
+      alignItems:
+        'center',
+
       gap: 6,
+
       paddingVertical: 8,
       paddingHorizontal: 4,
+
       marginBottom: 4,
     },
 
-    backButtonPressed: {
-      opacity: 0.6,
-    },
-
-    backButtonText: {
+    backText: {
       fontSize: 15,
       fontWeight: '700',
     },
 
+    pressed: {
+      opacity: 0.65,
+    },
+
+    heroImage: {
+      width: '100%',
+      height: 200,
+      borderRadius: 18,
+    },
+
     categoryRow: {
-      flexDirection: 'row',
+      flexDirection:
+        'row',
+
+      alignItems:
+        'center',
+
       justifyContent:
         'space-between',
-      alignItems: 'center',
+
       gap: 10,
     },
 
     categoryBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection:
+        'row',
+
+      alignItems:
+        'center',
+
       gap: 6,
+
+      borderRadius: 14,
+
       paddingHorizontal: 10,
       paddingVertical: 7,
-      borderRadius: 14,
+
+      flexShrink: 1,
     },
 
     categoryText: {
       fontSize: 11,
       fontWeight: '800',
+      flexShrink: 1,
     },
 
     xp: {
@@ -826,9 +1742,14 @@ const styles =
     },
 
     infoRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection:
+        'row',
+
+      alignItems:
+        'center',
+
       gap: 7,
+
       marginTop: 8,
     },
 
@@ -837,9 +1758,29 @@ const styles =
       fontSize: 13,
     },
 
+    messageRow: {
+      flexDirection:
+        'row',
+
+      alignItems:
+        'center',
+
+      gap: 9,
+    },
+
+    successText: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+
     sectionHeadingRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection:
+        'row',
+
+      alignItems:
+        'center',
+
       gap: 8,
     },
 
@@ -848,27 +1789,29 @@ const styles =
       fontWeight: '800',
     },
 
-    description: {
+    bodyText: {
       fontSize: 14,
       lineHeight: 21,
       marginTop: 7,
     },
 
-    successRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    statusRow: {
+      flexDirection:
+        'row',
+
+      alignItems:
+        'center',
+
       gap: 10,
     },
 
-    successText: {
-      flex: 1,
-      fontSize: 14,
-      fontWeight: '700',
-    },
+    warningRow: {
+      flexDirection:
+        'row',
 
-    statusHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      alignItems:
+        'flex-start',
+
       gap: 10,
     },
 
@@ -887,6 +1830,61 @@ const styles =
       marginTop: 2,
     },
 
+    detailRow: {
+      flexDirection:
+        'row',
+
+      alignItems:
+        'flex-start',
+
+      gap: 10,
+
+      paddingVertical: 4,
+    },
+
+    detailCopy: {
+      flex: 1,
+    },
+
+    detailLabel: {
+      fontSize: 13,
+      fontWeight: '800',
+    },
+
+    detailValue: {
+      fontSize: 13,
+      lineHeight: 19,
+      marginTop: 2,
+    },
+
+    textBlock: {
+      marginTop: 5,
+    },
+
+    linkBlock: {
+      gap: 8,
+      marginTop: 6,
+    },
+
+    linkTitleRow: {
+      flexDirection:
+        'row',
+
+      alignItems:
+        'center',
+
+      gap: 9,
+    },
+
+    linkTitleCopy: {
+      flex: 1,
+    },
+
+    smallText: {
+      fontSize: 12,
+      lineHeight: 18,
+    },
+
     xpLarge: {
       fontSize: 20,
       fontWeight: '800',
@@ -894,15 +1892,39 @@ const styles =
     },
 
     applicationComplete: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
+      flexDirection:
+        'row',
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
       gap: 7,
+
       paddingVertical: 10,
     },
 
     applicationCompleteText: {
       fontSize: 13,
+      fontWeight: '600',
+    },
+
+    viewOnlyRow: {
+      flexDirection:
+        'row',
+
+      alignItems:
+        'center',
+
+      gap: 9,
+    },
+
+    viewOnlyText: {
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 19,
       fontWeight: '600',
     },
   });
