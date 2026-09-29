@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Card, Stat } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
-import type { DashboardStats, GithubActivity } from '@/types/api';
+import type { DashboardStats, GithubActivity, Task } from '@/types/api';
 
 function getLevelTitle(level: number): string {
   if (level >= 20) return 'Principal Innovator';
@@ -33,6 +33,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { colors, theme } = useTheme();
   const [data, setData] = useState<DashboardStats | null>(null);
+  const [activeTasks, setActiveTasks] = useState<Task[]>([]);
   const [communityActivity, setCommunityActivity] = useState<GithubActivity[]>([]);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -40,9 +41,14 @@ export default function HomeScreen() {
   const load = useCallback(async () => {
     try {
       setError('');
-      const stats = await api.get<DashboardStats>('/dashboard/stats');
+      const [stats, taskList, feed] = await Promise.all([
+        api.get<DashboardStats>('/dashboard/stats'),
+        api.get<Task[]>('/tasks').catch(() => []),
+        api.get<GithubActivity[]>('/github/feed').catch(() => []),
+      ]);
       setData(stats);
-      api.get<GithubActivity[]>('/github/feed').then(setCommunityActivity).catch(() => setCommunityActivity([]));
+      setActiveTasks(taskList.filter((t) => t.status === 'IN_PROGRESS'));
+      setCommunityActivity(feed);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load dashboard.');
     }
@@ -57,6 +63,12 @@ export default function HomeScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load])
+  );
 
   if (!data && !error) return <Loading />;
 
@@ -81,8 +93,6 @@ export default function HomeScreen() {
     { label: 'Tasks This Week', value: tasksCompletedThisWeek.toString(), caption: 'Completed', icon: 'checkmark-circle' as const },
     { label: 'Lessons Mastered', value: lessonsCompleted.toString(), caption: 'Across 11 tracks', icon: 'book' as const },
   ];
-
-
 
   const workspaces: { title: string; description: string; route: string; icon: keyof typeof Ionicons.glyphMap }[] = [
     { title: 'Learning Hub', description: 'Curriculum tracks, role paths & flashcards.', route: '/coding', icon: 'code-slash' },
@@ -155,68 +165,58 @@ export default function HomeScreen() {
         ))}
       </View>
 
-      {/* Next Actions Card (Spine) */}
-      {profile?.nextActions && (
+      {/* Next Action Queue: Appears ONLY when tasks are currently in progress */}
+      {activeTasks.length > 0 ? (
         <>
-          <Text style={[styles.section, { color: colors.text }]}>Next Action Queue</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.section, { color: colors.text }]}>Next Action Queue</Text>
+            <View style={[styles.activeCountBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', borderColor: primaryAccent }]}>
+              <View style={[styles.pulseDot, { backgroundColor: primaryAccent }]} />
+              <Text style={[styles.activeCountText, { color: primaryAccent }]}>
+                {activeTasks.length} in progress
+              </Text>
+            </View>
+          </View>
           <Card>
-            <View style={{ gap: 12 }}>
-              {profile.nextActions.nextLesson && (
+            <View style={{ gap: 10 }}>
+              {activeTasks.map((task, idx) => (
                 <Pressable
-                  onPress={() => router.push('/coding' as never)}
-                  style={styles.nextActionItem}
+                  key={task.id}
+                  onPress={() => router.push('/tasks' as never)}
+                  style={({ pressed }) => [
+                    styles.activeTaskRow,
+                    idx > 0 && [styles.taskDivider, { borderTopColor: colors.border }],
+                    pressed && styles.workspacePressed,
+                  ]}
                 >
-                  <View style={[styles.nextActionIcon, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
-                    <Ionicons name="book-outline" size={16} color={primaryAccent} />
+                  <View style={[styles.taskStatusIcon, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
+                    <Ionicons name="play" size={14} color={primaryAccent} />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.nextActionType, { color: primaryAccent }]}>Curriculum Lesson</Text>
-                    <Text style={[styles.nextActionTitle, { color: colors.text }]}>{profile.nextActions.nextLesson.title}</Text>
-                    <Text style={[styles.nextActionSubtitle, { color: colors.muted }]}>{profile.nextActions.nextLesson.track} Track</Text>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={[styles.activeTaskTitle, { color: colors.text }]}>{task.title}</Text>
+                    {task.description ? (
+                      <Text numberOfLines={2} style={[styles.activeTaskDesc, { color: colors.muted }]}>
+                        {task.description}
+                      </Text>
+                    ) : null}
+                    <View style={styles.taskMetaRow}>
+                      <View style={[styles.inProgressBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
+                        <Text style={[styles.inProgressBadgeText, { color: primaryAccent }]}>IN PROGRESS</Text>
+                      </View>
+                      {task.dueDate ? (
+                        <Text style={[styles.taskDueText, { color: colors.muted }]}>
+                          Due {new Date(task.dueDate).toLocaleDateString()}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.muted} />
                 </Pressable>
-              )}
-
-              {profile.nextActions.nextChallenge && (
-                <Pressable
-                  onPress={() => router.push('/coding' as never)}
-                  style={styles.nextActionItem}
-                >
-                  <View style={[styles.nextActionIcon, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
-                    <Ionicons name="code-slash-outline" size={16} color={primaryAccent} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.nextActionType, { color: primaryAccent }]}>Coding Challenge</Text>
-                    <Text style={[styles.nextActionTitle, { color: colors.text }]}>{profile.nextActions.nextChallenge.title}</Text>
-                    <Text style={[styles.nextActionSubtitle, { color: colors.muted }]}>{profile.nextActions.nextChallenge.difficulty} · {profile.nextActions.nextChallenge.language}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-                </Pressable>
-              )}
-
-              {profile.nextActions.nextInterviewTopic && (
-                <Pressable
-                  onPress={() => router.push('/interviews' as never)}
-                  style={styles.nextActionItem}
-                >
-                  <View style={[styles.nextActionIcon, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
-                    <Ionicons name="mic-outline" size={16} color={primaryAccent} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.nextActionType, { color: primaryAccent }]}>Interview Focus</Text>
-                    <Text style={[styles.nextActionTitle, { color: colors.text }]}>{profile.nextActions.nextInterviewTopic.topic}</Text>
-                    <Text style={[styles.nextActionSubtitle, { color: colors.muted }]}>{profile.nextActions.nextInterviewTopic.reason}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-                </Pressable>
-              )}
+              ))}
             </View>
           </Card>
         </>
-      )}
-
-
+      ) : null}
 
       {/* Workspaces / Navigation */}
       <Text style={[styles.section, { color: colors.text }]}>Platform Workspaces</Text>
@@ -282,6 +282,19 @@ const styles = StyleSheet.create({
   progressBarFill: { height: '100%', borderRadius: 4 },
   muted: { fontSize: 13 },
   section: { fontSize: 17, fontWeight: '800', marginTop: 14, marginBottom: 2 },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 2 },
+  activeCountBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },
+  pulseDot: { width: 6, height: 6, borderRadius: 3 },
+  activeCountText: { fontSize: 11, fontWeight: '700' },
+  activeTaskRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 8 },
+  taskStatusIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  activeTaskTitle: { fontSize: 15, fontWeight: '700' },
+  activeTaskDesc: { fontSize: 13, lineHeight: 18 },
+  taskMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  inProgressBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  inProgressBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  taskDueText: { fontSize: 11 },
+  taskDivider: { borderTopWidth: 1 },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   kpiCard: { flexBasis: '48%', flexGrow: 1, borderWidth: 1, borderRadius: 12, padding: 12, gap: 4 },
   kpiHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -289,31 +302,6 @@ const styles = StyleSheet.create({
   kpiLabel: { fontSize: 11, fontWeight: '600' },
   kpiValue: { fontSize: 18, fontWeight: '800' },
   kpiCaption: { fontSize: 10, fontWeight: '600' },
-  activityContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 130, paddingTop: 10 },
-  barCol: { flex: 1, alignItems: 'center', gap: 6 },
-  barTrack: { width: 18, height: 95, borderRadius: 6, justifyContent: 'flex-end', overflow: 'hidden' },
-  barFill: { width: '100%', borderRadius: 6 },
-  dayLabel: { fontSize: 11, fontWeight: '600' },
-  tracksHeader: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 12 },
-  overallScore: { fontSize: 26, fontWeight: '800' },
-  overallLabel: { fontSize: 12, fontWeight: '500' },
-  tracksList: { gap: 10 },
-  trackItem: { gap: 4 },
-  trackLabels: { flexDirection: 'row', justifyContent: 'space-between' },
-  trackName: { fontSize: 13, fontWeight: '600' },
-  trackPercent: { fontSize: 12, fontWeight: '700' },
-  trackTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
-  trackFill: { height: '100%', borderRadius: 3 },
-  taskRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, gap: 8 },
-  taskDivider: { borderTopWidth: 1 },
-  taskBody: { flex: 1, gap: 2 },
-  taskTitle: { fontSize: 14, fontWeight: '700' },
-  taskDesc: { fontSize: 12 },
-  dueBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  dueText: { fontSize: 11, fontWeight: '700' },
-  recRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 8 },
-  recIcon: { marginTop: 2 },
-  recText: { flex: 1, fontSize: 13, lineHeight: 19 },
   workspace: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   workspaceDivider: { borderTopWidth: 1 },
   workspacePressed: { opacity: 0.65 },
@@ -323,9 +311,4 @@ const styles = StyleSheet.create({
   workspaceDescription: { fontSize: 12, lineHeight: 16 },
   feedItem: { gap: 3, paddingVertical: 10 },
   feedTitle: { fontSize: 14, fontWeight: '800' },
-  nextActionItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
-  nextActionIcon: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  nextActionType: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-  nextActionTitle: { fontSize: 13, fontWeight: '700' },
-  nextActionSubtitle: { fontSize: 11 },
 });
