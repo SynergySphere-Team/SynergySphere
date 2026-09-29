@@ -1,12 +1,18 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Card, Stat } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
+import {
+  scheduleFocusCompletionNotification,
+  cancelFocusNotification,
+  sendImmediateFocusNotification,
+} from '@/services/notifications';
 import type { DashboardStats, GithubActivity, Task } from '@/types/api';
 
 function getLevelTitle(level: number): string {
@@ -30,13 +36,26 @@ function getGreeting(): string {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, refresh: refreshAuth } = useAuth();
   const { colors, theme } = useTheme();
   const [data, setData] = useState<DashboardStats | null>(null);
   const [activeTasks, setActiveTasks] = useState<Task[]>([]);
   const [communityActivity, setCommunityActivity] = useState<GithubActivity[]>([]);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+
+  // Confined Mini Focus Session State
+  const [focusMinutes, setFocusMinutes] = useState(25);
+  const [focusTimeLeft, setFocusTimeLeft] = useState(25 * 60);
+  const [focusTimerState, setFocusTimerState] = useState<'idle' | 'running' | 'paused' | 'finished'>('idle');
+  const [focusSuccess, setFocusSuccess] = useState('');
+  const [activeNotificationId, setActiveNotificationId] = useState<string | null>(null);
+
+  const focusEndTimeRef = useRef<number | null>(null);
+  const focusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const isLight = theme === 'light';
+  const primaryAccent = isLight ? '#1e6827' : colors.primary;
 
   const load = useCallback(async () => {
     try {
@@ -70,10 +89,127 @@ export default function HomeScreen() {
     }, [load])
   );
 
+  // Focus Timer Handlers
+  const handleFocusComplete = useCallback(async () => {
+    if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
+    focusIntervalRef.current = null;
+    focusEndTimeRef.current = null;
+    setFocusTimerState('finished');
+    setFocusTimeLeft(0);
+
+    try {
+      deactivateKeepAwake();
+    } catch {}
+
+    try {
+      Vibration.vibrate([0, 500, 200, 500]);
+    } catch {}
+
+    await sendImmediateFocusNotification(focusMinutes);
+
+    try {
+      await api.post('/tasks/focus-session', { durationMinutes: focusMinutes });
+      setFocusSuccess(`🎉 ${focusMinutes}m sprint complete! +15 XP earned.`);
+      await Promise.all([load(), refreshAuth()]);
+    } catch {
+      // Ignore save error
+    }
+  }, [focusMinutes, load, refreshAuth]);
+
+  // Sync timer when app returns to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && focusTimerState === 'running' && focusEndTimeRef.current) {
+        const remaining = Math.max(0, Math.round((focusEndTimeRef.current - Date.now()) / 1000));
+        if (remaining <= 0) {
+          handleFocusComplete();
+        } else {
+          setFocusTimeLeft(remaining);
+        }
+      }
+    });
+    return () => subscription.remove();
+  }, [focusTimerState, handleFocusComplete]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
+      try {
+        deactivateKeepAwake();
+      } catch {}
+    };
+  }, []);
+
+  function setPreset(mins: number) {
+    if (focusTimerState === 'running') return;
+    setFocusMinutes(mins);
+    setFocusTimeLeft(mins * 60);
+    setFocusTimerState('idle');
+    setFocusSuccess('');
+    if (activeNotificationId) {
+      cancelFocusNotification(activeNotificationId);
+      setActiveNotificationId(null);
+    }
+  }
+
+  async function startFocusTimer() {
+    setFocusSuccess('');
+    const targetSeconds = focusTimeLeft > 0 ? focusTimeLeft : focusMinutes * 60;
+    focusEndTimeRef.current = Date.now() + targetSeconds * 1000;
+
+    const notifId = await scheduleFocusCompletionNotification(targetSeconds, focusMinutes);
+    if (notifId) setActiveNotificationId(notifId);
+
+    try {
+      await activateKeepAwakeAsync();
+    } catch {}
+
+    setFocusTimerState('running');
+    if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
+    focusIntervalRef.current = setInterval(() => {
+      if (!focusEndTimeRef.current) return;
+      const remaining = Math.max(0, Math.round((focusEndTimeRef.current - Date.now()) / 1000));
+      if (remaining <= 0) {
+        handleFocusComplete();
+      } else {
+        setFocusTimeLeft(remaining);
+      }
+    }, 500);
+  }
+
+  function pauseFocusTimer() {
+    if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
+    focusIntervalRef.current = null;
+    focusEndTimeRef.current = null;
+    if (activeNotificationId) {
+      cancelFocusNotification(activeNotificationId);
+      setActiveNotificationId(null);
+    }
+    try {
+      deactivateKeepAwake();
+    } catch {}
+    setFocusTimerState('paused');
+  }
+
+  function resetFocusTimer() {
+    if (focusIntervalRef.current) clearInterval(focusIntervalRef.current);
+    focusIntervalRef.current = null;
+    focusEndTimeRef.current = null;
+    if (activeNotificationId) {
+      cancelFocusNotification(activeNotificationId);
+      setActiveNotificationId(null);
+    }
+    try {
+      deactivateKeepAwake();
+    } catch {}
+    setFocusTimeLeft(focusMinutes * 60);
+    setFocusTimerState('idle');
+    setFocusSuccess('');
+  }
+
   if (!data && !error) return <Loading />;
 
-  const isLight = theme === 'light';
-  const primaryAccent = isLight ? '#1e6827' : colors.primary;
   const userLevel = data?.user?.level ?? user?.level ?? 1;
   const userXp = data?.user?.xp ?? user?.xp ?? 0;
   const levelTitle = data?.levelTitle || getLevelTitle(userLevel);
@@ -93,6 +229,13 @@ export default function HomeScreen() {
     { label: 'Tasks This Week', value: tasksCompletedThisWeek.toString(), caption: 'Completed', icon: 'checkmark-circle' as const },
     { label: 'Lessons Mastered', value: lessonsCompleted.toString(), caption: 'Across 11 tracks', icon: 'book' as const },
   ];
+
+  const focusMinsFormatted = String(Math.floor(focusTimeLeft / 60)).padStart(2, '0');
+  const focusSecsFormatted = String(focusTimeLeft % 60).padStart(2, '0');
+  const focusProgressPercent = Math.min(
+    100,
+    Math.max(0, ((focusMinutes * 60 - focusTimeLeft) / (focusMinutes * 60)) * 100)
+  );
 
   const workspaces: { title: string; description: string; route: string; icon: keyof typeof Ionicons.glyphMap }[] = [
     { title: 'Learning Hub', description: 'Curriculum tracks, role paths & flashcards.', route: '/coding', icon: 'code-slash' },
@@ -165,7 +308,7 @@ export default function HomeScreen() {
         ))}
       </View>
 
-      {/* Next Action Queue: Appears ONLY when tasks are currently in progress */}
+      {/* Next Action Queue & Confined Focus Session: Appears ONLY when tasks are currently in progress */}
       {activeTasks.length > 0 ? (
         <>
           <View style={styles.sectionHeaderRow}>
@@ -178,7 +321,8 @@ export default function HomeScreen() {
             </View>
           </View>
           <Card>
-            <View style={{ gap: 10 }}>
+            {/* Active Tasks List */}
+            <View style={{ gap: 8 }}>
               {activeTasks.map((task, idx) => (
                 <Pressable
                   key={task.id}
@@ -192,7 +336,7 @@ export default function HomeScreen() {
                   <View style={[styles.taskStatusIcon, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
                     <Ionicons name="play" size={14} color={primaryAccent} />
                   </View>
-                  <View style={{ flex: 1, gap: 3 }}>
+                  <View style={{ flex: 1, gap: 2 }}>
                     <Text style={[styles.activeTaskTitle, { color: colors.text }]}>{task.title}</Text>
                     {task.description ? (
                       <Text numberOfLines={2} style={[styles.activeTaskDesc, { color: colors.muted }]}>
@@ -213,6 +357,99 @@ export default function HomeScreen() {
                   <Ionicons name="chevron-forward" size={16} color={colors.muted} />
                 </Pressable>
               ))}
+            </View>
+
+            {/* Confined Mini Focus Session Box */}
+            <View style={[styles.miniFocusBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+              <View style={styles.miniFocusHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="timer-outline" size={15} color={primaryAccent} />
+                  <Text style={[styles.miniFocusTitle, { color: colors.text }]}>Focus Sprint</Text>
+                </View>
+                <Text
+                  style={[
+                    styles.miniTimerDigits,
+                    { color: focusTimerState === 'running' ? primaryAccent : colors.text },
+                  ]}
+                >
+                  {focusMinsFormatted}:{focusSecsFormatted}
+                </Text>
+              </View>
+
+              {/* Progress bar */}
+              <View style={[styles.miniProgressBarTrack, { backgroundColor: colors.surface }]}>
+                <View style={[styles.miniProgressBarFill, { width: `${focusProgressPercent}%`, backgroundColor: primaryAccent }]} />
+              </View>
+
+              {focusSuccess ? (
+                <Text style={[styles.miniFocusSuccessText, { color: primaryAccent }]}>{focusSuccess}</Text>
+              ) : null}
+
+              {/* Presets and Timer Action Controls */}
+              <View style={styles.miniFocusControlsRow}>
+                {/* Preset Chips */}
+                <View style={styles.presetGroup}>
+                  {[15, 25, 45].map((mins) => (
+                    <Pressable
+                      key={mins}
+                      onPress={() => setPreset(mins)}
+                      style={[
+                        styles.presetChip,
+                        {
+                          backgroundColor:
+                            focusMinutes === mins
+                              ? isLight
+                                ? '#E8F5E9'
+                                : 'rgba(30, 104, 39, 0.25)'
+                              : colors.surface,
+                          borderColor: focusMinutes === mins ? primaryAccent : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.presetChipText,
+                          { color: focusMinutes === mins ? primaryAccent : colors.muted },
+                        ]}
+                      >
+                        {mins}m
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* Start / Pause / Reset Buttons */}
+                <View style={styles.timerBtnGroup}>
+                  {focusTimerState === 'running' ? (
+                    <Pressable
+                      onPress={pauseFocusTimer}
+                      style={[styles.miniActionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    >
+                      <Ionicons name="pause" size={14} color={colors.text} />
+                      <Text style={[styles.miniActionBtnText, { color: colors.text }]}>Pause</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      onPress={startFocusTimer}
+                      style={[styles.miniActionBtn, { backgroundColor: primaryAccent }]}
+                    >
+                      <Ionicons name="play" size={14} color="#FFFFFF" />
+                      <Text style={[styles.miniActionBtnText, { color: '#FFFFFF', fontWeight: '800' }]}>
+                        {focusTimerState === 'paused' ? 'Resume' : 'Focus'}
+                      </Text>
+                    </Pressable>
+                  )}
+
+                  {(focusTimerState === 'paused' || focusTimerState === 'running') && (
+                    <Pressable
+                      onPress={resetFocusTimer}
+                      style={[styles.miniResetBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    >
+                      <Ionicons name="refresh" size={14} color={colors.muted} />
+                    </Pressable>
+                  )}
+                </View>
+              </View>
             </View>
           </Card>
         </>
@@ -295,6 +532,21 @@ const styles = StyleSheet.create({
   inProgressBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   taskDueText: { fontSize: 11 },
   taskDivider: { borderTopWidth: 1 },
+  miniFocusBox: { marginTop: 10, borderRadius: 12, borderWidth: 1, padding: 12, gap: 8 },
+  miniFocusHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  miniFocusTitle: { fontSize: 13, fontWeight: '700' },
+  miniTimerDigits: { fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
+  miniProgressBarTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
+  miniProgressBarFill: { height: '100%', borderRadius: 2 },
+  miniFocusSuccessText: { fontSize: 12, fontWeight: '700' },
+  miniFocusControlsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
+  presetGroup: { flexDirection: 'row', gap: 6 },
+  presetChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
+  presetChipText: { fontSize: 11, fontWeight: '700' },
+  timerBtnGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  miniActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: 'transparent' },
+  miniActionBtnText: { fontSize: 12, fontWeight: '700' },
+  miniResetBtn: { width: 28, height: 28, borderRadius: 6, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   kpiCard: { flexBasis: '48%', flexGrow: 1, borderWidth: 1, borderRadius: 12, padding: 12, gap: 4 },
   kpiHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
