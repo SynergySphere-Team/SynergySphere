@@ -357,7 +357,7 @@ export default function CodingScreen() {
         >
           <Ionicons
             name="school-outline"
-            size={16}
+            size={18}
             color={mode === 'academy' ? '#ffffff' : colors.muted}
           />
           <Text
@@ -365,6 +365,7 @@ export default function CodingScreen() {
               styles.modeTabText,
               { color: mode === 'academy' ? '#ffffff' : colors.text },
             ]}
+            numberOfLines={2}
           >
             Programming Academy
           </Text>
@@ -382,7 +383,7 @@ export default function CodingScreen() {
         >
           <Ionicons
             name="trophy-outline"
-            size={16}
+            size={18}
             color={mode === 'challenges' ? '#ffffff' : colors.muted}
           />
           <Text
@@ -390,6 +391,7 @@ export default function CodingScreen() {
               styles.modeTabText,
               { color: mode === 'challenges' ? '#ffffff' : colors.text },
             ]}
+            numberOfLines={2}
           >
             Coding Challenges
           </Text>
@@ -407,7 +409,7 @@ export default function CodingScreen() {
         >
           <Ionicons
             name="git-network-outline"
-            size={16}
+            size={18}
             color={mode === 'rolepaths' ? '#ffffff' : colors.muted}
           />
           <Text
@@ -415,6 +417,7 @@ export default function CodingScreen() {
               styles.modeTabText,
               { color: mode === 'rolepaths' ? '#ffffff' : colors.text },
             ]}
+            numberOfLines={2}
           >
             Role Paths
           </Text>
@@ -774,9 +777,9 @@ export default function CodingScreen() {
           <Text style={[styles.section, { color: colors.text }]}>Curated Career Role Paths</Text>
           {rolePaths.map((path) => (
             <Card key={path.id}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>{path.title}</Text>
-                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, gap: 8 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, flex: 1 }}>{path.title}</Text>
+                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', flexShrink: 0 }}>
                   <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>{path.totalLessons} Lessons</Text>
                 </View>
               </View>
@@ -813,11 +816,21 @@ export default function CodingScreen() {
 }
 
 const styles = StyleSheet.create({
-  modeTabs: { flexDirection: 'row', gap: 10, marginTop: 4, marginBottom: 10 },
-  modeTab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 10 },
+  modeTabs: { flexDirection: 'row', gap: 8, marginTop: 4, marginBottom: 12 },
+  modeTab: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+    minHeight: 58,
+  },
   modeTabActive: { elevation: 2 },
   modeTabInactive: { borderWidth: 1 },
-  modeTabText: { fontSize: 13, fontWeight: '700' },
+  modeTabText: { fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 14 },
   pressed: { opacity: 0.7 },
   section: { fontSize: 17, fontWeight: '800', marginTop: 14, marginBottom: 6 },
   filterRow: { gap: 8, paddingVertical: 4 },

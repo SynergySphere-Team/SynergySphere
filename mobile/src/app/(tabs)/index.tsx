@@ -117,7 +117,7 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={styles.head}>
         <View style={styles.headTop}>
-          <Text style={[styles.subBrand, { color: primaryAccent }]}>DEVELOPER OS</Text>
+          <Text style={[styles.subBrand, { color: primaryAccent }]}>SYNERGYSPHERE OS</Text>
           <View style={[styles.levelBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', borderColor: primaryAccent }]}>
             <Ionicons name="sparkles" size={12} color={primaryAccent} />
             <Text style={[styles.levelBadgeText, { color: primaryAccent }]}>

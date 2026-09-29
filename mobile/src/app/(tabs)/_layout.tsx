@@ -41,7 +41,9 @@ export default function TabsLayout() {
       if (direction === 'right') {
         if (router.canGoBack()) {
           router.back();
-        } else if (pathname.startsWith('/project-') || pathname === '/github-connect' || pathname === '/my-work') {
+        } else if (pathname === '/my-work') {
+          router.replace('/(tabs)/tasks' as never);
+        } else if (pathname.startsWith('/project-') || pathname === '/github-connect') {
           router.replace('/(tabs)/community' as never);
         } else {
           router.replace('/(tabs)/explore' as never);

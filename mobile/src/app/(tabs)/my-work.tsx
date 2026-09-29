@@ -51,7 +51,13 @@ function relativeDate(value?: string | null) {
   return `${Math.round(minutes / 1440)}d ago`;
 }
 
-export default function MyWorkScreen() {
+export function MyWorkView({
+  showBackButton = true,
+  wrapInScreen = true,
+}: {
+  showBackButton?: boolean;
+  wrapInScreen?: boolean;
+}) {
   const router = useRouter();
   const { colors, theme } = useTheme();
   const isDark = theme === 'dark';
@@ -162,24 +168,26 @@ export default function MyWorkScreen() {
     { id: 'orgs', label: 'Organizations', count: organizations.length, icon: 'business-outline' },
   ];
 
-  return (
-    <Screen>
-      <View style={styles.topNavRow}>
-        <Pressable
-          style={[styles.backNavButton, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace('/(tabs)/community' as never);
-            }
-          }}
-          hitSlop={8}
-        >
-          <Ionicons name="chevron-back" size={18} color={colors.text} />
-          <Text style={[styles.backNavText, { color: colors.text }]}>Community</Text>
-        </Pressable>
-      </View>
+  const content = (
+    <>
+      {showBackButton ? (
+        <View style={styles.topNavRow}>
+          <Pressable
+            style={[styles.backNavButton, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/tasks' as never);
+              }
+            }}
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-back" size={18} color={colors.text} />
+            <Text style={[styles.backNavText, { color: colors.text }]}>Tasks</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {/* Header */}
       <View style={styles.headerRow}>
@@ -741,8 +749,18 @@ export default function MyWorkScreen() {
           </View>
         </>
       ) : null}
-    </Screen>
+    </>
   );
+
+  if (wrapInScreen) {
+    return <Screen>{content}</Screen>;
+  }
+
+  return <View style={{ gap: 12 }}>{content}</View>;
+}
+
+export default function MyWorkScreen() {
+  return <MyWorkView showBackButton wrapInScreen />;
 }
 
 const styles = StyleSheet.create({

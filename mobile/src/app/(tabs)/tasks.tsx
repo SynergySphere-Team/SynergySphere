@@ -2,8 +2,10 @@
 import { AppState, Pressable, StyleSheet, Text, TextInput, Vibration, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { useLocalSearchParams } from 'expo-router';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card, Field } from '@/components/ui';
+import { MyWorkView } from './my-work';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/services/api';
@@ -28,6 +30,18 @@ const nextStatus: Record<Task['status'], Task['status']> = {
 export default function TasksScreen() {
   const { colors, theme } = useTheme();
   const { user, refresh: refreshAuth } = useAuth();
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const [activeModule, setActiveModule] = useState<'productivity' | 'my-work'>(
+    tab === 'my-work' ? 'my-work' : 'productivity'
+  );
+
+  useEffect(() => {
+    if (tab === 'my-work') {
+      setActiveModule('my-work');
+    } else if (tab === 'productivity') {
+      setActiveModule('productivity');
+    }
+  }, [tab]);
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [title, setTitle] = useState('');
@@ -310,7 +324,66 @@ export default function TasksScreen() {
 
   return (
     <Screen>
-      {/* Productivity Center Header */}
+      {/* Module Switcher: Tasks & Focus vs GitHub My Work */}
+      <View style={[styles.moduleTabSwitcher, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setActiveModule('productivity')}
+          style={[
+            styles.moduleTabBtn,
+            activeModule === 'productivity' && [styles.moduleTabBtnActive, { backgroundColor: brandGreen }],
+          ]}
+        >
+          <Ionicons
+            name="checkbox-outline"
+            size={16}
+            color={activeModule === 'productivity' ? '#FFFFFF' : colors.muted}
+          />
+          <Text
+            style={[
+              styles.moduleTabBtnText,
+              {
+                color: activeModule === 'productivity' ? '#FFFFFF' : colors.text,
+                fontWeight: activeModule === 'productivity' ? '800' : '600',
+              },
+            ]}
+          >
+            Tasks & Focus
+          </Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setActiveModule('my-work')}
+          style={[
+            styles.moduleTabBtn,
+            activeModule === 'my-work' && [styles.moduleTabBtnActive, { backgroundColor: brandGreen }],
+          ]}
+        >
+          <Ionicons
+            name="git-pull-request-outline"
+            size={16}
+            color={activeModule === 'my-work' ? '#FFFFFF' : colors.muted}
+          />
+          <Text
+            style={[
+              styles.moduleTabBtnText,
+              {
+                color: activeModule === 'my-work' ? '#FFFFFF' : colors.text,
+                fontWeight: activeModule === 'my-work' ? '800' : '600',
+              },
+            ]}
+          >
+            My Work
+          </Text>
+        </Pressable>
+      </View>
+
+      {activeModule === 'my-work' ? (
+        <MyWorkView showBackButton={false} wrapInScreen={false} />
+      ) : (
+        <>
+          {/* Productivity Center Header */}
       <View style={styles.headerRow}>
         <View style={styles.headerTitleCol}>
           <Text style={[styles.mainHeading, { color: colors.text }]}>Productivity Center</Text>
@@ -658,12 +731,41 @@ export default function TasksScreen() {
             })}
           </View>
         )}
-      </Card>
+        </Card>
+        </>
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  moduleTabSwitcher: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 4,
+    gap: 6,
+    marginBottom: 10,
+  },
+  moduleTabBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  moduleTabBtnActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  moduleTabBtnText: {
+    fontSize: 13,
+  },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
