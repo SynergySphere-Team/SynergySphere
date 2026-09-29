@@ -69,6 +69,8 @@ export default function ProjectDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [tabLoading, setTabLoading] = useState(false);
 
+  const [refreshing, setRefreshing] = useState(false);
+
   const load = useCallback(async () => {
     if (!projectId) return;
     try {
@@ -85,6 +87,12 @@ export default function ProjectDetailScreen() {
       setLoading(false);
     }
   }, [projectId]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -140,7 +148,7 @@ export default function ProjectDetailScreen() {
   const isPrivate = project.githubVisibility === 'private';
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <View style={styles.topNavRow}>
         <Pressable
           style={[styles.backNavButton, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}

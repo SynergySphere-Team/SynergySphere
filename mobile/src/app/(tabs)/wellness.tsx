@@ -35,6 +35,7 @@ export default function WellnessScreen() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -50,6 +51,12 @@ export default function WellnessScreen() {
       setLoaded(true);
     }
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   useEffect(() => {
     load();
@@ -81,7 +88,7 @@ export default function WellnessScreen() {
   const primaryAccent = isLight ? '#1e6827' : colors.primary;
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <Heading subtitle="A small daily check-in helps you notice your patterns.">Wellness</Heading>
       {error ? <Notice>{error}</Notice> : null}
       {saved ? <Notice tone="success">{saved}</Notice> : null}

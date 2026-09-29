@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useRouter } from 'expo-router';
 
@@ -172,6 +172,7 @@ export default function SettingsScreen() {
     logout,
     user,
     updateProfile,
+    refresh: refreshAuth,
   } = useAuth();
 
   const {
@@ -285,80 +286,50 @@ export default function SettingsScreen() {
     );
   }, [user]);
 
-  useEffect(() => {
-    api
-      .get<SettingsData>(
-        '/auth/settings',
-      )
-      .then((data) => {
-        if (data.user) {
-          setFirstName(
-            data.user
-              .firstName || '',
-          );
+  const [refreshing, setRefreshing] = useState(false);
 
-          setLastName(
-            data.user
-              .lastName || '',
-          );
+  const loadSettings = useCallback(async () => {
+    try {
+      const [data, conn] = await Promise.allSettled([
+        api.get<SettingsData>('/auth/settings'),
+        github.connection(),
+      ]);
 
-          setBio(
-            data.user.bio ||
-              data.profile
-                ?.about ||
-              '',
-          );
-
-          setEmailNotifications(
-            data.user
-              .emailNotifications ??
-              true,
-          );
-
-          if (
-            data.user.theme === 'dark' ||
-            data.user.theme === 'light'
-          ) {
-            setTheme(data.user.theme);
+      if (data.status === 'fulfilled' && data.value) {
+        if (data.value.user) {
+          setFirstName(data.value.user.firstName || '');
+          setLastName(data.value.user.lastName || '');
+          setBio(data.value.user.bio || data.value.profile?.about || '');
+          setEmailNotifications(data.value.user.emailNotifications ?? true);
+          if (data.value.user.theme === 'dark' || data.value.user.theme === 'light') {
+            setTheme(data.value.user.theme);
           }
         }
-
-        if (data.profile) {
-          setTargetRole(
-            data.profile
-              .targetRole || '',
-          );
-
-          setLocation(
-            data.profile
-              .location || '',
-          );
-
-          setGithubUrl(
-            data.profile
-              .githubUrl || '',
-          );
-
-          setLinkedinUrl(
-            data.profile
-              .linkedinUrl ||
-              '',
-          );
+        if (data.value.profile) {
+          setTargetRole(data.value.profile.targetRole || '');
+          setLocation(data.value.profile.location || '');
+          setGithubUrl(data.value.profile.githubUrl || '');
+          setLinkedinUrl(data.value.profile.linkedinUrl || '');
         }
-      })
-      .catch(() => {});
+      }
 
-    github
-      .connection()
-      .then(
-        setGithubConnection,
-      )
-      .catch(() =>
-        setGithubConnection(
-          null,
-        ),
-      );
-  }, []);
+      if (conn.status === 'fulfilled') {
+        setGithubConnection(conn.value);
+      }
+    } catch {
+      // Ignore background refresh errors
+    }
+  }, [setTheme]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.allSettled([loadSettings(), refreshAuth()]);
+    setRefreshing(false);
+  }, [loadSettings, refreshAuth]);
+
+  useEffect(() => {
+    void loadSettings();
+  }, [loadSettings]);
 
   async function choosePhoto() {
     const permission =
@@ -638,7 +609,7 @@ export default function SettingsScreen() {
     'SynergySphere User';
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <Heading subtitle="Manage your account, preferences, privacy and security.">
         Settings
       </Heading>

@@ -75,6 +75,8 @@ export default function PortfolioScreen() {
     ...manualSkills.map((m): [string, number] => [m.name, m.level]),
   ];
 
+  const [refreshing, setRefreshing] = useState(false);
+
   // Load portfolio items and profile signals from backend
   const load = useCallback(async () => {
     try {
@@ -108,6 +110,12 @@ export default function PortfolioScreen() {
       setLoaded(true);
     }
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   useEffect(() => {
     void load();
@@ -196,7 +204,7 @@ export default function PortfolioScreen() {
   if (!loaded) return <Loading />;
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <View style={styles.container}>
         {/* Top Header & Actions */}
         <View style={styles.topHeader}>

@@ -40,14 +40,14 @@ function AppLayout() {
             backgroundColor:
               colors.background,
           },
-
           headerTintColor:
             colors.text,
-
           contentStyle: {
             backgroundColor:
               colors.background,
           },
+          gestureEnabled: true,
+          animation: 'slide_from_right',
         }}
       >
         <Stack.Screen

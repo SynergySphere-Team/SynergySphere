@@ -173,6 +173,8 @@ export default function CodingScreen() {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
+  const [refreshing, setRefreshing] = useState(false);
+
   const load = useCallback(async () => {
     try {
       const [challengesData, learningData, rolePathsData, flashcardsData] = await Promise.allSettled([
@@ -200,6 +202,12 @@ export default function CodingScreen() {
       setLoaded(true);
     }
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   useEffect(() => {
     load();
@@ -338,7 +346,7 @@ export default function CodingScreen() {
   const primaryAccent = isLight ? '#1e6827' : colors.primary;
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <Heading subtitle="Explore structured programming tracks from W3Schools and master hands-on code challenges.">
         Learning Hub
       </Heading>

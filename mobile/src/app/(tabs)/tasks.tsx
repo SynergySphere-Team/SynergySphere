@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, StyleSheet, Text, TextInput, Vibration, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -67,6 +67,8 @@ export default function TasksScreen() {
   const isLight = theme === 'light';
   const brandGreen = isLight ? '#00875A' : colors.primary;
 
+  const [refreshing, setRefreshing] = useState(false);
+
   const load = useCallback(async () => {
     try {
       setError('');
@@ -82,6 +84,12 @@ export default function TasksScreen() {
       setLoaded(true);
     }
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   useEffect(() => {
     load();
@@ -323,7 +331,7 @@ export default function TasksScreen() {
       : 'READY';
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       {/* Module Switcher: Tasks & Focus vs GitHub My Work */}
       <View style={[styles.moduleTabSwitcher, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Pressable

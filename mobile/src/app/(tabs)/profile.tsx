@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { Button, Card, Heading, Stat } from '@/components/ui';
@@ -5,13 +6,24 @@ import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, refresh } = useAuth();
   const { colors, theme } = useTheme();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refresh]);
+
   const isLight = theme === 'light';
   const roleColor = isLight ? '#1e6827' : colors.primary;
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <Heading subtitle="Your SynergySphere account and learning progress.">Profile</Heading>
       <Card>
         <View style={styles.identity}>

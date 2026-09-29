@@ -299,6 +299,14 @@ export default function OpportunityDetailsScreen() {
       [id]
     );
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadProject();
+    setRefreshing(false);
+  }, [loadProject]);
+
   useEffect(() => {
     loadProject();
   }, [loadProject]);
@@ -521,7 +529,7 @@ export default function OpportunityDetailsScreen() {
     );
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       {/* BACK */}
 
       <Pressable

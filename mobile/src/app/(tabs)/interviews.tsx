@@ -196,6 +196,8 @@ export default function InterviewsScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [refreshing, setRefreshing] = useState(false);
+
   // 1. Initial Load of Metadata & Stats
   const loadDashboardData = useCallback(async () => {
     try {
@@ -226,6 +228,13 @@ export default function InterviewsScreen() {
       console.warn('Could not load interview data:', e);
     }
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    if (activeInterview) return;
+    setRefreshing(true);
+    await loadDashboardData();
+    setRefreshing(false);
+  }, [activeInterview, loadDashboardData]);
 
   useEffect(() => {
     loadDashboardData();
@@ -584,7 +593,7 @@ export default function InterviewsScreen() {
   const currentQ = activeInterview?.questions[step];
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       {/* Studio Header */}
       <View style={styles.header}>
         <View>

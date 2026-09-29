@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import {
   Pressable,
@@ -64,31 +64,34 @@ export default function NotificationSettingsScreen() {
     text: string;
   } | null>(null);
 
-  useEffect(() => {
-    api
-      .get<SettingsResponse>(
-        '/auth/settings',
-      )
-      .then((data) => {
-        setEmailNotifications(
-          data.user
-            ?.emailNotifications ??
-            true,
-        );
-      })
-      .catch((error) => {
-        setMessage({
-          type: 'error',
-          text:
-            error instanceof Error
-              ? error.message
-              : 'Could not load notification preferences.',
-        });
-      })
-      .finally(() => {
-        setLoading(false);
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
+
+  const loadSettings = useCallback(async () => {
+    try {
+      const data = await api.get<SettingsResponse>('/auth/settings');
+      setEmailNotifications(data.user?.emailNotifications ?? true);
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Could not load notification preferences.',
       });
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadSettings();
+    setRefreshing(false);
+  }, [loadSettings]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   async function changeEmailPreference(
     enabled: boolean,
@@ -139,7 +142,7 @@ export default function NotificationSettingsScreen() {
   }
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <View
         style={
           styles.headerRow

@@ -26,6 +26,7 @@ export default function LeaderboardScreen() {
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -37,6 +38,12 @@ export default function LeaderboardScreen() {
     }
   }, []);
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
   useEffect(() => {
     load();
   }, [load]);
@@ -47,7 +54,7 @@ export default function LeaderboardScreen() {
   const accentColor = isLight ? '#1e6827' : colors.primary;
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <View style={styles.headerWrap}>
         <Text style={[styles.kicker, { color: colors.primary }]}>COMMUNITY RANKINGS</Text>
         <Heading subtitle="Top learners, builders, and contributors across SynergySphere.">

@@ -38,6 +38,7 @@ export default function LectureToLifeScreen() {
   const [flipped, setFlipped] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -50,6 +51,12 @@ export default function LectureToLifeScreen() {
       setLoaded(true);
     }
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   useEffect(() => {
     load();
@@ -93,7 +100,7 @@ export default function LectureToLifeScreen() {
   const score = quizSubmitted ? quiz.reduce((total, item, index) => total + Number(answers[index] === item.answer), 0) : null;
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       {/* Top Mode Switcher Bar */}
       <View style={[styles.modeSwitcher, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
         <Pressable

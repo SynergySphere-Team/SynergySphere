@@ -35,32 +35,20 @@ export default function TabsLayout() {
       } else if (direction === 'right' && activeIndex > 0) {
         router.push(NAV_TAB_ITEMS[activeIndex - 1].href as never);
       }
-    } else {
-      // Sub-screen (detail view, wizard, github connect, settings, my work, etc.)
-      // Swiping right from the left side of the screen navigates back throughout the app
-      if (direction === 'right') {
-        if (router.canGoBack()) {
-          router.back();
-        } else if (pathname === '/my-work') {
-          router.replace('/(tabs)/tasks' as never);
-        } else if (pathname.startsWith('/project-') || pathname === '/github-connect') {
-          router.replace('/(tabs)/community' as never);
-        } else {
-          router.replace('/(tabs)/explore' as never);
-        }
-      }
     }
   };
 
   const panGesture = Gesture.Pan()
     .runOnJS(true)
-    .activeOffsetX([-25, 25])
+    .activeOffsetX([-35, 35])
     .failOffsetY([-20, 20])
     .onEnd((event) => {
-      if (event.translationX < -50 || event.velocityX < -350) {
-        handleSwipe('left');
-      } else if (event.translationX > 50 || event.velocityX > 350) {
-        handleSwipe('right');
+      if (activeIndex !== -1) {
+        if (event.translationX < -60 || event.velocityX < -400) {
+          handleSwipe('left');
+        } else if (event.translationX > 60 || event.velocityX > 400) {
+          handleSwipe('right');
+        }
       }
     });
 

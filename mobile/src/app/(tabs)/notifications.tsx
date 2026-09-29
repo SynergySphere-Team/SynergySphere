@@ -162,6 +162,12 @@ export default function NotificationsScreen() {
   ] =
     useState('');
 
+  const [
+    refreshing,
+    setRefreshing,
+  ] =
+    useState(false);
+
   const accentColor =
     theme === 'light'
       ? '#1e6827'
@@ -199,6 +205,13 @@ export default function NotificationsScreen() {
       },
       [],
     );
+
+  const handleRefresh =
+    useCallback(async () => {
+      setRefreshing(true);
+      await loadNotifications();
+      setRefreshing(false);
+    }, [loadNotifications]);
 
   useEffect(() => {
     loadNotifications();
@@ -310,7 +323,10 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <Screen>
+    <Screen
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+    >
       <View
         style={
           styles.topRow

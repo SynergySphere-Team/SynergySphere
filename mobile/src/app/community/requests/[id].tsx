@@ -131,6 +131,14 @@ export default function ProjectRequestsScreen() {
       }
     }, [id]);
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -231,7 +239,7 @@ export default function ProjectRequestsScreen() {
   }
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       {/* BACK */}
       <Pressable
         accessibilityRole="button"

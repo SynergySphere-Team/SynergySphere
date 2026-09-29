@@ -550,6 +550,14 @@ export default function ManageProjectScreen() {
       ]
     );
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadProject();
+    setRefreshing(false);
+  }, [loadProject]);
+
   useEffect(() => {
     loadProject();
   }, [loadProject]);
@@ -1021,7 +1029,7 @@ export default function ManageProjectScreen() {
   }
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <BackButton
         onPress={() =>
           router.back()

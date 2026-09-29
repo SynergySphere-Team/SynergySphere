@@ -12,6 +12,7 @@ export default function ExploreScreen() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -28,6 +29,12 @@ export default function ExploreScreen() {
     }
   }, []);
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
   useEffect(() => {
     load();
   }, [load]);
@@ -38,7 +45,7 @@ export default function ExploreScreen() {
   const tagColor = isLight ? '#1e6827' : colors.primary;
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <Heading subtitle="Discover current coding challenges and community projects.">Explore</Heading>
       {error ? <Notice>{error}</Notice> : null}
       <Text style={[styles.section, { color: colors.text }]}>Coding challenges</Text>

@@ -157,7 +157,7 @@ export default function GithubConnectScreen() {
   const parts = authorization?.userCode ? authorization.userCode.split('-') : [];
 
   return (
-    <Screen>
+    <Screen onSwipeBack={navigateBackOrToReturn}>
       <View style={styles.topNavRow}>
         <Pressable
           style={[styles.backNavButton, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}

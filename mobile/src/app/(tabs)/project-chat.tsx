@@ -17,6 +17,7 @@ export default function ProjectChatScreen() {
   const [loaded, setLoaded] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     if (!projectId) return;
@@ -29,6 +30,12 @@ export default function ProjectChatScreen() {
       setLoaded(true);
     }
   }, [projectId]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   useEffect(() => {
     load();
@@ -54,7 +61,7 @@ export default function ProjectChatScreen() {
   const brandGreen = isLight ? '#1e6827' : colors.primary;
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <Heading subtitle={title ? `Coordinate with the people involved in ${title}.` : 'Coordinate with the people involved in this project.'}>
         Project discussion
       </Heading>

@@ -35,6 +35,7 @@ export default function HomeScreen() {
   const [data, setData] = useState<DashboardStats | null>(null);
   const [communityActivity, setCommunityActivity] = useState<GithubActivity[]>([]);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -46,6 +47,12 @@ export default function HomeScreen() {
       setError(e instanceof Error ? e.message : 'Could not load dashboard.');
     }
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   useEffect(() => {
     load();
@@ -113,23 +120,15 @@ export default function HomeScreen() {
   }
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       {/* Header */}
       <View style={styles.head}>
-        <View style={styles.headTop}>
-          <Text style={[styles.subBrand, { color: primaryAccent }]}>SYNERGYSPHERE OS</Text>
-          <View style={[styles.levelBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', borderColor: primaryAccent }]}>
-            <Ionicons name="sparkles" size={12} color={primaryAccent} />
-            <Text style={[styles.levelBadgeText, { color: primaryAccent }]}>
-              {levelTitle} · Lvl {userLevel}
-            </Text>
-          </View>
-        </View>
+        <Text style={[styles.brand, { color: primaryAccent }]}>SynergySphere</Text>
+        <Text style={[styles.slogan, { color: colors.muted }]}>
+          Learn. Build. Thrive.{levelTitle ? ` · ${levelTitle}` : ''}
+        </Text>
         <Text style={[styles.greeting, { color: colors.text }]}>
           {getGreeting()}, {user?.firstName ?? 'Developer'}!
-        </Text>
-        <Text style={[styles.slogan, { color: colors.muted }]}>
-          Your verified engineering progress and daily junior developer loop.
         </Text>
       </View>
 
@@ -487,12 +486,9 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   head: { marginTop: 6, gap: 4 },
-  headTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  subBrand: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
-  levelBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
-  levelBadgeText: { fontSize: 11, fontWeight: '700' },
-  greeting: { fontSize: 24, fontWeight: '800', marginTop: 2 },
-  slogan: { fontSize: 14, fontWeight: '500', lineHeight: 20 },
+  brand: { fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
+  slogan: { fontSize: 18, fontWeight: '600', lineHeight: 24 },
+  greeting: { fontSize: 15, fontWeight: '700', marginTop: 4 },
   xpRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },
   xp: { fontSize: 32, fontWeight: '800' },
   xpTarget: { paddingBottom: 4 },

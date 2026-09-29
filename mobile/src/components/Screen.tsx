@@ -1,43 +1,150 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { ScrollView } from 'react-native-gesture-handler';
+import { usePathname, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 
-export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
-  const { colors } = useTheme();
+export interface ScreenProps {
+  children: ReactNode;
+  scroll?: boolean;
+  refreshing?: boolean;
+  onRefresh?: () => void | Promise<void>;
+  swipeBack?: boolean;
+  onSwipeBack?: () => void;
+  style?: StyleProp<ViewStyle>;
+  contentStyle?: StyleProp<ViewStyle>;
+  contentContainerStyle?: StyleProp<ViewStyle>;
+}
+
+export function Screen({
+  children,
+  scroll = true,
+  refreshing = false,
+  onRefresh,
+  swipeBack = true,
+  onSwipeBack,
+  style,
+  contentStyle,
+  contentContainerStyle,
+}: ScreenProps) {
+  const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleBack = () => {
+    if (onSwipeBack) {
+      onSwipeBack();
+      return;
+    }
+
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // Smart fallbacks for non-root / sub-screens
+      if (pathname === '/my-work') {
+        router.replace('/(tabs)/tasks' as never);
+      } else if (
+        pathname.startsWith('/project-') ||
+        pathname === '/github-connect' ||
+        pathname.startsWith('/community')
+      ) {
+        router.replace('/(tabs)/community' as never);
+      } else if (pathname === '/(auth)/register') {
+        router.replace('/(auth)/login' as never);
+      } else if (
+        pathname === '/coding' ||
+        pathname === '/ai-assistant' ||
+        pathname === '/lecture-to-life' ||
+        pathname === '/interviews' ||
+        pathname === '/portfolio' ||
+        pathname === '/leaderboard' ||
+        pathname === '/admin'
+      ) {
+        router.replace('/(tabs)/explore' as never);
+      } else if (pathname === '/settings' || pathname === '/change-password' || pathname === '/notification-settings' || pathname === '/notifications' || pathname === '/profile') {
+        router.replace('/' as never);
+      }
+    }
+  };
+
+  const isMainTabRoot = pathname === '/' || pathname === '/tasks' || pathname === '/wellness' || pathname === '/explore';
+
+  const edgeSwipeGesture = Gesture.Pan()
+    .runOnJS(true)
+    .activeOffsetX([15, 500])
+    .failOffsetY([-25, 25])
+    .onEnd((event) => {
+      if (!swipeBack) return;
+      const startX = event.x - event.translationX;
+      // Triggers if swipe started near left edge (within 80px) and dragged right
+      if (startX <= 80 && (event.translationX > 45 || event.velocityX > 250)) {
+        if (!isMainTabRoot || router.canGoBack()) {
+          handleBack();
+        }
+      }
+    });
+
   const content = (
-    <View style={[styles.content, { paddingBottom: Math.max(insets.bottom + 90, 120) }]}>
+    <View
+      style={[
+        styles.content,
+        { paddingBottom: Math.max(insets.bottom + 90, 120) },
+        contentStyle,
+      ]}
+    >
       {children}
     </View>
   );
-  return (
-    <SafeAreaView
-      edges={['top', 'left', 'right']}
-      style={[styles.safe, { backgroundColor: colors.background }]}
+
+  const isLight = theme === 'light';
+  const refreshSpinnerColor = isLight ? '#00875A' : colors.primary;
+
+  const refreshComponent = onRefresh ? (
+    <RefreshControl
+      refreshing={Boolean(refreshing)}
+      onRefresh={onRefresh}
+      tintColor={refreshSpinnerColor}
+      colors={[refreshSpinnerColor]}
+      progressBackgroundColor={colors.surface}
+    />
+  ) : undefined;
+
+  const body = scroll ? (
+    <ScrollView
+      style={styles.scroller}
+      contentContainerStyle={[styles.scroll, contentContainerStyle]}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      nestedScrollEnabled
+      showsVerticalScrollIndicator={false}
+      refreshControl={refreshComponent}
     >
-      {scroll ? (
-        <ScrollView
-          style={styles.scroller}
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={false}
-        >
-          {content}
-        </ScrollView>
-      ) : (
-        content
-      )}
-    </SafeAreaView>
+      {content}
+    </ScrollView>
+  ) : (
+    content
+  );
+
+  return (
+    <GestureDetector gesture={edgeSwipeGesture}>
+      <SafeAreaView
+        edges={['top', 'left', 'right']}
+        style={[styles.safe, { backgroundColor: colors.background }, style]}
+      >
+        {body}
+      </SafeAreaView>
+    </GestureDetector>
   );
 }
+
 export function Loading() {
   const { colors, theme } = useTheme();
   return (
     <View style={[styles.center, { backgroundColor: colors.background }]}>
-      <ActivityIndicator color={theme === 'light' ? '#2e7d32' : colors.primary} size="large" />
+      <ActivityIndicator color={theme === 'light' ? '#00875A' : colors.primary} size="large" />
     </View>
   );
 }
@@ -47,7 +154,7 @@ export function Notice({ children, tone = 'error' }: { children: ReactNode; tone
   const isLight = theme === 'light';
   const isError = tone === 'error';
   const bgColor = isError ? (isLight ? '#FDE8E8' : '#421d24') : isLight ? '#E2F5DA' : colors.primaryDark;
-  const textColor = isError ? (isLight ? '#C5221F' : colors.danger) : isLight ? '#1b5e20' : colors.primary;
+  const textColor = isError ? (isLight ? '#C5221F' : colors.danger) : isLight ? '#00875A' : colors.primary;
 
   return <Text style={[styles.notice, { backgroundColor: bgColor, color: textColor }]}>{children}</Text>;
 }

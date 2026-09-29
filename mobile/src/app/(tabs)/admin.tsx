@@ -13,6 +13,7 @@ export default function AdminScreen() {
   const [data, setData] = useState<AdminOverview | null>(null);
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -23,6 +24,12 @@ export default function AdminScreen() {
       setLoaded(true);
     }
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   useEffect(() => {
     if (user?.role === 'ADMIN') load();
@@ -40,7 +47,7 @@ export default function AdminScreen() {
   }
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <Heading subtitle="A live view of the SynergySphere platform.">Analytics</Heading>
       {error ? <Notice>{error}</Notice> : null}
       {data ? (
