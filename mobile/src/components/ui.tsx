@@ -47,11 +47,12 @@ export function Button({
 }
 
 export function Field({ label, ...props }: TextInputProps & { label: string }) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   return (
     <View style={styles.field}>
       <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
       <TextInput
+        keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
         placeholderTextColor={colors.placeholderText}
         style={[styles.input, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}
         {...props}

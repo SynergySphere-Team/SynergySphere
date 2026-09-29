@@ -1087,7 +1087,14 @@ export default function InterviewsScreen() {
       {/* 5. LIVE INTERVIEW SCREEN (Prompt 11, 12, 13, 14, 27, 28, 29, 30)          */}
       {/* ========================================================================= */}
       {activeInterview && currentQ && (
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 160 }}
+          automaticallyAdjustKeyboardInsets={true}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
           {/* Interviewer Persona Banner */}
           <View style={[styles.personaBanner, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)', borderColor: colors.border }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -1166,6 +1173,7 @@ export default function InterviewsScreen() {
                 triggerCritique(text, step);
               }}
               multiline
+              keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
               placeholder="Type your response here... (AI evaluates technical clarity, communication & depth)"
               placeholderTextColor={colors.muted}
               style={[
@@ -1319,6 +1327,7 @@ export default function InterviewsScreen() {
               value={scratchCode}
               onChangeText={setScratchCode}
               multiline
+              keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
               placeholder="// Write code or algorithm steps here..."
               placeholderTextColor={colors.muted}
               style={[
@@ -1591,6 +1600,7 @@ export default function InterviewsScreen() {
                     setPracticeAnswers(next);
                   }}
                   multiline
+                  keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
                   placeholder="Type your explanation or implementation..."
                   placeholderTextColor={colors.muted}
                   style={[styles.answerInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.text }]}
@@ -1637,6 +1647,7 @@ export default function InterviewsScreen() {
                   value={assessmentAnswer}
                   onChangeText={setAssessmentAnswer}
                   multiline
+                  keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
                   placeholder="Provide your comprehensive technical answer to complete the assessment..."
                   placeholderTextColor={colors.muted}
                   style={[styles.answerInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.text }]}

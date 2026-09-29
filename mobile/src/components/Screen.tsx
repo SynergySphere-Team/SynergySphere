@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleProp,
@@ -21,6 +23,8 @@ export interface ScreenProps {
   onRefresh?: () => void | Promise<void>;
   swipeBack?: boolean;
   onSwipeBack?: () => void;
+  keyboardAvoiding?: boolean;
+  keyboardOffset?: number;
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
@@ -33,6 +37,8 @@ export function Screen({
   onRefresh,
   swipeBack = true,
   onSwipeBack,
+  keyboardAvoiding = true,
+  keyboardOffset = 0,
   style,
   contentStyle,
   contentContainerStyle,
@@ -130,20 +136,33 @@ export function Screen({
     />
   ) : undefined;
 
-  const body = scroll ? (
+  const scrollBody = (
     <ScrollView
       style={styles.scroller}
       contentContainerStyle={[styles.scroll, contentContainerStyle]}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
+      automaticallyAdjustKeyboardInsets={true}
       nestedScrollEnabled
       showsVerticalScrollIndicator={false}
       refreshControl={refreshComponent}
     >
       {content}
     </ScrollView>
+  );
+
+  const innerContent = scroll ? scrollBody : content;
+
+  const body = keyboardAvoiding ? (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + keyboardOffset : 0}
+    >
+      {innerContent}
+    </KeyboardAvoidingView>
   ) : (
-    content
+    innerContent
   );
 
   const screenView = (

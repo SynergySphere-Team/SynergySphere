@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -32,68 +33,73 @@ export function SocialLinksModal({ visible, onClose, links, onSave }: SocialLink
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Social & Portfolio Links</Text>
-            <Pressable onPress={onClose} hitSlop={8} style={styles.closeBtn}>
-              <Ionicons name="close" size={22} color={colors.muted} />
-            </Pressable>
-          </View>
-
-          <Text style={[styles.modalDesc, { color: colors.muted }]}>
-            Set your public developer profiles for recruiters and collaborators.
-          </Text>
-
-          <View style={styles.fieldWrap}>
-            <Text style={[styles.fieldLabel, { color: colors.muted }]}>GITHUB PROFILE OR USERNAME</Text>
-            <View style={[styles.inputRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
-              <Ionicons name="logo-github" size={18} color={colors.muted} style={styles.inputIcon} />
-              <TextInput
-                value={form.github}
-                onChangeText={(text) => setForm({ ...form, github: text })}
-                placeholder="username or https://github.com/..."
-                placeholderTextColor={colors.placeholderText}
-                autoCapitalize="none"
-                style={[styles.input, { color: colors.text }]}
-              />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.backdrop}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Social & Portfolio Links</Text>
+              <Pressable onPress={onClose} hitSlop={8} style={styles.closeBtn}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </Pressable>
             </View>
-          </View>
 
-          <View style={styles.fieldWrap}>
-            <Text style={[styles.fieldLabel, { color: colors.muted }]}>LINKEDIN PROFILE URL</Text>
-            <View style={[styles.inputRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
-              <Ionicons name="logo-linkedin" size={18} color="#0077b5" style={styles.inputIcon} />
-              <TextInput
-                value={form.linkedin}
-                onChangeText={(text) => setForm({ ...form, linkedin: text })}
-                placeholder="https://linkedin.com/in/username"
-                placeholderTextColor={colors.placeholderText}
-                autoCapitalize="none"
-                style={[styles.input, { color: colors.text }]}
-              />
+            <Text style={[styles.modalDesc, { color: colors.muted }]}>
+              Set your public developer profiles for recruiters and collaborators.
+            </Text>
+
+            <View style={styles.fieldWrap}>
+              <Text style={[styles.fieldLabel, { color: colors.muted }]}>GITHUB PROFILE OR USERNAME</Text>
+              <View style={[styles.inputRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+                <Ionicons name="logo-github" size={18} color={colors.muted} style={styles.inputIcon} />
+                <TextInput
+                  value={form.github}
+                  onChangeText={(text) => setForm({ ...form, github: text })}
+                  placeholder="username or https://github.com/..."
+                  placeholderTextColor={colors.placeholderText}
+                  autoCapitalize="none"
+                  style={[styles.input, { color: colors.text }]}
+                />
+              </View>
             </View>
-          </View>
 
-          <View style={styles.btnRow}>
-            <Pressable
-              onPress={() => {
-                onSave(form);
-                onClose();
-              }}
-              style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
-            >
-              <Text style={[styles.primaryBtnText, { color: colors.primaryText }]}>Save Links</Text>
-            </Pressable>
-            <Pressable
-              onPress={onClose}
-              style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }]}
-            >
-              <Text style={[styles.secondaryBtnText, { color: colors.text }]}>Cancel</Text>
-            </Pressable>
+            <View style={styles.fieldWrap}>
+              <Text style={[styles.fieldLabel, { color: colors.muted }]}>LINKEDIN PROFILE URL</Text>
+              <View style={[styles.inputRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+                <Ionicons name="logo-linkedin" size={18} color="#0077b5" style={styles.inputIcon} />
+                <TextInput
+                  value={form.linkedin}
+                  onChangeText={(text) => setForm({ ...form, linkedin: text })}
+                  placeholder="https://linkedin.com/in/username"
+                  placeholderTextColor={colors.placeholderText}
+                  autoCapitalize="none"
+                  style={[styles.input, { color: colors.text }]}
+                />
+              </View>
+            </View>
+
+            <View style={styles.btnRow}>
+              <Pressable
+                onPress={() => {
+                  onSave(form);
+                  onClose();
+                }}
+                style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+              >
+                <Text style={[styles.primaryBtnText, { color: colors.primaryText }]}>Save Links</Text>
+              </Pressable>
+              <Pressable
+                onPress={onClose}
+                style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }]}
+              >
+                <Text style={[styles.secondaryBtnText, { color: colors.text }]}>Cancel</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -122,27 +128,31 @@ export function SkillModal({ visible, onClose, onSave }: SkillModalProps) {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Add Technical Skill</Text>
-            <Pressable onPress={onClose} hitSlop={8} style={styles.closeBtn}>
-              <Ionicons name="close" size={22} color={colors.muted} />
-            </Pressable>
-          </View>
-
-          <View style={styles.fieldWrap}>
-            <Text style={[styles.fieldLabel, { color: colors.muted }]}>SKILL NAME</Text>
-            <View style={[styles.inputRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
-              <TextInput
-                value={skillName}
-                onChangeText={setSkillName}
-                placeholder="e.g. Docker, TypeScript, AWS, PostgreSQL"
-                placeholderTextColor={colors.placeholderText}
-                style={[styles.input, { color: colors.text }]}
-              />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.backdrop}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Add Technical Skill</Text>
+              <Pressable onPress={onClose} hitSlop={8} style={styles.closeBtn}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </Pressable>
             </View>
-          </View>
+
+            <View style={styles.fieldWrap}>
+              <Text style={[styles.fieldLabel, { color: colors.muted }]}>SKILL NAME</Text>
+              <View style={[styles.inputRow, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+                <TextInput
+                  value={skillName}
+                  onChangeText={setSkillName}
+                  placeholder="e.g. Docker, TypeScript, AWS, PostgreSQL"
+                  placeholderTextColor={colors.placeholderText}
+                  style={[styles.input, { color: colors.text }]}
+                />
+              </View>
+            </View>
 
           <View style={styles.fieldWrap}>
             <View style={styles.levelHeader}>
@@ -220,8 +230,9 @@ export function SkillModal({ visible, onClose, onSave }: SkillModalProps) {
           </View>
         </View>
       </View>
-    </Modal>
-  );
+    </KeyboardAvoidingView>
+  </Modal>
+);
 }
 
 // ── Public Portfolio Preview Modal ─────────────────────────────────────────────

@@ -289,6 +289,7 @@ export default function AIAssistantScreen() {
             setContextEditedByUser(true);
           }}
           multiline
+          keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
           placeholder="Paste your code snippet here to analyze, debug, or optimize…"
           placeholderTextColor={colors.muted}
           style={[styles.codeEditor, { backgroundColor: isLight ? '#F5F5F5' : '#050a0d', color: primaryAccent }]}
@@ -407,6 +408,7 @@ export default function AIAssistantScreen() {
         <TextInput
           value={message}
           onChangeText={setMessage}
+          keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
           placeholder={lesson ? `Ask about ${lesson.title}…` : 'Ask about code concepts, debug traces, syntax…'}
           placeholderTextColor={colors.muted}
           multiline
