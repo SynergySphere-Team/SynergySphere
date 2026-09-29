@@ -1,8 +1,16 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, RefreshControl, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { ScrollView } from 'react-native-gesture-handler';
 import { usePathname, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -64,26 +72,36 @@ export function Screen({
         pathname === '/admin'
       ) {
         router.replace('/(tabs)/explore' as never);
-      } else if (pathname === '/settings' || pathname === '/change-password' || pathname === '/notification-settings' || pathname === '/notifications' || pathname === '/profile') {
+      } else if (
+        pathname === '/settings' ||
+        pathname === '/change-password' ||
+        pathname === '/notification-settings' ||
+        pathname === '/notifications' ||
+        pathname === '/profile'
+      ) {
         router.replace('/' as never);
       }
     }
   };
 
-  const isMainTabRoot = pathname === '/' || pathname === '/tasks' || pathname === '/wellness' || pathname === '/explore';
+  const isMainTabRoot =
+    pathname === '/' ||
+    pathname === '/tasks' ||
+    pathname === '/wellness' ||
+    pathname === '/explore';
+
+  const canPerformBack = swipeBack && (!isMainTabRoot || router.canGoBack());
 
   const edgeSwipeGesture = Gesture.Pan()
-    .runOnJS(true)
-    .activeOffsetX([15, 500])
+    .hitSlop({ left: 0, width: 44 })
+    .activeOffsetX(15)
     .failOffsetY([-25, 25])
+    .cancelsTouchesInView(false)
+    .runOnJS(true)
     .onEnd((event) => {
-      if (!swipeBack) return;
-      const startX = event.x - event.translationX;
-      // Triggers if swipe started near left edge (within 80px) and dragged right
-      if (startX <= 80 && (event.translationX > 45 || event.velocityX > 250)) {
-        if (!isMainTabRoot || router.canGoBack()) {
-          handleBack();
-        }
+      if (!canPerformBack) return;
+      if (event.translationX > 40 || event.velocityX > 250) {
+        handleBack();
       }
     });
 
@@ -128,14 +146,22 @@ export function Screen({
     content
   );
 
+  const screenView = (
+    <SafeAreaView
+      edges={['top', 'left', 'right']}
+      style={[styles.safe, { backgroundColor: colors.background }, style]}
+    >
+      {body}
+    </SafeAreaView>
+  );
+
+  if (!canPerformBack) {
+    return screenView;
+  }
+
   return (
     <GestureDetector gesture={edgeSwipeGesture}>
-      <SafeAreaView
-        edges={['top', 'left', 'right']}
-        style={[styles.safe, { backgroundColor: colors.background }, style]}
-      >
-        {body}
-      </SafeAreaView>
+      {screenView}
     </GestureDetector>
   );
 }
