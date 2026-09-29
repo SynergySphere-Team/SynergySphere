@@ -46,6 +46,7 @@ export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [initialStatus, setInitialStatus] = useState<Task['status']>('IN_PROGRESS');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [adding, setAdding] = useState(false);
@@ -284,6 +285,7 @@ export default function TasksScreen() {
     try {
       await api.post<Task>('/tasks', {
         title: title.trim(),
+        status: initialStatus,
         ...(description.trim() ? { description: description.trim() } : {}),
       });
       setTitle('');
@@ -294,6 +296,15 @@ export default function TasksScreen() {
       setError(e instanceof Error ? e.message : 'Could not create task.');
     } finally {
       setAdding(false);
+    }
+  }
+
+  async function updateStatus(task: Task, newStatus: Task['status']) {
+    try {
+      await api.patch<Task>(`/tasks/${task.id}`, { status: newStatus });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not update task.');
     }
   }
 
@@ -646,6 +657,51 @@ export default function TasksScreen() {
               placeholder="Add context"
               multiline
             />
+            <View style={{ marginBottom: 10, gap: 6 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.muted }}>Initial Status</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Pressable
+                  onPress={() => setInitialStatus('IN_PROGRESS')}
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    backgroundColor: initialStatus === 'IN_PROGRESS' ? (isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)') : colors.surface,
+                    borderColor: initialStatus === 'IN_PROGRESS' ? brandGreen : colors.border,
+                  }}
+                >
+                  <Ionicons name="play" size={13} color={initialStatus === 'IN_PROGRESS' ? brandGreen : colors.muted} />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: initialStatus === 'IN_PROGRESS' ? brandGreen : colors.text }}>
+                    In Progress
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setInitialStatus('TODO')}
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    backgroundColor: initialStatus === 'TODO' ? (isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)') : colors.surface,
+                    borderColor: initialStatus === 'TODO' ? brandGreen : colors.border,
+                  }}
+                >
+                  <Ionicons name="list" size={13} color={initialStatus === 'TODO' ? brandGreen : colors.muted} />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: initialStatus === 'TODO' ? brandGreen : colors.text }}>
+                    To Do
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
             <Button
               title={adding ? 'Adding…' : 'Add task'}
               onPress={add}
@@ -666,6 +722,7 @@ export default function TasksScreen() {
           <View style={styles.tasksList}>
             {tasks.map((task) => {
               const isDone = task.status === 'DONE';
+              const isInProgress = task.status === 'IN_PROGRESS';
               return (
                 <View
                   key={task.id}
@@ -679,18 +736,20 @@ export default function TasksScreen() {
                 >
                   <View style={styles.taskRow}>
                     <View style={styles.taskBody}>
-                      <Text
-                        style={[
-                          styles.taskStatus,
-                          {
-                            color: isDone
-                              ? colors.completedTitle
-                              : brandGreen,
-                          },
-                        ]}
-                      >
-                        {task.status.replace('_', ' ')}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                        <Text
+                          style={[
+                            styles.taskStatus,
+                            {
+                              color: isDone
+                                ? colors.completedTitle
+                                : brandGreen,
+                            },
+                          ]}
+                        >
+                          {task.status.replace('_', ' ')}
+                        </Text>
+                      </View>
                       <Text
                         style={[
                           styles.taskTitle,
@@ -711,11 +770,41 @@ export default function TasksScreen() {
                         </Text>
                       ) : null}
                     </View>
-                    <Button
-                      title={isDone ? 'Reopen' : 'Advance'}
-                      onPress={() => advance(task)}
-                      secondary
-                    />
+                    <View style={{ flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+                      {task.status === 'TODO' ? (
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          <Button
+                            title="▶ Start"
+                            onPress={() => updateStatus(task, 'IN_PROGRESS')}
+                            secondary
+                          />
+                          <Button
+                            title="✓ Done"
+                            onPress={() => updateStatus(task, 'DONE')}
+                            secondary
+                          />
+                        </View>
+                      ) : isInProgress ? (
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          <Button
+                            title="✓ Done"
+                            onPress={() => updateStatus(task, 'DONE')}
+                            secondary
+                          />
+                          <Button
+                            title="Advance"
+                            onPress={() => advance(task)}
+                            secondary
+                          />
+                        </View>
+                      ) : (
+                        <Button
+                          title={isDone ? 'Reopen' : '✓ Done'}
+                          onPress={() => (isDone ? updateStatus(task, 'TODO') : updateStatus(task, 'DONE'))}
+                          secondary
+                        />
+                      )}
+                    </View>
                   </View>
                   {isDone ? (
                     <View style={styles.learnedSection}>

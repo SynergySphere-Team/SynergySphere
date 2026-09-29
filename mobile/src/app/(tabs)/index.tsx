@@ -66,8 +66,15 @@ export default function HomeScreen() {
         api.get<GithubActivity[]>('/github/feed').catch(() => []),
       ]);
       setData(stats);
-      setActiveTasks(taskList.filter((t) => t.status === 'IN_PROGRESS'));
-      setCommunityActivity(feed);
+      // Active tasks: any uncompleted task (IN_PROGRESS, TODO, REVIEW), sorted with IN_PROGRESS first
+      const open = Array.isArray(taskList) ? taskList.filter((t) => t.status !== 'DONE') : [];
+      open.sort((a, b) => {
+        if (a.status === 'IN_PROGRESS' && b.status !== 'IN_PROGRESS') return -1;
+        if (a.status !== 'IN_PROGRESS' && b.status === 'IN_PROGRESS') return 1;
+        return 0;
+      });
+      setActiveTasks(open);
+      setCommunityActivity(Array.isArray(feed) ? feed : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load dashboard.');
     }
@@ -88,6 +95,21 @@ export default function HomeScreen() {
       void load();
     }, [load])
   );
+
+  async function toggleTaskStatus(task: Task) {
+    const nextSt =
+      task.status === 'TODO'
+        ? 'IN_PROGRESS'
+        : task.status === 'IN_PROGRESS'
+        ? 'DONE'
+        : 'IN_PROGRESS';
+    try {
+      await api.patch<Task>(`/tasks/${task.id}`, { status: nextSt });
+      await load();
+    } catch (e) {
+      // Ignore or log
+    }
+  }
 
   // Focus Timer Handlers
   const handleFocusComplete = useCallback(async () => {
@@ -237,6 +259,8 @@ export default function HomeScreen() {
     Math.max(0, ((focusMinutes * 60 - focusTimeLeft) / (focusMinutes * 60)) * 100)
   );
 
+  const inProgressCount = activeTasks.filter((t) => t.status === 'IN_PROGRESS').length;
+
   const workspaces: { title: string; description: string; route: string; icon: keyof typeof Ionicons.glyphMap }[] = [
     { title: 'Learning Hub', description: 'Curriculum tracks, role paths & flashcards.', route: '/coding', icon: 'code-slash' },
     { title: 'AI Workspace', description: 'Staff Engineer tutor, review gym & chat.', route: '/ai-assistant', icon: 'sparkles' },
@@ -308,7 +332,7 @@ export default function HomeScreen() {
         ))}
       </View>
 
-      {/* Next Action Queue & Confined Focus Session: Appears ONLY when tasks are currently in progress */}
+      {/* Next Action Queue & Confined Focus Session: Appears dynamically when active tasks exist */}
       {activeTasks.length > 0 ? (
         <>
           <View style={styles.sectionHeaderRow}>
@@ -316,47 +340,111 @@ export default function HomeScreen() {
             <View style={[styles.activeCountBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', borderColor: primaryAccent }]}>
               <View style={[styles.pulseDot, { backgroundColor: primaryAccent }]} />
               <Text style={[styles.activeCountText, { color: primaryAccent }]}>
-                {activeTasks.length} in progress
+                {inProgressCount > 0 ? `${inProgressCount} in progress` : `${activeTasks.length} active`}
               </Text>
             </View>
           </View>
           <Card>
             {/* Active Tasks List */}
             <View style={{ gap: 8 }}>
-              {activeTasks.map((task, idx) => (
-                <Pressable
-                  key={task.id}
-                  onPress={() => router.push('/tasks' as never)}
-                  style={({ pressed }) => [
-                    styles.activeTaskRow,
-                    idx > 0 && [styles.taskDivider, { borderTopColor: colors.border }],
-                    pressed && styles.workspacePressed,
-                  ]}
-                >
-                  <View style={[styles.taskStatusIcon, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
-                    <Ionicons name="play" size={14} color={primaryAccent} />
-                  </View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={[styles.activeTaskTitle, { color: colors.text }]}>{task.title}</Text>
-                    {task.description ? (
-                      <Text numberOfLines={2} style={[styles.activeTaskDesc, { color: colors.muted }]}>
-                        {task.description}
-                      </Text>
-                    ) : null}
-                    <View style={styles.taskMetaRow}>
-                      <View style={[styles.inProgressBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)' }]}>
-                        <Text style={[styles.inProgressBadgeText, { color: primaryAccent }]}>IN PROGRESS</Text>
-                      </View>
-                      {task.dueDate ? (
-                        <Text style={[styles.taskDueText, { color: colors.muted }]}>
-                          Due {new Date(task.dueDate).toLocaleDateString()}
+              {activeTasks.map((task, idx) => {
+                const isInProgress = task.status === 'IN_PROGRESS';
+                return (
+                  <Pressable
+                    key={task.id}
+                    onPress={() => router.push('/tasks' as never)}
+                    style={({ pressed }) => [
+                      styles.activeTaskRow,
+                      idx > 0 && [styles.taskDivider, { borderTopColor: colors.border }],
+                      pressed && styles.workspacePressed,
+                    ]}
+                  >
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        void toggleTaskStatus(task);
+                      }}
+                      hitSlop={8}
+                      style={[
+                        styles.taskStatusIcon,
+                        {
+                          backgroundColor: isInProgress
+                            ? isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)'
+                            : isLight ? '#F1F5F9' : colors.surfaceElevated,
+                          borderColor: isInProgress ? primaryAccent : colors.border,
+                          borderWidth: 1,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={isInProgress ? 'play' : task.status === 'REVIEW' ? 'eye-outline' : 'ellipse-outline'}
+                        size={14}
+                        color={isInProgress ? primaryAccent : colors.muted}
+                      />
+                    </Pressable>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={[styles.activeTaskTitle, { color: colors.text }]}>{task.title}</Text>
+                      {task.description ? (
+                        <Text numberOfLines={2} style={[styles.activeTaskDesc, { color: colors.muted }]}>
+                          {task.description}
                         </Text>
                       ) : null}
+                      <View style={styles.taskMetaRow}>
+                        <View
+                          style={[
+                            styles.inProgressBadge,
+                            {
+                              backgroundColor: isInProgress
+                                ? isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)'
+                                : isLight ? '#F3F4F6' : colors.surfaceElevated,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.inProgressBadgeText,
+                              { color: isInProgress ? primaryAccent : colors.muted },
+                            ]}
+                          >
+                            {task.status.replace('_', ' ')}
+                          </Text>
+                        </View>
+                        {task.dueDate ? (
+                          <Text style={[styles.taskDueText, { color: colors.muted }]}>
+                            Due {new Date(task.dueDate).toLocaleDateString()}
+                          </Text>
+                        ) : null}
+                      </View>
                     </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-                </Pressable>
-              ))}
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        void toggleTaskStatus(task);
+                      }}
+                      style={[
+                        styles.quickActionChip,
+                        {
+                          backgroundColor: isInProgress
+                            ? primaryAccent
+                            : isLight
+                            ? '#E8F5E9'
+                            : 'rgba(30, 104, 39, 0.2)',
+                          borderColor: primaryAccent,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.quickActionChipText,
+                          { color: isInProgress ? '#FFFFFF' : primaryAccent },
+                        ]}
+                      >
+                        {isInProgress ? '✓ Done' : '▶ Start'}
+                      </Text>
+                    </Pressable>
+                  </Pressable>
+                );
+              })}
             </View>
 
             {/* Confined Mini Focus Session Box */}
@@ -563,4 +651,15 @@ const styles = StyleSheet.create({
   workspaceDescription: { fontSize: 12, lineHeight: 16 },
   feedItem: { gap: 3, paddingVertical: 10 },
   feedTitle: { fontSize: 14, fontWeight: '800' },
+  quickActionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignSelf: 'center',
+  },
+  quickActionChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
 });
