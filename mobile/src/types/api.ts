@@ -94,8 +94,8 @@ export interface Project {
   description: string; requirements: string | null; xpReward: number;
   hasApplied: boolean; applicationStatus: string | null; isCreator: boolean; _count: { applications: number };
   githubOwner?: string | null; githubRepo?: string | null; githubFullName?: string | null; githubUrl?: string | null;
-  githubVisibility?: string | null; visibility?: string | null; githubOwnerAvatar?: string | null; primaryLanguage?: string | null; isGithubBacked?: boolean;
-  license?: string | null; starterTemplate?: string | null;
+  githubVisibility?: string | null; visibility?: string; primaryLanguage?: string | null; isGithubBacked?: boolean;
+  githubOwnerAvatar?: string; license?: string | null; starterTemplate?: string | null;
   githubStars?: number; githubForks?: number; contributorAvatars?: string[];
   lastActivityAt?: string | null; lastActivityMessage?: string | null; lastActivityActor?: string | null;
   techStack?: string | null; teamCapacity?: number | null; deliverableType?: string | null;
