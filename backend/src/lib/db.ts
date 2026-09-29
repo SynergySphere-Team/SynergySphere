@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import pg, { type PoolClient, type QueryResultRow } from 'pg';
+import pg, { type PoolClient, type QueryResultRow, type PoolConfig } from 'pg';
 
 const { Pool } = pg;
 const DEFAULT_DEV_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/synergysphere';
@@ -50,11 +50,29 @@ export const pool = new Pool({
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
   ...(isLocalhost ? {} : { ssl: { rejectUnauthorized: false } }),
-});
+} as PoolConfig & { keepAlive?: boolean; keepAliveInitialDelayMillis?: number });
 
 (pool as { on?: (event: string, listener: (err: Error) => void) => void }).on?.('error', (err: Error) => {
-  console.error('Unexpected error on idle PostgreSQL client:', err.message);
+  console.warn('PostgreSQL idle client notice:', err.message);
 });
+
+function isTransientDbError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const err = error as { code?: string; message?: string; errno?: number };
+  return (
+    err.code === 'ECONNRESET' ||
+    err.code === 'EPIPE' ||
+    err.code === 'ETIMEDOUT' ||
+    err.code === '57P01' ||
+    err.code === '08006' ||
+    err.code === '08001' ||
+    err.errno === -54 ||
+    (typeof err.message === 'string' &&
+      (err.message.includes('Connection terminated') ||
+        err.message.includes('ECONNRESET') ||
+        err.message.includes('server closed the connection')))
+  );
+}
 
 export type DbClient = Pick<PoolClient, 'query'>;
 
@@ -67,8 +85,17 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
   params: readonly unknown[] = [],
   client: DbClient = pool,
 ): Promise<T[]> {
-  const result = await client.query<T>(text, [...params]);
-  return result.rows;
+  try {
+    const result = await client.query<T>(text, [...params]);
+    return result.rows;
+  } catch (error) {
+    if (client === pool && isTransientDbError(error)) {
+      // Retry once on transient socket drop with a fresh connection
+      const result = await pool.query<T>(text, [...params]);
+      return result.rows;
+    }
+    throw error;
+  }
 }
 
 export async function queryOne<T extends QueryResultRow = QueryResultRow>(
@@ -85,8 +112,16 @@ export async function execute(
   params: readonly unknown[] = [],
   client: DbClient = pool,
 ): Promise<number> {
-  const result = await client.query(text, [...params]);
-  return result.rowCount || 0;
+  try {
+    const result = await client.query(text, [...params]);
+    return result.rowCount || 0;
+  } catch (error) {
+    if (client === pool && isTransientDbError(error)) {
+      const result = await pool.query(text, [...params]);
+      return result.rowCount || 0;
+    }
+    throw error;
+  }
 }
 
 export async function transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {

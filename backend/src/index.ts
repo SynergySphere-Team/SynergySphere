@@ -200,3 +200,11 @@ server.on('error', (error: NodeJS.ErrnoException) => {
 
   console.error('Unable to start the SynergySphere API:', error.message);
 });
+
+process.on('unhandledRejection', (reason: unknown) => {
+  console.warn('Unhandled promise rejection captured:', reason);
+});
+
+process.on('uncaughtException', (error: Error) => {
+  console.error('Uncaught exception captured:', error);
+});
