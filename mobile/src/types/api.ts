@@ -84,6 +84,53 @@ export interface WellnessEntry {
   taskStatus?: string | null;
   linkedTaskTitle?: string | null;
   linkedTaskStatus?: string | null;
+  sleepHours?: number | null;
+  waterIntake?: number | null;
+  tags?: string[] | null;
+  gratitude?: string | null;
+}
+
+export interface BurnoutRisk {
+  score: number;
+  level: 'LOW' | 'MODERATE' | 'CRITICAL';
+  label: string;
+  color: string;
+  description: string;
+  triggers: string[];
+}
+
+export interface StreakMilestone {
+  days: number;
+  label: string;
+  xp: number;
+  badge: string;
+  achieved: boolean;
+}
+
+export interface StreakInfo {
+  current: number;
+  milestones: StreakMilestone[];
+}
+
+export interface WellnessInsights {
+  recommendations: string[];
+  averages: {
+    stress: number;
+    mood: number;
+    energy: number;
+    sleep?: number | null;
+    water?: number | null;
+  } | null;
+  burnoutRisk?: BurnoutRisk;
+  streak?: StreakInfo;
+  moduleBreakdown?: Record<string, {
+    count: number;
+    avgStress: number;
+    avgMood: number;
+    avgEnergy: number;
+    highStressCount?: number;
+    highEnergyCount?: number;
+  }>;
 }
 
 export interface Challenge { id: string; title: string; difficulty: string; description: string; language: string | null; starterCode?: string | null; xpReward: number; }
