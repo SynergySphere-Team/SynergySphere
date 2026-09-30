@@ -3,7 +3,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen, Loading, Notice } from '@/components/Screen';
-import { Button, Card, Heading } from '@/components/ui';
+import { Button, Card } from '@/components/ui';
 import { CommunityChat } from '@/components/community/CommunityChat';
 import { api } from '@/services/api';
 import { github } from '@/services/github';
@@ -93,6 +93,22 @@ export default function CommunityScreen() {
 
   return (
     <Screen>
+      {/* Community Header with Logo */}
+      <View style={styles.headerRow}>
+        <Image
+          source={require('../../../assets/images/community-logo.png')}
+          style={styles.communityLogo}
+          resizeMode="contain"
+        />
+
+        <View style={styles.headerText}>
+          <Text style={[styles.title, { color: colors.text }]}>Community</Text>
+          <Text style={[styles.subtitle, { color: colors.muted }]}>
+            Chat with peers, ask questions, and collaborate on software initiatives.
+          </Text>
+        </View>
+      </View>
+
       {/* Top Tab Bar: Community Chat vs Initiatives */}
       <View style={styles.topTabBarRow}>
         <View
@@ -166,11 +182,7 @@ export default function CommunityScreen() {
         <CommunityChat />
       ) : (
         <>
-          <Heading subtitle="GitHub-powered collaboration for practical community impact.">
-            Community
-          </Heading>
-
-      {error ? <Notice>{error}</Notice> : null}
+          {error ? <Notice>{error}</Notice> : null}
 
       {/* GitHub Connection & Quick Actions Bar */}
       <View style={[styles.connectionCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
@@ -486,11 +498,35 @@ export default function CommunityScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+    paddingRight: 42,
+  },
+  communityLogo: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  headerText: {
+    flex: 1,
+    gap: 3,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  subtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
   topTabBarRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: 42,
-    marginBottom: 4,
+    marginBottom: 10,
   },
   topTabBar: {
     flex: 1,
