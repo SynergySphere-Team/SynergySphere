@@ -38,7 +38,7 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules'),
 ];
 
-config.resolver.disableHierarchicalLookup = true;
+config.resolver.disableHierarchicalLookup = false;
 
 // Exclude other workspaces and unnecessary folders from Metro file mapping
 const existingBlockList = Array.isArray(config.resolver.blockList)
