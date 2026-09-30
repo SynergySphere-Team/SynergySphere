@@ -4,6 +4,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { Ionicons } from '@expo/vector-icons';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card, Heading } from '@/components/ui';
+import { CommunityChat } from '@/components/community/CommunityChat';
 import { api } from '@/services/api';
 import { github } from '@/services/github';
 import { useTheme } from '@/context/ThemeContext';
@@ -39,6 +40,7 @@ export default function CommunityScreen() {
   const { colors, theme } = useTheme();
   const isDark = theme === 'dark';
 
+  const [activeTab, setActiveTab] = useState<'chat' | 'initiatives'>('chat');
   const [projects, setProjects] = useState<Project[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -91,9 +93,82 @@ export default function CommunityScreen() {
 
   return (
     <Screen>
-      <Heading subtitle="GitHub-powered collaboration for practical community impact.">
-        Community
-      </Heading>
+      {/* Top Tab Bar: Community Chat vs Initiatives */}
+      <View style={styles.topTabBarRow}>
+        <View
+          style={[
+            styles.topTabBar,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Pressable
+            onPress={() => setActiveTab('chat')}
+            style={[
+              styles.topTabButton,
+              activeTab === 'chat' && [
+                styles.topTabButtonActive,
+                { backgroundColor: theme === 'light' ? '#1e6827' : colors.primary },
+              ],
+            ]}
+          >
+            <Ionicons
+              name={activeTab === 'chat' ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'}
+              size={16}
+              color={activeTab === 'chat' ? (theme === 'light' ? '#FFFFFF' : '#07180d') : colors.muted}
+            />
+            <Text
+              style={[
+                styles.topTabText,
+                {
+                  color: activeTab === 'chat' ? (theme === 'light' ? '#FFFFFF' : '#07180d') : colors.text,
+                  fontWeight: activeTab === 'chat' ? '800' : '600',
+                },
+              ]}
+            >
+              Community Chat
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setActiveTab('initiatives')}
+            style={[
+              styles.topTabButton,
+              activeTab === 'initiatives' && [
+                styles.topTabButtonActive,
+                { backgroundColor: theme === 'light' ? '#1e6827' : colors.primary },
+              ],
+            ]}
+          >
+            <Ionicons
+              name="layers-outline"
+              size={16}
+              color={activeTab === 'initiatives' ? (theme === 'light' ? '#FFFFFF' : '#07180d') : colors.muted}
+            />
+            <Text
+              style={[
+                styles.topTabText,
+                {
+                  color: activeTab === 'initiatives' ? (theme === 'light' ? '#FFFFFF' : '#07180d') : colors.text,
+                  fontWeight: activeTab === 'initiatives' ? '800' : '600',
+                },
+              ]}
+            >
+              Initiatives
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {activeTab === 'chat' ? (
+        <CommunityChat />
+      ) : (
+        <>
+          <Heading subtitle="GitHub-powered collaboration for practical community impact.">
+            Community
+          </Heading>
 
       {error ? <Notice>{error}</Notice> : null}
 
@@ -404,11 +479,47 @@ export default function CommunityScreen() {
           </View>
         </Card>
       ) : null}
+        </>
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  topTabBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 42,
+    marginBottom: 4,
+  },
+  topTabBar: {
+    flex: 1,
+    flexDirection: 'row',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 3,
+    gap: 4,
+  },
+  topTabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  topTabButtonActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  topTabText: {
+    fontSize: 13,
+  },
   connectionCard: {
     borderRadius: 18,
     borderWidth: 1.5,
