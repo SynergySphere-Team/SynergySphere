@@ -108,3 +108,39 @@ export async function awardXp(userId: string, amount: number, reason: string): P
     }
   });
 }
+
+export async function awardBadgeDirectly(userId: string, badgeName: string): Promise<boolean> {
+  const badge = await queryOne<{ id: string; name: string }>(
+    `SELECT "id", "name" FROM "Badge" WHERE "name" = $1`,
+    [badgeName],
+  );
+  if (!badge) return false;
+
+  const existing = await queryOne(
+    `SELECT "id" FROM "UserBadge" WHERE "userId" = $1 AND "badgeId" = $2`,
+    [userId, badge.id],
+  );
+  if (existing) return false;
+
+  await queryOne(
+    `INSERT INTO "UserBadge" ("id", "userId", "badgeId")
+     VALUES ($1, $2, $3)
+     ON CONFLICT ("userId", "badgeId") DO NOTHING`,
+    [newId(), userId, badge.id],
+  );
+
+  await queryOne(
+    `INSERT INTO "Notification" ("id", "userId", "title", "message", "type")
+     VALUES ($1, $2, $3, $4, $5)`,
+    [
+      newId(),
+      userId,
+      'Milestone Badge Unlocked!',
+      'You unlocked the "' + badge.name + '" badge for your wellness dedication!',
+      'badge',
+    ],
+  );
+
+  return true;
+}
+

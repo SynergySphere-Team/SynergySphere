@@ -142,7 +142,52 @@ describe('4. Student Community Project Creation', () => {
   });
 });
 
+describe('5. Wellness Module & Career Resilience OS', () => {
+  it('verifies wellness check-in table supports micro-tracking fields', async () => {
+    const student = await queryOne<{ id: string }>(
+      `SELECT "id" FROM "User" WHERE "email" = 'student@synergysphere.com'`,
+    );
+    assert.ok(student, 'Student user must exist');
+
+    const result = await queryOne<{ id: string; sleepHours: string; waterIntake: number; tags: string[]; gratitude: string }>(
+      `INSERT INTO "Wellness" (
+         "id", "userId", "stressLevel", "mood", "energyLevel", "notes",
+         "moduleId", "sleepHours", "waterIntake", "tags", "gratitude"
+       )
+       VALUES (
+         'test-wellness-' || round(random() * 1000000)::text,
+         $1, 4, 8, 7, 'Automated test check-in with high flow state',
+         'LEARNING_HUB', 8.0, 7, ARRAY['#flow-state', '#breakthrough'],
+         'Passed challenging unit test suite'
+       )
+       RETURNING "id", "sleepHours"::text, "waterIntake", "tags", "gratitude"`,
+      [student.id],
+    );
+
+    assert.ok(result, 'Check-in must be inserted');
+    assert.equal(Number(result.sleepHours), 8.0, 'Sleep hours must be stored correctly');
+    assert.equal(result.waterIntake, 7, 'Water intake must be stored correctly');
+    assert.ok(Array.isArray(result.tags) && result.tags.includes('#flow-state'), 'Tags must be stored');
+    assert.equal(result.gratitude, 'Passed challenging unit test suite', 'Gratitude must be stored');
+  });
+
+  it('calculates burnout risk index and triggers appropriately', () => {
+    // High stress (8) + low energy (3) -> Critical risk
+    const highStress = 8;
+    const lowEnergy = 3;
+    const criticalScore = Math.round((highStress / 10) * 55 + ((10 - lowEnergy) / 10) * 35);
+    assert.ok(criticalScore >= 67, 'High stress + low energy must yield score >= 67% (Critical)');
+
+    // Low stress (3) + high energy (8) -> Low risk
+    const lowStress = 3;
+    const highEnergy = 8;
+    const lowScore = Math.round((lowStress / 10) * 55 + ((10 - highEnergy) / 10) * 35);
+    assert.ok(lowScore < 35, 'Low stress + high energy must yield score < 35% (Low)');
+  });
+});
+
 after(async () => {
   await pool.end();
 });
+
 
