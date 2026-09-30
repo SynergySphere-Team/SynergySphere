@@ -1,7 +1,14 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+LogBox.ignoreLogs([
+  'Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go',
+  '`expo-notifications` functionality is not fully supported in Expo Go',
+  'expo-notifications:',
+]);
 
 import { AuthProvider } from '@/context/AuthContext';
 import {

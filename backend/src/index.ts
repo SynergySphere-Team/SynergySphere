@@ -19,6 +19,7 @@ import curriculumRoutes from './routes/curriculum.js';
 import githubRoutes, { githubWebhookRoutes, pollGithubActivity } from './routes/github.js';
 import communityChatRoutes from './routes/communityChat.js';
 import { pool } from './lib/db.js';
+import { runMigrations } from './scripts/migrate.js';
 
 const app = express();
 const PORT = process.env.PORT || 4001;
@@ -139,6 +140,12 @@ async function checkDatabaseConnection(): Promise<boolean> {
     await pool.query('SELECT 1');
     if (!isDbConnected) {
       console.log('Database connection OK');
+      try {
+        await runMigrations();
+        console.log('Database schema verified and up to date.');
+      } catch (migErr: any) {
+        console.warn('Auto-migration warning:', migErr?.message || migErr);
+      }
     }
     isDbConnected = true;
     return true;

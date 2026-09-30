@@ -17,8 +17,8 @@ import { accessTokenForUser, githubConnection, githubRequest, GithubError } from
 const router = Router();
 
 router.get('/', authenticate, async (req: AuthRequest, res) => {
-
-  const take = Math.min(Number(req.query.take) || 50, 100);
+  try {
+    const take = Math.min(Number(req.query.take) || 50, 100);
 
   const category = typeof req.query.category === 'string' ? req.query.category : undefined;
 
@@ -208,6 +208,10 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
     }),
 
   );
+  } catch (error) {
+    console.error('Error fetching projects:', error);
+    res.status(500).json({ error: 'Failed to fetch projects' });
+  }
 
 });
 
