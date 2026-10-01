@@ -1,7 +1,18 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
+import { useAccessibility } from '@/context/AccessibilityContext';
+
 export type ThemeName = 'dark' | 'light';
+
 export type ThemeColors = {
   background: string;
   surface: string;
@@ -75,35 +86,120 @@ export const themes: Record<ThemeName, ThemeColors> = {
   },
 };
 
-type ThemeContextValue = { theme: ThemeName; colors: ThemeColors; setTheme(theme: ThemeName): Promise<void> };
+const highContrastThemes: Record<ThemeName, ThemeColors> = {
+  dark: {
+    ...themes.dark,
+    background: '#000000',
+    surface: '#050A0C',
+    surfaceElevated: '#0A1418',
+    border: '#FFFFFF',
+    text: '#FFFFFF',
+    muted: '#E1E8EA',
+    inputBg: '#050A0C',
+    inputBorder: '#FFFFFF',
+    placeholderText: '#D3DCDF',
+    completedTitle: '#E1E8EA',
+    completedDesc: '#D3DCDF',
+    navSurface: '#000000',
+    navBorder: '#FFFFFF',
+    navInactive: '#E1E8EA',
+  },
+  light: {
+    ...themes.light,
+    background: '#FFFFFF',
+    surface: '#FFFFFF',
+    surfaceElevated: '#F4F7F5',
+    border: '#10231D',
+    text: '#000000',
+    muted: '#263D34',
+    inputBg: '#FFFFFF',
+    inputBorder: '#10231D',
+    placeholderText: '#334A41',
+    completedTitle: '#263D34',
+    completedDesc: '#334A41',
+    navSurface: '#FFFFFF',
+    navBorder: '#10231D',
+    navInactive: '#263D34',
+  },
+};
+
+type ThemeContextValue = {
+  theme: ThemeName;
+  colors: ThemeColors;
+  setTheme(theme: ThemeName): Promise<void>;
+};
+
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 const STORAGE_KEY = 'synergysphere.theme';
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+async function readStoredTheme(): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    return typeof window !== 'undefined'
+      ? window.localStorage.getItem(STORAGE_KEY)
+      : null;
+  }
+
+  return SecureStore.getItemAsync(STORAGE_KEY);
+}
+
+async function saveStoredTheme(theme: ThemeName): Promise<void> {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(STORAGE_KEY, theme);
+    }
+    return;
+  }
+
+  await SecureStore.setItemAsync(STORAGE_KEY, theme);
+}
+
+export function ThemeProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const [theme, setThemeState] = useState<ThemeName>('dark');
+  const { highContrast } = useAccessibility();
+
   useEffect(() => {
-    SecureStore.getItemAsync(STORAGE_KEY)
+    readStoredTheme()
       .then((value) => {
-        if (value === 'light' || value === 'dark') setThemeState(value);
+        if (value === 'light' || value === 'dark') {
+          setThemeState(value);
+        }
       })
       .catch(() => undefined);
   }, []);
+
   const value = useMemo<ThemeContextValue>(
     () => ({
       theme,
-      colors: themes[theme],
+      colors: highContrast
+        ? highContrastThemes[theme]
+        : themes[theme],
       setTheme: async (nextTheme) => {
         setThemeState(nextTheme);
-        await SecureStore.setItemAsync(STORAGE_KEY, nextTheme);
+        await saveStoredTheme(nextTheme);
       },
     }),
-    [theme]
+    [theme, highContrast],
   );
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+
+  return (
+    <ThemeContext.Provider value={value}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {
   const context = useContext(ThemeContext);
-  if (!context) throw new Error('useTheme must be used inside ThemeProvider');
+
+  if (!context) {
+    throw new Error(
+      'useTheme must be used inside ThemeProvider',
+    );
+  }
+
   return context;
 }

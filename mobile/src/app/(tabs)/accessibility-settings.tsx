@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {
+  Alert,
   Linking,
   Platform,
   Pressable,
@@ -13,80 +13,72 @@ import {
 
 import { Screen } from '@/components/Screen';
 import { useTheme } from '@/context/ThemeContext';
-
-const STORAGE_KEY = 'synergysphere-accessibility';
-
-type AccessibilityPreferences = {
-  largerText: boolean;
-  highContrast: boolean;
-  reduceMotion: boolean;
-};
-
-const DEFAULT_PREFERENCES: AccessibilityPreferences = {
-  largerText: false,
-  highContrast: false,
-  reduceMotion: false,
-};
+import { useAccessibility } from '@/context/AccessibilityContext';
 
 export default function AccessibilitySettingsScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
 
-  const [preferences, setPreferences] =
-    useState<AccessibilityPreferences>(DEFAULT_PREFERENCES);
-
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
-
-      if (stored) {
-        const parsed = JSON.parse(stored) as Partial<AccessibilityPreferences>;
-
-        setPreferences({
-          largerText: Boolean(parsed.largerText),
-          highContrast: Boolean(parsed.highContrast),
-          reduceMotion: Boolean(parsed.reduceMotion),
-        });
-      }
-    } catch {
-      // Keep defaults if stored preferences cannot be read.
-    }
-  }, []);
-
-  function updatePreference(
-    key: keyof AccessibilityPreferences,
-    value: boolean,
-  ) {
-    const next = {
-      ...preferences,
-      [key]: value,
-    };
-
-    setPreferences(next);
-
-    if (Platform.OS === 'web') {
-      try {
-        window.localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify(next),
-        );
-      } catch {
-        // Keep the in-memory preference if browser storage is unavailable.
-      }
-    }
-  }
+  const {
+    largerText,
+    highContrast,
+    reduceMotion,
+    setLargerText,
+    setHighContrast,
+    setReduceMotion,
+    fontSize,
+  } = useAccessibility();
 
   function goBackToSettings() {
     router.replace('/(tabs)/settings' as never);
-}
+  }
 
   async function openDeviceSettings() {
     try {
+      // Windows web build: open Windows Accessibility settings.
+      if (Platform.OS === 'web') {
+        const userAgent =
+          typeof navigator !== 'undefined'
+            ? navigator.userAgent.toLowerCase()
+            : '';
+
+        if (userAgent.includes('windows')) {
+          window.location.href = 'ms-settings:easeofaccess';
+          return;
+        }
+
+        console.warn(
+          'Direct system accessibility settings are only supported from the Windows web build.',
+        );
+        return;
+      }
+
+      // iOS does not provide a supported deep link directly to
+      // Settings > Accessibility. Explain where to go, then open Settings.
+      if (Platform.OS === 'ios') {
+        Alert.alert(
+          'Open Accessibility Settings',
+          'In Settings, go to Accessibility to manage VoiceOver, text size, display, motion and other accessibility options.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Open Settings',
+              onPress: () => {
+                void Linking.openSettings();
+              },
+            },
+          ],
+        );
+        return;
+      }
+
+      // Fallback for other native platforms.
       await Linking.openSettings();
-    } catch {
-      // Some web browsers do not expose operating-system settings.
+    } catch (error) {
+      console.error(
+        'Unable to open system accessibility settings:',
+        error,
+      );
     }
   }
 
@@ -131,7 +123,7 @@ export default function AccessibilitySettingsScreen() {
                 styles.title,
                 {
                   color: colors.text,
-                  fontSize: preferences.largerText ? 34 : 30,
+                  fontSize: fontSize(30),
                 },
               ]}
             >
@@ -143,7 +135,7 @@ export default function AccessibilitySettingsScreen() {
                 styles.subtitle,
                 {
                   color: colors.muted,
-                  fontSize: preferences.largerText ? 17 : 15,
+                  fontSize: fontSize(15),
                 },
               ]}
             >
@@ -156,10 +148,10 @@ export default function AccessibilitySettingsScreen() {
           style={[
             styles.sectionLabel,
             {
-              color: preferences.highContrast
+              color: highContrast
                 ? colors.text
                 : colors.muted,
-              fontSize: preferences.largerText ? 15 : 13,
+              fontSize: fontSize(13),
             },
           ]}
         >
@@ -171,10 +163,10 @@ export default function AccessibilitySettingsScreen() {
             styles.card,
             {
               backgroundColor: colors.surface,
-              borderColor: preferences.highContrast
+              borderColor: highContrast
                 ? colors.text
                 : colors.border,
-              borderWidth: preferences.highContrast ? 2 : 1,
+              borderWidth: highContrast ? 2 : 1,
             },
           ]}
         >
@@ -182,19 +174,19 @@ export default function AccessibilitySettingsScreen() {
             icon="text-outline"
             title="Larger Text"
             description="Increase text size for improved readability."
-            value={preferences.largerText}
+            value={largerText}
             onValueChange={(value) =>
-              updatePreference('largerText', value)
+              void setLargerText(value)
             }
             colors={colors}
             accent={accent}
             activeTrack={activeTrack}
-            largerText={preferences.largerText}
+            fontSize={fontSize}
           />
 
           <Divider
             color={
-              preferences.highContrast
+              highContrast
                 ? colors.text
                 : colors.border
             }
@@ -204,14 +196,14 @@ export default function AccessibilitySettingsScreen() {
             icon="contrast-outline"
             title="High Contrast"
             description="Increase visual contrast between text and interface elements."
-            value={preferences.highContrast}
+            value={highContrast}
             onValueChange={(value) =>
-              updatePreference('highContrast', value)
+              void setHighContrast(value)
             }
             colors={colors}
             accent={accent}
             activeTrack={activeTrack}
-            largerText={preferences.largerText}
+            fontSize={fontSize}
           />
         </View>
 
@@ -219,10 +211,10 @@ export default function AccessibilitySettingsScreen() {
           style={[
             styles.sectionLabel,
             {
-              color: preferences.highContrast
+              color: highContrast
                 ? colors.text
                 : colors.muted,
-              fontSize: preferences.largerText ? 15 : 13,
+              fontSize: fontSize(13),
             },
           ]}
         >
@@ -234,10 +226,10 @@ export default function AccessibilitySettingsScreen() {
             styles.card,
             {
               backgroundColor: colors.surface,
-              borderColor: preferences.highContrast
+              borderColor: highContrast
                 ? colors.text
                 : colors.border,
-              borderWidth: preferences.highContrast ? 2 : 1,
+              borderWidth: highContrast ? 2 : 1,
             },
           ]}
         >
@@ -245,14 +237,14 @@ export default function AccessibilitySettingsScreen() {
             icon="walk-outline"
             title="Reduce Motion"
             description="Reduce non-essential animations and transitions."
-            value={preferences.reduceMotion}
+            value={reduceMotion}
             onValueChange={(value) =>
-              updatePreference('reduceMotion', value)
+              void setReduceMotion(value)
             }
             colors={colors}
             accent={accent}
             activeTrack={activeTrack}
-            largerText={preferences.largerText}
+            fontSize={fontSize}
           />
         </View>
 
@@ -260,14 +252,14 @@ export default function AccessibilitySettingsScreen() {
           style={[
             styles.sectionLabel,
             {
-              color: preferences.highContrast
+              color: highContrast
                 ? colors.text
                 : colors.muted,
-              fontSize: preferences.largerText ? 15 : 13,
+              fontSize: fontSize(13),
             },
           ]}
         >
-          DEVICE ACCESSIBILITY
+          SYSTEM ACCESSIBILITY
         </Text>
 
         <View
@@ -275,16 +267,16 @@ export default function AccessibilitySettingsScreen() {
             styles.card,
             {
               backgroundColor: colors.surface,
-              borderColor: preferences.highContrast
+              borderColor: highContrast
                 ? colors.text
                 : colors.border,
-              borderWidth: preferences.highContrast ? 2 : 1,
+              borderWidth: highContrast ? 2 : 1,
             },
           ]}
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Open device accessibility settings"
+            accessibilityLabel="Open system accessibility settings"
             onPress={openDeviceSettings}
             style={({ pressed }) => [
               styles.deviceRow,
@@ -312,11 +304,11 @@ export default function AccessibilitySettingsScreen() {
                   styles.rowTitle,
                   {
                     color: colors.text,
-                    fontSize: preferences.largerText ? 18 : 16,
+                    fontSize: fontSize(16),
                   },
                 ]}
               >
-                Device Accessibility Settings
+                System Accessibility Settings
               </Text>
 
               <Text
@@ -324,11 +316,11 @@ export default function AccessibilitySettingsScreen() {
                   styles.rowDescription,
                   {
                     color: colors.muted,
-                    fontSize: preferences.largerText ? 15 : 13,
+                    fontSize: fontSize(13),
                   },
                 ]}
               >
-                Manage screen reader, system text size and other device accessibility options.
+                Open your system settings to manage screen reader, text size and other accessibility options.
               </Text>
             </View>
 
@@ -360,7 +352,7 @@ export default function AccessibilitySettingsScreen() {
               styles.infoText,
               {
                 color: colors.muted,
-                fontSize: preferences.largerText ? 14 : 12,
+                fontSize: fontSize(12),
               },
             ]}
           >
@@ -381,7 +373,7 @@ function PreferenceRow({
   colors,
   accent,
   activeTrack,
-  largerText,
+  fontSize,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
@@ -391,7 +383,7 @@ function PreferenceRow({
   colors: any;
   accent: string;
   activeTrack: string;
-  largerText: boolean;
+  fontSize: (size: number) => number;
 }) {
   return (
     <View style={styles.preferenceRow}>
@@ -416,7 +408,7 @@ function PreferenceRow({
             styles.rowTitle,
             {
               color: colors.text,
-              fontSize: largerText ? 18 : 16,
+              fontSize: fontSize(16),
             },
           ]}
         >
@@ -428,7 +420,7 @@ function PreferenceRow({
             styles.rowDescription,
             {
               color: colors.muted,
-              fontSize: largerText ? 15 : 13,
+              fontSize: fontSize(13),
             },
           ]}
         >
