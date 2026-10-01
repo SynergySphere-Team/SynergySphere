@@ -18,14 +18,24 @@ function normalizeApiUrl(value: string | undefined): string | null {
   }
 }
 
-function apiUrlFromMetroHost(hostUri: unknown): string | null {
+function getPortFromApiUrl(url: string | null): string {
+  if (!url) return '4000';
+  try {
+    const parsed = new URL(url);
+    return parsed.port || (parsed.protocol === 'https:' ? '443' : '4000');
+  } catch {
+    return '4000';
+  }
+}
+
+function apiUrlFromMetroHost(hostUri: unknown, targetPort: string = '4000'): string | null {
   if (typeof hostUri !== 'string' || !hostUri.trim()) return null;
 
   try {
     // Expo reports the Metro address as "host:port". URL parsing also keeps
     // IPv6 hosts intact instead of splitting them at their first colon.
     const host = new URL(`http://${hostUri}`).hostname;
-    return host ? `http://${host}:4000/api` : null;
+    return host ? `http://${host}:${targetPort}/api` : null;
   } catch {
     return null;
   }
@@ -49,6 +59,7 @@ function isPrivateOrLocalIp(url: string): boolean {
 
 export function getApiUrl(): string {
   const envUrl = normalizeApiUrl(process.env.EXPO_PUBLIC_API_URL);
+  const targetPort = getPortFromApiUrl(envUrl);
 
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window.location?.hostname) {
@@ -56,15 +67,15 @@ export function getApiUrl(): string {
       // When accessed from localhost/loopback in the browser, always use localhost:4000
       // so stale LAN IPs from .env files don't prevent local connections.
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return 'http://localhost:4000/api';
+        return `http://localhost:${targetPort}/api`;
       }
       // If accessing via custom hostname or LAN IP in the browser and envUrl is not a remote production host,
       // route to the same host on port 4000.
       if (!envUrl || isPrivateOrLocalIp(envUrl)) {
-        return `http://${hostname}:4000/api`;
+        return `http://${hostname}:${targetPort}/api`;
       }
     }
-    return envUrl || 'http://localhost:4000/api';
+    return envUrl || `http://localhost:${targetPort}/api`;
   }
 
   // Infer host from Expo Go / development client Metro connection
@@ -73,7 +84,7 @@ export function getApiUrl(): string {
     (Constants as any).manifest2?.extra?.expoClient?.hostUri ||
     (Constants as any).manifest?.debuggerHost;
 
-  const metroUrl = apiUrlFromMetroHost(hostUri);
+  const metroUrl = apiUrlFromMetroHost(hostUri, targetPort);
 
   // If envUrl is an explicit remote URL (e.g. https://... ngrok or deployed backend), respect it
   if (envUrl && !isPrivateOrLocalIp(envUrl)) {
@@ -88,10 +99,10 @@ export function getApiUrl(): string {
 
   // Final fallback by platform
   if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:4000/api';
+    return `http://10.0.2.2:${targetPort}/api`;
   }
 
-  return 'http://localhost:4000/api';
+  return `http://localhost:${targetPort}/api`;
 }
 
 export class ApiError extends Error {
