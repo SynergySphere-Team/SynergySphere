@@ -1,10 +1,32 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type TextInputProps,
+} from 'react-native';
+
+import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 
 export function Card({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
-  return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>{children}</View>;
+
+  return (
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+        },
+      ]}
+    >
+      {children}
+    </View>
+  );
 }
 
 export function Button({
@@ -21,14 +43,27 @@ export function Button({
   danger?: boolean;
 }) {
   const { colors } = useTheme();
+  const { fontSize } = useAccessibility();
+
   return (
     <Pressable
+      accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: danger ? colors.danger : colors.primary },
-        secondary && [styles.secondary, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }],
+        {
+          backgroundColor: danger
+            ? colors.danger
+            : colors.primary,
+        },
+        secondary && [
+          styles.secondary,
+          {
+            backgroundColor: colors.surfaceElevated,
+            borderColor: colors.border,
+          },
+        ],
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
       ]}
@@ -36,8 +71,14 @@ export function Button({
       <Text
         style={[
           styles.buttonText,
-          { color: colors.primaryText },
-          secondary && [styles.secondaryText, { color: colors.text }],
+          {
+            color: colors.primaryText,
+            fontSize: fontSize(14),
+          },
+          secondary && [
+            styles.secondaryText,
+            { color: colors.text },
+          ],
         ]}
       >
         {title}
@@ -56,43 +97,142 @@ export function Field({
   rightElement?: ReactNode;
 }) {
   const { colors, theme } = useTheme();
+  const { fontSize } = useAccessibility();
+
   return (
     <View style={styles.field}>
-      <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
+      <Text
+        style={[
+          styles.label,
+          {
+            color: colors.text,
+            fontSize: fontSize(13),
+          },
+        ]}
+      >
+        {label}
+      </Text>
+
       <View
         style={[
           styles.inputContainer,
-          { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
+          {
+            backgroundColor: colors.inputBg,
+            borderColor: colors.inputBorder,
+          },
         ]}
       >
         <TextInput
-          keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
+          keyboardAppearance={
+            theme === 'dark' ? 'dark' : 'light'
+          }
           placeholderTextColor={colors.placeholderText}
-          style={[styles.input, { color: colors.text }, style]}
+          allowFontScaling
+          style={[
+            styles.input,
+            {
+              color: colors.text,
+              fontSize: fontSize(16),
+            },
+            style,
+          ]}
           {...props}
         />
+
         {rightElement}
       </View>
     </View>
   );
 }
 
-export function Heading({ children, subtitle }: { children: ReactNode; subtitle?: string }) {
+export function Heading({
+  children,
+  subtitle,
+}: {
+  children: ReactNode;
+  subtitle?: string;
+}) {
   const { colors } = useTheme();
+  const { fontSize } = useAccessibility();
+
   return (
     <View>
-      <Text style={[styles.heading, { color: colors.text }]}>{children}</Text>
-      {subtitle && <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text>}
+      <Text
+        style={[
+          styles.heading,
+          {
+            color: colors.text,
+            fontSize: fontSize(25),
+          },
+        ]}
+      >
+        {children}
+      </Text>
+
+      {subtitle ? (
+        <Text
+          style={[
+            styles.subtitle,
+            {
+              color: colors.muted,
+              fontSize: fontSize(14),
+              lineHeight: fontSize(20),
+            },
+          ]}
+        >
+          {subtitle}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
-export function Stat({ label, value }: { label: string; value: string | number }) {
+export function Stat({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
   const { colors, theme } = useTheme();
+  const { fontSize } = useAccessibility();
+
   return (
-    <View style={[styles.stat, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-      <Text style={[styles.statValue, { color: theme === 'light' ? '#2e7d32' : colors.primary }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: colors.muted }]}>{label}</Text>
+    <View
+      style={[
+        styles.stat,
+        {
+          backgroundColor: colors.surfaceElevated,
+          borderColor: colors.border,
+        },
+      ]}
+    >
+      <Text
+        style={[
+          styles.statValue,
+          {
+            color:
+              theme === 'light'
+                ? '#2e7d32'
+                : colors.primary,
+            fontSize: fontSize(22),
+          },
+        ]}
+      >
+        {value}
+      </Text>
+
+      <Text
+        style={[
+          styles.statLabel,
+          {
+            color: colors.muted,
+            fontSize: fontSize(12),
+          },
+        ]}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
@@ -112,6 +252,7 @@ const styles = StyleSheet.create({
   button: {
     minHeight: 46,
     paddingHorizontal: 16,
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
@@ -119,6 +260,7 @@ const styles = StyleSheet.create({
   buttonText: {
     fontWeight: '800',
     fontSize: 14,
+    textAlign: 'center',
   },
   secondary: {
     borderWidth: 1,

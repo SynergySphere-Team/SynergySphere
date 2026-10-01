@@ -16,6 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { usePathname, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
+import { useAccessibility } from '@/context/AccessibilityContext';
 
 export interface ScreenProps {
   children: ReactNode;
@@ -104,9 +105,13 @@ export function Screen({
       ) {
         router.replace('/(tabs)/explore' as never);
       } else if (
-        pathname === '/settings' ||
         pathname === '/change-password' ||
         pathname === '/notification-settings' ||
+        pathname === '/accessibility-settings'
+      ) {
+        router.replace('/(tabs)/settings' as never);
+      } else if (
+        pathname === '/settings' ||
         pathname === '/notifications' ||
         pathname === '/profile'
       ) {
@@ -217,28 +222,83 @@ export function Screen({
 
 export function Loading() {
   const { colors, theme } = useTheme();
+
   return (
     <View style={[styles.center, { backgroundColor: colors.background }]}>
-      <ActivityIndicator color={theme === 'light' ? '#00875A' : colors.primary} size="large" />
+      <ActivityIndicator
+        color={theme === 'light' ? '#00875A' : colors.primary}
+        size="large"
+      />
     </View>
   );
 }
 
-export function Notice({ children, tone = 'error' }: { children: ReactNode; tone?: 'error' | 'success' }) {
+export function Notice({
+  children,
+  tone = 'error',
+}: {
+  children: ReactNode;
+  tone?: 'error' | 'success';
+}) {
   const { colors, theme } = useTheme();
+  const { fontSize } = useAccessibility();
+
   const isLight = theme === 'light';
   const isError = tone === 'error';
-  const bgColor = isError ? (isLight ? '#FDE8E8' : '#421d24') : isLight ? '#E2F5DA' : colors.primaryDark;
-  const textColor = isError ? (isLight ? '#C5221F' : colors.danger) : isLight ? '#00875A' : colors.primary;
 
-  return <Text style={[styles.notice, { backgroundColor: bgColor, color: textColor }]}>{children}</Text>;
+  const bgColor = isError
+    ? isLight
+      ? '#FDE8E8'
+      : '#421d24'
+    : isLight
+      ? '#E2F5DA'
+      : colors.primaryDark;
+
+  const textColor = isError
+    ? isLight
+      ? '#C5221F'
+      : colors.danger
+    : isLight
+      ? '#00875A'
+      : colors.primary;
+
+  return (
+    <Text
+      style={[
+        styles.notice,
+        {
+          backgroundColor: bgColor,
+          color: textColor,
+          fontSize: fontSize(14),
+        },
+      ]}
+    >
+      {children}
+    </Text>
+  );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroller: { flex: 1 },
   scroll: { flexGrow: 1 },
-  content: { paddingHorizontal: 16, paddingTop: 12, gap: 12, maxWidth: 720, width: '100%', alignSelf: 'center' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  notice: { borderRadius: 10, padding: 12, fontSize: 14, fontWeight: '600' },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    gap: 12,
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notice: {
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
