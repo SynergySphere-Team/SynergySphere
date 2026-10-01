@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { AppState, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
+import { AppState, Image, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Card, Stat } from '@/components/ui';
+import { WorkspaceMenu } from '@/components/WorkspaceMenu';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
@@ -43,6 +44,7 @@ export default function HomeScreen() {
   const [communityActivity, setCommunityActivity] = useState<GithubActivity[]>([]);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Confined Mini Focus Session State
   const [focusMinutes, setFocusMinutes] = useState(25);
@@ -56,6 +58,15 @@ export default function HomeScreen() {
 
   const isLight = theme === 'light';
   const primaryAccent = isLight ? '#1e6827' : colors.primary;
+
+  const userInitials =
+    user?.firstName && user?.lastName
+      ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+      : user?.firstName && user.firstName.length >= 2
+      ? user.firstName.slice(0, 2).toUpperCase()
+      : user?.firstName
+      ? user.firstName[0].toUpperCase()
+      : 'AS';
 
   const load = useCallback(async () => {
     try {
@@ -281,14 +292,66 @@ export default function HomeScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      {/* Header */}
-      <View style={styles.head}>
-        <Text style={[styles.brand, { color: primaryAccent }]}>SynergySphere</Text>
-        <Text style={[styles.slogan, { color: colors.muted }]}>
-          Learn. Build. Thrive.{levelTitle ? ` · ${levelTitle}` : ''}
-        </Text>
+      {/* Top Header matching Picture 2 */}
+      <View style={styles.topHeader}>
+        <View style={styles.topHeaderLeft}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open workspace menu"
+            onPress={() => setMenuOpen(true)}
+            hitSlop={10}
+            style={styles.headerBtn}
+          >
+            <Ionicons name="menu" size={26} color={colors.text} />
+          </Pressable>
+
+          <View style={styles.brandGroup}>
+            <Image
+              source={require('../../../assets/images/synergysphere-brand-icon.png')}
+              style={styles.brandIcon}
+              resizeMode="contain"
+            />
+            <Text style={[styles.brandTitle, { color: isLight ? '#144626' : colors.primary }]}>
+              SynergySphere
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.topHeaderRight}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            onPress={() => router.push('/notifications' as never)}
+            hitSlop={10}
+            style={styles.headerBtn}
+          >
+            <Ionicons name="notifications-outline" size={23} color={colors.text} />
+            {(data?.stats?.unreadNotifications ?? 0) > 0 ? (
+              <View style={[styles.unreadDot, { backgroundColor: colors.danger }]} />
+            ) : null}
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="View profile"
+            onPress={() => router.push('/profile' as never)}
+            hitSlop={8}
+            style={styles.avatarBtn}
+          >
+            <View style={[styles.avatarCircle, { backgroundColor: isLight ? '#0B2314' : '#0F3D24' }]}>
+              <Text style={styles.avatarInitials}>{userInitials}</Text>
+            </View>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Greeting & Slogan */}
+      <View style={styles.greetingWrap}>
         <Text style={[styles.greeting, { color: colors.text }]}>
           {getGreeting()}, {user?.firstName ?? 'Developer'}!
+        </Text>
+        <Text style={[styles.slogan, { color: colors.muted }]}>
+          Learn. Build. Thrive.{levelTitle ? ` · ${levelTitle}` : ''}
         </Text>
       </View>
 
@@ -590,15 +653,89 @@ export default function HomeScreen() {
           </Card>
         </>
       ) : null}
+      <WorkspaceMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  head: { marginTop: 6, gap: 4 },
-  brand: { fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
-  slogan: { fontSize: 18, fontWeight: '600', lineHeight: 24 },
-  greeting: { fontSize: 15, fontWeight: '700', marginTop: 4 },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    marginTop: -2,
+    marginBottom: 6,
+  },
+  topHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  brandGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  brandIcon: {
+    width: 28,
+    height: 28,
+  },
+  brandTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  topHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  headerBtn: {
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  unreadDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  avatarBtn: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitials: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  greetingWrap: {
+    marginTop: 2,
+    marginBottom: 4,
+    gap: 3,
+  },
+  greeting: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  slogan: {
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
   xpRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },
   xp: { fontSize: 32, fontWeight: '800' },
   xpTarget: { paddingBottom: 4 },
