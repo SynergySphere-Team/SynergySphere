@@ -78,6 +78,7 @@ export default function TabsLayout() {
           <Tabs.Screen name="change-password" options={{ title: 'Change Password', href: null }} />
           <Tabs.Screen name="notifications-settings" options={{ title: 'Notifications', href: null }} />
           <Tabs.Screen name="notifications" options={{ title: 'Notifications', href: null }} />
+          <Tabs.Screen name ="accessibility-settings" options={{ title: 'Accessibility', href: null }} />
           <Tabs.Screen name="coding" options={{ title: 'Coding', href: null }} />
           <Tabs.Screen name="ai-assistant" options={{ title: 'AI Assistant', href: null }} />
           <Tabs.Screen name="lecture-to-life" options={{ title: 'Lecture to Life', href: null }} />
