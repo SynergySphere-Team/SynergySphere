@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { AppState, Image, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
+import { AppState, Image, Pressable, StyleSheet, Text as RNText, Vibration, View, type TextProps } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Card, Stat } from '@/components/ui';
 import { WorkspaceMenu } from '@/components/WorkspaceMenu';
 import { useTheme } from '@/context/ThemeContext';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import { api } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -33,6 +34,47 @@ function getGreeting(): string {
   if (hour < 12) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
+}
+
+function Text({
+  style,
+  ...props
+}: TextProps) {
+  const {
+    largerText,
+    fontSize,
+  } = useAccessibility();
+
+  const flattenedStyle =
+    StyleSheet.flatten(style);
+
+  const baseFontSize =
+    typeof flattenedStyle?.fontSize === 'number'
+      ? flattenedStyle.fontSize
+      : 14;
+
+  const baseLineHeight =
+    typeof flattenedStyle?.lineHeight === 'number'
+      ? flattenedStyle.lineHeight
+      : undefined;
+
+  return (
+    <RNText
+      {...props}
+      allowFontScaling
+      style={[
+        style,
+        largerText && {
+          fontSize: fontSize(baseFontSize),
+
+          lineHeight:
+            baseLineHeight !== undefined
+              ? fontSize(baseLineHeight)
+              : undefined,
+        },
+      ]}
+    />
+  );
 }
 
 export default function HomeScreen() {
@@ -338,8 +380,33 @@ export default function HomeScreen() {
             hitSlop={8}
             style={styles.avatarBtn}
           >
-            <View style={[styles.avatarCircle, { backgroundColor: isLight ? '#0B2314' : '#0F3D24' }]}>
-              <Text style={styles.avatarInitials}>{userInitials}</Text>
+            <View
+              style={[
+                styles.avatarCircle,
+                {
+                  backgroundColor: isLight
+                    ? '#0B2314'
+                    : '#0F3D24',
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              {user?.profilePicture ? (
+                <Image
+                  source={{
+                    uri: user.profilePicture,
+                  }}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
+                  accessibilityLabel={`${user.firstName ?? ''} ${
+                    user.lastName ?? ''
+                  } profile picture`}
+                />
+              ) : (
+                <Text style={styles.avatarInitials}>
+                  {userInitials}
+                </Text>
+              )}
             </View>
           </Pressable>
         </View>
@@ -710,18 +777,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarInitials: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  justifyContent: 'center',
+  alignItems: 'center',
+  overflow: 'hidden',
+  borderWidth: 1,
+},
+
+avatarImage: {
+  width: '100%',
+  height: '100%',
+  borderRadius: 16,
+},
+
+avatarInitials: {
+  color: '#FFFFFF',
+  fontSize: 13,
+  fontWeight: '800',
+  letterSpacing: 0.5,
+},
   greetingWrap: {
     marginTop: 2,
     marginBottom: 4,
