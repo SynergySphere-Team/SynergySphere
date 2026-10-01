@@ -168,7 +168,7 @@ export function Screen({
   const screenView = (
     <SafeAreaView
       edges={['top', 'left', 'right']}
-      style={[styles.safe, { backgroundColor: colors.background }, style]}
+      style={[styles.safe, { backgroundColor: colors.background }, style as any]}
     >
       {body}
     </SafeAreaView>

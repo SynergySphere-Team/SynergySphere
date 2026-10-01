@@ -31,14 +31,41 @@ function apiUrlFromMetroHost(hostUri: unknown): string | null {
   }
 }
 
+function isPrivateOrLocalIp(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '10.0.2.2' ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function getApiUrl(): string {
   const envUrl = normalizeApiUrl(process.env.EXPO_PUBLIC_API_URL);
 
   if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && window.location?.hostname) {
+      const hostname = window.location.hostname;
+      // When accessed from localhost/loopback in the browser, always use localhost:4000
+      // so stale LAN IPs from .env files don't prevent local connections.
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'http://localhost:4000/api';
+      }
+      // If accessing via custom hostname or LAN IP in the browser and envUrl is not a remote production host,
+      // route to the same host on port 4000.
+      if (!envUrl || isPrivateOrLocalIp(envUrl)) {
+        return `http://${hostname}:4000/api`;
+      }
+    }
     return envUrl || 'http://localhost:4000/api';
   }
-
-  if (envUrl) return envUrl;
 
   // Infer host from Expo Go / development client Metro connection
   const hostUri =
@@ -47,9 +74,24 @@ export function getApiUrl(): string {
     (Constants as any).manifest?.debuggerHost;
 
   const metroUrl = apiUrlFromMetroHost(hostUri);
+
+  // If envUrl is an explicit remote URL (e.g. https://... ngrok or deployed backend), respect it
+  if (envUrl && !isPrivateOrLocalIp(envUrl)) {
+    return envUrl;
+  }
+
+  // In development, the active Metro host matches the dev server network
   if (metroUrl) return metroUrl;
 
-  return 'http://192.168.39.192:4000/api';
+  // Fallback to configured envUrl if available
+  if (envUrl) return envUrl;
+
+  // Final fallback by platform
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:4000/api';
+  }
+
+  return 'http://localhost:4000/api';
 }
 
 export class ApiError extends Error {

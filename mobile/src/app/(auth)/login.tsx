@@ -164,6 +164,10 @@ export default function LoginScreen() {
               Create an account
             </Text>
           </Pressable>
+
+          <Text style={[styles.demoHint, { color: colors.muted }]}>
+            Demo: student@synergysphere.com / student123
+          </Text>
         </View>
 
         <Text style={[styles.terms, { color: colors.muted }]}>
@@ -241,5 +245,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     paddingHorizontal: 20,
+  },
+  demoHint: {
+    textAlign: 'center',
+    fontSize: 12,
+    marginTop: 8,
   },
 });
