@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, TextInput, Vibration, View } from 'react-native';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Pressable, StyleSheet, Text as RNText, TextInput as RNTextInput, Vibration, View, type TextProps, type TextInputProps } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams } from 'expo-router';
@@ -8,6 +8,7 @@ import { Button, Card, Field } from '@/components/ui';
 import { MyWorkView } from './my-work';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import { api } from '@/services/api';
 import {
   scheduleFocusCompletionNotification,
@@ -26,6 +27,78 @@ const nextStatus: Record<Task['status'], Task['status']> = {
   REVIEW: 'DONE',
   DONE: 'TODO',
 };
+
+function Text({
+  style,
+  ...props
+}: TextProps) {
+  const { largerText, fontSize } = useAccessibility();
+
+  const flattenedStyle = StyleSheet.flatten(style);
+
+  const baseFontSize =
+    typeof flattenedStyle?.fontSize === 'number'
+      ? flattenedStyle.fontSize
+      : 14;
+
+  const baseLineHeight =
+    typeof flattenedStyle?.lineHeight === 'number'
+      ? flattenedStyle.lineHeight
+      : undefined;
+
+  return (
+    <RNText
+      {...props}
+      allowFontScaling
+      style={[
+        style,
+        largerText && {
+          fontSize: fontSize(baseFontSize),
+          lineHeight:
+            baseLineHeight !== undefined
+              ? fontSize(baseLineHeight)
+              : undefined,
+        },
+      ]}
+    />
+  );
+}
+
+function TextInput({
+  style,
+  ...props
+}: TextInputProps) {
+  const { largerText, fontSize } = useAccessibility();
+
+  const flattenedStyle = StyleSheet.flatten(style);
+
+  const baseFontSize =
+    typeof flattenedStyle?.fontSize === 'number'
+      ? flattenedStyle.fontSize
+      : 16;
+
+  const baseLineHeight =
+    typeof flattenedStyle?.lineHeight === 'number'
+      ? flattenedStyle.lineHeight
+      : undefined;
+
+  return (
+    <RNTextInput
+      {...props}
+      allowFontScaling
+      style={[
+        style,
+        largerText && {
+          fontSize: fontSize(baseFontSize),
+          lineHeight:
+            baseLineHeight !== undefined
+              ? fontSize(baseLineHeight)
+              : undefined,
+        },
+      ]}
+    />
+  );
+}
 
 export default function TasksScreen() {
   const { colors, theme } = useTheme();
