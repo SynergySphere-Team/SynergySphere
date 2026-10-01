@@ -22,7 +22,8 @@ import { pool } from './lib/db.js';
 import { runMigrations } from './scripts/migrate.js';
 
 const app = express();
-const PORT = process.env.PORT || 4001;
+const PORT = Number(process.env.PORT) || 4000;
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Trust one proxy hop (ngrok / load-balancer) so that express-rate-limit
 // can read the real client IP from X-Forwarded-For without throwing a
@@ -34,6 +35,10 @@ const DEFAULT_DEV_ORIGINS = [
   'http://127.0.0.1:3000',
   'http://localhost:3001',
   'http://127.0.0.1:3001',
+  'http://localhost:8081',
+  'http://127.0.0.1:8081',
+  'http://localhost:19006',
+  'http://127.0.0.1:19006',
 ];
 
 function configuredOrigins(): string[] {
@@ -74,7 +79,13 @@ app.use(cors({
       return;
     }
 
-    callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    if (process.env.NODE_ENV !== 'production') {
+      // In development allow any origin to facilitate physical device and emulator access
+      callback(null, true);
+      return;
+    }
+
+    callback(null, false);
   },
   credentials: true,
 }));
@@ -89,14 +100,14 @@ app.use(express.json({
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 300,
   message: { error: 'Too many requests, please try again later.' },
 });
 app.use('/api/', limiter);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 30,
   message: { error: 'Too many auth attempts, please try again later.' },
 });
 app.use('/api/auth/login', authLimiter);
@@ -104,8 +115,13 @@ app.use('/api/auth/register', authLimiter);
 
 app.use('/api/github', githubWebhookRoutes);
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'SynergySphere API', version: '1.0.0' });
+app.get(['/api/health', '/health'], (_req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'SynergySphere API',
+    version: '1.0.0',
+    database: isDbConnected ? 'connected' : 'disconnected',
+  });
 });
 
 app.use('/api/auth', authRoutes);
@@ -164,8 +180,8 @@ async function checkDatabaseConnection(): Promise<boolean> {
   }
 }
 
-const server = app.listen(PORT, () => {
-  console.log(`SynergySphere API running on http://localhost:${PORT}`);
+const server = app.listen(PORT, HOST, () => {
+  console.log(`SynergySphere API running on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT} (bound to ${HOST}:${PORT})`);
   void checkDatabaseConnection();
 });
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen, Notice } from '@/components/Screen';
 import { Button, Field } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
@@ -14,6 +15,7 @@ export default function LoginScreen() {
   const { colors, theme, setTheme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -31,12 +33,32 @@ export default function LoginScreen() {
     }
   }, [setTheme]);
 
+  function isValidEmail(val: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
+  }
+
   async function submit() {
+    if (submitting) return;
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!isValidEmail(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+
     setError('');
     setSubmitting(true);
 
     try {
-      await login(email.trim(), password);
+      await login(trimmedEmail, password);
       router.replace('/(tabs)');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to sign in.');
@@ -83,9 +105,13 @@ export default function LoginScreen() {
           <Field
             label="Email"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (error) setError('');
+            }}
             keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
             autoComplete="email"
             placeholder="you@example.com"
           />
@@ -93,15 +119,33 @@ export default function LoginScreen() {
           <Field
             label="Password"
             value={password}
-            onChangeText={setPassword}
-            secureTextEntry
+            onChangeText={(text) => {
+              setPassword(text);
+              if (error) setError('');
+            }}
+            secureTextEntry={!showPassword}
             autoComplete="password"
             placeholder="Your password"
+            rightElement={
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                onPress={() => setShowPassword((prev) => !prev)}
+                hitSlop={8}
+                style={styles.eyeButton}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={colors.muted}
+                />
+              </Pressable>
+            }
           />
 
           <Button
             title={submitting ? 'Signing in…' : 'Sign in to SynergySphere'}
-            disabled={submitting || !email || !password}
+            disabled={submitting || !email.trim() || !password}
             onPress={submit}
           />
 
@@ -180,6 +224,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderRadius: 10,
+  },
+  eyeButton: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   link: {
     textAlign: 'center',

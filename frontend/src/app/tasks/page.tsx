@@ -51,6 +51,9 @@ const columns = [
 ];
 
 const TIMER_STORAGE_KEY = 'synergysphere_focus_timer';
+const MIN_MINUTES = 1;
+const MAX_MINUTES = 240;
+const DEFAULT_MINUTES = 25;
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -65,6 +68,7 @@ export default function TasksPage() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [editingLearned, setEditingLearned] = useState<string | null>(null);
   const [learnedDraft, setLearnedDraft] = useState('');
   const [includeWellnessCheckIn, setIncludeWellnessCheckIn] = useState(true);
@@ -72,8 +76,9 @@ export default function TasksPage() {
   const [checkInMood, setCheckInMood] = useState(8);
   const [checkInEnergy, setCheckInEnergy] = useState(7);
 
-  const [durationMinutes, setDurationMinutes] = useState(25);
-  const [secondsLeft, setSecondsLeft] = useState(25 * 60);
+  const [durationInput, setDurationInput] = useState(String(DEFAULT_MINUTES));
+  const [durationMinutes, setDurationMinutes] = useState(DEFAULT_MINUTES);
+  const [secondsLeft, setSecondsLeft] = useState(DEFAULT_MINUTES * 60);
   const [timerStatus, setTimerStatus] = useState<'idle' | 'running' | 'paused'>('idle');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -101,6 +106,7 @@ export default function TasksPage() {
         method: 'POST',
         body: JSON.stringify({ durationMinutes }),
       });
+      setSuccess('🎉 Focus session completed! +15 XP earned.');
       await loadStats();
     } catch {
       /* still count locally */
@@ -121,13 +127,18 @@ export default function TasksPage() {
         timerStatus: 'idle' | 'running' | 'paused';
         endsAt?: number;
       };
-      setDurationMinutes(parsed.durationMinutes || 25);
+      const initialMins = Math.max(
+        MIN_MINUTES,
+        Math.min(MAX_MINUTES, parsed.durationMinutes || DEFAULT_MINUTES)
+      );
+      setDurationMinutes(initialMins);
+      setDurationInput(String(initialMins));
       if (parsed.timerStatus === 'running' && parsed.endsAt) {
         const remaining = Math.max(0, Math.ceil((parsed.endsAt - Date.now()) / 1000));
         setSecondsLeft(remaining);
         setTimerStatus(remaining > 0 ? 'running' : 'idle');
       } else {
-        setSecondsLeft(parsed.secondsLeft ?? parsed.durationMinutes * 60);
+        setSecondsLeft(parsed.secondsLeft ?? initialMins * 60);
         setTimerStatus(parsed.timerStatus || 'idle');
       }
     } catch {
@@ -168,15 +179,55 @@ export default function TasksPage() {
     localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(payload));
   }, [durationMinutes, secondsLeft, timerStatus]);
 
-  function updateDuration(minutes: number) {
-    const clamped = Math.min(240, Math.max(1, minutes));
+  function applyDuration(mins: number) {
+    const clamped = Math.max(MIN_MINUTES, Math.min(MAX_MINUTES, Math.round(mins)));
     setDurationMinutes(clamped);
-    if (timerStatus === 'idle') {
+    setDurationInput(String(clamped));
+    if (timerStatus !== 'running') {
       setSecondsLeft(clamped * 60);
+      setTimerStatus('idle');
     }
   }
 
+  function handleInputChange(text: string) {
+    const digitsOnly = text.replace(/[^0-9]/g, '');
+    setDurationInput(digitsOnly);
+
+    if (!digitsOnly) {
+      return;
+    }
+
+    const val = parseInt(digitsOnly, 10);
+    if (!isNaN(val)) {
+      const clamped = Math.max(MIN_MINUTES, Math.min(MAX_MINUTES, val));
+      setDurationMinutes(clamped);
+      if (timerStatus !== 'running') {
+        setSecondsLeft(clamped * 60);
+        setTimerStatus('idle');
+      }
+    }
+  }
+
+  function handleInputBlur() {
+    const val = parseInt(durationInput, 10);
+    if (isNaN(val) || val < MIN_MINUTES) {
+      applyDuration(DEFAULT_MINUTES);
+    } else if (val > MAX_MINUTES) {
+      applyDuration(MAX_MINUTES);
+    } else {
+      applyDuration(val);
+    }
+  }
+
+  function adjustDuration(delta: number) {
+    if (timerStatus === 'running') return;
+    const current = parseInt(durationInput, 10) || durationMinutes;
+    applyDuration(current + delta);
+  }
+
   function startTimer() {
+    setError('');
+    setSuccess('');
     if (timerStatus === 'idle') {
       setSecondsLeft(durationMinutes * 60);
     }
@@ -270,6 +321,10 @@ export default function TasksPage() {
         <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
       )}
 
+      {success && (
+        <div className="mb-4 rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm text-primary">{success}</div>
+      )}
+
       {showForm && (
         <Card className="mb-4">
           <CardContent className="flex flex-col gap-3 pt-1 sm:flex-row">
@@ -279,7 +334,7 @@ export default function TasksPage() {
         </Card>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_270px]">
+      <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
         <div className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-4">
             {columns.map((column) => {
@@ -454,25 +509,90 @@ export default function TasksPage() {
 
         <div className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <Clock className="h-4 w-4 text-primary" />
                 Focus Timer
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-center">
-              <div className="mb-3 flex items-center justify-center gap-2">
-                <label className="text-xs text-muted-foreground">Minutes:</label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={120}
-                  value={durationMinutes}
-                  onChange={(e) => updateDuration(Number(e.target.value))}
-                  disabled={timerStatus === 'running'}
-                  className="h-8 w-16 text-center text-sm"
-                />
-              </div>
+            <CardContent className="text-center pt-0">
+              {/* Dynamic Custom Duration Controls */}
+              {timerStatus !== 'running' ? (
+                <div className="mb-4 space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Set Duration (1 – 240 mins)
+                  </p>
+                  <div className="flex items-center justify-center gap-1.5">
+                    {/* Rapid -5m step */}
+                    <button
+                      type="button"
+                      onClick={() => adjustDuration(-5)}
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-white/10 bg-secondary/60 px-2 text-xs font-semibold text-muted-foreground transition-all hover:bg-secondary hover:text-white active:scale-95"
+                      title="Decrease 5 minutes"
+                      aria-label="Decrease 5 minutes"
+                    >
+                      -5m
+                    </button>
+
+                    {/* Step -1m button */}
+                    <button
+                      type="button"
+                      onClick={() => adjustDuration(-1)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-secondary/60 text-muted-foreground transition-all hover:bg-secondary hover:text-white active:scale-95"
+                      title="Decrease 1 minute"
+                      aria-label="Decrease 1 minute"
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </button>
+
+                    {/* Numerical Input with 'min' suffix */}
+                    <div className="relative flex items-center">
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={3}
+                        value={durationInput}
+                        onChange={(e) => handleInputChange(e.target.value)}
+                        onBlur={handleInputBlur}
+                        className="h-8 w-16 pr-6 text-center text-sm font-bold bg-background/80 border-white/15"
+                        aria-label="Custom focus duration in minutes"
+                      />
+                      <span className="pointer-events-none absolute right-1.5 text-[11px] font-medium text-muted-foreground">
+                        min
+                      </span>
+                    </div>
+
+                    {/* Step +1m button */}
+                    <button
+                      type="button"
+                      onClick={() => adjustDuration(1)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-secondary/60 text-muted-foreground transition-all hover:bg-secondary hover:text-white active:scale-95"
+                      title="Increase 1 minute"
+                      aria-label="Increase 1 minute"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+
+                    {/* Rapid +5m step */}
+                    <button
+                      type="button"
+                      onClick={() => adjustDuration(5)}
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-white/10 bg-secondary/60 px-2 text-xs font-semibold text-muted-foreground transition-all hover:bg-secondary hover:text-white active:scale-95"
+                      title="Increase 5 minutes"
+                      aria-label="Increase 5 minutes"
+                    >
+                      +5m
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-4 flex items-center justify-center gap-1.5 rounded-md border border-primary/25 bg-primary/10 py-1.5 px-2 text-xs font-medium text-primary">
+                  <Flame className="h-3.5 w-3.5 animate-pulse text-primary shrink-0" />
+                  <span className="truncate">Focusing ({durationMinutes}m target)</span>
+                </div>
+              )}
+
               <div className="mx-auto flex h-36 w-36 items-center justify-center rounded-full border-4 border-primary/70 bg-primary/10">
                 <div>
                   <p className="text-3xl font-bold text-white">{formatTime(secondsLeft)}</p>

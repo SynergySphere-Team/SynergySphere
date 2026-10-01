@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = (process.env.BACKEND_URL || 'http://localhost:4001').replace(/\/$/, '');
+const BACKEND_URL = (process.env.BACKEND_URL || 'http://127.0.0.1:4000').replace(/\/$/, '');
 
 async function proxyRequest(request: NextRequest, pathSegments: string[]) {
   const path = pathSegments.join('/');
@@ -11,6 +11,12 @@ async function proxyRequest(request: NextRequest, pathSegments: string[]) {
   if (contentType) headers.set('content-type', contentType);
   const cookie = request.headers.get('cookie');
   if (cookie) headers.set('cookie', cookie);
+  const authorization = request.headers.get('authorization');
+  if (authorization) headers.set('authorization', authorization);
+  const client = request.headers.get('x-synergysphere-client');
+  if (client) headers.set('x-synergysphere-client', client);
+  const accept = request.headers.get('accept');
+  if (accept) headers.set('accept', accept);
 
   const init: RequestInit = {
     method: request.method,
@@ -30,7 +36,7 @@ async function proxyRequest(request: NextRequest, pathSegments: string[]) {
     // Letting this throw produces an HTML 500 page, which becomes the opaque
     // "Request failed" message in every client screen.
     return NextResponse.json(
-      { error: 'The SynergySphere API is unavailable. Start the backend on port 4001 and try again.' },
+      { error: 'The SynergySphere API is unavailable. Start the backend on port 4000 and try again.' },
       { status: 503 },
     );
   }

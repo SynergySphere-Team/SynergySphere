@@ -41,33 +41,47 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
   // Sync state
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const technologyRequestId = useRef(0);
+  const detailCache = useRef<Map<string, TechnologyDetail>>(new Map());
 
   // Load technologies list
   const loadTechnologies = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const data = await api.get<{ technologies: Technology[] }>('/curriculum/technologies');
-      setTechnologies(data.technologies);
-      if (data.technologies.length > 0 && !activeTechId) {
-        setActiveTechId(data.technologies[0].id);
+      const list = Array.isArray(data?.technologies) ? data.technologies : [];
+      setTechnologies(list);
+      if (list.length > 0) {
+        setActiveTechId((curr) => (curr && list.some((t) => t.id === curr) ? curr : list[0].id));
       }
-    } catch {
-      // Fallback defaults
+    } catch (err: any) {
+      setError(err?.message || 'Unable to load curriculum. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [activeTechId]);
+  }, []);
 
   // Load active technology detail
   const loadTechDetail = useCallback(async (techId: string) => {
+    if (!techId) return;
     const requestId = ++technologyRequestId.current;
-    setDetailLoading(true);
-    setActiveTechDetail(null);
+
+    // Check fast in-memory cache first for instant responsiveness
+    const cached = detailCache.current.get(techId);
+    if (cached) {
+      setActiveTechDetail(cached);
+      setDetailLoading(false);
+    } else {
+      setDetailLoading(true);
+      setActiveTechDetail(null);
+    }
+
     try {
       const detail = await api.get<TechnologyDetail>(`/curriculum/technologies/${techId}`);
-      // A slower response for a previously selected tab must never replace the
-      // curriculum the learner selected most recently.
       if (requestId !== technologyRequestId.current) return;
+      detailCache.current.set(techId, detail);
       setActiveTechDetail(detail);
       // Auto-expand first module by default
       if (detail.modules && detail.modules.length > 0) {
@@ -77,7 +91,7 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
         }));
       }
     } catch {
-      // Handle error
+      // If cached version was already shown, leave it; otherwise detail remains null
     } finally {
       if (requestId === technologyRequestId.current) setDetailLoading(false);
     }
@@ -131,6 +145,7 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
     try {
       const res = await api.post<{ lastSynchronized: string; message: string }>('/curriculum/sync');
       setSyncNotice(`${res.message} (Synced: ${res.lastSynchronized})`);
+      detailCache.current.clear();
       await loadTechnologies();
       if (activeTechId) await loadTechDetail(activeTechId);
     } catch {
@@ -141,23 +156,72 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
     }
   }
 
+  // 1. LOADING STATE
   if (loading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={[styles.loadingText, { color: colors.muted }]}>
-          Loading programming academy…
+          Loading curriculum...
         </Text>
       </View>
     );
   }
 
+  // 2. ERROR STATE (when no technologies could be loaded)
+  if (error && technologies.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <Ionicons name="alert-circle-outline" size={44} color={colors.danger} />
+        <Text style={[styles.stateTitle, { color: colors.text }]}>
+          Unable to load curriculum. Please try again.
+        </Text>
+        <Text style={[styles.stateSubtitle, { color: colors.muted }]}>
+          {error}
+        </Text>
+        <Pressable
+          onPress={loadTechnologies}
+          style={({ pressed }) => [
+            styles.retryButton,
+            { backgroundColor: colors.primary },
+            pressed && { opacity: 0.8 },
+          ]}
+        >
+          <Text style={[styles.retryButtonText, { color: colors.primaryText }]}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // 3. EMPTY STATE (technologies list is empty)
+  if (technologies.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <Ionicons name="school-outline" size={44} color={colors.muted} />
+        <Text style={[styles.stateTitle, { color: colors.text }]}>
+          No technologies available.
+        </Text>
+        <Pressable
+          onPress={loadTechnologies}
+          style={({ pressed }) => [
+            styles.retryButton,
+            { backgroundColor: colors.surfaceElevated, borderColor: colors.border, borderWidth: 1 },
+            pressed && { opacity: 0.8 },
+          ]}
+        >
+          <Text style={[styles.retryButtonText, { color: colors.text }]}>Refresh</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // Active tech resolution (safe fallback)
+  const activeTech = technologies.find((t) => t.id === activeTechId) || (technologies.length > 0 ? technologies[0] : null);
+
   // Find continue learning candidate
   const continueLesson = activeTechDetail?.modules
-    .flatMap((m) => m.lessons)
-    .find((l) => !l.completed);
-
-  const activeTech = technologies.find((t) => t.id === activeTechId) || technologies[0];
+    ?.flatMap((m) => m.lessons)
+    ?.find((l) => !l.completed);
 
   return (
     <View style={styles.container}>
@@ -268,7 +332,7 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
               {continueLesson.title}
             </Text>
             <Text style={[styles.continueMeta, { color: isLight ? '#166534' : '#a7f3d0' }]}>
-              {activeTech.name} · {continueLesson.difficulty}
+              {activeTech ? activeTech.name : ''} · {continueLesson.difficulty}
             </Text>
           </View>
           <View style={styles.continueRight}>
@@ -507,6 +571,12 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
               </View>
             );
           })
+        ) : !activeTech ? (
+          <View style={[styles.moduleCard, { padding: 18, alignItems: 'center' }]}>
+            <Text style={[{ color: colors.muted, fontSize: 13 }]}>
+              Select a technology to view lessons.
+            </Text>
+          </View>
         ) : (
           <View style={[styles.moduleCard, { padding: 18, alignItems: 'center' }]}>
             <Text style={[{ color: colors.muted, fontSize: 13 }]}>
@@ -565,6 +635,29 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  stateTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 6,
+  },
+  stateSubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginHorizontal: 24,
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  retryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 14,
+  },
+  retryButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   headerArea: {
     gap: 6,

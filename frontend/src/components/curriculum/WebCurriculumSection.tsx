@@ -130,28 +130,44 @@ export function WebCurriculumSection() {
   const [consoleOpen, setConsoleOpen] = useState<Record<number, boolean>>({});
   const [runningIndex, setRunningIndex] = useState<number | null>(null);
   const [xpBanner, setXpBanner] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const technologyRequestId = useRef(0);
   const lessonRequestId = useRef(0);
   const requestedLessonForTechnology = useRef<{ technologyId: string; lessonId: string } | null>(null);
+  const detailCache = useRef<Map<string, TechnologyDetail>>(new Map());
 
   const loadTechnologies = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const data = await api<{ technologies: Technology[] }>('/curriculum/technologies');
-      setTechnologies(data.technologies);
-    } catch {
-      // Fallback
+      const list = Array.isArray(data?.technologies) ? data.technologies : [];
+      setTechnologies(list);
+      if (list.length > 0) {
+        setActiveTechId((curr) => (curr && list.some((t) => t.id === curr) ? curr : list[0].id));
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Unable to load curriculum. Please try again.');
     } finally {
       setLoading(false);
     }
   }, []);
 
   const loadTechDetail = useCallback(async (techId: string, selectFirstLesson = false) => {
+    if (!techId) return;
     const requestId = ++technologyRequestId.current;
-    setActiveTechDetail(null);
+
+    const cached = detailCache.current.get(techId);
+    if (cached) {
+      setActiveTechDetail(cached);
+    } else {
+      setActiveTechDetail(null);
+    }
+
     try {
       const detail = await api<TechnologyDetail>(`/curriculum/technologies/${techId}`);
-      // A delayed response for a previous tab must not overwrite the current curriculum.
       if (requestId !== technologyRequestId.current) return;
+      detailCache.current.set(techId, detail);
       setActiveTechDetail(detail);
       if (detail.modules?.length > 0) {
         setExpandedModules((prev) => ({ ...prev, [detail.modules[0].id]: true }));
@@ -164,7 +180,7 @@ export function WebCurriculumSection() {
         }
       }
     } catch {
-      // Handle
+      // Keep cached if available
     }
   }, []);
 
@@ -253,8 +269,39 @@ export function WebCurriculumSection() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-        Loading W3Schools programming curriculum…
+      <div className="flex h-64 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+        <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+        <span>Loading curriculum...</span>
+      </div>
+    );
+  }
+
+  if (error && technologies.length === 0) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
+        <p className="text-base font-semibold text-white">Unable to load curriculum. Please try again.</p>
+        <p className="text-xs text-muted-foreground max-w-md">{error}</p>
+        <button
+          onClick={() => loadTechnologies()}
+          className="mt-2 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow hover:opacity-90 transition"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (technologies.length === 0) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
+        <BookOpen className="h-8 w-8 text-muted-foreground" />
+        <p className="text-base font-semibold text-white">No technologies available.</p>
+        <button
+          onClick={() => loadTechnologies()}
+          className="mt-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-white hover:bg-white/10 transition"
+        >
+          Refresh
+        </button>
       </div>
     );
   }
@@ -343,7 +390,7 @@ export function WebCurriculumSection() {
         <div className="space-y-3 rounded-xl border border-white/[0.08] bg-black/20 p-4 h-fit max-h-[800px] overflow-y-auto">
           <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
             <div>
-              <h3 className="text-sm font-bold text-white">{activeTechDetail?.name} Curriculum</h3>
+              <h3 className="text-sm font-bold text-white">{activeTechDetail?.name || 'Technology'} Curriculum</h3>
               <p className="text-xs text-muted-foreground">
                 {activeTechDetail?.completedLessons} / {activeTechDetail?.totalLessons} lessons completed
               </p>

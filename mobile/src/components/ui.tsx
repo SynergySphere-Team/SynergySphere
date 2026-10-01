@@ -46,17 +46,33 @@ export function Button({
   );
 }
 
-export function Field({ label, ...props }: TextInputProps & { label: string }) {
+export function Field({
+  label,
+  rightElement,
+  style,
+  ...props
+}: TextInputProps & {
+  label: string;
+  rightElement?: ReactNode;
+}) {
   const { colors, theme } = useTheme();
   return (
     <View style={styles.field}>
       <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
-      <TextInput
-        keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
-        placeholderTextColor={colors.placeholderText}
-        style={[styles.input, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}
-        {...props}
-      />
+      <View
+        style={[
+          styles.inputContainer,
+          { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
+        ]}
+      >
+        <TextInput
+          keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
+          placeholderTextColor={colors.placeholderText}
+          style={[styles.input, { color: colors.text }, style]}
+          {...props}
+        />
+        {rightElement}
+      </View>
     </View>
   );
 }
@@ -123,13 +139,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  input: {
+  inputContainer: {
     minHeight: 46,
     borderWidth: 1,
     borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 14,
+  },
+  input: {
+    flex: 1,
+    minHeight: 46,
     fontSize: 16,
     fontWeight: '500',
+    paddingVertical: 8,
   },
   heading: {
     fontSize: 25,

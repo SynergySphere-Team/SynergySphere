@@ -7,7 +7,7 @@ The Expo mobile client for SynergySphere. It uses the shared Express API and nev
 From the repository root, configure `mobile/.env` with your computer’s current LAN address:
 
 ```env
-EXPO_PUBLIC_API_URL=http://192.168.x.x:4001/api
+EXPO_PUBLIC_API_URL=http://<COMPUTER-LAN-IP>:4000/api
 ```
 
 Start the API and Expo together:
