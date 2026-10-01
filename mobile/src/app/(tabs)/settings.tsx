@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-
 import { useRouter } from 'expo-router';
-
 import Ionicons from '@expo/vector-icons/Ionicons';
-
 import * as ImagePicker from 'expo-image-picker';
-
 import {
   Alert,
   Image,
@@ -17,24 +13,18 @@ import {
   Text,
   View,
 } from 'react-native';
-
 import { Screen, Notice } from '@/components/Screen';
-
 import {
   Button,
   Card,
   Field,
   Heading,
 } from '@/components/ui';
-
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-
 import { api } from '@/services/api';
 import { github } from '@/services/github';
-
 import type { GithubConnection } from '@/types/api';
-
 interface SettingsData {
   user: {
     firstName: string;
@@ -45,7 +35,6 @@ interface SettingsData {
     theme: string;
     emailNotifications: boolean;
   };
-
   profile: {
     githubUrl: string | null;
     linkedinUrl: string | null;
@@ -54,21 +43,18 @@ interface SettingsData {
     about: string | null;
   };
 }
-
 type SettingKey =
   | 'account'
   | 'password'
   | 'linked'
   | 'notifications'
   | 'appearance'
-  | 'accessibility'
   | 'privacy'
   | 'security'
   | 'data'
   | 'support'
   | 'about'
   | null;
-
 type SettingRowProps = {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
@@ -84,7 +70,6 @@ type SettingRowProps = {
   accentColor: string;
   danger?: boolean;
 };
-
 function SettingRow({
   icon,
   title,
@@ -97,7 +82,6 @@ function SettingRow({
 }: SettingRowProps) {
   const rowColor = danger ? '#D92D20' : colors.text;
   const iconColor = danger ? '#D92D20' : accentColor;
-
   return (
     <Pressable
       accessibilityRole="button"
@@ -125,7 +109,6 @@ function SettingRow({
           color={iconColor}
         />
       </View>
-
       <View style={styles.settingCopy}>
         <Text
           style={[
@@ -137,7 +120,6 @@ function SettingRow({
         >
           {title}
         </Text>
-
         {subtitle ? (
           <Text
             style={[
@@ -151,7 +133,6 @@ function SettingRow({
           </Text>
         ) : null}
       </View>
-
       <Ionicons
         name={
           expanded
@@ -164,23 +145,19 @@ function SettingRow({
     </Pressable>
   );
 }
-
 export default function SettingsScreen() {
   const router = useRouter();
-
   const {
     logout,
     user,
     updateProfile,
     refresh: refreshAuth,
   } = useAuth();
-
   const {
     theme,
     setTheme,
     colors,
   } = useTheme();
-
   const [
     expanded,
     setExpanded,
@@ -188,49 +165,40 @@ export default function SettingsScreen() {
     useState<SettingKey>(
       null,
     );
-
   const [
     firstName,
     setFirstName,
   ] = useState(
     user?.firstName || '',
   );
-
   const [
     lastName,
     setLastName,
   ] = useState(
     user?.lastName || '',
   );
-
   const [bio, setBio] =
     useState('');
-
   const [
     targetRole,
     setTargetRole,
   ] = useState('');
-
   const [
     location,
     setLocation,
   ] = useState('');
-
   const [
     githubUrl,
     setGithubUrl,
   ] = useState('');
-
   const [
     linkedinUrl,
     setLinkedinUrl,
   ] = useState('');
-
   const [
     emailNotifications,
     setEmailNotifications,
   ] = useState(true);
-
   const [
     photo,
     setPhoto,
@@ -242,12 +210,10 @@ export default function SettingsScreen() {
     >(
       user?.profilePicture,
     );
-
   const [
     saving,
     setSaving,
   ] = useState(false);
-
   const [
     message,
     setMessage,
@@ -258,7 +224,6 @@ export default function SettingsScreen() {
         | 'error';
       text: string;
     } | null>(null);
-
   const [
     githubConnection,
     setGithubConnection,
@@ -266,35 +231,28 @@ export default function SettingsScreen() {
     useState<GithubConnection | null>(
       null,
     );
-
   const [
     resetSending,
     setResetSending,
   ] = useState(false);
-
   useEffect(() => {
     setFirstName(
       user?.firstName || '',
     );
-
     setLastName(
       user?.lastName || '',
     );
-
     setPhoto(
       user?.profilePicture,
     );
   }, [user]);
-
   const [refreshing, setRefreshing] = useState(false);
-
   const loadSettings = useCallback(async () => {
     try {
       const [data, conn] = await Promise.allSettled([
         api.get<SettingsData>('/auth/settings'),
         github.connection(),
       ]);
-
       if (data.status === 'fulfilled' && data.value) {
         if (data.value.user) {
           setFirstName(data.value.user.firstName || '');
@@ -312,7 +270,6 @@ export default function SettingsScreen() {
           setLinkedinUrl(data.value.profile.linkedinUrl || '');
         }
       }
-
       if (conn.status === 'fulfilled') {
         setGithubConnection(conn.value);
       }
@@ -320,30 +277,24 @@ export default function SettingsScreen() {
       // Ignore background refresh errors
     }
   }, [setTheme]);
-
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.allSettled([loadSettings(), refreshAuth()]);
     setRefreshing(false);
   }, [loadSettings, refreshAuth]);
-
   useEffect(() => {
     void loadSettings();
   }, [loadSettings]);
-
   async function choosePhoto() {
     const permission =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
-
     if (!permission.granted) {
       setMessage({
         type: 'error',
         text: 'Photo-library access is needed to choose a profile photo.',
       });
-
       return;
     }
-
     const result =
       await ImagePicker.launchImageLibraryAsync(
         {
@@ -356,7 +307,6 @@ export default function SettingsScreen() {
           base64: true,
         },
       );
-
     if (
       !result.canceled &&
       result.assets[0]
@@ -367,7 +317,6 @@ export default function SettingsScreen() {
       );
     }
   }
-
   async function saveSettings() {
     if (
       !firstName.trim() ||
@@ -377,13 +326,10 @@ export default function SettingsScreen() {
         type: 'error',
         text: 'First and last name are required.',
       });
-
       return;
     }
-
     setSaving(true);
     setMessage(null);
-
     try {
       await api.patch(
         '/auth/settings',
@@ -405,7 +351,6 @@ export default function SettingsScreen() {
           emailNotifications,
         },
       );
-
       if (
         photo !==
         user?.profilePicture
@@ -419,7 +364,6 @@ export default function SettingsScreen() {
             photo,
         });
       }
-
       setMessage({
         type: 'success',
         text: 'Settings saved successfully.',
@@ -436,7 +380,6 @@ export default function SettingsScreen() {
       setSaving(false);
     }
   }
-
   async function handleRequestPasswordReset() {
     if (!user?.email) {
       setMessage({
@@ -445,10 +388,8 @@ export default function SettingsScreen() {
       });
       return;
     }
-
     setResetSending(true);
     setMessage(null);
-
     try {
       const res =
         await api.post<{
@@ -461,7 +402,6 @@ export default function SettingsScreen() {
               user.email,
           },
         );
-
       if (res.resetToken) {
         router.push({
           pathname:
@@ -473,7 +413,6 @@ export default function SettingsScreen() {
         } as never);
         return;
       }
-
       setMessage({
         type: 'success',
         text:
@@ -493,7 +432,6 @@ export default function SettingsScreen() {
       );
     }
   }
-
   function confirmDeleteAccount() {
     Alert.alert(
       'Delete Account (POPIA)',
@@ -513,7 +451,6 @@ export default function SettingsScreen() {
                 await api.delete(
                   '/auth/me',
                 );
-
                 await logout();
               } catch (
                 err: any
@@ -529,7 +466,6 @@ export default function SettingsScreen() {
       ],
     );
   }
-
   function confirmLogout() {
     Alert.alert(
       'Sign Out',
@@ -548,17 +484,14 @@ export default function SettingsScreen() {
       ],
     );
   }
-
   async function disconnectGithub() {
     try {
       await github.disconnect();
-
       setGithubConnection({
         connected: false,
         username: null,
         avatarUrl: null,
       });
-
       setMessage({
         type: 'success',
         text: 'GitHub disconnected from SynergySphere.',
@@ -573,7 +506,6 @@ export default function SettingsScreen() {
       });
     }
   }
-
   function toggleSection(
     key: Exclude<
       SettingKey,
@@ -589,15 +521,12 @@ export default function SettingsScreen() {
           : key,
     );
   }
-
   const isLight =
     theme === 'light';
-
   const primaryAccent =
     isLight
       ? '#1e6827'
       : colors.primary;
-
   const fullName =
     [
       firstName,
@@ -607,13 +536,11 @@ export default function SettingsScreen() {
       .join(' ')
       .trim() ||
     'SynergySphere User';
-
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <Heading subtitle="Manage your account, preferences, privacy and security.">
         Settings
       </Heading>
-
       {message ? (
         <Notice
           tone={
@@ -626,7 +553,6 @@ export default function SettingsScreen() {
           {message.text}
         </Notice>
       ) : null}
-
       <View
         style={[
           styles.profileSummary,
@@ -673,7 +599,6 @@ export default function SettingsScreen() {
             />
           )}
         </Pressable>
-
         <View
           style={
             styles.summaryCopy
@@ -690,7 +615,6 @@ export default function SettingsScreen() {
           >
             {fullName}
           </Text>
-
           <Text
             style={[
               styles.summaryEmail,
@@ -703,7 +627,6 @@ export default function SettingsScreen() {
             {user?.email ||
               'No email available'}
           </Text>
-
           <Text
             style={[
               styles.summaryRole,
@@ -723,7 +646,6 @@ export default function SettingsScreen() {
           </Text>
         </View>
       </View>
-
       <Text
         style={[
           styles.sectionLabel,
@@ -735,7 +657,6 @@ export default function SettingsScreen() {
       >
         ACCOUNT
       </Text>
-
       <Card>
         <SettingRow
           icon="person-outline"
@@ -757,7 +678,6 @@ export default function SettingsScreen() {
             primaryAccent
           }
         />
-
         {expanded ===
         'account' ? (
           <View
@@ -809,7 +729,6 @@ export default function SettingsScreen() {
                   />
                 )}
               </Pressable>
-
               <View
                 style={
                   styles.profileCopy
@@ -826,7 +745,6 @@ export default function SettingsScreen() {
                 >
                   Your profile appears across community projects and team spaces.
                 </Text>
-
                 <Button
                   title="Upload Photo"
                   secondary
@@ -836,7 +754,6 @@ export default function SettingsScreen() {
                 />
               </View>
             </View>
-
             <Field
               label="First Name"
               value={
@@ -846,7 +763,6 @@ export default function SettingsScreen() {
                 setFirstName
               }
             />
-
             <Field
               label="Last Name"
               value={
@@ -856,7 +772,6 @@ export default function SettingsScreen() {
                 setLastName
               }
             />
-
             <Field
               label="Target Role (e.g. Backend Intern)"
               value={
@@ -866,7 +781,6 @@ export default function SettingsScreen() {
                 setTargetRole
               }
             />
-
             <Field
               label="Location"
               value={
@@ -876,7 +790,6 @@ export default function SettingsScreen() {
                 setLocation
               }
             />
-
             <Field
               label="Bio / Engineering Focus"
               value={bio}
@@ -888,7 +801,6 @@ export default function SettingsScreen() {
                 3
               }
             />
-
             <Button
               title={
                 saving
@@ -904,7 +816,6 @@ export default function SettingsScreen() {
             />
           </View>
         ) : null}
-
         <SettingRow
           icon="key-outline"
           title="Change Password"
@@ -925,7 +836,6 @@ export default function SettingsScreen() {
             primaryAccent
           }
         />
-
         {expanded ===
         'password' ? (
           <View
@@ -948,7 +858,6 @@ export default function SettingsScreen() {
             >
               A secure password reset will be requested for {user?.email || 'your account email'}.
             </Text>
-
             <Button
               title={
                 resetSending
@@ -965,7 +874,6 @@ export default function SettingsScreen() {
             />
           </View>
         ) : null}
-
         <SettingRow
           icon="link-outline"
           title="Linked Accounts"
@@ -986,7 +894,6 @@ export default function SettingsScreen() {
             primaryAccent
           }
         />
-
         {expanded ===
         'linked' ? (
           <View
@@ -1006,7 +913,6 @@ export default function SettingsScreen() {
                   colors.text
                 }
               />
-
               <View
                 style={{
                   flex: 1,
@@ -1023,7 +929,6 @@ export default function SettingsScreen() {
                 >
                   GitHub Collaboration
                 </Text>
-
                 <Text
                   style={[
                     styles.description,
@@ -1039,7 +944,6 @@ export default function SettingsScreen() {
                 </Text>
               </View>
             </View>
-
             <Button
               title={
                 githubConnection?.connected
@@ -1056,7 +960,6 @@ export default function SettingsScreen() {
                       )
               }
             />
-
             <Field
               label="LinkedIn Profile URL"
               value={
@@ -1066,7 +969,6 @@ export default function SettingsScreen() {
                 setLinkedinUrl
               }
             />
-
             <Field
               label="GitHub Profile URL"
               value={
@@ -1076,7 +978,6 @@ export default function SettingsScreen() {
                 setGithubUrl
               }
             />
-
             <Button
               title={
                 saving
@@ -1093,7 +994,6 @@ export default function SettingsScreen() {
           </View>
         ) : null}
       </Card>
-
       <Text
         style={[
           styles.sectionLabel,
@@ -1105,7 +1005,6 @@ export default function SettingsScreen() {
       >
         PREFERENCES
       </Text>
-
       <Card>
         <SettingRow
           icon="notifications-outline"
@@ -1123,8 +1022,6 @@ export default function SettingsScreen() {
             primaryAccent
           }
         />
-
-
         <SettingRow
           icon="color-palette-outline"
           title="Appearance"
@@ -1145,7 +1042,6 @@ export default function SettingsScreen() {
             primaryAccent
           }
         />
-
         {expanded ===
         'appearance' ? (
           <View
@@ -1178,7 +1074,6 @@ export default function SettingsScreen() {
                 >
                   Dark Mode
                 </Text>
-
                 <Text
                   style={[
                     styles.description,
@@ -1191,7 +1086,6 @@ export default function SettingsScreen() {
                   Switch between dark and light themes.
                 </Text>
               </View>
-
               <Switch
                 value={
                   theme ===
@@ -1200,7 +1094,6 @@ export default function SettingsScreen() {
                 onValueChange={async (val) => {
                   const nextTheme =
                     val ? 'dark' : 'light';
-
                   setTheme(nextTheme);
                   if (Platform.OS === 'web') {
                     window.localStorage.setItem(
@@ -1208,7 +1101,6 @@ export default function SettingsScreen() {
                       nextTheme,
                     );
                   }
-
                   try {
                     await api.patch(
                       '/auth/settings',
@@ -1216,7 +1108,6 @@ export default function SettingsScreen() {
                         theme: nextTheme,
                       },
                     );
-
                     setMessage({
                       type: 'success',
                       text:
@@ -1250,18 +1141,13 @@ export default function SettingsScreen() {
             </View>
           </View>
         ) : null}
-
         <SettingRow
           icon="accessibility-outline"
           title="Accessibility"
-          subtitle="Use device accessibility preferences"
-          expanded={
-            expanded ===
-            'accessibility'
-          }
+          subtitle="Text, contrast and motion preferences"
           onPress={() =>
-            toggleSection(
-              'accessibility',
+            router.push(
+              '/accessibility-settings' as never,
             )
           }
           colors={
@@ -1271,37 +1157,7 @@ export default function SettingsScreen() {
             primaryAccent
           }
         />
-
-        {expanded ===
-        'accessibility' ? (
-          <View
-            style={
-              styles.lastExpandedPanel
-            }
-          >
-            <Text
-              style={[
-                styles.description,
-                {
-                  color:
-                    colors.muted,
-                },
-              ]}
-            >
-              SynergySphere follows your device text, display and accessibility settings where supported.
-            </Text>
-
-            <Button
-              title="Open Device Settings"
-              secondary
-              onPress={() =>
-                Linking.openSettings()
-              }
-            />
-          </View>
-        ) : null}
       </Card>
-
       <Text
         style={[
           styles.sectionLabel,
@@ -1313,7 +1169,6 @@ export default function SettingsScreen() {
       >
         PRIVACY & SECURITY
       </Text>
-
       <Card>
         <SettingRow
           icon="shield-checkmark-outline"
@@ -1335,7 +1190,6 @@ export default function SettingsScreen() {
             primaryAccent
           }
         />
-
         {expanded ===
         'privacy' ? (
           <View
@@ -1358,7 +1212,6 @@ export default function SettingsScreen() {
             >
               Profile visibility
             </Text>
-
             <Text
               style={[
                 styles.description,
@@ -1372,7 +1225,6 @@ export default function SettingsScreen() {
             </Text>
           </View>
         ) : null}
-
         <SettingRow
           icon="lock-closed-outline"
           title="Security"
@@ -1393,7 +1245,6 @@ export default function SettingsScreen() {
             primaryAccent
           }
         />
-
         {expanded ===
         'security' ? (
           <View
@@ -1416,7 +1267,6 @@ export default function SettingsScreen() {
             >
               Your authenticated session is stored securely on this device. Signing out removes the stored session credentials.
             </Text>
-
             <Button
               title="Sign Out"
               secondary
@@ -1426,7 +1276,6 @@ export default function SettingsScreen() {
             />
           </View>
         ) : null}
-
         <SettingRow
           icon="document-lock-outline"
           title="Data & Permissions"
@@ -1447,7 +1296,6 @@ export default function SettingsScreen() {
             primaryAccent
           }
         />
-
         {expanded ===
         'data' ? (
           <View
@@ -1466,7 +1314,6 @@ export default function SettingsScreen() {
             >
               Photo-library permission is only requested when you choose a profile image. You can review device permissions at any time.
             </Text>
-
             <Button
               title="Manage Device Permissions"
               secondary
@@ -1477,7 +1324,6 @@ export default function SettingsScreen() {
           </View>
         ) : null}
       </Card>
-
       <Text
         style={[
           styles.sectionLabel,
@@ -1489,7 +1335,6 @@ export default function SettingsScreen() {
       >
         SUPPORT
       </Text>
-
       <Card>
         <SettingRow
           icon="help-circle-outline"
@@ -1511,7 +1356,6 @@ export default function SettingsScreen() {
             primaryAccent
           }
         />
-
         {expanded ===
         'support' ? (
           <View
@@ -1536,7 +1380,6 @@ export default function SettingsScreen() {
             </Text>
           </View>
         ) : null}
-
         <SettingRow
           icon="information-circle-outline"
           title="About SynergySphere"
@@ -1557,7 +1400,6 @@ export default function SettingsScreen() {
             primaryAccent
           }
         />
-
         {expanded ===
         'about' ? (
           <View
@@ -1576,7 +1418,6 @@ export default function SettingsScreen() {
             >
               SynergySphere
             </Text>
-
             <Text
               style={[
                 styles.description,
@@ -1591,7 +1432,6 @@ export default function SettingsScreen() {
           </View>
         ) : null}
       </Card>
-
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Log out"
@@ -1616,7 +1456,6 @@ export default function SettingsScreen() {
           size={19}
           color="#D92D20"
         />
-
         <Text
           style={
             styles.logoutText
@@ -1625,7 +1464,6 @@ export default function SettingsScreen() {
           Log Out
         </Text>
       </Pressable>
-
       <View
         style={[
           styles.dangerCard,
@@ -1647,7 +1485,6 @@ export default function SettingsScreen() {
             size={21}
             color="#D92D20"
           />
-
           <Text
             style={
               styles.dangerTitle
@@ -1656,7 +1493,6 @@ export default function SettingsScreen() {
             Danger Zone
           </Text>
         </View>
-
         <Text
           style={[
             styles.description,
@@ -1668,7 +1504,6 @@ export default function SettingsScreen() {
         >
           Permanently delete your account and personal data pursuant to POPIA privacy rights.
         </Text>
-
         <Button
           title="Delete Account"
           danger
@@ -1680,7 +1515,6 @@ export default function SettingsScreen() {
     </Screen>
   );
 }
-
 const styles =
   StyleSheet.create({
     profileSummary: {
@@ -1691,7 +1525,6 @@ const styles =
       alignItems: 'center',
       gap: 12,
     },
-
     summaryAvatar: {
       width: 62,
       height: 62,
@@ -1701,34 +1534,28 @@ const styles =
       justifyContent: 'center',
       overflow: 'hidden',
     },
-
     avatarImage: {
       width: '100%',
       height: '100%',
     },
-
     summaryCopy: {
       flex: 1,
       gap: 2,
     },
-
     summaryName: {
       fontSize: 17,
       fontWeight: '900',
     },
-
     summaryEmail: {
       fontSize: 12,
       lineHeight: 17,
     },
-
     summaryRole: {
       marginTop: 2,
       fontSize: 11,
       fontWeight: '800',
       textTransform: 'capitalize',
     },
-
     sectionLabel: {
       marginTop: 10,
       marginBottom: -4,
@@ -1737,7 +1564,6 @@ const styles =
       fontWeight: '900',
       letterSpacing: 1,
     },
-
     settingRow: {
       minHeight: 64,
       flexDirection: 'row',
@@ -1746,7 +1572,6 @@ const styles =
       borderBottomWidth: 1,
       paddingVertical: 10,
     },
-
     settingIcon: {
       width: 38,
       height: 38,
@@ -1754,42 +1579,35 @@ const styles =
       alignItems: 'center',
       justifyContent: 'center',
     },
-
     settingCopy: {
       flex: 1,
       gap: 2,
     },
-
     settingTitle: {
       fontSize: 14,
       fontWeight: '800',
     },
-
     settingSubtitle: {
       fontSize: 11,
       lineHeight: 15,
     },
-
     expandedPanel: {
       gap: 12,
       paddingTop: 6,
       paddingBottom: 16,
       borderBottomWidth: 1,
     },
-
     lastExpandedPanel: {
       gap: 12,
       paddingTop: 6,
       paddingBottom: 4,
     },
-
     profileTop: {
       flexDirection: 'row',
       gap: 12,
       alignItems: 'center',
       marginBottom: 4,
     },
-
     avatar: {
       width: 72,
       height: 72,
@@ -1799,40 +1617,33 @@ const styles =
       justifyContent: 'center',
       borderWidth: 1,
     },
-
     profileCopy: {
       flex: 1,
       gap: 8,
     },
-
     panelTitle: {
       fontSize: 14,
       fontWeight: '800',
     },
-
     description: {
       fontSize: 12,
       lineHeight: 18,
     },
-
     switchRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
     },
-
     switchLabel: {
       fontSize: 14,
       fontWeight: '800',
     },
-
     linkedHeading: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: 10,
     },
-
     logoutButton: {
       minHeight: 50,
       borderWidth: 1,
@@ -1843,26 +1654,22 @@ const styles =
       gap: 8,
       marginTop: 4,
     },
-
     logoutText: {
       color: '#D92D20',
       fontSize: 14,
       fontWeight: '900',
     },
-
     dangerCard: {
       borderWidth: 1,
       borderRadius: 18,
       padding: 16,
       gap: 11,
     },
-
     dangerHeading: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
     },
-
     dangerTitle: {
       color: '#D92D20',
       fontSize: 16,
