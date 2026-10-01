@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View, TextInput, ScrollView } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
@@ -100,6 +100,8 @@ export default function AIAssistantScreen() {
   const { lesson: lessonParamRaw } = useLocalSearchParams<{ lesson?: string | string[] }>();
   const lessonParam = Array.isArray(lessonParamRaw) ? lessonParamRaw[0] : lessonParamRaw;
 
+  const scrollViewRef = useRef<ScrollView>(null);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -200,6 +202,9 @@ export default function AIAssistantScreen() {
       ]);
     } finally {
       setLoading(false);
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 150);
     }
   }
 
@@ -238,7 +243,7 @@ export default function AIAssistantScreen() {
   const primaryAccent = isLight ? '#1e6827' : colors.primary;
 
   return (
-    <Screen>
+    <Screen scrollViewRef={scrollViewRef}>
       <View style={styles.headerRow}>
         <View style={styles.headerTitleWrap}>
           <Heading
@@ -408,6 +413,11 @@ export default function AIAssistantScreen() {
         <TextInput
           value={message}
           onChangeText={setMessage}
+          onFocus={() => {
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 180);
+          }}
           keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
           placeholder={lesson ? `Ask about ${lesson.title}…` : 'Ask about code concepts, debug traces, syntax…'}
           placeholderTextColor={colors.muted}

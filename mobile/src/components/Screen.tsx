@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
@@ -28,6 +29,7 @@ export interface ScreenProps {
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
+  scrollViewRef?: React.RefObject<ScrollView | null>;
 }
 
 export function Screen({
@@ -42,11 +44,34 @@ export function Screen({
   style,
   contentStyle,
   contentContainerStyle,
+  scrollViewRef,
 }: ScreenProps) {
   const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
+
+  const internalScrollRef = useRef<ScrollView>(null);
+  const activeScrollRef = scrollViewRef || internalScrollRef;
+
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const handleBack = () => {
     if (onSwipeBack) {
@@ -115,7 +140,11 @@ export function Screen({
     <View
       style={[
         styles.content,
-        { paddingBottom: Math.max(insets.bottom + 90, 120) },
+        {
+          paddingBottom:
+            Math.max(insets.bottom + 90, 120) +
+            (keyboardHeight > 0 ? (Platform.OS === 'android' ? 32 : 24) : 0),
+        },
         contentStyle,
       ]}
     >
@@ -138,11 +167,12 @@ export function Screen({
 
   const scrollBody = (
     <ScrollView
+      ref={activeScrollRef}
       style={styles.scroller}
       contentContainerStyle={[styles.scroll, contentContainerStyle]}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
-      automaticallyAdjustKeyboardInsets={true}
+      automaticallyAdjustKeyboardInsets={!keyboardAvoiding}
       nestedScrollEnabled
       showsVerticalScrollIndicator={false}
       refreshControl={refreshComponent}
@@ -156,8 +186,8 @@ export function Screen({
   const body = keyboardAvoiding ? (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + keyboardOffset : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + keyboardOffset : keyboardOffset}
     >
       {innerContent}
     </KeyboardAvoidingView>
