@@ -1309,7 +1309,7 @@ export default function InterviewsScreen() {
 
               <View style={{ marginTop: 10 }}>
                 <Button
-                  title={loading ? 'Preparing Session...' : '🚀 Launch Simulated Interview'}
+                  title={loading ? 'Preparing Session...' : 'Launch Simulated Interview'}
                   onPress={startInterview}
                   disabled={loading}
                 />

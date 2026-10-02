@@ -24,7 +24,9 @@ interface SocialLinksModalProps {
 }
 
 export function SocialLinksModal({ visible, onClose, links, onSave }: SocialLinksModalProps) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
+  const isLight = theme === 'light';
+  const primaryAccent = isLight ? '#1e6827' : colors.primary;
   const [form, setForm] = useState(links);
 
   React.useEffect(() => {
@@ -86,9 +88,9 @@ export function SocialLinksModal({ visible, onClose, links, onSave }: SocialLink
                   onSave(form);
                   onClose();
                 }}
-                style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+                style={[styles.primaryBtn, { backgroundColor: primaryAccent }]}
               >
-                <Text style={[styles.primaryBtnText, { color: colors.primaryText }]}>Save Links</Text>
+                <Text style={[styles.primaryBtnText, { color: isLight ? '#FFFFFF' : colors.primaryText }]}>Save Links</Text>
               </Pressable>
               <Pressable
                 onPress={onClose}
@@ -112,7 +114,9 @@ interface SkillModalProps {
 }
 
 export function SkillModal({ visible, onClose, onSave }: SkillModalProps) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
+  const isLight = theme === 'light';
+  const primaryAccent = isLight ? '#1e6827' : colors.primary;
   const [skillName, setSkillName] = useState('');
   const [skillLevel, setSkillLevel] = useState(75);
 
@@ -157,7 +161,7 @@ export function SkillModal({ visible, onClose, onSave }: SkillModalProps) {
           <View style={styles.fieldWrap}>
             <View style={styles.levelHeader}>
               <Text style={[styles.fieldLabel, { color: colors.muted }]}>PROFICIENCY LEVEL</Text>
-              <Text style={[styles.levelValue, { color: colors.primary }]}>{skillLevel}%</Text>
+              <Text style={[styles.levelValue, { color: primaryAccent }]}>{skillLevel}%</Text>
             </View>
 
             {/* Stepper controls */}
@@ -171,7 +175,7 @@ export function SkillModal({ visible, onClose, onSave }: SkillModalProps) {
 
               <View style={styles.progressBarWrapper}>
                 <View style={[styles.progressBarTrack, { backgroundColor: colors.surfaceElevated }]}>
-                  <View style={[styles.progressBarFill, { width: `${skillLevel}%`, backgroundColor: colors.primary }]} />
+                  <View style={[styles.progressBarFill, { width: `${skillLevel}%`, backgroundColor: primaryAccent }]} />
                 </View>
               </View>
 
@@ -192,15 +196,15 @@ export function SkillModal({ visible, onClose, onSave }: SkillModalProps) {
                   style={[
                     styles.chip,
                     {
-                      borderColor: skillLevel === val ? colors.primary : colors.border,
-                      backgroundColor: skillLevel === val ? `${colors.primary}20` : colors.surfaceElevated,
+                      borderColor: skillLevel === val ? primaryAccent : colors.border,
+                      backgroundColor: skillLevel === val ? (isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)') : colors.surfaceElevated,
                     },
                   ]}
                 >
                   <Text
                     style={[
                       styles.chipText,
-                      { color: skillLevel === val ? colors.primary : colors.muted },
+                      { color: skillLevel === val ? primaryAccent : colors.muted },
                     ]}
                   >
                     {val}%
@@ -216,10 +220,10 @@ export function SkillModal({ visible, onClose, onSave }: SkillModalProps) {
               disabled={!skillName.trim()}
               style={[
                 styles.primaryBtn,
-                { backgroundColor: colors.primary, opacity: !skillName.trim() ? 0.6 : 1 },
+                { backgroundColor: primaryAccent, opacity: !skillName.trim() ? 0.6 : 1 },
               ]}
             >
-              <Text style={[styles.primaryBtnText, { color: colors.primaryText }]}>Add Skill</Text>
+              <Text style={[styles.primaryBtnText, { color: isLight ? '#FFFFFF' : colors.primaryText }]}>Add Skill</Text>
             </Pressable>
             <Pressable
               onPress={onClose}
@@ -253,7 +257,9 @@ export function PublicPortfolioModal({
   skills,
   links,
 }: PublicPortfolioModalProps) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
+  const isLight = theme === 'light';
+  const primaryAccent = isLight ? '#1e6827' : colors.primary;
   const fullName = `${user?.firstName ?? 'Student'} ${user?.lastName ?? 'Developer'}`;
 
   async function handleShare() {
@@ -278,12 +284,12 @@ export function PublicPortfolioModal({
           {/* Header */}
           <View style={[styles.previewHeader, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
             <View>
-              <Text style={[styles.badge, { color: colors.primary }]}>PUBLIC PORTFOLIO PREVIEW</Text>
+              <Text style={[styles.badge, { color: primaryAccent }]}>PUBLIC PORTFOLIO PREVIEW</Text>
               <Text style={[styles.previewTitle, { color: colors.text }]}>{fullName}</Text>
             </View>
             <View style={styles.previewHeaderActions}>
-              <Pressable onPress={handleShare} style={[styles.iconBtn, { backgroundColor: `${colors.primary}20` }]}>
-                <Ionicons name="share-social" size={18} color={colors.primary} />
+              <Pressable onPress={handleShare} style={[styles.iconBtn, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)' }]}>
+                <Ionicons name="share-social" size={18} color={primaryAccent} />
               </Pressable>
               <Pressable onPress={onClose} style={[styles.iconBtn, { backgroundColor: colors.surfaceElevated }]}>
                 <Ionicons name="close" size={18} color={colors.text} />
@@ -294,13 +300,13 @@ export function PublicPortfolioModal({
           <ScrollView contentContainerStyle={styles.previewScroll} showsVerticalScrollIndicator={false}>
             {/* Bio Card */}
             <View style={[styles.previewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={[styles.avatar, { backgroundColor: `${colors.primary}25`, borderColor: colors.primary }]}>
-                <Text style={[styles.avatarText, { color: colors.primary }]}>
+              <View style={[styles.avatar, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)', borderColor: primaryAccent }]}>
+                <Text style={[styles.avatarText, { color: primaryAccent }]}>
                   {user?.firstName?.[0] ?? 'S'}{user?.lastName?.[0] ?? 'D'}
                 </Text>
               </View>
               <Text style={[styles.cardName, { color: colors.text }]}>{fullName}</Text>
-              <Text style={[styles.cardRole, { color: colors.primary }]}>
+              <Text style={[styles.cardRole, { color: primaryAccent }]}>
                 Student Developer · Backend & Full-Stack
               </Text>
               <Text style={[styles.cardBio, { color: colors.muted }]}>
@@ -336,10 +342,10 @@ export function PublicPortfolioModal({
                   <View key={skill}>
                     <View style={styles.skillHeaderRow}>
                       <Text style={[styles.skillName, { color: colors.text }]}>{skill}</Text>
-                      <Text style={[styles.skillPercent, { color: colors.primary }]}>{val}%</Text>
+                      <Text style={[styles.skillPercent, { color: primaryAccent }]}>{val}%</Text>
                     </View>
                     <View style={[styles.progressBarTrack, { backgroundColor: colors.surfaceElevated, height: 6 }]}>
-                      <View style={[styles.progressBarFill, { width: `${val}%`, backgroundColor: colors.primary }]} />
+                      <View style={[styles.progressBarFill, { width: `${val}%`, backgroundColor: primaryAccent }]} />
                     </View>
                   </View>
                 ))}
@@ -353,17 +359,17 @@ export function PublicPortfolioModal({
                 <Text style={[styles.emptyNotice, { color: colors.muted }]}>No projects added yet.</Text>
               ) : (
                 items.map((item) => (
-                  <View key={item.id} style={[styles.projectBlock, { borderLeftColor: colors.primary, backgroundColor: colors.surfaceElevated }]}>
+                  <View key={item.id} style={[styles.projectBlock, { borderLeftColor: primaryAccent, backgroundColor: colors.surfaceElevated }]}>
                     <Text style={[styles.projectTitle, { color: colors.text }]}>{item.title}</Text>
                     {item.description ? (
                       <Text style={[styles.projectDesc, { color: colors.muted }]}>{item.description}</Text>
                     ) : null}
                     <View style={styles.projectLinksRow}>
                       {item.projectLink ? (
-                        <Text style={[styles.linkBadge, { color: colors.primary }]}>🔗 Live Demo</Text>
+                        <Text style={[styles.linkBadge, { color: primaryAccent }]}>🔗 Live Demo</Text>
                       ) : null}
                       {item.githubLink ? (
-                        <Text style={[styles.linkBadge, { color: colors.primary }]}>💻 GitHub Source</Text>
+                        <Text style={[styles.linkBadge, { color: primaryAccent }]}>💻 GitHub Source</Text>
                       ) : null}
                     </View>
                   </View>

@@ -46,6 +46,8 @@ const LINKS_KEY = 'synergysphere.portfolio.links';
 
 export default function PortfolioScreen() {
   const { colors, theme } = useTheme();
+  const isLight = theme === 'light';
+  const primaryAccent = isLight ? '#1e6827' : colors.primary;
   const { user } = useAuth();
 
   const [items, setItems] = useState<PortfolioItem[]>([]);
@@ -209,7 +211,7 @@ export default function PortfolioScreen() {
         {/* Top Header & Actions */}
         <View style={styles.topHeader}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.kicker, { color: colors.primary }]}>PORTFOLIO & CAREER CENTER</Text>
+            <Text style={[styles.kicker, { color: primaryAccent }]}>PORTFOLIO & CAREER CENTER</Text>
             <Heading subtitle="Showcase projects, skills, achievements, and career readiness.">
               Career Profile
             </Heading>
@@ -230,10 +232,10 @@ export default function PortfolioScreen() {
 
           <Pressable
             onPress={() => setShowForm((prev) => !prev)}
-            style={[styles.headerActionBtn, { backgroundColor: colors.primary }]}
+            style={[styles.headerActionBtn, { backgroundColor: primaryAccent, borderColor: primaryAccent }]}
           >
-            <Ionicons name={showForm ? 'close' : 'add'} size={16} color={colors.primaryText} />
-            <Text style={[styles.headerActionText, { color: colors.primaryText }]}>
+            <Ionicons name={showForm ? 'close' : 'add'} size={16} color={isLight ? '#FFFFFF' : colors.primaryText} />
+            <Text style={[styles.headerActionText, { color: isLight ? '#FFFFFF' : colors.primaryText }]}>
               {showForm ? 'Close Form' : 'Add Project'}
             </Text>
           </Pressable>
@@ -256,20 +258,20 @@ export default function PortfolioScreen() {
         {/* ── 1. Profile Hero Card ────────────────────────────────────────── */}
         <Card>
           <View style={styles.profileRow}>
-            <View style={[styles.avatarBig, { backgroundColor: `${colors.primary}20`, borderColor: colors.primary }]}>
-              <Text style={[styles.avatarBigText, { color: colors.primary }]}>
+            <View style={[styles.avatarBig, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)', borderColor: primaryAccent }]}>
+              <Text style={[styles.avatarBigText, { color: primaryAccent }]}>
                 {user?.firstName?.[0] ?? 'S'}{user?.lastName?.[0] ?? 'D'}
               </Text>
             </View>
             <View style={{ flex: 1, gap: 3 }}>
               <Text style={[styles.profileName, { color: colors.text }]}>{fullName}</Text>
-              <Text style={[styles.profileTitle, { color: colors.primary }]}>Student Developer</Text>
+              <Text style={[styles.profileTitle, { color: primaryAccent }]}>Student Developer</Text>
               <View style={styles.badgeRow}>
-                <View style={[styles.levelBadge, { backgroundColor: colors.surfaceElevated }]}>
-                  <Text style={[styles.levelBadgeText, { color: colors.text }]}>Level {user?.level ?? 1}</Text>
+                <View style={[styles.levelBadge, { backgroundColor: isLight ? '#E8F5E9' : colors.surfaceElevated }]}>
+                  <Text style={[styles.levelBadgeText, { color: isLight ? '#1e6827' : colors.text }]}>Level {user?.level ?? 1}</Text>
                 </View>
-                <View style={[styles.levelBadge, { backgroundColor: colors.surfaceElevated }]}>
-                  <Text style={[styles.levelBadgeText, { color: colors.text }]}>{user?.xp ?? 285} XP</Text>
+                <View style={[styles.levelBadge, { backgroundColor: isLight ? '#E8F5E9' : colors.surfaceElevated }]}>
+                  <Text style={[styles.levelBadgeText, { color: isLight ? '#1e6827' : colors.text }]}>{user?.xp ?? 285} XP</Text>
                 </View>
               </View>
             </View>
@@ -303,10 +305,10 @@ export default function PortfolioScreen() {
 
             <Pressable
               onPress={() => setActiveCareerTool('cv')}
-              style={[styles.socialPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+              style={[styles.socialPill, { backgroundColor: isLight ? '#E8F5E9' : colors.surfaceElevated, borderColor: isLight ? primaryAccent : colors.border }]}
             >
-              <Ionicons name="download-outline" size={15} color={colors.primary} />
-              <Text style={[styles.socialPillText, { color: colors.text }]}>Download CV</Text>
+              <Ionicons name="download-outline" size={15} color={primaryAccent} />
+              <Text style={[styles.socialPillText, { color: primaryAccent }]}>Download CV</Text>
             </Pressable>
 
             <Pressable
@@ -321,7 +323,7 @@ export default function PortfolioScreen() {
         {/* ── 2. Featured Projects Section ─────────────────────────────────── */}
         <View style={styles.sectionHeaderRow}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="briefcase" size={18} color={colors.primary} />
+            <Ionicons name="briefcase" size={18} color={primaryAccent} />
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Featured Projects</Text>
           </View>
           <Text style={[styles.countBadge, { color: colors.muted }]}>{items.length} projects</Text>
@@ -330,7 +332,7 @@ export default function PortfolioScreen() {
         {items.length === 0 ? (
           <Card>
             <Text style={[styles.emptyNotice, { color: colors.muted }]}>
-              No projects added yet. Tap <Text style={{ color: colors.primary, fontWeight: '700' }}>"Add Project"</Text> above to showcase your work.
+              No projects added yet. Tap <Text style={{ color: primaryAccent, fontWeight: '700' }}>"Add Project"</Text> above to showcase your work.
             </Text>
           </Card>
         ) : (
@@ -355,10 +357,10 @@ export default function PortfolioScreen() {
                 {item.projectLink ? (
                   <Pressable
                     onPress={() => Linking.openURL(item.projectLink!)}
-                    style={[styles.linkBtn, { backgroundColor: `${colors.primary}18` }]}
+                    style={[styles.linkBtn, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', borderColor: primaryAccent, borderWidth: 1 }]}
                   >
-                    <Ionicons name="open-outline" size={13} color={colors.primary} />
-                    <Text style={[styles.linkBtnText, { color: colors.primary }]}>Live Demo</Text>
+                    <Ionicons name="open-outline" size={13} color={primaryAccent} />
+                    <Text style={[styles.linkBtnText, { color: primaryAccent }]}>Live Demo</Text>
                   </Pressable>
                 ) : null}
 
@@ -379,10 +381,10 @@ export default function PortfolioScreen() {
         {/* ── 3. AI Career Development Studio Grid ─────────────────────────── */}
         <View style={styles.sectionHeaderRow}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="sparkles" size={18} color={colors.primary} />
+            <Ionicons name="sparkles" size={18} color={primaryAccent} />
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Career Tools</Text>
           </View>
-          <Text style={[styles.kicker, { color: colors.primary }]}>TAP TO OPEN STUDIO</Text>
+          <Text style={[styles.kicker, { color: primaryAccent }]}>TAP TO OPEN STUDIO</Text>
         </View>
 
         <View style={styles.careerToolsGrid}>
@@ -400,11 +402,11 @@ export default function PortfolioScreen() {
               ]}
             >
               <View style={styles.toolCardTop}>
-                <View style={[styles.toolIconWrap, { backgroundColor: `${colors.primary}20` }]}>
-                  <Ionicons name={tool.icon} size={18} color={colors.primary} />
+                <View style={[styles.toolIconWrap, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)' }]}>
+                  <Ionicons name={tool.icon} size={18} color={primaryAccent} />
                 </View>
-                <View style={[styles.toolBadge, { backgroundColor: `${colors.primary}18` }]}>
-                  <Text style={[styles.toolBadgeText, { color: colors.primary }]}>{tool.badge}</Text>
+                <View style={[styles.toolBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)' }]}>
+                  <Text style={[styles.toolBadgeText, { color: primaryAccent }]}>{tool.badge}</Text>
                 </View>
               </View>
 
@@ -414,8 +416,8 @@ export default function PortfolioScreen() {
               </Text>
 
               <View style={styles.toolLaunchRow}>
-                <Text style={[styles.toolLaunchText, { color: colors.primary }]}>Launch Studio</Text>
-                <Ionicons name="arrow-forward" size={13} color={colors.primary} />
+                <Text style={[styles.toolLaunchText, { color: primaryAccent }]}>Launch Studio</Text>
+                <Ionicons name="arrow-forward" size={13} color={primaryAccent} />
               </View>
             </Pressable>
           ))}
@@ -424,15 +426,15 @@ export default function PortfolioScreen() {
         {/* ── 4. Technical Skills Section ─────────────────────────────────── */}
         <View style={styles.sectionHeaderRow}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="code-slash" size={18} color={colors.primary} />
+            <Ionicons name="code-slash" size={18} color={primaryAccent} />
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Learning Hub Verified Skills</Text>
           </View>
           <Pressable
             onPress={() => setShowSkillModal(true)}
-            style={[styles.addSkillBtn, { backgroundColor: `${colors.primary}20` }]}
+            style={[styles.addSkillBtn, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', borderColor: primaryAccent, borderWidth: 1 }]}
           >
-            <Ionicons name="add" size={14} color={colors.primary} />
-            <Text style={[styles.addSkillText, { color: colors.primary }]}>Custom Skill</Text>
+            <Ionicons name="add" size={14} color={primaryAccent} />
+            <Text style={[styles.addSkillText, { color: primaryAccent }]}>Custom Skill</Text>
           </Pressable>
         </View>
 
@@ -445,18 +447,18 @@ export default function PortfolioScreen() {
                   <View key={skill.id} style={styles.skillItem}>
                     <View style={styles.skillHeader}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
+                        <Ionicons name="checkmark-circle" size={14} color={primaryAccent} />
                         <Text style={[styles.skillName, { color: colors.text }]}>{skill.name}</Text>
                       </View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <Text style={{ fontSize: 11, color: colors.muted }}>
                           {skill.completedLessons}/{skill.totalLessons}
                         </Text>
-                        <Text style={[styles.skillPercent, { color: colors.primary }]}>{skill.percent}%</Text>
+                        <Text style={[styles.skillPercent, { color: primaryAccent }]}>{skill.percent}%</Text>
                       </View>
                     </View>
                     <View style={[styles.progressTrack, { backgroundColor: colors.surfaceElevated }]}>
-                      <View style={[styles.progressFill, { width: `${Math.max(5, skill.percent)}%`, backgroundColor: colors.primary }]} />
+                      <View style={[styles.progressFill, { width: `${Math.max(5, skill.percent)}%`, backgroundColor: primaryAccent }]} />
                     </View>
                   </View>
                 ))
@@ -478,14 +480,14 @@ export default function PortfolioScreen() {
                     <View style={styles.skillHeader}>
                       <Text style={[styles.skillName, { color: colors.text }]}>{s.name}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <Text style={[styles.skillPercent, { color: colors.primary }]}>{s.level}%</Text>
+                        <Text style={[styles.skillPercent, { color: primaryAccent }]}>{s.level}%</Text>
                         <Pressable onPress={() => removeSkill(s.id)} hitSlop={6}>
                           <Ionicons name="close-circle-outline" size={16} color={colors.muted} />
                         </Pressable>
                       </View>
                     </View>
                     <View style={[styles.progressTrack, { backgroundColor: colors.surfaceElevated }]}>
-                      <View style={[styles.progressFill, { width: `${s.level}%`, backgroundColor: colors.primary }]} />
+                      <View style={[styles.progressFill, { width: `${s.level}%`, backgroundColor: primaryAccent }]} />
                     </View>
                   </View>
                 ))}

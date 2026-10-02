@@ -76,7 +76,9 @@ export function CareerStudioModal({
   skills,
   linkedinUrl,
 }: CareerStudioModalProps) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
+  const isLight = theme === 'light';
+  const primaryAccent = isLight ? '#1e6827' : colors.primary;
   const [activeTool, setActiveTool] = useState<CareerToolId>(initialTool);
   const [targetRole, setTargetRole] = useState(PRESET_ROLES[0]);
   const [loading, setLoading] = useState(false);
@@ -198,8 +200,8 @@ export function CareerStudioModal({
           {/* Top Bar */}
           <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
             <View style={styles.headerLeft}>
-              <View style={[styles.sparkleIcon, { backgroundColor: `${colors.primary}20` }]}>
-                <Ionicons name="sparkles" size={16} color={colors.primary} />
+              <View style={[styles.sparkleIcon, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)' }]}>
+                <Ionicons name="sparkles" size={16} color={primaryAccent} />
               </View>
               <View>
                 <Text style={[styles.headerTitle, { color: colors.text }]}>Career Studio</Text>
@@ -223,20 +225,20 @@ export function CareerStudioModal({
                     style={[
                       styles.tabPill,
                       {
-                        backgroundColor: isActive ? colors.primary : colors.surfaceElevated,
-                        borderColor: isActive ? colors.primary : colors.border,
+                        backgroundColor: isActive ? primaryAccent : colors.surfaceElevated,
+                        borderColor: isActive ? primaryAccent : colors.border,
                       },
                     ]}
                   >
                     <Ionicons
                       name={t.icon}
                       size={14}
-                      color={isActive ? colors.primaryText : colors.muted}
+                      color={isActive ? (isLight ? '#FFFFFF' : colors.primaryText) : colors.muted}
                     />
                     <Text
                       style={[
                         styles.tabPillText,
-                        { color: isActive ? colors.primaryText : colors.text },
+                        { color: isActive ? (isLight ? '#FFFFFF' : colors.primaryText) : colors.text },
                       ]}
                     >
                       {t.label}
@@ -260,15 +262,15 @@ export function CareerStudioModal({
                     style={[
                       styles.roleChip,
                       {
-                        borderColor: isSelected ? colors.primary : colors.border,
-                        backgroundColor: isSelected ? `${colors.primary}20` : colors.surfaceElevated,
+                        borderColor: isSelected ? primaryAccent : colors.border,
+                        backgroundColor: isSelected ? (isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)') : colors.surfaceElevated,
                       },
                     ]}
                   >
                     <Text
                       style={[
                         styles.roleChipText,
-                        { color: isSelected ? colors.primary : colors.muted },
+                        { color: isSelected ? primaryAccent : colors.muted },
                       ]}
                     >
                       {r}
@@ -297,24 +299,24 @@ export function CareerStudioModal({
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <Pressable
                   onPress={() => handleCopy('main_output', currentOutput)}
-                  style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+                  style={[styles.actionBtn, { backgroundColor: primaryAccent }]}
                 >
                   <Ionicons
                     name={copiedKey === 'main_output' ? 'checkmark' : 'copy-outline'}
                     size={14}
-                    color={colors.primaryText}
+                    color={isLight ? '#FFFFFF' : colors.primaryText}
                   />
-                  <Text style={[styles.actionBtnText, { color: colors.primaryText }]}>
+                  <Text style={[styles.actionBtnText, { color: isLight ? '#FFFFFF' : colors.primaryText }]}>
                     {copiedKey === 'main_output' ? 'Copied!' : 'Copy'}
                   </Text>
                 </Pressable>
 
                 <Pressable
                   onPress={() => handleShare(`${fullName} — ${CAREER_TOOLS.find((t) => t.id === activeTool)?.label}`, currentOutput)}
-                  style={[styles.actionBtn, { backgroundColor: `${colors.primary}20`, borderColor: colors.primary }]}
+                  style={[styles.actionBtn, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', borderColor: primaryAccent }]}
                 >
-                  <Ionicons name="share-outline" size={14} color={colors.primary} />
-                  <Text style={[styles.actionBtnText, { color: colors.primary }]}>Share</Text>
+                  <Ionicons name="share-outline" size={14} color={primaryAccent} />
+                  <Text style={[styles.actionBtnText, { color: primaryAccent }]}>Share</Text>
                 </Pressable>
               </View>
             ) : null}
@@ -324,7 +326,7 @@ export function CareerStudioModal({
           <ScrollView contentContainerStyle={styles.contentScroll} showsVerticalScrollIndicator={false}>
             {loading ? (
               <View style={styles.loadingBox}>
-                <ActivityIndicator size="large" color={colors.primary} />
+                <ActivityIndicator size="large" color={primaryAccent} />
                 <Text style={[styles.loadingTitle, { color: colors.text }]}>
                   Generating {CAREER_TOOLS.find((t) => t.id === activeTool)?.label}…
                 </Text>
@@ -335,9 +337,9 @@ export function CareerStudioModal({
             ) : activeTool === 'jobs' ? (
               /* ── Job Match Intelligence ────────────────────────────────────────── */
               <View style={{ gap: 14 }}>
-                <View style={[styles.intelCard, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}40` }]}>
+                <View style={[styles.intelCard, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)', borderColor: isLight ? '#C8E6C9' : 'rgba(30, 104, 39, 0.4)' }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="sparkles" size={16} color={colors.primary} />
+                    <Ionicons name="sparkles" size={16} color={primaryAccent} />
                     <Text style={[styles.intelTitle, { color: colors.text }]}>Live Job Match Intelligence</Text>
                   </View>
                   <Text style={[styles.intelDesc, { color: colors.muted }]}>
@@ -391,8 +393,8 @@ export function CareerStudioModal({
                           {job.company} · {job.location}
                         </Text>
                       </View>
-                      <View style={[styles.matchBadge, { backgroundColor: `${colors.primary}20` }]}>
-                        <Text style={[styles.matchBadgeText, { color: colors.primary }]}>{job.matchPercent}% Match</Text>
+                      <View style={[styles.matchBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)' }]}>
+                        <Text style={[styles.matchBadgeText, { color: primaryAccent }]}>{job.matchPercent}% Match</Text>
                       </View>
                     </View>
 
@@ -421,7 +423,7 @@ export function CareerStudioModal({
 
                     {job.salary && (
                       <Text style={[styles.jobSalary, { color: colors.text }]}>
-                        Est. Salary: <Text style={{ color: colors.primary, fontWeight: '800' }}>{job.salary}</Text>
+                        Est. Salary: <Text style={{ color: primaryAccent, fontWeight: '800' }}>{job.salary}</Text>
                       </Text>
                     )}
 
@@ -429,10 +431,10 @@ export function CareerStudioModal({
                     <View style={[styles.jobSearchRow, { borderTopColor: colors.border }]}>
                       <Pressable
                         onPress={() => Linking.openURL(job.url)}
-                        style={[styles.searchBtn, { backgroundColor: colors.primary }]}
+                        style={[styles.searchBtn, { backgroundColor: primaryAccent }]}
                       >
-                        <Ionicons name="open-outline" size={13} color={colors.primaryText} />
-                        <Text style={[styles.searchBtnText, { color: colors.primaryText, fontWeight: '700' }]}>View Listing</Text>
+                        <Ionicons name="open-outline" size={13} color={isLight ? '#FFFFFF' : colors.primaryText} />
+                        <Text style={[styles.searchBtnText, { color: isLight ? '#FFFFFF' : colors.primaryText, fontWeight: '700' }]}>View Listing</Text>
                       </Pressable>
 
                       {jobsData?.searchLinks && (
@@ -473,7 +475,7 @@ export function CareerStudioModal({
                     ].map((item, idx) => (
                       <View key={idx} style={[styles.headlineCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <View style={{ flex: 1, gap: 4 }}>
-                          <Text style={[styles.headlineType, { color: colors.primary }]}>{item.type}</Text>
+                          <Text style={[styles.headlineType, { color: primaryAccent }]}>{item.type}</Text>
                           <Text style={[styles.headlineText, { color: colors.text }]}>{item.text}</Text>
                         </View>
                         <Pressable
@@ -483,7 +485,7 @@ export function CareerStudioModal({
                           <Ionicons
                             name={copiedKey === `hl_${idx}` ? 'checkmark' : 'copy-outline'}
                             size={14}
-                            color={copiedKey === `hl_${idx}` ? colors.primary : colors.muted}
+                            color={copiedKey === `hl_${idx}` ? primaryAccent : colors.muted}
                           />
                         </Pressable>
                       </View>
@@ -509,9 +511,9 @@ export function CareerStudioModal({
                       <Ionicons
                         name={copiedKey === 'about' ? 'checkmark' : 'copy-outline'}
                         size={14}
-                        color={copiedKey === 'about' ? colors.primary : colors.muted}
+                        color={copiedKey === 'about' ? primaryAccent : colors.muted}
                       />
-                      <Text style={[styles.smallCopyBtnText, { color: copiedKey === 'about' ? colors.primary : colors.text }]}>
+                      <Text style={[styles.smallCopyBtnText, { color: copiedKey === 'about' ? primaryAccent : colors.text }]}>
                         {copiedKey === 'about' ? 'Copied' : 'Copy'}
                       </Text>
                     </Pressable>
@@ -553,12 +555,12 @@ export function CareerStudioModal({
                         style={[
                           styles.keywordChip,
                           {
-                            backgroundColor: copiedKey === `kw_${kw}` ? `${colors.primary}30` : colors.surfaceElevated,
-                            borderColor: copiedKey === `kw_${kw}` ? colors.primary : colors.border,
+                            backgroundColor: copiedKey === `kw_${kw}` ? (isLight ? '#E8F5E9' : `${colors.primary}30`) : colors.surfaceElevated,
+                            borderColor: copiedKey === `kw_${kw}` ? primaryAccent : colors.border,
                           },
                         ]}
                       >
-                        <Text style={[styles.keywordText, { color: copiedKey === `kw_${kw}` ? colors.primary : colors.text }]}>
+                        <Text style={[styles.keywordText, { color: copiedKey === `kw_${kw}` ? primaryAccent : colors.text }]}>
                           {copiedKey === `kw_${kw}` ? '✓ Copied' : `+ ${kw}`}
                         </Text>
                       </Pressable>
@@ -595,7 +597,7 @@ export function CareerStudioModal({
           {/* Footer */}
           <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name="ribbon-outline" size={16} color={colors.primary} />
+              <Ionicons name="ribbon-outline" size={16} color={primaryAccent} />
               <Text style={[styles.footerText, { color: colors.muted }]}>Tailored for {targetRole}</Text>
             </View>
             <Pressable onPress={onClose} style={[styles.doneBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
