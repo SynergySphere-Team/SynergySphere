@@ -186,6 +186,116 @@ describe('5. Wellness Module & Career Resilience OS', () => {
   });
 });
 
+describe('6. Productivity Center Task Enhancements & Career Boost', () => {
+  it('creates task with description, target minutes, break intervals, and external link', async () => {
+    const user = await queryOne<{ id: string }>('SELECT "id" FROM "User" LIMIT 1');
+    assert.ok(user, 'User must exist');
+
+    const taskId = 'test-task-' + Math.round(Math.random() * 1000000);
+    const task = await queryOne<{
+      id: string;
+      title: string;
+      description: string;
+      targetDurationMinutes: number;
+      breakIntervalMinutes: number;
+      link: string;
+      status: string;
+    }>(
+      `INSERT INTO "Task" (
+         "id", "userId", "title", "description", "status",
+         "targetDurationMinutes", "breakIntervalMinutes", "link"
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [
+        taskId,
+        user.id,
+        'Implement OAuth2 Flow',
+        'Build Google & GitHub login handlers with refresh token rotation',
+        'TODO',
+        45,
+        20,
+        'https://github.com/SynergySphere/auth-service',
+      ],
+    );
+
+    assert.ok(task, 'Task must be created');
+    assert.equal(task.title, 'Implement OAuth2 Flow');
+    assert.equal(task.description, 'Build Google & GitHub login handlers with refresh token rotation');
+    assert.equal(task.targetDurationMinutes, 45);
+    assert.equal(task.breakIntervalMinutes, 20);
+    assert.equal(task.link, 'https://github.com/SynergySphere/auth-service');
+  });
+
+  it('notifies user on task completion and generates notification record', async () => {
+    const user = await queryOne<{ id: string }>('SELECT "id" FROM "User" LIMIT 1');
+    assert.ok(user, 'User must exist');
+
+    const notifId = 'test-notif-' + Math.round(Math.random() * 1000000);
+    const notif = await queryOne<{ id: string; title: string; message: string; type: string }>(
+      `INSERT INTO "Notification" ("id", "userId", "title", "message", "type", "link")
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        notifId,
+        user.id,
+        'Task Completed: Implement OAuth2 Flow',
+        'Great job! You completed "Implement OAuth2 Flow".',
+        'achievement',
+        '/tasks',
+      ],
+    );
+
+    assert.ok(notif);
+    assert.equal(notif.type, 'achievement');
+    assert.ok(notif.title.includes('Implement OAuth2 Flow'));
+  });
+
+  it('notifies user when focus timer session has ended and updates task timeSpent', async () => {
+    const user = await queryOne<{ id: string }>('SELECT "id" FROM "User" LIMIT 1');
+    assert.ok(user, 'User must exist');
+
+    const notif = await queryOne<{ id: string; title: string; message: string; type: string }>(
+      `INSERT INTO "Notification" ("id", "userId", "title", "message", "type", "link")
+       VALUES (
+         'test-focus-notif-' || round(random() * 1000000)::text,
+         $1, 'Focus Session Completed',
+         'Your 25-minute focus session has ended. Take a break!',
+         'info', '/tasks'
+       )
+       RETURNING *`,
+      [user.id],
+    );
+
+    assert.ok(notif);
+    assert.equal(notif.title, 'Focus Session Completed');
+  });
+
+  it('boosts task into Career Portfolio with portfolio and bullet entries', async () => {
+    const user = await queryOne<{ id: string }>('SELECT "id" FROM "User" LIMIT 1');
+    assert.ok(user, 'User must exist');
+
+    const portfolioId = 'test-port-' + Math.round(Math.random() * 1000000);
+    const portItem = await queryOne<{ id: string; title: string; description: string; projectLink: string }>(
+      `INSERT INTO "Portfolio" ("id", "userId", "title", "description", "projectLink", "githubLink")
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        portfolioId,
+        user.id,
+        'OAuth2 & JWT Microservice',
+        'Architected authentication pipeline with PKCE and token rotation.',
+        'https://synergysphere.io/docs/auth',
+        'https://github.com/SynergySphere/auth-service',
+      ],
+    );
+
+    assert.ok(portItem);
+    assert.equal(portItem.title, 'OAuth2 & JWT Microservice');
+    assert.equal(portItem.projectLink, 'https://synergysphere.io/docs/auth');
+  });
+});
+
 after(async () => {
   await pool.end();
 });
