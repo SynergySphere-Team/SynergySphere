@@ -8,12 +8,14 @@ import {
   TextInput,
   TouchableOpacity,
   Platform,
+  Image,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen, Loading, Notice } from '@/components/Screen';
-import { Button, Card, Field, Heading } from '@/components/ui';
+import { Button, Card, Field } from '@/components/ui';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import type { WellnessEntry, WellnessInsights } from '@/types/api';
@@ -30,6 +32,7 @@ type TimeRange = '7D' | '30D' | 'SEMESTER';
 
 export default function WellnessScreen() {
   const { colors, theme } = useTheme();
+  const { fontSize, largerText } = useAccessibility();
   const isLight = theme === 'light';
 
   // Navigation tab: 'checkin' | 'trends'
@@ -276,10 +279,52 @@ export default function WellnessScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      {/* Title Header */}
-      <Heading subtitle="Track mental bandwidth, prevent burnout & optimize tasks.">
-        Wellness OS
-      </Heading>
+      {/* WELLNESS HEADER */}
+      <View
+        style={[
+          styles.headerRow,
+          largerText && styles.headerRowLarge,
+        ]}
+      >
+        <Image
+          source={require('../../../assets/images/wellness-logo.png')}
+          style={[
+            styles.wellnessLogo,
+            largerText && styles.wellnessLogoLarge,
+          ]}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+        />
+
+        <View style={styles.headerText}>
+          <Text
+            allowFontScaling
+            style={[
+              styles.headerTitle,
+              {
+                color: colors.text,
+                fontSize: fontSize(24),
+              },
+            ]}
+          >
+            Wellness OS
+          </Text>
+
+          <Text
+            allowFontScaling
+            style={[
+              styles.headerSubtitle,
+              {
+                color: colors.muted,
+                fontSize: fontSize(13),
+                lineHeight: fontSize(18),
+              },
+            ]}
+          >
+            Track mental bandwidth, prevent burnout & optimize tasks.
+          </Text>
+        </View>
+      </View>
 
       {error ? <Notice>{error}</Notice> : null}
       {savedMessage ? <Notice tone="success">{savedMessage}</Notice> : null}
@@ -1683,5 +1728,40 @@ const styles = StyleSheet.create({
   summary: {
     fontSize: 12,
     lineHeight: 16,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+    paddingRight: 42,
+  },
+  headerRowLarge: {
+    alignItems: 'flex-start',
+  },
+  wellnessLogo: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+  },
+  wellnessLogoLarge: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+  },
+  headerText: {
+    flex: 1,
+    gap: 3,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
