@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, Image } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Screen, Loading, Notice } from '@/components/Screen';
-import { Card, Heading } from '@/components/ui';
+import { Card } from '@/components/ui';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import type { Challenge, DashboardStats, Project } from '@/types/api';
@@ -11,6 +12,7 @@ import type { Challenge, DashboardStats, Project } from '@/types/api';
 export default function ExploreScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { fontSize, largerText } = useAccessibility();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [statsData, setStatsData] = useState<DashboardStats | null>(null);
@@ -74,9 +76,52 @@ export default function ExploreScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <Heading subtitle="Explore your career readiness, study tracks, challenges, and upcoming work.">
-        Explore
-      </Heading>
+      {/* EXPLORE HEADER */}
+      <View
+        style={[
+          styles.headerRow,
+          largerText && styles.headerRowLarge,
+        ]}
+      >
+        <Image
+          source={require('../../../assets/images/explore-logo.png')}
+          style={[
+            styles.exploreLogo,
+            largerText && styles.exploreLogoLarge,
+          ]}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+        />
+
+        <View style={styles.headerText}>
+          <Text
+            allowFontScaling
+            style={[
+              styles.headerTitle,
+              {
+                color: colors.text,
+                fontSize: fontSize(24),
+              },
+            ]}
+          >
+            Explore
+          </Text>
+
+          <Text
+            allowFontScaling
+            style={[
+              styles.headerSubtitle,
+              {
+                color: colors.muted,
+                fontSize: fontSize(13),
+                lineHeight: fontSize(18),
+              },
+            ]}
+          >
+            Explore your career readiness, study tracks, challenges, and upcoming work.
+          </Text>
+        </View>
+      </View>
 
       {error ? <Notice>{error}</Notice> : null}
 
@@ -335,4 +380,39 @@ const styles = StyleSheet.create({
   taskTitle: { fontSize: 14, fontWeight: '700' },
   taskDesc: { fontSize: 12 },
   workspacePressed: { opacity: 0.65 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+    paddingRight: 42,
+  },
+  headerRowLarge: {
+    alignItems: 'flex-start',
+  },
+  exploreLogo: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+  },
+  exploreLogoLarge: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+  },
+  headerText: {
+    flex: 1,
+    gap: 3,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
 });
