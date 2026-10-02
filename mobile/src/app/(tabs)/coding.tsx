@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View, TextInput, Modal } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View, TextInput, Modal, Image } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { Screen, Loading, Notice } from '@/components/Screen';
-import { Button, Card, Heading } from '@/components/ui';
+import { Button, Card } from '@/components/ui';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import { CurriculumDashboard } from '@/components/curriculum/CurriculumDashboard';
@@ -288,6 +289,7 @@ interface Flashcard {
 export default function CodingScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { fontSize, largerText } = useAccessibility();
 
   // Mode: Academy vs Challenges vs Role Paths
   const [mode, setMode] = useState<'academy' | 'challenges' | 'rolepaths'>('academy');
@@ -554,9 +556,52 @@ export default function CodingScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <Heading subtitle="Explore structured programming tracks from W3Schools and master hands-on code challenges.">
-        Learning Hub
-      </Heading>
+      {/* LEARNING HUB HEADER */}
+      <View
+        style={[
+          styles.headerRow,
+          largerText && styles.headerRowLarge,
+        ]}
+      >
+        <Image
+          source={require('../../../assets/images/learning-hub-logo.png')}
+          style={[
+            styles.learningHubLogo,
+            largerText && styles.learningHubLogoLarge,
+          ]}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+        />
+
+        <View style={styles.headerText}>
+          <Text
+            allowFontScaling
+            style={[
+              styles.headerTitle,
+              {
+                color: colors.text,
+                fontSize: fontSize(24),
+              },
+            ]}
+          >
+            Learning Hub
+          </Text>
+
+          <Text
+            allowFontScaling
+            style={[
+              styles.headerSubtitle,
+              {
+                color: colors.muted,
+                fontSize: fontSize(13),
+                lineHeight: fontSize(18),
+              },
+            ]}
+          >
+            Explore structured programming tracks from W3Schools and master hands-on code challenges.
+          </Text>
+        </View>
+      </View>
 
       {/* Mode Switcher Tabs */}
       <View style={styles.modeTabs}>
@@ -1500,4 +1545,39 @@ const styles = StyleSheet.create({
   syllabusLessonDesc: { fontSize: 11, marginTop: 2, lineHeight: 15 },
   studyBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   studyBtnText: { fontSize: 11, fontWeight: '700', color: '#ffffff' },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+    paddingRight: 42,
+  },
+  headerRowLarge: {
+    alignItems: 'flex-start',
+  },
+  learningHubLogo: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+  },
+  learningHubLogoLarge: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+  },
+  headerText: {
+    flex: 1,
+    gap: 3,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
 });

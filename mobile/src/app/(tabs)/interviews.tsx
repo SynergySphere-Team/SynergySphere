@@ -842,18 +842,18 @@ export default function InterviewsScreen() {
       {/* Studio Header & Context Switcher */}
       <View style={styles.header}>
         <View style={styles.badgeRow}>
-          <View style={[styles.proBadge, { backgroundColor: `${primaryAccent}20` }]}>
-            <Ionicons name="sparkles" size={12} color={primaryAccent} />
-            <Text style={[styles.proBadgeText, { color: primaryAccent }]}>
-              {activeInterview
-                ? 'LIVE SIMULATION'
-                : practiceSession
-                ? 'FOCUSED PRACTICE'
-                : evaluationResult
-                ? 'SESSION REVIEW'
-                : 'DEVELOPER INTERVIEW OS'}
-            </Text>
-          </View>
+          {(activeInterview || practiceSession || evaluationResult) && (
+            <View style={[styles.proBadge, { backgroundColor: `${primaryAccent}20` }]}>
+              <Ionicons name="sparkles" size={12} color={primaryAccent} />
+              <Text style={[styles.proBadgeText, { color: primaryAccent }]}>
+                {activeInterview
+                  ? 'LIVE SIMULATION'
+                  : practiceSession
+                  ? 'FOCUSED PRACTICE'
+                  : 'SESSION REVIEW'}
+              </Text>
+            </View>
+          )}
 
           {activeInterview ? (
             <Pressable

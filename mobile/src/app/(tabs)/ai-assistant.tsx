@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View, TextInput, ScrollView } from 'react-native';
+import { Pressable, StyleSheet, Text, View, TextInput, ScrollView, Image } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
 import { Screen, Notice } from '@/components/Screen';
-import { Button, Card, Heading } from '@/components/ui';
+import { Button, Card } from '@/components/ui';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 
@@ -97,6 +98,7 @@ const starterPrompts = [
 
 export default function AIAssistantScreen() {
   const { colors, theme } = useTheme();
+  const { fontSize, largerText } = useAccessibility();
   const { lesson: lessonParamRaw } = useLocalSearchParams<{ lesson?: string | string[] }>();
   const lessonParam = Array.isArray(lessonParamRaw) ? lessonParamRaw[0] : lessonParamRaw;
 
@@ -244,18 +246,53 @@ export default function AIAssistantScreen() {
 
   return (
     <Screen scrollViewRef={scrollViewRef}>
-      <View style={styles.headerRow}>
+      <View
+        style={[
+          styles.headerRow,
+          largerText && styles.headerRowLarge,
+        ]}
+      >
+        <Image
+          source={require('../../../assets/images/ai-workspace-logo.png')}
+          style={[
+            styles.aiLogo,
+            largerText && styles.aiLogoLarge,
+          ]}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+        />
+
         <View style={styles.headerTitleWrap}>
-          <Heading
-            subtitle={
-              lesson
-                ? `Grounded in ${lesson.subjectName} › ${lesson.moduleName} › ${lesson.title}`
-                : 'Grounded in LectureToLife Programming Academy and your study packs.'
-            }
+          <Text
+            allowFontScaling
+            style={[
+              styles.headerTitle,
+              {
+                color: colors.text,
+                fontSize: fontSize(24),
+              },
+            ]}
           >
             {lesson ? 'Lesson Assistant' : 'AI Workspace'}
-          </Heading>
+          </Text>
+
+          <Text
+            allowFontScaling
+            style={[
+              styles.headerSubtitle,
+              {
+                color: colors.muted,
+                fontSize: fontSize(13),
+                lineHeight: fontSize(18),
+              },
+            ]}
+          >
+            {lesson
+              ? `Grounded in ${lesson.subjectName} › ${lesson.moduleName} › ${lesson.title}`
+              : 'Grounded in LectureToLife Programming Academy and your study packs.'}
+          </Text>
         </View>
+
         <Pressable
           onPress={clearChat}
           style={({ pressed }) => [
@@ -435,8 +472,41 @@ export default function AIAssistantScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 4 },
-  headerTitleWrap: { flex: 1 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  headerRowLarge: {
+    alignItems: 'flex-start',
+  },
+  aiLogo: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+  },
+  aiLogoLarge: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+  },
+  headerTitleWrap: {
+    flex: 1,
+    gap: 3,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
   clearButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, marginTop: 4 },
   clearText: { fontSize: 12, fontWeight: '600' },
   pressed: { opacity: 0.7 },
