@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View, TextInput } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View, TextInput, Modal } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card, Heading } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
@@ -87,16 +88,136 @@ const BUILTIN_CHALLENGES: BuiltinChallenge[] = [
   },
 ];
 
-interface RolePath {
+export interface RolePathLesson {
+  id: string;
+  title: string;
+  phase: string;
+  description: string;
+}
+
+export interface RolePathChallenge {
+  id: string;
+  title: string;
+  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
+  xpReward: number;
+  passed?: boolean;
+}
+
+export interface RolePath {
   id: string;
   title: string;
   targetRole: string;
   tagline: string;
   subjectIds: string[];
+  curatedLessonIds?: string[];
+  syllabus: RolePathLesson[];
   totalLessons: number;
-  recommendedChallenges: Array<{ id: string }>;
+  completedLessons: number;
+  percent: number;
+  recommendedChallenges: RolePathChallenge[];
   interviewTags: string[];
 }
+
+const BACKEND_INTERN_SYLLABUS: RolePathLesson[] = [
+  { id: 'w3s-java-java-intro', title: 'Java Environment & JVM Architecture', phase: 'Phase 1: Language Syntax', description: 'Understanding bytecode, JDK, and running your first Java program.' },
+  { id: 'w3s-java-java-syntax', title: 'Syntax, Variables & Data Types', phase: 'Phase 1: Language Syntax', description: 'Primitive types, variables, and type casting rules in Java.' },
+  { id: 'w3s-java-java-operators', title: 'Operators, Logic & Expressions', phase: 'Phase 1: Language Syntax', description: 'Mathematical and boolean conditional evaluations.' },
+  { id: 'w3s-java-java-if...else', title: 'Control Flow & Branching', phase: 'Phase 1: Language Syntax', description: 'If-else statements, switch expressions, and loops.' },
+  { id: 'w3s-java-java-methods', title: 'Methods & Parameter Passing', phase: 'Phase 1: Language Syntax', description: 'Method signatures, return types, and overloading.' },
+  { id: 'w3s-java-java-oop', title: 'Object-Oriented Programming (OOP)', phase: 'Phase 2: Core Engineering', description: 'Classes, objects, attributes, and instantiation.' },
+  { id: 'w3s-java-java-encapsulation', title: 'Encapsulation & Access Modifiers', phase: 'Phase 2: Core Engineering', description: 'Public/private scope, getters, setters, and data hiding.' },
+  { id: 'w3s-java-java-inheritance', title: 'Inheritance & Method Overriding', phase: 'Phase 2: Core Engineering', description: 'Extending classes, super keyword, and polymorphism.' },
+  { id: 'w3s-java-java-interface', title: 'Interfaces & Abstract Classes', phase: 'Phase 2: Core Engineering', description: 'Decoupling software contracts and multiple implementation.' },
+  { id: 'w3s-java-java-hashmap', title: 'Collections: HashMap & ArrayList', phase: 'Phase 2: Core Engineering', description: 'Key-value maps, lists, and time complexity in memory.' },
+  { id: 'w3s-sql-sql-intro', title: 'SQL & Relational Databases', phase: 'Phase 3: Database & Persistence', description: 'RDBMS concepts, tables, primary keys, and schemas.' },
+  { id: 'w3s-sql-sql-select', title: 'SELECT Queries & Filters', phase: 'Phase 3: Database & Persistence', description: 'Filtering records with WHERE, ORDER BY, and LIMIT.' },
+  { id: 'w3s-sql-sql-joins', title: 'Relational Joins (INNER, LEFT, RIGHT)', phase: 'Phase 3: Database & Persistence', description: 'Combining data across normalized relational tables.' },
+  { id: 'w3s-sql-sql-group-by', title: 'Aggregations & GROUP BY', phase: 'Phase 3: Database & Persistence', description: 'COUNT, SUM, AVG, and filtering grouped results with HAVING.' },
+];
+
+const FRONTEND_INTERN_SYLLABUS: RolePathLesson[] = [
+  { id: 'w3s-html-html-intro', title: 'Semantic HTML5 Fundamentals', phase: 'Phase 1: Web Foundations', description: 'Document structure, accessibility, and modern tags.' },
+  { id: 'w3s-html-html-forms', title: 'Forms, Inputs & Validation', phase: 'Phase 1: Web Foundations', description: 'Building accessible client-side form controls.' },
+  { id: 'w3s-css-css-box-model', title: 'CSS Box Model & Margin Collapsing', phase: 'Phase 1: Web Foundations', description: 'Content, padding, border, and margin calculations.' },
+  { id: 'w3s-css-css-flexbox', title: 'Flexbox Layouts & Responsive Design', phase: 'Phase 1: Web Foundations', description: 'Flexible 1D box arrangements, alignment, and wrapping.' },
+  { id: 'w3s-css-css-grid', title: 'CSS Grid 2D Systems', phase: 'Phase 1: Web Foundations', description: 'Rows, columns, areas, and responsive grid templates.' },
+  { id: 'w3s-javascript-js-variables', title: 'Modern JavaScript (ES6+) Scope', phase: 'Phase 2: Modern JavaScript', description: 'Let, const, arrow functions, and lexical scope.' },
+  { id: 'w3s-javascript-js-arrays', title: 'Array Iteration & Map/Filter/Reduce', phase: 'Phase 2: Modern JavaScript', description: 'Functional array manipulation and transformation.' },
+  { id: 'w3s-javascript-js-async', title: 'Async/Await & Fetch API', phase: 'Phase 2: Modern JavaScript', description: 'Handling asynchronous REST requests and error states.' },
+  { id: 'w3s-react-react-intro', title: 'React Component Architecture', phase: 'Phase 3: Reactive Frontend', description: 'Component lifecycles, JSX, and unidirectional data flow.' },
+  { id: 'w3s-react-react-props', title: 'React Props & Composition', phase: 'Phase 3: Reactive Frontend', description: 'Passing data, callbacks, and component reusability.' },
+  { id: 'w3s-react-react-usestate', title: 'State Management with useState', phase: 'Phase 3: Reactive Frontend', description: 'Reactive local state, updater functions, and re-renders.' },
+  { id: 'w3s-react-react-useeffect', title: 'Side Effects with useEffect', phase: 'Phase 3: Reactive Frontend', description: 'API fetching, subscriptions, cleanup, and dependency arrays.' },
+];
+
+const FULLSTACK_SYLLABUS: RolePathLesson[] = [
+  { id: 'w3s-nodejs-node.js-intro', title: 'Node.js Runtime & Event Loop', phase: 'Phase 1: Backend Services', description: 'Non-blocking asynchronous I/O and module systems.' },
+  { id: 'w3s-nodejs-node.js-http-module', title: 'HTTP Servers & RESTful APIs', phase: 'Phase 1: Backend Services', description: 'Handling requests, status codes, and JSON responses.' },
+  { id: 'w3s-typescript-ts-intro', title: 'TypeScript Types & Inference', phase: 'Phase 2: Full-Stack Type Safety', description: 'Primitive types, type assertions, and compilation.' },
+  { id: 'w3s-typescript-ts-aliases-and-interfaces', title: 'Interfaces & Data Contracts', phase: 'Phase 2: Full-Stack Type Safety', description: 'Defining shared API contracts and object models.' },
+  { id: 'w3s-react-react-intro', title: 'React Single-Page Client', phase: 'Phase 3: End-to-End Integration', description: 'Connecting UI frontend to backend REST endpoints.' },
+  { id: 'w3s-sql-sql-intro', title: 'Relational Database Schema Design', phase: 'Phase 3: End-to-End Integration', description: 'Normalization, foreign keys, and indexes.' },
+  { id: 'w3s-sql-sql-joins', title: 'Multi-Table Relational Queries', phase: 'Phase 3: End-to-End Integration', description: 'Optimizing joins and aggregations for APIs.' },
+];
+
+const BUILTIN_ROLE_PATHS: RolePath[] = [
+  {
+    id: 'backend-intern',
+    title: 'Backend Intern (Java & SQL)',
+    tagline: 'From syntax to database persistence, query optimization, and REST API microservices.',
+    targetRole: 'Junior Backend Developer',
+    subjectIds: ['java', 'sql'],
+    curatedLessonIds: ['w3s-java-java-intro', 'w3s-java-java-syntax', 'w3s-java-java-oop', 'w3s-sql-sql-intro', 'w3s-sql-sql-joins'],
+    syllabus: BACKEND_INTERN_SYLLABUS,
+    totalLessons: 63,
+    completedLessons: 0,
+    percent: 0,
+    recommendedChallenges: [
+      { id: 'js-hello-world', title: 'Hello World', difficulty: 'EASY', xpReward: 50, passed: false },
+      { id: 'js-sum-array', title: 'Sum Array', difficulty: 'EASY', xpReward: 50, passed: false },
+      { id: 'js-fizzbuzz', title: 'FizzBuzz', difficulty: 'MEDIUM', xpReward: 75, passed: false },
+      { id: 'sql-customers', title: 'Active Customers Count', difficulty: 'MEDIUM', xpReward: 80, passed: false },
+      { id: 'java-binary-search', title: 'Binary Search', difficulty: 'HARD', xpReward: 100, passed: false },
+    ],
+    interviewTags: ['Java', 'SQL', 'Spring Boot', 'Concurrency', 'Transactions'],
+  },
+  {
+    id: 'frontend-intern',
+    title: 'Frontend Intern (HTML, CSS, JS & React)',
+    tagline: 'Modern accessible UI components, reactive state, DOM events, and client performance.',
+    targetRole: 'Junior Frontend Developer',
+    subjectIds: ['html', 'css', 'javascript', 'react'],
+    curatedLessonIds: ['w3s-html-html-intro', 'w3s-css-css-box-model', 'w3s-javascript-js-functions', 'w3s-react-react-intro'],
+    syllabus: FRONTEND_INTERN_SYLLABUS,
+    totalLessons: 42,
+    completedLessons: 0,
+    percent: 0,
+    recommendedChallenges: [
+      { id: 'js-hello-world', title: 'Hello World', difficulty: 'EASY', xpReward: 50, passed: false },
+      { id: 'js-sum-array', title: 'Sum Array', difficulty: 'EASY', xpReward: 50, passed: false },
+      { id: 'js-two-sum', title: 'Two Sum', difficulty: 'EASY', xpReward: 60, passed: false },
+    ],
+    interviewTags: ['JavaScript', 'React', 'CSS Box Model', 'HTML5', 'State Management'],
+  },
+  {
+    id: 'fullstack-engineer',
+    title: 'Full-Stack Developer (Node, React & SQL)',
+    tagline: 'End-to-end applications: REST/WebSocket APIs, relational data models, and reactive frontend.',
+    targetRole: 'Junior Full-Stack Engineer',
+    subjectIds: ['nodejs', 'react', 'sql', 'typescript'],
+    curatedLessonIds: ['w3s-nodejs-node.js-intro', 'w3s-typescript-ts-intro', 'w3s-react-react-intro', 'w3s-sql-sql-intro'],
+    syllabus: FULLSTACK_SYLLABUS,
+    totalLessons: 58,
+    completedLessons: 0,
+    percent: 0,
+    recommendedChallenges: [
+      { id: 'js-hello-world', title: 'Hello World', difficulty: 'EASY', xpReward: 50, passed: false },
+      { id: 'sql-customers', title: 'Active Customers Count', difficulty: 'MEDIUM', xpReward: 80, passed: false },
+      { id: 'java-binary-search', title: 'Binary Search', difficulty: 'HARD', xpReward: 100, passed: false },
+    ],
+    interviewTags: ['Node.js', 'React', 'SQL Joins', 'TypeScript', 'REST APIs'],
+  },
+];
 
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
@@ -109,6 +230,10 @@ function formatTrackName(track: string): string {
     javascript: 'JavaScript',
     csharp: 'C#',
     cpp: 'C++',
+    react: 'React',
+    sql: 'SQL',
+    html: 'HTML',
+    css: 'CSS',
   };
   return names[track.toLowerCase()] ?? `${track.charAt(0).toUpperCase()}${track.slice(1)}`;
 }
@@ -118,17 +243,38 @@ function normalizeRolePath(value: unknown): RolePath | null {
   const path = value as Partial<RolePath>;
   if (typeof path.id !== 'string' || typeof path.title !== 'string') return null;
 
+  const defaultSyllabus =
+    path.id === 'backend-intern'
+      ? BACKEND_INTERN_SYLLABUS
+      : path.id === 'frontend-intern'
+      ? FRONTEND_INTERN_SYLLABUS
+      : FULLSTACK_SYLLABUS;
+
+  const fallbackItem = BUILTIN_ROLE_PATHS.find((b) => b.id === path.id);
+
   return {
     id: path.id,
     title: path.title,
-    targetRole: typeof path.targetRole === 'string' ? path.targetRole : 'Developer',
-    tagline: typeof path.tagline === 'string' ? path.tagline : '',
-    subjectIds: stringList(path.subjectIds),
-    totalLessons: typeof path.totalLessons === 'number' && Number.isFinite(path.totalLessons) ? path.totalLessons : 0,
-    recommendedChallenges: Array.isArray(path.recommendedChallenges)
-      ? path.recommendedChallenges.filter((challenge): challenge is { id: string } => Boolean(challenge) && typeof challenge === 'object' && typeof (challenge as { id?: unknown }).id === 'string')
-      : [],
-    interviewTags: stringList(path.interviewTags),
+    targetRole: typeof path.targetRole === 'string' ? path.targetRole : fallbackItem?.targetRole || 'Developer',
+    tagline: typeof path.tagline === 'string' ? path.tagline : fallbackItem?.tagline || '',
+    subjectIds: stringList(path.subjectIds).length > 0 ? stringList(path.subjectIds) : (fallbackItem?.subjectIds || []),
+    curatedLessonIds: stringList(path.curatedLessonIds),
+    syllabus: defaultSyllabus,
+    totalLessons: typeof path.totalLessons === 'number' && Number.isFinite(path.totalLessons) ? path.totalLessons : defaultSyllabus.length,
+    completedLessons: typeof path.completedLessons === 'number' ? path.completedLessons : 0,
+    percent: typeof path.percent === 'number' ? path.percent : 0,
+    recommendedChallenges: Array.isArray(path.recommendedChallenges) && path.recommendedChallenges.length > 0
+      ? path.recommendedChallenges.map((c: any) => ({
+          id: typeof c?.id === 'string' ? c.id : String(c || ''),
+          title: typeof c?.title === 'string' ? c.title : (typeof c?.id === 'string' ? c.id : 'Challenge'),
+          difficulty: (['EASY', 'MEDIUM', 'HARD'].includes(c?.difficulty?.toUpperCase()) ? c.difficulty.toUpperCase() : 'MEDIUM') as any,
+          xpReward: typeof c?.xpReward === 'number' ? c.xpReward : 50,
+          passed: Boolean(c?.passed),
+        })).filter((c) => c.id.length > 0)
+      : (fallbackItem?.recommendedChallenges || []),
+    interviewTags: stringList(path.interviewTags).length > 0
+      ? stringList(path.interviewTags)
+      : (fallbackItem?.interviewTags || []),
   };
 }
 
@@ -145,6 +291,7 @@ export default function CodingScreen() {
 
   // Mode: Academy vs Challenges vs Role Paths
   const [mode, setMode] = useState<'academy' | 'challenges' | 'rolepaths'>('academy');
+  const [previousMode, setPreviousMode] = useState<'academy' | 'challenges' | 'rolepaths'>('rolepaths');
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
 
   // Challenges state
@@ -163,7 +310,10 @@ export default function CodingScreen() {
   const [loaded, setLoaded] = useState(false);
 
   // Role paths and daily flashcards
-  const [rolePaths, setRolePaths] = useState<RolePath[]>([]);
+  const [rolePaths, setRolePaths] = useState<RolePath[]>(BUILTIN_ROLE_PATHS);
+  const [activeTrackId, setActiveTrackId] = useState<string>('backend-intern');
+  const [selectedRolePathModal, setSelectedRolePathModal] = useState<RolePath | null>(null);
+  const [enrolledToast, setEnrolledToast] = useState<string>('');
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -174,6 +324,15 @@ export default function CodingScreen() {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
   const [refreshing, setRefreshing] = useState(false);
+
+  // Restore active role path from SecureStore
+  useEffect(() => {
+    SecureStore.getItemAsync('synergysphere.active_role_path')
+      .then((val) => {
+        if (val) setActiveTrackId(val);
+      })
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -190,8 +349,10 @@ export default function CodingScreen() {
       if (learningData.status === 'fulfilled') {
         setResources(learningData.value);
       }
-      if (rolePathsData.status === 'fulfilled' && Array.isArray(rolePathsData.value?.paths)) {
+      if (rolePathsData.status === 'fulfilled' && Array.isArray(rolePathsData.value?.paths) && rolePathsData.value.paths.length > 0) {
         setRolePaths(rolePathsData.value.paths.map(normalizeRolePath).filter((path): path is RolePath => path !== null));
+      } else {
+        setRolePaths(BUILTIN_ROLE_PATHS);
       }
       if (flashcardsData.status === 'fulfilled' && flashcardsData.value?.flashcards) {
         setFlashcards(flashcardsData.value.flashcards);
@@ -212,6 +373,52 @@ export default function CodingScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  function handleOpenLessonFromPath(path: RolePath, lessonId?: string) {
+    const targetId = lessonId || path.curatedLessonIds?.[0] || path.syllabus?.[0]?.id || 'w3s-java-java-intro';
+    setPreviousMode('rolepaths');
+    setSelectedRolePathModal(null);
+    setSelectedLessonId(targetId);
+  }
+
+  function handleLaunchChallengeFromPath(ch: RolePathChallenge) {
+    const match = allChallenges.find(
+      (c) => c.id === ch.id || c.title.toLowerCase() === ch.title.toLowerCase()
+    );
+    if (match) {
+      selectChallenge(match);
+    } else {
+      const fallbackCh: BuiltinChallenge = {
+        id: ch.id,
+        title: ch.title || ch.id,
+        difficulty: ch.difficulty || 'MEDIUM',
+        description: `Implement the algorithm or query solution for ${ch.title || ch.id} to satisfy verified unit test requirements.`,
+        language: ch.id.startsWith('sql') ? 'SQL' : ch.id.startsWith('py') ? 'Python' : ch.id.startsWith('java') ? 'Java' : 'JavaScript',
+        starterCode: ch.id.startsWith('sql')
+          ? 'SELECT country, COUNT(*) AS count\nFROM users\nGROUP BY country;'
+          : ch.id.startsWith('py')
+          ? 'def solve():\n    pass\n'
+          : 'function solve() {\n  // Write solution here\n}\n',
+        hint: 'Deconstruct inputs and handle boundary conditions.',
+        xpReward: ch.xpReward || 50,
+      };
+      selectChallenge(fallbackCh);
+    }
+    setSelectedRolePathModal(null);
+    setMode('challenges');
+  }
+
+  function handleLaunchInterviewFromPath(path: RolePath) {
+    setSelectedRolePathModal(null);
+    router.push('/interviews' as never);
+  }
+
+  function handleSetActiveGoal(pathId: string, pathTitle: string) {
+    setActiveTrackId(pathId);
+    setEnrolledToast(`🎯 Set "${pathTitle}" as your active career focus goal!`);
+    SecureStore.setItemAsync('synergysphere.active_role_path', pathId).catch(() => {});
+    setTimeout(() => setEnrolledToast(''), 4000);
+  }
 
   // Combine builtin and API challenges
   const allChallenges = [
@@ -435,21 +642,29 @@ export default function CodingScreen() {
       {error ? <Notice>{error}</Notice> : null}
       {result ? <Notice tone="success">{result}</Notice> : null}
 
-      {/* Mode: Programming Academy (W3Schools) */}
-      {mode === 'academy' ? (
-        selectedLessonId ? (
-          <LessonViewer
-            lessonId={selectedLessonId}
-            onBack={() => setSelectedLessonId(null)}
-            onNavigateLesson={(nextId) => setSelectedLessonId(nextId)}
-          />
-        ) : (
-          <CurriculumDashboard onSelectLesson={(lessonId) => setSelectedLessonId(lessonId)} />
-        )
+      {/* Mode: Programming Academy (W3Schools) or Active Lesson */}
+      {selectedLessonId ? (
+        <LessonViewer
+          lessonId={selectedLessonId}
+          onBack={() => {
+            setSelectedLessonId(null);
+            if (previousMode === 'rolepaths') {
+              setMode('rolepaths');
+            }
+          }}
+          onNavigateLesson={(nextId) => setSelectedLessonId(nextId)}
+        />
+      ) : mode === 'academy' ? (
+        <CurriculumDashboard
+          onSelectLesson={(lessonId) => {
+            setPreviousMode('academy');
+            setSelectedLessonId(lessonId);
+          }}
+        />
       ) : null}
 
       {/* Mode: Coding Challenges Studio */}
-      {mode === 'challenges' ? (
+      {mode === 'challenges' && !selectedLessonId ? (
         <>
           {/* Languages Filter Scroll */}
           <Text style={[styles.section, { color: colors.text }]}>Languages</Text>
@@ -705,8 +920,53 @@ export default function CodingScreen() {
       ) : null}
 
       {/* Mode: Role Paths & Spaced Flashcards */}
-      {mode === 'rolepaths' ? (
+      {mode === 'rolepaths' && !selectedLessonId ? (
         <>
+          {/* Explainer Guide Card */}
+          <Card style={{ backgroundColor: isLight ? '#f6fbf7' : colors.surfaceElevated, borderColor: isLight ? '#c8e6c9' : colors.border, marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <View style={[styles.guideIconWrap, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)' }]}>
+                <Ionicons name="compass-outline" size={22} color={primaryAccent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
+                  What are Role Paths?
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 1 }}>
+                  Curated career blueprints bridging 3 learning pillars
+                </Text>
+              </View>
+            </View>
+
+            <Text style={{ fontSize: 13, color: colors.text, lineHeight: 19, marginBottom: 12 }}>
+              Role Paths connect foundational syntax, algorithmic problem solving, and simulated technical interviews into an end-to-end career roadmap for software engineering positions.
+            </Text>
+
+            <View style={styles.pillarsRow}>
+              <View style={[styles.pillarPill, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Ionicons name="school-outline" size={15} color={primaryAccent} />
+                <Text style={[styles.pillarPillTitle, { color: colors.text }]}>1. Academy</Text>
+                <Text style={[styles.pillarPillSub, { color: colors.muted }]}>Curated Lessons</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color={colors.muted} />
+              <View style={[styles.pillarPill, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Ionicons name="code-slash-outline" size={15} color={primaryAccent} />
+                <Text style={[styles.pillarPillTitle, { color: colors.text }]}>2. Challenges</Text>
+                <Text style={[styles.pillarPillSub, { color: colors.muted }]}>Verified Code</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color={colors.muted} />
+              <View style={[styles.pillarPill, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Ionicons name="mic-outline" size={15} color={primaryAccent} />
+                <Text style={[styles.pillarPillTitle, { color: colors.text }]}>3. Interviews</Text>
+                <Text style={[styles.pillarPillSub, { color: colors.muted }]}>AI Mock Coach</Text>
+              </View>
+            </View>
+          </Card>
+
+          {enrolledToast ? (
+            <Notice tone="success">{enrolledToast}</Notice>
+          ) : null}
+
           {/* Daily Spaced Repetition (SM-2) */}
           <Text style={[styles.section, { color: colors.text }]}>Daily Spaced Review (SM-2)</Text>
           <Card>
@@ -781,44 +1041,364 @@ export default function CodingScreen() {
             )}
           </Card>
 
-          {/* Curated Role Paths */}
+          {/* Curated Career Role Paths */}
           <Text style={[styles.section, { color: colors.text }]}>Curated Career Role Paths</Text>
-          {rolePaths.map((path) => (
-            <Card key={path.id}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, gap: 8 }}>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, flex: 1 }}>{path.title}</Text>
-                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', flexShrink: 0 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>{path.totalLessons} Lessons</Text>
-                </View>
-              </View>
-              <Text style={{ fontSize: 13, color: colors.muted, lineHeight: 18, marginBottom: 10 }}>{path.tagline}</Text>
+          {rolePaths.map((path) => {
+            const isActive = activeTrackId === path.id;
+            return (
+              <Card key={path.id} style={isActive ? { borderColor: primaryAccent, borderWidth: 1.5 } : undefined}>
+                {/* Active Goal Ribbon */}
+                {isActive ? (
+                  <View style={[styles.activeGoalBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)' }]}>
+                    <Ionicons name="star" size={12} color={primaryAccent} />
+                    <Text style={[styles.activeGoalBadgeText, { color: primaryAccent }]}>
+                      ACTIVE CAREER GOAL
+                    </Text>
+                  </View>
+                ) : null}
 
-              <View style={{ gap: 6 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="book-outline" size={14} color={primaryAccent} />
-                  <Text style={{ fontSize: 12, color: colors.text }}>
-                    Tracks: <Text style={{ fontWeight: '600' }}>{path.subjectIds.map(formatTrackName).join(', ') || 'Coming soon'}</Text>
-                  </Text>
+                {/* Card Title & Meta Header */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text }}>
+                      {path.title}
+                    </Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: primaryAccent, marginTop: 2 }}>
+                      {path.targetRole}
+                    </Text>
+                  </View>
+                  <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', flexShrink: 0 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>
+                      {path.totalLessons} Lessons
+                    </Text>
+                  </View>
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="code-slash-outline" size={14} color={primaryAccent} />
-                  <Text style={{ fontSize: 12, color: colors.text }}>
-                    Target: <Text style={{ fontWeight: '600' }}>{path.recommendedChallenges.length} Verified Challenges</Text>
-                  </Text>
+                <Text style={{ fontSize: 13, color: colors.muted, lineHeight: 18, marginBottom: 12 }}>
+                  {path.tagline}
+                </Text>
+
+                {/* Completion Progress Bar */}
+                <View style={{ marginBottom: 14 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.muted }}>
+                      Progress
+                    </Text>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>
+                      {path.completedLessons || 0} of {path.totalLessons} Lessons ({path.percent || 0}%)
+                    </Text>
+                  </View>
+                  <View style={[styles.pathProgressTrack, { backgroundColor: colors.border }]}>
+                    <View
+                      style={[
+                        styles.pathProgressFill,
+                        {
+                          backgroundColor: primaryAccent,
+                          width: `${Math.min(100, Math.max(path.percent || 0, 4))}%`,
+                        },
+                      ]}
+                    />
+                  </View>
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="mic-outline" size={14} color={primaryAccent} />
-                  <Text style={{ fontSize: 12, color: colors.text }}>
-                    Interview Focus: <Text style={{ fontWeight: '600' }}>{path.interviewTags.map(formatTrackName).join(', ') || 'Coming soon'}</Text>
-                  </Text>
+                {/* Pillar 1: Curriculum Tracks */}
+                <View style={[styles.pathPillarBox, { backgroundColor: isLight ? '#FAFAFA' : colors.surfaceElevated, borderColor: colors.border }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="school-outline" size={14} color={primaryAccent} />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                        Curriculum Syllabus ({path.syllabus?.length || path.totalLessons} Lessons)
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => setSelectedRolePathModal(path)}
+                      style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>
+                        View All ↗
+                      </Text>
+                    </Pressable>
+                  </View>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                    {path.subjectIds.map((sub) => (
+                      <View key={sub} style={[styles.subTrackPill, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text }}>
+                          {formatTrackName(sub)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Pressable
+                      onPress={() => handleOpenLessonFromPath(path)}
+                      style={({ pressed }) => [
+                        styles.actionBtnPrimary,
+                        { backgroundColor: primaryAccent, opacity: pressed ? 0.8 : 1 },
+                      ]}
+                    >
+                      <Ionicons name="play" size={12} color="#ffffff" />
+                      <Text style={styles.actionBtnPrimaryText}>Start Learning</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setSelectedRolePathModal(path)}
+                      style={({ pressed }) => [
+                        styles.actionBtnSecondary,
+                        { borderColor: colors.border, backgroundColor: colors.background, opacity: pressed ? 0.8 : 1 },
+                      ]}
+                    >
+                      <Ionicons name="list" size={12} color={colors.text} />
+                      <Text style={[styles.actionBtnSecondaryText, { color: colors.text }]}>Roadmap</Text>
+                    </Pressable>
+                  </View>
                 </View>
-              </View>
-            </Card>
-          ))}
+
+                {/* Pillar 2: Hands-on Code Challenges (Interactive) */}
+                <View style={[styles.pathPillarBox, { backgroundColor: isLight ? '#FAFAFA' : colors.surfaceElevated, borderColor: colors.border }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <Ionicons name="code-slash-outline" size={14} color={primaryAccent} />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                      Verified Code Challenges (Tap to solve):
+                    </Text>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+                    {path.recommendedChallenges.map((ch) => (
+                      <Pressable
+                        key={ch.id}
+                        onPress={() => handleLaunchChallengeFromPath(ch)}
+                        style={({ pressed }) => [
+                          styles.challengeChipBtn,
+                          {
+                            borderColor: primaryAccent,
+                            backgroundColor: isLight ? '#F0F9F1' : 'rgba(30, 104, 39, 0.15)',
+                            opacity: pressed ? 0.7 : 1,
+                          },
+                        ]}
+                      >
+                        <Ionicons name="flash-outline" size={12} color={primaryAccent} />
+                        <Text style={[styles.challengeChipTitle, { color: colors.text }]}>
+                          {ch.title}
+                        </Text>
+                        <View style={[styles.diffBadgeMicro, { backgroundColor: ch.difficulty === 'EASY' ? '#388E3C' : ch.difficulty === 'HARD' ? '#D32F2F' : '#F57C00' }]}>
+                          <Text style={styles.diffBadgeMicroText}>{ch.difficulty}</Text>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                {/* Pillar 3: Mock Interview Prep */}
+                <View style={[styles.pathPillarBox, { backgroundColor: isLight ? '#FAFAFA' : colors.surfaceElevated, borderColor: colors.border }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="mic-outline" size={14} color={primaryAccent} />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                        Technical Mock Interview Topics:
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                    {path.interviewTags.map((tag) => (
+                      <View key={tag} style={[styles.interviewTagPill, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                        <Text style={{ fontSize: 11, color: colors.muted }}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  <Pressable
+                    onPress={() => handleLaunchInterviewFromPath(path)}
+                    style={({ pressed }) => [
+                      styles.actionBtnSecondary,
+                      { borderColor: primaryAccent, backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', opacity: pressed ? 0.8 : 1 },
+                    ]}
+                  >
+                    <Ionicons name="chatbubbles-outline" size={13} color={primaryAccent} />
+                    <Text style={[styles.actionBtnSecondaryText, { color: primaryAccent }]}>
+                      Practice in Interview Coach ↗
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* Goal Enrollment Toggle Footer */}
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 }}>
+                  <Pressable
+                    onPress={() => handleSetActiveGoal(path.id, path.title)}
+                    style={({ pressed }) => [
+                      styles.goalToggleBtn,
+                      { opacity: pressed ? 0.7 : 1 },
+                    ]}
+                  >
+                    <Ionicons
+                      name={isActive ? 'star' : 'star-outline'}
+                      size={14}
+                      color={isActive ? primaryAccent : colors.muted}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '700',
+                        color: isActive ? primaryAccent : colors.muted,
+                      }}
+                    >
+                      {isActive ? 'Current Career Goal' : 'Set as Career Goal'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </Card>
+            );
+          })}
         </>
       ) : null}
+
+      {/* Syllabus Roadmap Modal */}
+      <Modal
+        visible={Boolean(selectedRolePathModal)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedRolePathModal(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.background }]}>
+            {/* Modal Header */}
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>
+                    {selectedRolePathModal?.title}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                  {selectedRolePathModal?.targetRole} · {selectedRolePathModal?.totalLessons} Lessons
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setSelectedRolePathModal(null)}
+                style={({ pressed }) => [
+                  styles.modalCloseBtn,
+                  { backgroundColor: colors.surfaceElevated, opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <Ionicons name="close" size={20} color={colors.text} />
+              </Pressable>
+            </View>
+
+            {/* Modal Content */}
+            <ScrollView
+              contentContainerStyle={{ padding: 16, gap: 14 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Overview & Quick Launch Banner */}
+              <View style={[styles.modalSummaryBox, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', borderColor: primaryAccent }]}>
+                <Text style={{ fontSize: 13, color: colors.text, lineHeight: 19, marginBottom: 10 }}>
+                  {selectedRolePathModal?.tagline}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable
+                    onPress={() => selectedRolePathModal && handleOpenLessonFromPath(selectedRolePathModal)}
+                    style={({ pressed }) => [
+                      styles.actionBtnPrimary,
+                      { flex: 1, backgroundColor: primaryAccent, opacity: pressed ? 0.8 : 1 },
+                    ]}
+                  >
+                    <Ionicons name="play" size={13} color="#ffffff" />
+                    <Text style={styles.actionBtnPrimaryText}>Start Learning</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => selectedRolePathModal && handleLaunchInterviewFromPath(selectedRolePathModal)}
+                    style={({ pressed }) => [
+                      styles.actionBtnSecondary,
+                      { flex: 1, borderColor: primaryAccent, backgroundColor: colors.background, opacity: pressed ? 0.8 : 1 },
+                    ]}
+                  >
+                    <Ionicons name="mic-outline" size={13} color={primaryAccent} />
+                    <Text style={[styles.actionBtnSecondaryText, { color: primaryAccent }]}>Mock Interview</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Phase-by-Phase Lessons Syllabus */}
+              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text, marginTop: 4 }}>
+                Curated Step-by-Step Curriculum
+              </Text>
+
+              {selectedRolePathModal?.syllabus?.map((lesson, idx) => (
+                <View
+                  key={lesson.id}
+                  style={[
+                    styles.syllabusLessonItem,
+                    { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <View style={[styles.phaseTag, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)' }]}>
+                        <Text style={[styles.phaseTagText, { color: primaryAccent }]}>
+                          {lesson.phase}
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>
+                        Lesson {idx + 1}
+                      </Text>
+                    </View>
+                    <Text style={[styles.syllabusLessonTitle, { color: colors.text }]}>
+                      {lesson.title}
+                    </Text>
+                    <Text style={[styles.syllabusLessonDesc, { color: colors.muted }]}>
+                      {lesson.description}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => selectedRolePathModal && handleOpenLessonFromPath(selectedRolePathModal, lesson.id)}
+                    style={({ pressed }) => [
+                      styles.studyBtn,
+                      { backgroundColor: primaryAccent, opacity: pressed ? 0.8 : 1 },
+                    ]}
+                  >
+                    <Text style={styles.studyBtnText}>Study ↗</Text>
+                  </Pressable>
+                </View>
+              ))}
+
+              {/* Recommended Coding Challenges */}
+              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text, marginTop: 8 }}>
+                Required Verified Challenges
+              </Text>
+              {selectedRolePathModal?.recommendedChallenges.map((ch) => (
+                <View
+                  key={ch.id}
+                  style={[
+                    styles.syllabusLessonItem,
+                    { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <View style={[styles.diffBadgeMicro, { backgroundColor: ch.difficulty === 'EASY' ? '#388E3C' : ch.difficulty === 'HARD' ? '#D32F2F' : '#F57C00' }]}>
+                        <Text style={styles.diffBadgeMicroText}>{ch.difficulty}</Text>
+                      </View>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>
+                        +{ch.xpReward} XP
+                      </Text>
+                    </View>
+                    <Text style={[styles.syllabusLessonTitle, { color: colors.text }]}>
+                      {ch.title}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => handleLaunchChallengeFromPath(ch)}
+                    style={({ pressed }) => [
+                      styles.studyBtn,
+                      { backgroundColor: primaryAccent, opacity: pressed ? 0.8 : 1 },
+                    ]}
+                  >
+                    <Text style={styles.studyBtnText}>Solve Code ↗</Text>
+                  </Pressable>
+                </View>
+              ))}
+
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -886,4 +1466,38 @@ const styles = StyleSheet.create({
   radioDot: { width: 6, height: 6, borderRadius: 3 },
   optionText: { flex: 1, fontSize: 13 },
   complete: { fontWeight: '800', fontSize: 13 },
+  guideIconWrap: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  pillarsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4 },
+  pillarPill: { flex: 1, alignItems: 'center', paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8, borderWidth: 1, gap: 2 },
+  pillarPillTitle: { fontSize: 11, fontWeight: '800' },
+  pillarPillSub: { fontSize: 9 },
+  activeGoalBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginBottom: 8 },
+  activeGoalBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  pathProgressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  pathProgressFill: { height: '100%', borderRadius: 3 },
+  pathPillarBox: { padding: 10, borderRadius: 8, borderWidth: 1, marginBottom: 8 },
+  subTrackPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
+  actionBtnPrimary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6 },
+  actionBtnPrimaryText: { fontSize: 12, fontWeight: '700', color: '#ffffff' },
+  actionBtnSecondary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1 },
+  actionBtnSecondaryText: { fontSize: 12, fontWeight: '700' },
+  challengeChipBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  challengeChipTitle: { fontSize: 12, fontWeight: '700' },
+  diffBadgeMicro: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
+  diffBadgeMicroText: { fontSize: 9, fontWeight: '800', color: '#ffffff' },
+  interviewTagPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
+  goalToggleBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 6 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
+  modalSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '88%', minHeight: '50%' },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
+  modalTitle: { fontSize: 17, fontWeight: '800' },
+  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  modalSummaryBox: { padding: 12, borderRadius: 10, borderWidth: 1 },
+  syllabusLessonItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 10, borderWidth: 1, gap: 10 },
+  phaseTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  phaseTagText: { fontSize: 10, fontWeight: '700' },
+  syllabusLessonTitle: { fontSize: 13, fontWeight: '700', marginTop: 2 },
+  syllabusLessonDesc: { fontSize: 11, marginTop: 2, lineHeight: 15 },
+  studyBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  studyBtnText: { fontSize: 11, fontWeight: '700', color: '#ffffff' },
 });

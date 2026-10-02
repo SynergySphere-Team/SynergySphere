@@ -5,13 +5,21 @@ import {
   Text,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
+  type ViewStyle,
 } from 'react-native';
 
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 
-export function Card({ children }: { children: ReactNode }) {
+export function Card({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
   const { colors } = useTheme();
 
   return (
@@ -22,6 +30,7 @@ export function Card({ children }: { children: ReactNode }) {
           backgroundColor: colors.surface,
           borderColor: colors.border,
         },
+        style,
       ]}
     >
       {children}
