@@ -1,5 +1,7 @@
-﻿import * as Notifications from 'expo-notifications';
+import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+import { api } from './api';
 
 // Configure notification presentation in foreground
 Notifications.setNotificationHandler({
@@ -23,6 +25,10 @@ export async function setupNotificationChannels(): Promise<void> {
       vibrationPattern: [0, 500, 250, 500],
       lightColor: '#00875A',
       sound: 'default',
+    });
+    await Notifications.setNotificationChannelAsync('community', {
+      name: 'Community Activity',
+      importance: Notifications.AndroidImportance.DEFAULT,
     });
     channelConfigured = true;
   } catch (err) {
@@ -113,3 +119,24 @@ export async function sendImmediateFocusNotification(durationMinutes: number): P
     console.warn('Immediate notification error:', err);
   }
 }
+
+export async function registerCommunityPushNotifications(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  // Expo Go on Android removed remote push notifications in SDK 53+
+  if (Constants.appOwnership === 'expo' && Platform.OS === 'android') {
+    return;
+  }
+  await setupNotificationChannels();
+  try {
+    const current = await Notifications.getPermissionsAsync();
+    const permission = current.status === 'granted' ? current : await Notifications.requestPermissionsAsync();
+    if (permission.status !== 'granted') return;
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+    if (!projectId) return;
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    await api.put('/github/push-token', { token, platform: Platform.OS });
+  } catch {
+    // Development clients or Expo Go without push credentials still use the in-app feed.
+  }
+}
+

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, authStorage, ApiError } from '@/services/api';
-import { registerCommunityPushNotifications } from '@/services/pushNotifications';
+import { registerCommunityPushNotifications } from '@/services/notifications';
 import { github } from '@/services/github';
 import type { AuthResponse, User } from '@/types/api';
 
