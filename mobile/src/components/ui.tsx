@@ -7,11 +7,14 @@ import {
   View,
   type StyleProp,
   type TextInputProps,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
+
+export { TaskCard, type TaskCardAction, type TaskCardProps } from './TaskCard';
 
 export function Card({
   children,
@@ -44,12 +47,16 @@ export function Button({
   disabled = false,
   secondary = false,
   danger = false,
+  style,
+  textStyle,
 }: {
   title: string;
   onPress(): void;
   disabled?: boolean;
   secondary?: boolean;
   danger?: boolean;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
 }) {
   const { colors } = useTheme();
   const { fontSize } = useAccessibility();
@@ -75,6 +82,7 @@ export function Button({
         ],
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
+        style,
       ]}
     >
       <Text
@@ -88,6 +96,7 @@ export function Button({
             styles.secondaryText,
             { color: colors.text },
           ],
+          textStyle,
         ]}
       >
         {title}

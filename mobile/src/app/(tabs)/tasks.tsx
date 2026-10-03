@@ -1,10 +1,10 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, StyleSheet, Text as RNText, TextInput as RNTextInput, Vibration, View, type TextProps, type TextInputProps } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams } from 'expo-router';
 import { Screen, Loading, Notice } from '@/components/Screen';
-import { Button, Card, Field } from '@/components/ui';
+import { Button, Card, Field, TaskCard, type TaskCardAction } from '@/components/ui';
 import { MyWorkView } from './my-work';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
@@ -796,107 +796,62 @@ export default function TasksScreen() {
             {tasks.map((task) => {
               const isDone = task.status === 'DONE';
               const isInProgress = task.status === 'IN_PROGRESS';
-              return (
-                <View
-                  key={task.id}
-                  style={[
-                    styles.taskItem,
+              const isTodo = task.status === 'TODO';
+
+              const actions: TaskCardAction[] = isTodo
+                ? [
                     {
-                      borderColor: colors.border,
-                      backgroundColor: isLight ? '#F9FBFA' : colors.surfaceElevated,
+                      label: '▶ Start',
+                      onPress: () => updateStatus(task, 'IN_PROGRESS'),
+                      secondary: true,
                     },
-                  ]}
-                >
-                  <View style={styles.taskRow}>
-                    <View style={styles.taskBody}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                        <Text
-                          style={[
-                            styles.taskStatus,
-                            {
-                              color: isDone
-                                ? colors.completedTitle
-                                : brandGreen,
-                            },
-                          ]}
-                        >
-                          {task.status.replace('_', ' ')}
-                        </Text>
-                      </View>
-                      <Text
-                        style={[
-                          styles.taskTitle,
-                          { color: isDone ? colors.completedTitle : colors.text },
-                          isDone && styles.doneTitle,
-                        ]}
-                      >
-                        {task.title}
-                      </Text>
-                      {task.description ? (
-                        <Text
-                          style={[
-                            styles.taskDescription,
-                            { color: isDone ? colors.completedDesc : colors.muted },
-                          ]}
-                        >
-                          {task.description}
-                        </Text>
-                      ) : null}
-                    </View>
-                    <View style={{ flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
-                      {task.status === 'TODO' ? (
-                        <View style={{ flexDirection: 'row', gap: 6 }}>
-                          <Button
-                            title="▶ Start"
-                            onPress={() => updateStatus(task, 'IN_PROGRESS')}
-                            secondary
-                          />
-                          <Button
-                            title="✓ Done"
-                            onPress={() => updateStatus(task, 'DONE')}
-                            secondary
-                          />
-                        </View>
-                      ) : isInProgress ? (
-                        <View style={{ flexDirection: 'row', gap: 6 }}>
-                          <Button
-                            title="✓ Done"
-                            onPress={() => updateStatus(task, 'DONE')}
-                            secondary
-                          />
-                          <Button
-                            title="Advance"
-                            onPress={() => advance(task)}
-                            secondary
-                          />
-                        </View>
-                      ) : (
-                        <Button
-                          title={isDone ? 'Reopen' : '✓ Done'}
-                          onPress={() => (isDone ? updateStatus(task, 'TODO') : updateStatus(task, 'DONE'))}
-                          secondary
-                        />
-                      )}
-                    </View>
-                  </View>
-                  {isDone ? (
-                    <View style={styles.learnedSection}>
-                      <Field
-                        label="What did you learn?"
-                        value={learned[task.id] ?? task.learnedNote ?? ''}
-                        onChangeText={(val) =>
-                          setLearned((curr) => ({ ...curr, [task.id]: val }))
-                        }
-                        multiline
-                      />
-                      <Button
-                        title="Save learning note"
-                        onPress={() => saveLearned(task)}
-                        secondary
-                      />
-                    </View>
-                  ) : null}
-                </View>
+                    {
+                      label: '✓ Done',
+                      onPress: () => updateStatus(task, 'DONE'),
+                      secondary: true,
+                    },
+                  ]
+                : isInProgress
+                ? [
+                    {
+                      label: '✓ Done',
+                      onPress: () => updateStatus(task, 'DONE'),
+                      secondary: true,
+                    },
+                    {
+                      label: 'Advance',
+                      onPress: () => advance(task),
+                      secondary: true,
+                    },
+                  ]
+                : isDone
+                ? [
+                    {
+                      label: 'Reopen',
+                      onPress: () => updateStatus(task, 'TODO'),
+                      secondary: true,
+                    },
+                  ]
+                : [
+                    {
+                      label: '✓ Done',
+                      onPress: () => updateStatus(task, 'DONE'),
+                      secondary: true,
+                    },
+                  ];
+
+              return (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  status={task.status}
+                  actions={actions}
+                  learnedNote={learned[task.id] ?? task.learnedNote ?? ''}
+                  onChangeLearnedNote={(val) =>
+                    setLearned((curr) => ({ ...curr, [task.id]: val }))
+                  }
+                  onSaveLearnedNote={() => saveLearned(task)}
+                />
               );
             })}
           </View>
@@ -1153,42 +1108,7 @@ const styles = StyleSheet.create({
     maxWidth: 260,
   },
   tasksList: {
-    gap: 10,
-    marginTop: 4,
-  },
-  taskItem: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-  },
-  taskRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 12,
-  },
-  taskBody: {
-    flex: 1,
-    gap: 4,
-  },
-  taskStatus: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  taskTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  doneTitle: {
-    textDecorationLine: 'line-through',
-  },
-  taskDescription: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  learnedSection: {
-    marginTop: 8,
-    gap: 8,
+    marginTop: 6,
   },
 });
