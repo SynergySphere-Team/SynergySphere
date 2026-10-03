@@ -16,6 +16,7 @@ import {
 } from '../data/w3schoolsCurriculumData.js';
 import type { LessonSpec, SubjectSpec, ModuleSpec } from '../data/lectureCurriculumTypes.js';
 import { materializeLesson } from '../data/curriculumLessonMaterial.js';
+import { resolveLessonEntry } from '../data/curriculumAliases.js';
 
 export const GROUNDING_CHAR_LIMIT = 8000;
 
@@ -121,7 +122,7 @@ export function getAllFlatLessons(): FlatLessonEntry[] {
 }
 
 function findLessonById(lessonId: string): FlatLessonEntry | undefined {
-  return getAllFlatLessons().find((e) => e.lesson.id === lessonId);
+  return resolveLessonEntry(lessonId, getAllFlatLessons())?.entry;
 }
 
 function toGroundedLesson(entry: FlatLessonEntry): GroundedLesson {

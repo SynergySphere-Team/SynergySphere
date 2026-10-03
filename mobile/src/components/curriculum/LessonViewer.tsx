@@ -91,9 +91,24 @@ export function LessonViewer({
         <Text style={[styles.errorText, { color: colors.danger }]}>
           Could not load this lesson.
         </Text>
-        <Pressable onPress={onBack} style={[styles.backBtn, { backgroundColor: colors.primary }]}>
-          <Text style={{ color: colors.primaryText, fontWeight: '700' }}>Back to Curriculum</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: 12, marginTop: 14 }}>
+          <Pressable
+            onPress={() => fetchLesson(lessonId)}
+            style={[
+              styles.backBtn,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderWidth: 1,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Text style={{ color: colors.text, fontWeight: '700' }}>Retry</Text>
+          </Pressable>
+          <Pressable onPress={onBack} style={[styles.backBtn, { backgroundColor: colors.primary }]}>
+            <Text style={{ color: colors.primaryText, fontWeight: '700' }}>Back to Curriculum</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }

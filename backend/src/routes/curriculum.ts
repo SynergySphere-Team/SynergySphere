@@ -10,6 +10,12 @@ import {
 import type { LessonSpec, SubjectSpec } from '../data/lectureCurriculumTypes.js';
 import { materializeLesson } from '../data/curriculumLessonMaterial.js';
 import { W3SchoolsSyncEngine } from '../services/w3schoolsSyncEngine.js';
+import {
+  resolveLessonEntry,
+  getCanonicalLessonId,
+  getAliasesForLesson,
+  type FlatLessonEntry,
+} from '../data/curriculumAliases.js';
 
 const router = Router();
 
@@ -40,7 +46,16 @@ router.use(optionalAuth);
 
 // Helper to retrieve set of completed lesson IDs for current user
 async function getUserCompletions(userId?: string): Promise<Set<string>> {
-  const completed = new Set<string>(memoryCompletions);
+  const completed = new Set<string>();
+  for (const mId of memoryCompletions) {
+    completed.add(mId);
+    const canon = getCanonicalLessonId(mId);
+    if (canon) completed.add(canon);
+    for (const alias of getAliasesForLesson(mId)) {
+      completed.add(alias);
+    }
+  }
+
   if (!userId) return completed;
 
   try {
@@ -50,20 +65,16 @@ async function getUserCompletions(userId?: string): Promise<Set<string>> {
     );
     for (const r of rows) {
       completed.add(r.lessonId);
+      const canon = getCanonicalLessonId(r.lessonId);
+      if (canon) completed.add(canon);
+      for (const alias of getAliasesForLesson(r.lessonId)) {
+        completed.add(alias);
+      }
     }
   } catch {
     // DB offline or table empty, fallback to in-memory
   }
   return completed;
-}
-
-// Flat list of all lessons with technology and module metadata
-interface FlatLessonEntry {
-  lesson: LessonSpec;
-  subjectId: string;
-  subjectName: string;
-  moduleId: string;
-  moduleName: string;
 }
 
 function getAllFlatLessons(): FlatLessonEntry[] {
@@ -206,14 +217,14 @@ router.get('/technologies/:techId', async (req: AuthRequest, res) => {
 router.get('/lessons/:lessonId', async (req: AuthRequest, res) => {
   const lessonId = String(req.params.lessonId || '');
   const allEntries = getAllFlatLessons();
-  const index = allEntries.findIndex((e) => e.lesson.id === lessonId);
+  const match = resolveLessonEntry(lessonId, allEntries);
 
-  if (index === -1) {
+  if (!match) {
     res.status(404).json({ error: `Lesson '${lessonId}' not found.` });
     return;
   }
 
-  const entry = allEntries[index];
+  const { entry, index } = match;
   const completedSet = await getUserCompletions(req.user?.userId);
 
   // Sequential previous & next lesson links
@@ -226,7 +237,7 @@ router.get('/lessons/:lessonId', async (req: AuthRequest, res) => {
     subjectName: entry.subjectName,
     moduleId: entry.moduleId,
     moduleName: entry.moduleName,
-    completed: completedSet.has(entry.lesson.id),
+    completed: completedSet.has(entry.lesson.id) || completedSet.has(lessonId),
     previousLesson: prevEntry ? { id: prevEntry.lesson.id, title: prevEntry.lesson.title } : null,
     nextLesson: nextEntry ? { id: nextEntry.lesson.id, title: nextEntry.lesson.title } : null,
     attribution: {
@@ -242,20 +253,24 @@ router.get('/lessons/:lessonId', async (req: AuthRequest, res) => {
 router.post('/lessons/:lessonId/progress', async (req: AuthRequest, res) => {
   const lessonId = String(req.params.lessonId || '');
   const allEntries = getAllFlatLessons();
-  const entry = allEntries.find((e) => e.lesson.id === lessonId);
+  const match = resolveLessonEntry(lessonId, allEntries);
 
-  if (!entry) {
+  if (!match) {
     res.status(404).json({ error: `Lesson '${lessonId}' not found.` });
     return;
   }
 
+  const entry = match.entry;
+  const canonicalId = entry.lesson.id;
   const userId = req.user?.userId;
   const desiredCompleted = req.body?.completed !== undefined ? Boolean(req.body.completed) : true;
   let xpEarned = 0;
 
   if (desiredCompleted) {
+    memoryCompletions.add(canonicalId);
     memoryCompletions.add(lessonId);
   } else {
+    memoryCompletions.delete(canonicalId);
     memoryCompletions.delete(lessonId);
   }
 
@@ -263,13 +278,13 @@ router.post('/lessons/:lessonId/progress', async (req: AuthRequest, res) => {
     try {
       if (desiredCompleted) {
         const existing = await queryOne<{ id: string }>(
-          `SELECT "id" FROM "LectureLessonProgress" WHERE "userId" = $1 AND "lessonId" = $2`,
-          [userId, lessonId],
+          `SELECT "id" FROM "LectureLessonProgress" WHERE "userId" = $1 AND ("lessonId" = $2 OR "lessonId" = $3)`,
+          [userId, canonicalId, lessonId],
         );
         if (!existing) {
           await queryOne(
             `INSERT INTO "LectureLessonProgress" ("id", "userId", "lessonId") VALUES ($1, $2, $3) RETURNING "id"`,
-            [newId(), userId, lessonId],
+            [newId(), userId, canonicalId],
           );
           // Award 20 XP for completing a curriculum lesson
           xpEarned = 20;
@@ -277,8 +292,8 @@ router.post('/lessons/:lessonId/progress', async (req: AuthRequest, res) => {
         }
       } else {
         await query(
-          `DELETE FROM "LectureLessonProgress" WHERE "userId" = $1 AND "lessonId" = $2`,
-          [userId, lessonId],
+          `DELETE FROM "LectureLessonProgress" WHERE "userId" = $1 AND ("lessonId" = $2 OR "lessonId" = $3)`,
+          [userId, canonicalId, lessonId],
         );
       }
     } catch {
@@ -287,7 +302,7 @@ router.post('/lessons/:lessonId/progress', async (req: AuthRequest, res) => {
   }
 
   res.json({
-    lessonId,
+    lessonId: canonicalId,
     completed: desiredCompleted,
     xpEarned,
     message: desiredCompleted ? `Completed '${entry.lesson.title}'!` : `Marked '${entry.lesson.title}' as incomplete.`,
@@ -389,69 +404,65 @@ router.get('/role-paths', async (req: AuthRequest, res) => {
       color: 'from-orange-500/20 to-amber-500/10 border-orange-500/30',
       subjectIds: ['java', 'sql'],
       curatedLessonIds: [
-        'w3s-java-java-intro',
-        'w3s-java-java-get-started',
-        'w3s-java-java-syntax',
-        'w3s-java-java-variables',
-        'w3s-java-java-data-types',
-        'w3s-java-java-type-casting',
-        'w3s-java-java-operators',
-        'w3s-java-java-strings',
-        'w3s-java-java-math',
-        'w3s-java-java-booleans',
-        'w3s-java-java-if...else',
-        'w3s-java-java-switch',
-        'w3s-java-java-while-loop',
-        'w3s-java-java-for-loop',
-        'w3s-java-java-break/continue',
-        'w3s-java-java-arrays',
-        'w3s-java-java-methods',
-        'w3s-java-java-classes/objects',
-        'w3s-java-java-oop',
-        'w3s-java-java-class-attributes',
-        'w3s-java-java-class-methods',
-        'w3s-java-java-constructors',
-        'w3s-java-java-modifiers',
-        'w3s-java-java-encapsulation',
-        'w3s-java-java-packages-/-api',
-        'w3s-java-java-inheritance',
-        'w3s-java-java-polymorphism',
-        'w3s-java-java-inner-classes',
-        'w3s-java-java-abstraction',
-        'w3s-java-java-interface',
-        'w3s-java-java-enums',
-        'w3s-java-java-user-input',
-        'w3s-java-java-date',
-        'w3s-java-java-arraylist',
-        'w3s-java-java-linkedlist',
-        'w3s-java-java-hashmap',
-        'w3s-java-java-hashset',
-        'w3s-java-java-iterator',
-        'w3s-java-java-wrapper-classes',
-        'w3s-java-java-exceptions',
-        'w3s-java-java-regex',
-        'w3s-java-java-threads',
-        'w3s-java-java-lambda',
-        'w3s-sql-sql-intro',
-        'w3s-sql-sql-syntax',
-        'w3s-sql-sql-select',
-        'w3s-sql-sql-where',
-        'w3s-sql-sql-order-by',
-        'w3s-sql-sql-insert-into',
-        'w3s-sql-sql-null-values',
-        'w3s-sql-sql-update',
-        'w3s-sql-sql-delete',
-        'w3s-sql-sql-min-and-max',
-        'w3s-sql-sql-count',
-        'w3s-sql-sql-like',
-        'w3s-sql-sql-wildcards',
-        'w3s-sql-sql-in',
-        'w3s-sql-sql-between',
-        'w3s-sql-sql-joins',
-        'w3s-sql-sql-inner-join',
-        'w3s-sql-sql-left-join',
-        'w3s-sql-sql-right-join',
-        'w3s-sql-sql-group-by',
+        'java-java-tutorial-java-introduction',
+        'java-java-tutorial-java-get-started',
+        'java-java-tutorial-java-syntax',
+        'java-java-tutorial-java-variables',
+        'java-java-tutorial-java-data-types',
+        'java-java-tutorial-java-type-casting',
+        'java-java-tutorial-java-operators',
+        'java-java-tutorial-java-strings',
+        'java-java-tutorial-java-math',
+        'java-java-tutorial-java-booleans',
+        'java-java-tutorial-java-if-else',
+        'java-java-tutorial-java-switch',
+        'java-java-tutorial-java-while-loop',
+        'java-java-tutorial-java-for-loop',
+        'java-java-tutorial-java-break-continue',
+        'java-java-tutorial-java-arrays',
+        'java-java-methods-java-methods',
+        'java-java-classes-java-classes-objects',
+        'java-java-classes-java-oop',
+        'java-java-classes-java-class-attributes',
+        'java-java-classes-java-class-methods',
+        'java-java-classes-java-constructors',
+        'java-java-classes-java-modifiers',
+        'java-java-classes-java-encapsulation',
+        'java-java-classes-java-packages-api',
+        'java-java-classes-java-inheritance',
+        'java-java-classes-java-polymorphism',
+        'java-java-classes-java-inner-classes',
+        'java-java-classes-java-abstraction',
+        'java-java-classes-java-interface',
+        'java-java-classes-java-enum',
+        'java-java-input-and-date-java-user-input',
+        'java-java-input-and-date-java-date',
+        'java-java-reference-java-arraylist-methods',
+        'java-java-reference-java-linkedlist-methods',
+        'java-java-collections-and-built-in-classes-java-hashmap',
+        'java-java-collections-and-built-in-classes-java-collections',
+        'java-java-i-o-streams-java-iterator',
+        'java-java-errors-java-exceptions',
+        'sql-sql-fundamentals-sql-introduction',
+        'sql-sql-fundamentals-sql-syntax',
+        'sql-sql-fundamentals-sql-select',
+        'sql-sql-fundamentals-sql-where',
+        'sql-sql-fundamentals-sql-order-by',
+        'sql-sql-fundamentals-sql-insert-into',
+        'sql-sql-fundamentals-sql-null-values',
+        'sql-sql-fundamentals-sql-update',
+        'sql-sql-fundamentals-sql-delete',
+        'sql-sql-functions-sql-min',
+        'sql-sql-functions-sql-count',
+        'sql-sql-functions-sql-like',
+        'sql-sql-functions-sql-wildcards',
+        'sql-sql-functions-sql-in',
+        'sql-sql-functions-sql-between',
+        'sql-sql-joins-sql-joins',
+        'sql-sql-joins-sql-inner-join',
+        'sql-sql-joins-sql-left-join',
+        'sql-sql-joins-sql-right-join',
+        'sql-sql-grouping-and-conditions-sql-group-by',
       ],
       recommendedChallenges: [
         { id: 'js-hello-world', title: 'Hello World', difficulty: 'EASY', xpReward: 50 },
@@ -471,45 +482,44 @@ router.get('/role-paths', async (req: AuthRequest, res) => {
       color: 'from-blue-500/20 to-cyan-500/10 border-blue-500/30',
       subjectIds: ['html', 'css', 'javascript', 'react'],
       curatedLessonIds: [
-        'w3s-html-html-intro',
-        'w3s-html-html-editors',
-        'w3s-html-html-basic',
-        'w3s-html-html-elements',
-        'w3s-html-html-attributes',
-        'w3s-html-html-headings',
-        'w3s-html-html-paragraphs',
-        'w3s-html-html-styles',
-        'w3s-html-html-formatting',
-        'w3s-html-html-links',
-        'w3s-html-html-images',
-        'w3s-html-html-tables',
-        'w3s-html-html-lists',
-        'w3s-html-html-block-and-inline',
-        'w3s-html-html-classes',
-        'w3s-html-html-id',
-        'w3s-html-html-forms',
-        'w3s-css-css-intro',
-        'w3s-css-css-syntax',
-        'w3s-css-css-selectors',
-        'w3s-css-css-box-model',
-        'w3s-css-css-flexbox',
-        'w3s-css-css-grid',
-        'w3s-javascript-js-intro',
-        'w3s-javascript-js-variables',
-        'w3s-javascript-js-functions',
-        'w3s-javascript-js-objects',
-        'w3s-javascript-js-arrays',
-        'w3s-javascript-js-arrow-function',
-        'w3s-javascript-js-async',
-        'w3s-react-react-intro',
-        'w3s-react-react-get-started',
-        'w3s-react-react-jsx',
-        'w3s-react-react-components',
-        'w3s-react-react-props',
-        'w3s-react-react-state',
-        'w3s-react-react-hooks',
-        'w3s-react-react-usestate',
-        'w3s-react-react-useeffect',
+        'html-html-tutorial-html-introduction',
+        'html-html-tutorial-html-editors',
+        'html-html-tutorial-html-basic',
+        'html-html-tutorial-html-elements',
+        'html-html-tutorial-html-attributes',
+        'html-html-tutorial-html-headings',
+        'html-html-tutorial-html-paragraphs',
+        'html-html-tutorial-html-styles',
+        'html-html-tutorial-html-formatting',
+        'html-html-tutorial-html-links',
+        'html-html-tutorial-html-images',
+        'html-html-tutorial-html-tables',
+        'html-html-tutorial-html-lists',
+        'html-html-tutorial-html-block-and-inline',
+        'html-html-tutorial-html-classes',
+        'html-html-tutorial-html-id',
+        'html-html-forms-html-forms',
+        'css-css-fundamentals-css-introduction',
+        'css-css-fundamentals-css-syntax',
+        'css-css-fundamentals-css-selectors',
+        'css-css-fundamentals-css-box-model',
+        'css-css-responsive-design-css-flexbox',
+        'css-css-responsive-design-css-grid',
+        'javascript-javascript-fundamentals-javascript-introduction',
+        'javascript-javascript-fundamentals-javascript-variables',
+        'javascript-javascript-functions-function-introduction',
+        'javascript-javascript-objects-object-introduction',
+        'javascript-javascript-arrays-javascript-arrays',
+        'javascript-javascript-functions-arrow-functions',
+        'javascript-javascript-asynchronous-programming-async-await',
+        'react-react-fundamentals-react-introduction',
+        'react-react-fundamentals-react-get-started',
+        'react-react-jsx-jsx-introduction',
+        'react-react-components-react-components',
+        'react-react-components-react-props',
+        'react-react-hooks-what-is-hooks',
+        'react-react-hooks-usestate',
+        'react-react-hooks-useeffect',
       ],
       recommendedChallenges: [
         { id: 'js-hello-world', title: 'Hello World', difficulty: 'EASY', xpReward: 50 },
@@ -528,29 +538,30 @@ router.get('/role-paths', async (req: AuthRequest, res) => {
       color: 'from-emerald-500/20 to-teal-500/10 border-emerald-500/30',
       subjectIds: ['nodejs', 'react', 'sql', 'typescript'],
       curatedLessonIds: [
-        'w3s-nodejs-node.js-intro',
-        'w3s-nodejs-node.js-get-started',
-        'w3s-nodejs-node.js-modules',
-        'w3s-nodejs-node.js-http-module',
-        'w3s-nodejs-node.js-file-system',
-        'w3s-nodejs-node.js-url-module',
-        'w3s-nodejs-node.js-events',
-        'w3s-typescript-ts-intro',
-        'w3s-typescript-ts-simple-types',
-        'w3s-typescript-ts-arrays',
-        'w3s-typescript-ts-tuples',
-        'w3s-typescript-ts-object-types',
-        'w3s-typescript-ts-enums',
-        'w3s-typescript-ts-aliases-and-interfaces',
-        'w3s-typescript-ts-union-types',
-        'w3s-typescript-ts-functions',
-        'w3s-react-react-intro',
-        'w3s-react-react-hooks',
-        'w3s-react-react-useeffect',
-        'w3s-sql-sql-intro',
-        'w3s-sql-sql-select',
-        'w3s-sql-sql-where',
-        'w3s-sql-sql-joins',
+        'nodejs-node-js-fundamentals-node-introduction',
+        'nodejs-node-js-fundamentals-node-get-started',
+        'nodejs-node-js-modules-node-modules',
+        'nodejs-node-js-core-modules-http-module',
+        'nodejs-node-js-core-modules-file-system',
+        'nodejs-node-js-core-modules-url-module',
+        'nodejs-node-js-core-modules-events-module',
+        'typescript-typescript-fundamentals-typescript-introduction',
+        'typescript-typescript-fundamentals-typescript-simple-types',
+        'typescript-typescript-fundamentals-typescript-arrays',
+        'typescript-typescript-fundamentals-typescript-tuples',
+        'typescript-typescript-fundamentals-typescript-object-types',
+        'typescript-typescript-fundamentals-typescript-enums',
+        'typescript-typescript-fundamentals-typescript-type-aliases',
+        'typescript-typescript-fundamentals-typescript-interfaces',
+        'typescript-typescript-fundamentals-typescript-union-types',
+        'typescript-typescript-fundamentals-typescript-functions',
+        'react-react-fundamentals-react-introduction',
+        'react-react-hooks-what-is-hooks',
+        'react-react-hooks-useeffect',
+        'sql-sql-fundamentals-sql-introduction',
+        'sql-sql-fundamentals-sql-select',
+        'sql-sql-fundamentals-sql-where',
+        'sql-sql-joins-sql-joins',
       ],
       recommendedChallenges: [
         { id: 'js-hello-world', title: 'Hello World', difficulty: 'EASY', xpReward: 50 },
@@ -595,7 +606,7 @@ router.get('/flashcards/daily-review', async (req: AuthRequest, res) => {
         topic: 'Java Collections',
         question: 'What is the time complexity of searching by key in a HashMap vs a TreeMap?',
         answer: 'HashMap provides O(1) average time via hash buckets. TreeMap provides O(log n) time using a Red-Black balanced binary search tree.',
-        lessonId: 'w3s-java-java-hashmap',
+        lessonId: 'java-java-collections-and-built-in-classes-java-hashmap',
         subjectId: 'java',
       },
       {
@@ -603,7 +614,7 @@ router.get('/flashcards/daily-review', async (req: AuthRequest, res) => {
         topic: 'SQL Joins',
         question: 'What is the difference between LEFT JOIN and INNER JOIN?',
         answer: 'INNER JOIN returns only rows that have matching values in both tables. LEFT JOIN returns all rows from the left table and matched rows from the right table (filling NULLs when no match exists).',
-        lessonId: 'w3s-sql-sql-joins',
+        lessonId: 'sql-sql-joins-sql-joins',
         subjectId: 'sql',
       },
       {
@@ -611,7 +622,7 @@ router.get('/flashcards/daily-review', async (req: AuthRequest, res) => {
         topic: 'JavaScript Concurrency',
         question: 'How does the Event Loop handle the Microtask Queue vs the Macrotask (Callback) Queue?',
         answer: 'The event loop executes ALL pending microtasks (Promises, queueMicrotask, MutationObserver) immediately after the current synchronous stack empties, BEFORE picking up the next macrotask (setTimeout, setInterval).',
-        lessonId: 'w3s-javascript-js-async',
+        lessonId: 'javascript-javascript-asynchronous-programming-async-await',
         subjectId: 'javascript',
       },
       {
@@ -619,7 +630,7 @@ router.get('/flashcards/daily-review', async (req: AuthRequest, res) => {
         topic: 'React Performance',
         question: 'When should you use useCallback vs useMemo?',
         answer: 'useCallback caches a function instance between renders to prevent unnecessary re-renders of memoized child components. useMemo caches the calculated return value of an expensive computational operation.',
-        lessonId: 'w3s-react-react-hooks',
+        lessonId: 'react-react-hooks-what-is-hooks',
         subjectId: 'react',
       },
       {
@@ -627,7 +638,7 @@ router.get('/flashcards/daily-review', async (req: AuthRequest, res) => {
         topic: 'HTTP & APIs',
         question: 'What makes an HTTP method "idempotent"? Which standard methods are idempotent?',
         answer: 'An operation is idempotent if executing it multiple times produces the identical side-effect on the server as executing it once. GET, PUT, and DELETE are idempotent; POST is typically not.',
-        lessonId: 'w3s-nodejs-node.js-http-module',
+        lessonId: 'nodejs-node-js-core-modules-http-module',
         subjectId: 'nodejs',
       },
     ];

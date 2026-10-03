@@ -120,45 +120,45 @@ export interface RolePath {
 }
 
 const BACKEND_INTERN_SYLLABUS: RolePathLesson[] = [
-  { id: 'w3s-java-java-intro', title: 'Java Environment & JVM Architecture', phase: 'Phase 1: Language Syntax', description: 'Understanding bytecode, JDK, and running your first Java program.' },
-  { id: 'w3s-java-java-syntax', title: 'Syntax, Variables & Data Types', phase: 'Phase 1: Language Syntax', description: 'Primitive types, variables, and type casting rules in Java.' },
-  { id: 'w3s-java-java-operators', title: 'Operators, Logic & Expressions', phase: 'Phase 1: Language Syntax', description: 'Mathematical and boolean conditional evaluations.' },
-  { id: 'w3s-java-java-if...else', title: 'Control Flow & Branching', phase: 'Phase 1: Language Syntax', description: 'If-else statements, switch expressions, and loops.' },
-  { id: 'w3s-java-java-methods', title: 'Methods & Parameter Passing', phase: 'Phase 1: Language Syntax', description: 'Method signatures, return types, and overloading.' },
-  { id: 'w3s-java-java-oop', title: 'Object-Oriented Programming (OOP)', phase: 'Phase 2: Core Engineering', description: 'Classes, objects, attributes, and instantiation.' },
-  { id: 'w3s-java-java-encapsulation', title: 'Encapsulation & Access Modifiers', phase: 'Phase 2: Core Engineering', description: 'Public/private scope, getters, setters, and data hiding.' },
-  { id: 'w3s-java-java-inheritance', title: 'Inheritance & Method Overriding', phase: 'Phase 2: Core Engineering', description: 'Extending classes, super keyword, and polymorphism.' },
-  { id: 'w3s-java-java-interface', title: 'Interfaces & Abstract Classes', phase: 'Phase 2: Core Engineering', description: 'Decoupling software contracts and multiple implementation.' },
-  { id: 'w3s-java-java-hashmap', title: 'Collections: HashMap & ArrayList', phase: 'Phase 2: Core Engineering', description: 'Key-value maps, lists, and time complexity in memory.' },
-  { id: 'w3s-sql-sql-intro', title: 'SQL & Relational Databases', phase: 'Phase 3: Database & Persistence', description: 'RDBMS concepts, tables, primary keys, and schemas.' },
-  { id: 'w3s-sql-sql-select', title: 'SELECT Queries & Filters', phase: 'Phase 3: Database & Persistence', description: 'Filtering records with WHERE, ORDER BY, and LIMIT.' },
-  { id: 'w3s-sql-sql-joins', title: 'Relational Joins (INNER, LEFT, RIGHT)', phase: 'Phase 3: Database & Persistence', description: 'Combining data across normalized relational tables.' },
-  { id: 'w3s-sql-sql-group-by', title: 'Aggregations & GROUP BY', phase: 'Phase 3: Database & Persistence', description: 'COUNT, SUM, AVG, and filtering grouped results with HAVING.' },
+  { id: 'java-java-tutorial-java-introduction', title: 'Java Environment & JVM Architecture', phase: 'Phase 1: Language Syntax', description: 'Understanding bytecode, JDK, and running your first Java program.' },
+  { id: 'java-java-tutorial-java-syntax', title: 'Syntax, Variables & Data Types', phase: 'Phase 1: Language Syntax', description: 'Primitive types, variables, and type casting rules in Java.' },
+  { id: 'java-java-tutorial-java-operators', title: 'Operators, Logic & Expressions', phase: 'Phase 1: Language Syntax', description: 'Mathematical and boolean conditional evaluations.' },
+  { id: 'java-java-tutorial-java-if-else', title: 'Control Flow & Branching', phase: 'Phase 1: Language Syntax', description: 'If-else statements, switch expressions, and loops.' },
+  { id: 'java-java-methods-java-methods', title: 'Methods & Parameter Passing', phase: 'Phase 1: Language Syntax', description: 'Method signatures, return types, and overloading.' },
+  { id: 'java-java-classes-java-oop', title: 'Object-Oriented Programming (OOP)', phase: 'Phase 2: Core Engineering', description: 'Classes, objects, attributes, and instantiation.' },
+  { id: 'java-java-classes-java-encapsulation', title: 'Encapsulation & Access Modifiers', phase: 'Phase 2: Core Engineering', description: 'Public/private scope, getters, setters, and data hiding.' },
+  { id: 'java-java-classes-java-inheritance', title: 'Inheritance & Method Overriding', phase: 'Phase 2: Core Engineering', description: 'Extending classes, super keyword, and polymorphism.' },
+  { id: 'java-java-classes-java-interface', title: 'Interfaces & Abstract Classes', phase: 'Phase 2: Core Engineering', description: 'Decoupling software contracts and multiple implementation.' },
+  { id: 'java-java-collections-and-built-in-classes-java-hashmap', title: 'Collections: HashMap & ArrayList', phase: 'Phase 2: Core Engineering', description: 'Key-value maps, lists, and time complexity in memory.' },
+  { id: 'sql-sql-fundamentals-sql-introduction', title: 'SQL & Relational Databases', phase: 'Phase 3: Database & Persistence', description: 'RDBMS concepts, tables, primary keys, and schemas.' },
+  { id: 'sql-sql-fundamentals-sql-select', title: 'SELECT Queries & Filters', phase: 'Phase 3: Database & Persistence', description: 'Filtering records with WHERE, ORDER BY, and LIMIT.' },
+  { id: 'sql-sql-joins-sql-joins', title: 'Relational Joins (INNER, LEFT, RIGHT)', phase: 'Phase 3: Database & Persistence', description: 'Combining data across normalized relational tables.' },
+  { id: 'sql-sql-grouping-and-conditions-sql-group-by', title: 'Aggregations & GROUP BY', phase: 'Phase 3: Database & Persistence', description: 'COUNT, SUM, AVG, and filtering grouped results with HAVING.' },
 ];
 
 const FRONTEND_INTERN_SYLLABUS: RolePathLesson[] = [
-  { id: 'w3s-html-html-intro', title: 'Semantic HTML5 Fundamentals', phase: 'Phase 1: Web Foundations', description: 'Document structure, accessibility, and modern tags.' },
-  { id: 'w3s-html-html-forms', title: 'Forms, Inputs & Validation', phase: 'Phase 1: Web Foundations', description: 'Building accessible client-side form controls.' },
-  { id: 'w3s-css-css-box-model', title: 'CSS Box Model & Margin Collapsing', phase: 'Phase 1: Web Foundations', description: 'Content, padding, border, and margin calculations.' },
-  { id: 'w3s-css-css-flexbox', title: 'Flexbox Layouts & Responsive Design', phase: 'Phase 1: Web Foundations', description: 'Flexible 1D box arrangements, alignment, and wrapping.' },
-  { id: 'w3s-css-css-grid', title: 'CSS Grid 2D Systems', phase: 'Phase 1: Web Foundations', description: 'Rows, columns, areas, and responsive grid templates.' },
-  { id: 'w3s-javascript-js-variables', title: 'Modern JavaScript (ES6+) Scope', phase: 'Phase 2: Modern JavaScript', description: 'Let, const, arrow functions, and lexical scope.' },
-  { id: 'w3s-javascript-js-arrays', title: 'Array Iteration & Map/Filter/Reduce', phase: 'Phase 2: Modern JavaScript', description: 'Functional array manipulation and transformation.' },
-  { id: 'w3s-javascript-js-async', title: 'Async/Await & Fetch API', phase: 'Phase 2: Modern JavaScript', description: 'Handling asynchronous REST requests and error states.' },
-  { id: 'w3s-react-react-intro', title: 'React Component Architecture', phase: 'Phase 3: Reactive Frontend', description: 'Component lifecycles, JSX, and unidirectional data flow.' },
-  { id: 'w3s-react-react-props', title: 'React Props & Composition', phase: 'Phase 3: Reactive Frontend', description: 'Passing data, callbacks, and component reusability.' },
-  { id: 'w3s-react-react-usestate', title: 'State Management with useState', phase: 'Phase 3: Reactive Frontend', description: 'Reactive local state, updater functions, and re-renders.' },
-  { id: 'w3s-react-react-useeffect', title: 'Side Effects with useEffect', phase: 'Phase 3: Reactive Frontend', description: 'API fetching, subscriptions, cleanup, and dependency arrays.' },
+  { id: 'html-html-tutorial-html-introduction', title: 'Semantic HTML5 Fundamentals', phase: 'Phase 1: Web Foundations', description: 'Document structure, accessibility, and modern tags.' },
+  { id: 'html-html-forms-html-forms', title: 'Forms, Inputs & Validation', phase: 'Phase 1: Web Foundations', description: 'Building accessible client-side form controls.' },
+  { id: 'css-css-fundamentals-css-box-model', title: 'CSS Box Model & Margin Collapsing', phase: 'Phase 1: Web Foundations', description: 'Content, padding, border, and margin calculations.' },
+  { id: 'css-css-responsive-design-css-flexbox', title: 'Flexbox Layouts & Responsive Design', phase: 'Phase 1: Web Foundations', description: 'Flexible 1D box arrangements, alignment, and wrapping.' },
+  { id: 'css-css-responsive-design-css-grid', title: 'CSS Grid 2D Systems', phase: 'Phase 1: Web Foundations', description: 'Rows, columns, areas, and responsive grid templates.' },
+  { id: 'javascript-javascript-fundamentals-javascript-variables', title: 'Modern JavaScript (ES6+) Scope', phase: 'Phase 2: Modern JavaScript', description: 'Let, const, arrow functions, and lexical scope.' },
+  { id: 'javascript-javascript-arrays-javascript-arrays', title: 'Array Iteration & Map/Filter/Reduce', phase: 'Phase 2: Modern JavaScript', description: 'Functional array manipulation and transformation.' },
+  { id: 'javascript-javascript-asynchronous-programming-async-await', title: 'Async/Await & Fetch API', phase: 'Phase 2: Modern JavaScript', description: 'Handling asynchronous REST requests and error states.' },
+  { id: 'react-react-fundamentals-react-introduction', title: 'React Component Architecture', phase: 'Phase 3: Reactive Frontend', description: 'Component lifecycles, JSX, and unidirectional data flow.' },
+  { id: 'react-react-components-react-props', title: 'React Props & Composition', phase: 'Phase 3: Reactive Frontend', description: 'Passing data, callbacks, and component reusability.' },
+  { id: 'react-react-hooks-usestate', title: 'State Management with useState', phase: 'Phase 3: Reactive Frontend', description: 'Reactive local state, updater functions, and re-renders.' },
+  { id: 'react-react-hooks-useeffect', title: 'Side Effects with useEffect', phase: 'Phase 3: Reactive Frontend', description: 'API fetching, subscriptions, cleanup, and dependency arrays.' },
 ];
 
 const FULLSTACK_SYLLABUS: RolePathLesson[] = [
-  { id: 'w3s-nodejs-node.js-intro', title: 'Node.js Runtime & Event Loop', phase: 'Phase 1: Backend Services', description: 'Non-blocking asynchronous I/O and module systems.' },
-  { id: 'w3s-nodejs-node.js-http-module', title: 'HTTP Servers & RESTful APIs', phase: 'Phase 1: Backend Services', description: 'Handling requests, status codes, and JSON responses.' },
-  { id: 'w3s-typescript-ts-intro', title: 'TypeScript Types & Inference', phase: 'Phase 2: Full-Stack Type Safety', description: 'Primitive types, type assertions, and compilation.' },
-  { id: 'w3s-typescript-ts-aliases-and-interfaces', title: 'Interfaces & Data Contracts', phase: 'Phase 2: Full-Stack Type Safety', description: 'Defining shared API contracts and object models.' },
-  { id: 'w3s-react-react-intro', title: 'React Single-Page Client', phase: 'Phase 3: End-to-End Integration', description: 'Connecting UI frontend to backend REST endpoints.' },
-  { id: 'w3s-sql-sql-intro', title: 'Relational Database Schema Design', phase: 'Phase 3: End-to-End Integration', description: 'Normalization, foreign keys, and indexes.' },
-  { id: 'w3s-sql-sql-joins', title: 'Multi-Table Relational Queries', phase: 'Phase 3: End-to-End Integration', description: 'Optimizing joins and aggregations for APIs.' },
+  { id: 'nodejs-node-js-fundamentals-node-introduction', title: 'Node.js Runtime & Event Loop', phase: 'Phase 1: Backend Services', description: 'Non-blocking asynchronous I/O and module systems.' },
+  { id: 'nodejs-node-js-core-modules-http-module', title: 'HTTP Servers & RESTful APIs', phase: 'Phase 1: Backend Services', description: 'Handling requests, status codes, and JSON responses.' },
+  { id: 'typescript-typescript-fundamentals-typescript-introduction', title: 'TypeScript Types & Inference', phase: 'Phase 2: Full-Stack Type Safety', description: 'Primitive types, type assertions, and compilation.' },
+  { id: 'typescript-typescript-fundamentals-typescript-interfaces', title: 'Interfaces & Data Contracts', phase: 'Phase 2: Full-Stack Type Safety', description: 'Defining shared API contracts and object models.' },
+  { id: 'react-react-fundamentals-react-introduction', title: 'React Single-Page Client', phase: 'Phase 3: End-to-End Integration', description: 'Connecting UI frontend to backend REST endpoints.' },
+  { id: 'sql-sql-fundamentals-sql-introduction', title: 'Relational Database Schema Design', phase: 'Phase 3: End-to-End Integration', description: 'Normalization, foreign keys, and indexes.' },
+  { id: 'sql-sql-joins-sql-joins', title: 'Multi-Table Relational Queries', phase: 'Phase 3: End-to-End Integration', description: 'Optimizing joins and aggregations for APIs.' },
 ];
 
 const BUILTIN_ROLE_PATHS: RolePath[] = [
@@ -168,7 +168,13 @@ const BUILTIN_ROLE_PATHS: RolePath[] = [
     tagline: 'From syntax to database persistence, query optimization, and REST API microservices.',
     targetRole: 'Junior Backend Developer',
     subjectIds: ['java', 'sql'],
-    curatedLessonIds: ['w3s-java-java-intro', 'w3s-java-java-syntax', 'w3s-java-java-oop', 'w3s-sql-sql-intro', 'w3s-sql-sql-joins'],
+    curatedLessonIds: [
+      'java-java-tutorial-java-introduction',
+      'java-java-tutorial-java-syntax',
+      'java-java-classes-java-oop',
+      'sql-sql-fundamentals-sql-introduction',
+      'sql-sql-joins-sql-joins',
+    ],
     syllabus: BACKEND_INTERN_SYLLABUS,
     totalLessons: 63,
     completedLessons: 0,
@@ -188,7 +194,12 @@ const BUILTIN_ROLE_PATHS: RolePath[] = [
     tagline: 'Modern accessible UI components, reactive state, DOM events, and client performance.',
     targetRole: 'Junior Frontend Developer',
     subjectIds: ['html', 'css', 'javascript', 'react'],
-    curatedLessonIds: ['w3s-html-html-intro', 'w3s-css-css-box-model', 'w3s-javascript-js-functions', 'w3s-react-react-intro'],
+    curatedLessonIds: [
+      'html-html-tutorial-html-introduction',
+      'css-css-fundamentals-css-box-model',
+      'javascript-javascript-functions-function-introduction',
+      'react-react-fundamentals-react-introduction',
+    ],
     syllabus: FRONTEND_INTERN_SYLLABUS,
     totalLessons: 42,
     completedLessons: 0,
@@ -206,7 +217,12 @@ const BUILTIN_ROLE_PATHS: RolePath[] = [
     tagline: 'End-to-end applications: REST/WebSocket APIs, relational data models, and reactive frontend.',
     targetRole: 'Junior Full-Stack Engineer',
     subjectIds: ['nodejs', 'react', 'sql', 'typescript'],
-    curatedLessonIds: ['w3s-nodejs-node.js-intro', 'w3s-typescript-ts-intro', 'w3s-react-react-intro', 'w3s-sql-sql-intro'],
+    curatedLessonIds: [
+      'nodejs-node-js-fundamentals-node-introduction',
+      'typescript-typescript-fundamentals-typescript-introduction',
+      'react-react-fundamentals-react-introduction',
+      'sql-sql-fundamentals-sql-introduction',
+    ],
     syllabus: FULLSTACK_SYLLABUS,
     totalLessons: 58,
     completedLessons: 0,
@@ -377,7 +393,7 @@ export default function CodingScreen() {
   }, [load]);
 
   function handleOpenLessonFromPath(path: RolePath, lessonId?: string) {
-    const targetId = lessonId || path.curatedLessonIds?.[0] || path.syllabus?.[0]?.id || 'w3s-java-java-intro';
+    const targetId = lessonId || path.curatedLessonIds?.[0] || path.syllabus?.[0]?.id || 'java-java-tutorial-java-introduction';
     setPreviousMode('rolepaths');
     setSelectedRolePathModal(null);
     setSelectedLessonId(targetId);
