@@ -27,7 +27,7 @@ export const CURATED_RESOURCE_LIBRARY: CuratedResource[] = [
     id: 'res-ts-narrowing',
     title: 'TypeScript Type Narrowing & Discriminated Unions',
     description: 'DevDocs rapid reference guide for eliminating stubborn any types and exhaustive switch checks.',
-    url: 'https://devdocs.io/typescript/handbook/2/narrowing',
+    url: 'https://www.typescriptlang.org/docs/handbook/2/narrowing.html',
     badge: 'DevDocs Cheatsheet',
     readTime: '4 min read',
     difficulty: 'Beginner',

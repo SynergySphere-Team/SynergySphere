@@ -48,7 +48,7 @@ export const CURATED_RESOURCE_LIBRARY: CuratedResource[] = [
     id: 'res-ts-narrowing',
     title: 'TypeScript Type Narrowing & Unions',
     description: 'DevDocs rapid reference guide for eliminating stubborn any types.',
-    url: 'https://devdocs.io/typescript/handbook/2/narrowing',
+    url: 'https://www.typescriptlang.org/docs/handbook/2/narrowing.html',
     badge: 'DevDocs Cheatsheet',
     readTime: '4 min read',
     difficulty: 'Beginner',
@@ -192,6 +192,90 @@ export const MOOD_TAG_OPTIONS = [
   '#breakthrough',
 ];
 
+export const MOOD_TAG_CATEGORIES = [
+  {
+    category: 'Flow & Momentum',
+    color: '#10b981',
+    icon: 'flash',
+    tags: ['#flow-state', '#shipped-feature', '#breakthrough', '#clean-code'],
+  },
+  {
+    category: 'Focus & Context',
+    color: '#3b82f6',
+    icon: 'bulb',
+    tags: ['#deep-work', '#exam-prep', '#code-review', '#architecture'],
+  },
+  {
+    category: 'Cognitive Friction',
+    color: '#f43f5e',
+    icon: 'warning',
+    tags: ['#debugging-hell', '#sleep-deprived', '#syntax-errors', '#deadline-crunch'],
+  },
+];
+
+export const STRESS_ANCHORS: Record<number, { label: string; desc: string; color: string }> = {
+  1: { label: 'Deep Zen', desc: 'Completely relaxed, zero cognitive tension', color: '#10b981' },
+  2: { label: 'Calm Pace', desc: 'Clear mind, minimal friction', color: '#10b981' },
+  3: { label: 'Mild Pressure', desc: 'Manageable workload, focused attention', color: '#3b82f6' },
+  4: { label: 'Engaged', desc: 'Positive challenge, active problem-solving', color: '#3b82f6' },
+  5: { label: 'Moderate Load', desc: 'Balanced cognitive demand', color: '#f59e0b' },
+  6: { label: 'Building Tension', desc: 'Starting to feel mental friction', color: '#f59e0b' },
+  7: { label: 'High Strain', desc: 'Significant stress, decision fatigue creeping in', color: '#f97316' },
+  8: { label: 'Heavy Friction', desc: 'Struggling with blockers, patience fraying', color: '#f97316' },
+  9: { label: 'Severe Strain', desc: 'Near boiling point, syntax frustration', color: '#ef4444' },
+  10: { label: 'Acute Overwhelm', desc: 'Cognitive burnout threshold, step away now', color: '#ef4444' },
+};
+
+export const MOOD_ANCHORS: Record<number, { label: string; desc: string; color: string }> = {
+  1: { label: 'Exhausted', desc: 'Mentally checked out or resentful', color: '#ef4444' },
+  2: { label: 'Frustrated', desc: 'Annoyed by stubborn bugs or obstacles', color: '#f97316' },
+  3: { label: 'Disheartened', desc: 'Low enthusiasm, feeling stuck', color: '#f59e0b' },
+  4: { label: 'Flat', desc: 'Low emotional engagement', color: '#a855f7' },
+  5: { label: 'Steady', desc: 'Balanced, pragmatic mindset', color: '#a855f7' },
+  6: { label: 'Content', desc: 'Smooth sailing, no major complaints', color: '#8b5cf6' },
+  7: { label: 'Optimistic', desc: 'Good rhythm and positive outlook', color: '#3b82f6' },
+  8: { label: 'Confident', desc: 'High agency, enjoying challenges', color: '#10b981' },
+  9: { label: 'Flow State', desc: 'Time flying, effortless productivity', color: '#10b981' },
+  10: { label: 'Peak Euphoria', desc: 'Major breakthrough, triumphant momentum', color: '#10b981' },
+};
+
+export const ENERGY_ANCHORS: Record<number, { label: string; desc: string; color: string }> = {
+  1: { label: 'Depleted', desc: 'Physical and mental depletion', color: '#ef4444' },
+  2: { label: 'Exhausted', desc: 'Struggling to keep eyes open', color: '#f97316' },
+  3: { label: 'Sluggish', desc: 'Heavy brain fog, low focus bandwidth', color: '#f59e0b' },
+  4: { label: 'Low Reserve', desc: 'Can do simple tasks, not deep architecture', color: '#f59e0b' },
+  5: { label: 'Adequate', desc: 'Standard working baseline', color: '#14b8a6' },
+  6: { label: 'Alert', desc: 'Clear-headed and attentive', color: '#14b8a6' },
+  7: { label: 'Energized', desc: 'Strong focus, ready for deep work sprints', color: '#10b981' },
+  8: { label: 'Vibrant', desc: 'High stamina, firing on all cylinders', color: '#10b981' },
+  9: { label: 'Surging', desc: 'Boundless mental clarity', color: '#10b981' },
+  10: { label: 'Peak State', desc: 'Maximum cognitive vitality & motivation', color: '#10b981' },
+};
+
+export const SLEEP_PRESETS = [5, 6, 7, 7.5, 8, 9];
+export const WATER_PRESETS = [4, 6, 8, 10];
+
+export const WELLNESS_MILESTONES = [
+  {
+    days: 3,
+    name: 'Mindful Coder',
+    bonusXp: 25,
+    description: 'Logged 3 consecutive days of developer wellness check-ins.',
+  },
+  {
+    days: 7,
+    name: 'Balance Master',
+    bonusXp: 50,
+    description: 'A full week of intentional focus, hydration, and burnout pacing.',
+  },
+  {
+    days: 14,
+    name: 'Peak Resilience',
+    bonusXp: 100,
+    description: 'Two weeks of sustained cognitive equilibrium and high developer output.',
+  },
+];
+
 export const GRATITUDE_PROMPT_PRESETS = [
   'Cracked a stubborn bug 🐛',
   'Understood recursion 💡',
@@ -209,3 +293,111 @@ export const WELLNESS_MODULES = [
   { id: 'INTERVIEWS', label: 'Interviews', color: '#06b6d4' },
   { id: 'GENERAL', label: 'General', color: '#64748b' },
 ];
+
+export interface ClusteredSession {
+  id: string;
+  startTime: string;
+  endTime: string;
+  entryCount: number;
+  primaryModuleId: string;
+  avgStress: number;
+  avgMood: number;
+  avgEnergy: number;
+  sleepHours: number | null;
+  waterIntake: number | null;
+  allTags: string[];
+  taskTitles: string[];
+  gratitudeWins: string[];
+  notes: string[];
+  entries: any[];
+  netStrain: number; // avgStress - avgEnergy
+}
+
+export function clusterWellnessEntries(
+  entries: any[],
+  windowMinutes: number = 45
+): ClusteredSession[] {
+  if (!entries || entries.length === 0) return [];
+
+  // Sort descending by date
+  const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const clusters: ClusteredSession[] = [];
+
+  let currentCluster: any[] = [];
+
+  for (const entry of sorted) {
+    if (currentCluster.length === 0) {
+      currentCluster.push(entry);
+      continue;
+    }
+
+    const prevEntry = currentCluster[currentCluster.length - 1];
+    const diffMs = Math.abs(new Date(prevEntry.date).getTime() - new Date(entry.date).getTime());
+    const diffMins = diffMs / (1000 * 60);
+
+    if (diffMins <= windowMinutes) {
+      currentCluster.push(entry);
+    } else {
+      clusters.push(createClusterSession(currentCluster));
+      currentCluster = [entry];
+    }
+  }
+
+  if (currentCluster.length > 0) {
+    clusters.push(createClusterSession(currentCluster));
+  }
+
+  return clusters;
+}
+
+function createClusterSession(entries: any[]): ClusteredSession {
+  const sortedChron = [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const first = sortedChron[0];
+  const last = sortedChron[sortedChron.length - 1];
+
+  const totalStress = entries.reduce((acc, e) => acc + (e.stressLevel || 0), 0);
+  const totalMood = entries.reduce((acc, e) => acc + (e.mood || 0), 0);
+  const totalEnergy = entries.reduce((acc, e) => acc + (e.energyLevel || 0), 0);
+  const count = entries.length;
+
+  const avgStress = Number((totalStress / count).toFixed(1));
+  const avgMood = Number((totalMood / count).toFixed(1));
+  const avgEnergy = Number((totalEnergy / count).toFixed(1));
+
+  const tagsSet = new Set<string>();
+  entries.forEach((e) => e.tags?.forEach((t: string) => tagsSet.add(t)));
+
+  const tasks = entries
+    .map((e) => e.linkedTaskTitle || e.taskTitle)
+    .filter((t): t is string => Boolean(t?.trim()));
+
+  const wins = entries
+    .map((e) => e.gratitude)
+    .filter((g): g is string => Boolean(g?.trim()));
+
+  const notes = entries
+    .map((e) => e.notes)
+    .filter((n): n is string => Boolean(n?.trim()));
+
+  const latestSleep = entries.find((e) => e.sleepHours != null)?.sleepHours ?? null;
+  const latestWater = entries.find((e) => e.waterIntake != null)?.waterIntake ?? null;
+
+  return {
+    id: `cluster-${last.id}`,
+    startTime: first.date,
+    endTime: last.date,
+    entryCount: count,
+    primaryModuleId: last.moduleId || 'GENERAL',
+    avgStress,
+    avgMood,
+    avgEnergy,
+    sleepHours: latestSleep,
+    waterIntake: latestWater,
+    allTags: Array.from(tagsSet),
+    taskTitles: Array.from(new Set(tasks)),
+    gratitudeWins: Array.from(new Set(wins)),
+    notes: Array.from(new Set(notes)),
+    entries: sortedChron,
+    netStrain: Number((avgStress - avgEnergy).toFixed(1)),
+  };
+}
