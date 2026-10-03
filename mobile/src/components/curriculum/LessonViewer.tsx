@@ -433,19 +433,19 @@ export function LessonViewer({
         </View>
       ) : null}
 
-      {/* 10. W3Schools Source Reference & Attribution */}
+      {/* 10. Curriculum Standard & Attribution */}
       <View style={[styles.attributionCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
         <View style={styles.attributionRow}>
           <Ionicons name="information-circle-outline" size={18} color={colors.muted} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.attributionTitle, { color: colors.text }]}>
-              W3Schools Educational Source
+              Curriculum Standard: {lesson.attribution.source}
             </Text>
             <Text style={[styles.attributionMeta, { color: colors.muted }]}>
-              Original lesson: {lesson.title} · Retrieved: {lesson.attribution.retrievedAt}
+              All syntax and lesson materials are natively integrated in SynergySphere · Retrieved: {lesson.attribution.retrievedAt}
             </Text>
             <Text style={[styles.attributionUrl, { color: isLight ? '#0284c7' : colors.primary }]}>
-              {lesson.attribution.primaryUrl}
+              Optional Reference: {lesson.attribution.primaryUrl}
             </Text>
           </View>
         </View>

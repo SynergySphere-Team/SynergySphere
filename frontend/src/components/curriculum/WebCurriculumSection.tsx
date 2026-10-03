@@ -20,6 +20,8 @@ import {
   ArrowLeft,
   ArrowRight,
   MessageCircleQuestion,
+  ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface Technology {
@@ -109,6 +111,69 @@ interface SearchResult {
   difficulty: string;
   subjectId: string;
   subjectName: string;
+}
+
+function FormattedExplanation({ content }: { content: string }) {
+  if (!content || !content.includes('### ')) {
+    return (
+      <p className="text-sm leading-7 text-slate-200 whitespace-pre-line">
+        {content}
+      </p>
+    );
+  }
+
+  const rawSections = content.split(/(?=### )/g);
+
+  return (
+    <div className="space-y-4">
+      {rawSections.map((section, idx) => {
+        const trimmed = section.trim();
+        if (!trimmed) return null;
+        if (trimmed.startsWith('### ')) {
+          const lines = trimmed.split('\n');
+          const heading = lines[0].replace('### ', '').trim();
+          const body = lines.slice(1).join('\n').trim();
+
+          const codeBlockMatch = body.match(/```([a-z0-9_-]*)\n([\s\S]*?)```/i);
+
+          return (
+            <div key={idx} className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 space-y-2.5">
+              <h4 className="text-sm font-bold text-sky-400 flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+                {heading}
+              </h4>
+              {codeBlockMatch ? (
+                <div className="space-y-2">
+                  {body.split(/```[a-z0-9_-]*\n[\s\S]*?```/i)[0]?.trim() && (
+                    <p className="text-xs leading-6 text-slate-300 whitespace-pre-line">
+                      {body.split(/```[a-z0-9_-]*\n[\s\S]*?```/i)[0].trim()}
+                    </p>
+                  )}
+                  <pre className="rounded-lg border border-white/[0.08] bg-[#0d1117] p-3 font-mono text-xs text-sky-300 overflow-x-auto whitespace-pre-wrap">
+                    <code>{codeBlockMatch[2].trim()}</code>
+                  </pre>
+                  {body.split(/```[a-z0-9_-]*\n[\s\S]*?```/i)[1]?.trim() && (
+                    <div className="text-xs leading-6 text-slate-300 whitespace-pre-line pt-1">
+                      {body.split(/```[a-z0-9_-]*\n[\s\S]*?```/i)[1].trim()}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-xs leading-6 text-slate-300 whitespace-pre-line">
+                  {body}
+                </div>
+              )}
+            </div>
+          );
+        }
+        return (
+          <p key={idx} className="text-xs leading-6 text-slate-300 whitespace-pre-line">
+            {trimmed}
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 export function WebCurriculumSection() {
@@ -544,14 +609,34 @@ export function WebCurriculumSection() {
                 </div>
               )}
 
+              {/* Syntax Reference */}
+              {activeLesson.content.syntax && activeLesson.content.syntax.length > 0 && (
+                <div className="rounded-xl border border-white/[0.08] bg-black/20 p-6 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Code2 className="h-4 w-4 text-sky-400" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-sky-400">
+                      Syntax Reference & Anatomy
+                    </h3>
+                  </div>
+                  <div className="space-y-2">
+                    {activeLesson.content.syntax.map((s, i) => (
+                      <pre
+                        key={i}
+                        className="rounded-lg border border-white/[0.06] bg-[#0d1117] p-3 font-mono text-xs text-sky-300 overflow-x-auto whitespace-pre-wrap"
+                      >
+                        <code>{s}</code>
+                      </pre>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Explanation */}
               <div className="rounded-xl border border-white/[0.08] bg-black/20 p-6 space-y-3">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-primary">
-                  Explanation
+                  Detailed Tutorial & Execution Guide
                 </h3>
-                <p className="text-sm leading-7 text-slate-200 whitespace-pre-line">
-                  {activeLesson.content.explanation}
-                </p>
+                <FormattedExplanation content={activeLesson.content.explanation} />
               </div>
 
               {/* Code Examples */}
@@ -616,6 +701,46 @@ export function WebCurriculumSection() {
                 </div>
               )}
 
+              {/* Best Practices & Rules */}
+              {activeLesson.content.rules && activeLesson.content.rules.length > 0 && (
+                <div className="rounded-xl border border-white/[0.08] bg-black/20 p-6 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                      Best Practices & Production Rules
+                    </h3>
+                  </div>
+                  <ul className="space-y-2">
+                    {activeLesson.content.rules.map((rule, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-xs text-slate-200">
+                        <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                        <span>{rule}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Common Traps & Pitfalls */}
+              {activeLesson.content.commonMistakes && activeLesson.content.commonMistakes.length > 0 && (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.03] p-6 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-400" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                      Common Traps & Junior Developer Pitfalls
+                    </h3>
+                  </div>
+                  <ul className="space-y-2">
+                    {activeLesson.content.commonMistakes.map((mistake, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-xs text-slate-300">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                        <span>{mistake}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {/* Practice material is tied to the selected lesson, rather than a generic runner card. */}
               {(activeLesson.content.exercise || activeLesson.content.quiz || activeLesson.content.challenge) && (
                 <div className="rounded-xl border border-white/[0.08] bg-black/20 p-6 space-y-4">
@@ -646,22 +771,25 @@ export function WebCurriculumSection() {
                 </div>
               )}
 
-              {/* Attribution & W3Schools Source Card */}
+              {/* Educational Integration & Reference Card */}
               <div className="rounded-xl border border-white/[0.08] bg-black/30 p-4 text-xs space-y-1.5">
                 <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Source: {activeLesson.attribution.source}</span>
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-3.5 w-3.5 text-primary" />
+                    <span>Curriculum Standard: {activeLesson.attribution.source}</span>
+                  </div>
                   <a
                     href={activeLesson.attribution.primaryUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-1 text-primary hover:underline"
+                    className="flex items-center gap-1 text-primary hover:underline text-[11px]"
                   >
-                    <span>View Reference on W3Schools</span>
+                    <span>Optional External Reference</span>
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
                 <p className="text-[11px] text-muted-foreground italic">
-                  {activeLesson.attribution.licenseNote} · Retrieved {activeLesson.attribution.retrievedAt}
+                  All detailed syntax, execution steps, and interactive lessons are natively integrated into SynergySphere. {activeLesson.attribution.licenseNote}
                 </p>
               </div>
 
