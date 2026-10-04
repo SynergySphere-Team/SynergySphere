@@ -66,6 +66,7 @@ interface CareerStudioModalProps {
   user: User | null;
   skills: [string, number][];
   linkedinUrl?: string;
+  savedTargetRole?: string;
 }
 
 export function CareerStudioModal({
@@ -75,12 +76,13 @@ export function CareerStudioModal({
   user,
   skills,
   linkedinUrl,
+  savedTargetRole,
 }: CareerStudioModalProps) {
   const { colors, theme } = useTheme();
   const isLight = theme === 'light';
   const primaryAccent = isLight ? '#1e6827' : colors.primary;
   const [activeTool, setActiveTool] = useState<CareerToolId>(initialTool);
-  const [targetRole, setTargetRole] = useState(PRESET_ROLES[0]);
+  const [targetRole, setTargetRole] = useState(savedTargetRole || PRESET_ROLES[0]);
   const [loading, setLoading] = useState(false);
   const [outputs, setOutputs] = useState<Record<string, string>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -131,6 +133,19 @@ export function CareerStudioModal({
       }
     }
   }, [visible, activeTool, targetRole]);
+  async function handleTargetRoleChange(role: string) {
+  // Update the UI immediately
+  setTargetRole(role);
+
+  try {
+    // Persist the student's career preference
+    await api.put('/portfolio/profile', {
+      targetRole: role,
+    });
+  } catch (error) {
+    console.warn('Failed to save target role:', error);
+  }
+}
 
   async function fetchLiveJobs(role: string) {
     setLoading(true);
@@ -258,7 +273,7 @@ export function CareerStudioModal({
                 return (
                   <Pressable
                     key={r}
-                    onPress={() => setTargetRole(r)}
+                    onPress={() => void handleTargetRoleChange(r)}
                     style={[
                       styles.roleChip,
                       {
@@ -335,17 +350,172 @@ export function CareerStudioModal({
                 </Text>
               </View>
             ) : activeTool === 'jobs' ? (
-              /* ── Job Match Intelligence ────────────────────────────────────────── */
+              /* ── Job Match Intelligence ─────────────────────────────── */
               <View style={{ gap: 14 }}>
-                <View style={[styles.intelCard, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.15)', borderColor: isLight ? '#C8E6C9' : 'rgba(30, 104, 39, 0.4)' }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="sparkles" size={16} color={primaryAccent} />
-                    <Text style={[styles.intelTitle, { color: colors.text }]}>Live Job Match Intelligence</Text>
+
+                {/* Job Match Profile */}
+                <View
+                  style={[
+                    styles.intelCard,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <Ionicons
+                      name="sparkles"
+                      size={16}
+                      color={primaryAccent}
+                    />
+
+                    <Text style={[styles.intelTitle, { color: colors.text }]}>
+                      Job Match Profile
+                    </Text>
                   </View>
+
                   <Text style={[styles.intelDesc, { color: colors.muted }]}>
-                    Computed from your verified skills: <Text style={{ color: colors.text, fontWeight: '700' }}>{skillsSummary}</Text>.
+                    Computed from your verified skills:{' '}
+                    <Text
+                      style={{
+                        color: colors.text,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {skillsSummary || 'No verified skills yet'}
+                    </Text>
+                    .
                   </Text>
                 </View>
+
+                {/* Fallback job search when live listings are unavailable */}
+                {!jobsData?.configured && (
+                  <View
+                    style={[
+                      styles.intelCard,
+                      {
+                        backgroundColor: isLight
+                          ? '#F4F8F4'
+                          : colors.surfaceElevated,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      <Ionicons
+                        name="briefcase-outline"
+                        size={17}
+                        color={primaryAccent}
+                      />
+
+                      <Text style={[styles.intelTitle, { color: colors.text }]}>
+                        Find Opportunities
+                      </Text>
+                    </View>
+
+                    <Text style={[styles.intelDesc, { color: colors.muted }]}>
+                      Live job matches are not available right now. You can still
+                      search opportunities tailored to {targetRole} using the
+                      platforms below.
+                    </Text>
+
+                    {jobsData?.searchLinks && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                          marginTop: 10,
+                        }}
+                      >
+                        <Pressable
+                          onPress={() =>
+                            Linking.openURL(jobsData.searchLinks.linkedin)
+                          }
+                          style={[
+                            styles.searchBtn,
+                            { backgroundColor: colors.surfaceElevated },
+                          ]}
+                        >
+                          <Ionicons
+                            name="logo-linkedin"
+                            size={14}
+                            color="#0077b5"
+                          />
+                          <Text
+                            style={[
+                              styles.searchBtnText,
+                              { color: colors.text },
+                            ]}
+                          >
+                            LinkedIn Jobs
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() =>
+                            Linking.openURL(jobsData.searchLinks.indeed)
+                          }
+                          style={[
+                            styles.searchBtn,
+                            { backgroundColor: colors.surfaceElevated },
+                          ]}
+                        >
+                          <Ionicons
+                            name="search"
+                            size={14}
+                            color={primaryAccent}
+                          />
+                          <Text
+                            style={[
+                              styles.searchBtnText,
+                              { color: colors.text },
+                            ]}
+                          >
+                            Indeed
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() =>
+                            Linking.openURL(jobsData.searchLinks.googleJobs)
+                          }
+                          style={[
+                            styles.searchBtn,
+                            { backgroundColor: colors.surfaceElevated },
+                          ]}
+                        >
+                          <Ionicons
+                            name="globe-outline"
+                            size={14}
+                            color={primaryAccent}
+                          />
+                          <Text
+                            style={[
+                              styles.searchBtnText,
+                              { color: colors.text },
+                            ]}
+                          >
+                            Google Jobs
+                          </Text>
+                        </Pressable>
+                      </View>
+                    )}
+                  </View>
+                )}
 
                 {!jobsData?.configured && (
                   <View style={[styles.intelCard, { backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.3)' }]}>

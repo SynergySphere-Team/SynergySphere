@@ -121,6 +121,38 @@ router.post('/', validateBody(portfolioSchema), async (req: AuthRequest, res) =>
   res.status(201).json(item);
 });
 
+router.put('/:id', validateBody(portfolioSchema), async (req: AuthRequest, res) => {
+  try {
+    const item = await queryOne(
+      `UPDATE "Portfolio"
+       SET "title" = $1,
+           "description" = $2,
+           "projectLink" = $3,
+           "githubLink" = $4
+       WHERE "id" = $5 AND "userId" = $6
+       RETURNING *`,
+      [
+        req.body.title,
+        nullable(req.body.description),
+        nullable(req.body.projectLink),
+        nullable(req.body.githubLink),
+        paramId(req),
+        req.user!.userId,
+      ],
+    );
+
+    if (!item) {
+      res.status(404).json({ error: 'Portfolio item not found' });
+      return;
+    }
+
+    res.json(item);
+  } catch (error) {
+    console.error('Error updating portfolio item:', error);
+    res.status(500).json({ error: 'Failed to update portfolio item' });
+  }
+});
+
 router.delete('/:id', async (req: AuthRequest, res) => {
   const deleted = await execute(
     `DELETE FROM "Portfolio"

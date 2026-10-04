@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -300,10 +301,32 @@ export function PublicPortfolioModal({
           <ScrollView contentContainerStyle={styles.previewScroll} showsVerticalScrollIndicator={false}>
             {/* Bio Card */}
             <View style={[styles.previewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={[styles.avatar, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)', borderColor: primaryAccent }]}>
-                <Text style={[styles.avatarText, { color: primaryAccent }]}>
-                  {user?.firstName?.[0] ?? 'S'}{user?.lastName?.[0] ?? 'D'}
-                </Text>
+              <View
+                style={[
+                  styles.avatar,
+                  {
+                    backgroundColor: isLight
+                      ? '#E8F5E9'
+                      : 'rgba(30, 104, 39, 0.25)',
+                    borderColor: primaryAccent,
+                  },
+                ]}
+              >
+                {user?.profilePicture ? (
+                  <Image
+                    source={{ uri: user.profilePicture }}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                    accessibilityLabel={`${user.firstName ?? ''} ${
+                      user.lastName ?? ''
+                    } profile picture`}
+                  />
+                ) : (
+                  <Text style={[styles.avatarText, { color: primaryAccent }]}>
+                    {user?.firstName?.[0] ?? 'S'}
+                    {user?.lastName?.[0] ?? 'D'}
+                  </Text>
+                )}
               </View>
               <Text style={[styles.cardName, { color: colors.text }]}>{fullName}</Text>
               <Text style={[styles.cardRole, { color: primaryAccent }]}>
@@ -573,6 +596,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: 22,
