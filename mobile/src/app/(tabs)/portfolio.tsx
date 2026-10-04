@@ -65,6 +65,7 @@ export default function PortfolioScreen() {
 
   // Social Links
   const [links, setLinks] = useState({ github: '', linkedin: '' });
+  const [targetRole, setTargetRole] = useState('');
   const [showLinksModal, setShowLinksModal] = useState(false);
 
   // Real Skills from Hub & DB
@@ -92,7 +93,7 @@ export default function PortfolioScreen() {
       const [portfolioRes, signalsRes] = await Promise.allSettled([
         api.get<PortfolioItem[]>('/portfolio'),
         api.get<{
-          profile: { githubUrl?: string; linkedinUrl?: string };
+          profile: { githubUrl?: string; linkedinUrl?: string; targetRole?: string };
           hubSkills: HubSkillSignal[];
           manualSkills: ManualSkillSignal[];
         }>('/portfolio/profile-signals'),
@@ -111,6 +112,7 @@ export default function PortfolioScreen() {
             github: sig.profile.githubUrl || '',
             linkedin: sig.profile.linkedinUrl || '',
           });
+            setTargetRole(sig.profile.targetRole || '');
         }
       }
     } catch (e) {
@@ -306,9 +308,15 @@ export default function PortfolioScreen() {
               PORTFOLIO & CAREER CENTER
             </Text>
 
-            <Heading subtitle="Showcase projects, skills, achievements, and career readiness.">
-              Career Profile
-            </Heading>
+            <View style={styles.portfolioHeadingWrap}>
+              <Text style={[styles.portfolioHeading, { color: colors.text }]}>
+                Career Profile
+              </Text>
+
+              <Text style={[styles.portfolioSubtitle, { color: colors.muted }]}>
+                Showcase your projects, skills, achievements, and career readiness.
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -379,11 +387,30 @@ export default function PortfolioScreen() {
         {/* ── 1. Profile Hero Card ────────────────────────────────────────── */}
         <Card>
           <View style={styles.profileRow}>
-            <View style={[styles.avatarBig, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)', borderColor: primaryAccent }]}>
-              <Text style={[styles.avatarBigText, { color: primaryAccent }]}>
-                {user?.firstName?.[0] ?? 'S'}{user?.lastName?.[0] ?? 'D'}
-              </Text>
-            </View>
+              <View
+                style={[
+                  styles.avatarBig,
+                  {
+                    backgroundColor: isLight
+                      ? '#E8F5E9'
+                      : 'rgba(30, 104, 39, 0.25)',
+                    borderColor: primaryAccent,
+                  },
+                ]}
+              >
+                {user?.profilePicture ? (
+                  <Image
+                    source={{ uri: user.profilePicture }}
+                    style={styles.avatarBigImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text style={[styles.avatarBigText, { color: primaryAccent }]}>
+                    {user?.firstName?.[0] ?? 'S'}
+                    {user?.lastName?.[0] ?? 'D'}
+                  </Text>
+                )}
+              </View>
             <View style={{ flex: 1, gap: 3 }}>
               <Text style={[styles.profileName, { color: colors.text }]}>{fullName}</Text>
               <Text style={[styles.profileTitle, { color: primaryAccent }]}>Student Developer</Text>
@@ -405,38 +432,49 @@ export default function PortfolioScreen() {
           {/* Social Links & CV buttons */}
           <View style={styles.socialButtonsRow}>
             <Pressable
-              onPress={handleOpenGitHub}
-              style={[styles.socialPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-            >
-              <Ionicons name="logo-github" size={15} color={colors.text} />
-              <Text style={[styles.socialPillText, { color: colors.text }]}>
-                {links.github ? 'GitHub' : 'Set GitHub'}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={handleOpenLinkedIn}
-              style={[styles.socialPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-            >
-              <Ionicons name="logo-linkedin" size={15} color="#0077b5" />
-              <Text style={[styles.socialPillText, { color: colors.text }]}>
-                {links.linkedin ? 'LinkedIn' : 'Set LinkedIn'}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setActiveCareerTool('cv')}
-              style={[styles.socialPill, { backgroundColor: isLight ? '#E8F5E9' : colors.surfaceElevated, borderColor: isLight ? primaryAccent : colors.border }]}
-            >
-              <Ionicons name="download-outline" size={15} color={primaryAccent} />
-              <Text style={[styles.socialPillText, { color: primaryAccent }]}>Download CV</Text>
-            </Pressable>
-
-            <Pressable
               onPress={() => setShowLinksModal(true)}
-              style={[styles.socialIconBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+              style={[
+                styles.socialPill,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Manage social links"
             >
-              <Ionicons name="settings-outline" size={16} color={colors.muted} />
+              <Ionicons
+                name="link-outline"
+                size={16}
+                color={primaryAccent}
+              />
+
+              <Text style={[styles.socialPillText, { color: colors.text }]}>
+                Social Links
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => setActiveCareerTool('resume')}
+              style={[
+                styles.socialPill,
+                {
+                  backgroundColor: isLight ? '#E8F5E9' : colors.surfaceElevated,
+                  borderColor: isLight ? primaryAccent : colors.border,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Open Career Studio"
+            >
+              <Ionicons
+                name="sparkles-outline"
+                size={15}
+                color={primaryAccent}
+              />
+
+              <Text style={[styles.socialPillText, { color: primaryAccent }]}>
+                Career Studio
+              </Text>
             </Pressable>
           </View>
         </Card>
@@ -527,7 +565,31 @@ export default function PortfolioScreen() {
             <Ionicons name="sparkles" size={18} color={primaryAccent} />
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Career Tools</Text>
           </View>
-          <Text style={[styles.kicker, { color: primaryAccent }]}>TAP TO OPEN STUDIO</Text>
+          <Pressable
+            onPress={() => setActiveCareerTool('resume')}
+            style={({ pressed }) => [
+              styles.openStudioButton,
+              {
+                borderColor: primaryAccent,
+                backgroundColor: isLight
+                  ? '#E8F5E9'
+                  : colors.surfaceElevated,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Open Career Studio"
+          >
+            <Ionicons
+              name="sparkles-outline"
+              size={14}
+              color={primaryAccent}
+            />
+
+            <Text style={[styles.openStudioText, { color: primaryAccent }]}>
+              OPEN STUDIO
+            </Text>
+          </Pressable>
         </View>
 
         <View style={styles.careerToolsGrid}>
@@ -670,6 +732,7 @@ export default function PortfolioScreen() {
         user={user}
         skills={effectiveSkills}
         linkedinUrl={links.linkedin}
+        savedTargetRole={targetRole}
       />
     </Screen>
   );
@@ -692,6 +755,23 @@ portfolioLogo: {
 },
 headerTextContainer: {
   flex: 1,
+},
+portfolioHeadingWrap: {
+  gap: 3,
+},
+
+portfolioHeading: {
+  fontSize: 24,
+  fontWeight: '900',
+  letterSpacing: -0.6,
+  lineHeight: 29,
+},
+
+portfolioSubtitle: {
+  fontSize: 13,
+  fontWeight: '500',
+  lineHeight: 19,
+  maxWidth: 320,
 },
   kicker: {
     fontSize: 10,
@@ -736,6 +816,11 @@ headerTextContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
+  avatarBigImage: {
+  width: '100%',
+  height: '100%',
+  borderRadius: 32,
+},
   avatarBigText: {
     fontSize: 26,
     fontWeight: '800',
@@ -956,4 +1041,19 @@ projectActionBtn: {
     height: '100%',
     borderRadius: 999,
   },
+  openStudioButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+  paddingHorizontal: 10,
+  paddingVertical: 7,
+  borderRadius: 10,
+  borderWidth: 1,
+},
+
+openStudioText: {
+  fontSize: 10,
+  fontWeight: '800',
+  letterSpacing: 0.5,
+},
 });
