@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   Linking,
   Platform,
   Pressable,
@@ -210,8 +211,17 @@ export default function PortfolioScreen() {
       <View style={styles.container}>
         {/* Top Header & Actions */}
         <View style={styles.topHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.kicker, { color: primaryAccent }]}>PORTFOLIO & CAREER CENTER</Text>
+          <Image
+            source={require('../../../assets/images/portfolio-logo.png')}
+            style={styles.portfolioLogo}
+            resizeMode="contain"
+          />
+
+          <View style={styles.headerTextContainer}>
+            <Text style={[styles.kicker, { color: primaryAccent }]}>
+              PORTFOLIO & CAREER CENTER
+            </Text>
+
             <Heading subtitle="Showcase projects, skills, achievements, and career readiness.">
               Career Profile
             </Heading>
@@ -538,10 +548,18 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   topHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 14,
+},
+portfolioLogo: {
+  width: 64,
+  height: 64,
+  borderRadius: 16,
+},
+headerTextContainer: {
+  flex: 1,
+},
   kicker: {
     fontSize: 10,
     fontWeight: '800',
