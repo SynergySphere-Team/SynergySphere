@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import { File } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card, Field, Heading } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
@@ -95,9 +96,15 @@ export default function LectureToLifeScreen() {
       setSelectedDocType(detectedFormat);
       setExtracting(true);
 
-      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-        encoding: 'base64',
-      });
+      let base64 = '';
+      try {
+        base64 = await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: 'base64',
+        });
+      } catch {
+        const file = new File(asset.uri);
+        base64 = await file.base64();
+      }
 
       const res = await api.post<{ text: string }>('/ai/extract-lecture-text', {
         fileName: asset.name,
