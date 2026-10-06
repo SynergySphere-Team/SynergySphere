@@ -13,7 +13,7 @@ export default function RegisterPage() {
   const { register } = useAuth();
   const router = useRouter();
   const [form, setForm] = useState({
-    firstName: '', lastName: '', email: '', password: '', role: 'STUDENT',
+    firstName: '', lastName: '', email: '', password: '', confirmPassword: '', role: 'STUDENT',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,9 +21,22 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+
+    if (form.password !== form.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
     setLoading(true);
     try {
-      await register(form);
+      await register({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        password: form.password,
+        confirmPassword: form.confirmPassword,
+        role: form.role,
+      });
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
@@ -64,7 +77,30 @@ export default function RegisterPage() {
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">Password</label>
-              <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={8} />
+              <Input
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                required
+                minLength={8}
+                placeholder="At least 8 characters"
+                autoComplete="new-password"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Confirm Password</label>
+              <Input
+                type="password"
+                value={form.confirmPassword}
+                onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                required
+                minLength={8}
+                placeholder="Re-enter your password"
+                autoComplete="new-password"
+              />
+              {form.confirmPassword && form.password !== form.confirmPassword && (
+                <p className="mt-1 text-xs text-destructive">Passwords do not match</p>
+              )}
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">I am a</label>

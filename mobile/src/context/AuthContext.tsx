@@ -4,7 +4,7 @@ import { registerCommunityPushNotifications } from '@/services/notifications';
 import { github } from '@/services/github';
 import type { AuthResponse, User } from '@/types/api';
 
-type RegisterInput = { firstName: string; lastName: string; email: string; password: string; role?: 'STUDENT' | 'ORGANIZATION' };
+type RegisterInput = { firstName: string; lastName: string; email: string; password: string; confirmPassword?: string; role?: 'STUDENT' | 'ORGANIZATION' };
 type ProfileInput = { firstName: string; lastName: string; profilePicture?: string | null };
 type AuthContextValue = { user: User | null; loading: boolean; login(email: string, password: string): Promise<void>; register(data: RegisterInput): Promise<void>; logout(): Promise<void>; refresh(): Promise<void>; updateProfile(data: ProfileInput): Promise<void>; };
 const AuthContext = createContext<AuthContextValue | null>(null);
