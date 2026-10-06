@@ -20,7 +20,6 @@ import {
   Linkedin,
   Loader2,
   Lock,
-  Moon,
   Palette,
   Shield,
   Trash2,

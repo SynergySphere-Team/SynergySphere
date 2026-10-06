@@ -18,7 +18,7 @@ const destinations: {
 }[] = [
   { title: 'Learning Hub', href: '/coding', icon: 'code-slash' },
   { title: 'AI Workspace', href: '/ai-assistant', icon: 'sparkles' },
-  { title: 'LectureToLife', href: '/lecture-to-life', icon: 'school' },
+  { title: 'Lecture to Life', href: '/lecture-to-life', icon: 'school' },
   { title: 'Community', href: '/community', icon: 'people' },
   { title: 'My Work', href: '/my-work', icon: 'git-pull-request' },
   { title: 'Portfolio', href: '/portfolio', icon: 'briefcase' },

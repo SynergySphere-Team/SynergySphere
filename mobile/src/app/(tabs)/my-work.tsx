@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
   Image,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen, Loading, Notice } from '@/components/Screen';
-import { Button, Card, Heading } from '@/components/ui';
+import { Button, Heading } from '@/components/ui';
 import { api } from '@/services/api';
 import { useTheme } from '@/context/ThemeContext';
 

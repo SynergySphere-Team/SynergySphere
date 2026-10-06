@@ -18,7 +18,6 @@ import {
   ALL_INTERVIEW_TYPES,
   ALL_DIFFICULTIES,
   ALL_INTERVIEWER_STYLES,
-  selectSessionQuestions,
 } from '../data/interviewBank/index.js';
 
 test('SynergySphere Developer Interview Simulator & Practice System', async (t) => {

@@ -8,10 +8,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/utils';
 import Link from 'next/link';
 import {
-  Bell,
   BookOpen,
-  CalendarDays,
-  Check,
   CheckCircle2,
   Clock,
   Coffee,
@@ -27,7 +24,6 @@ import {
   RotateCcw,
   Sparkles,
   Trash2,
-  Volume2,
   X,
 } from 'lucide-react';
 

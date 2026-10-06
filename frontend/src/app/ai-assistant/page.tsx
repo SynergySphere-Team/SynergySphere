@@ -293,6 +293,32 @@ function AIAssistantInner() {
     }
   }
 
+  // Fetch persistent chat history on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const history = await api<
+          Array<{ id: string; role: 'user' | 'assistant'; content: string; createdAt: string }>
+        >('/ai/chat/history');
+        if (!cancelled && Array.isArray(history) && history.length > 0) {
+          setMessages(
+            history.map((m) => ({
+              role: m.role,
+              content: m.content,
+              timestamp: new Date(m.createdAt),
+            }))
+          );
+        }
+      } catch {
+        // Fall back to the default welcome message if offline or not logged in
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function handleQuickAction(action: (typeof quickActions)[number]) {
     if (!codeContext.trim()) {
       setMessages((prev) => [
@@ -308,7 +334,12 @@ function AIAssistantInner() {
     sendMessage(action.prompt(codeContext), undefined, codeContext);
   }
 
-  function clearChat() {
+  async function clearChat() {
+    try {
+      await api('/ai/chat/history', { method: 'DELETE' });
+    } catch {
+      // ignore
+    }
     const fresh: Message[] = [
       {
         role: 'assistant',

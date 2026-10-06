@@ -3,7 +3,6 @@ import {
   technologiesCatalog,
   W3SCHOOLS_BASE_SOURCE,
 } from '../data/w3schoolsCurriculumData.js';
-import type { LessonSpec, LessonStatus } from '../data/lectureCurriculumTypes.js';
 
 export interface SyncAuditItem {
   id: string;
@@ -54,7 +53,6 @@ export class W3SchoolsSyncEngine {
     const timestamp = new Date().toISOString();
 
     for (const subject of subjectsToScan) {
-      const techCatalogItem = technologiesCatalog.find((t) => t.id === subject.id);
       const allLessons = subject.modules.flatMap((m) => m.lessons);
 
       // Verify each lesson's integrity and metadata

@@ -14,7 +14,6 @@ import {
   Globe2,
   GraduationCap,
   Play,
-  Sparkles,
   Target,
   Users,
 } from 'lucide-react';

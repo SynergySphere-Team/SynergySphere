@@ -79,7 +79,7 @@ export function buildLectureMaterialsFromContent(content: string, fileName?: str
   const summary = `This study pack is based on "${topic}". ${summaryParts.join(' ')}`.slice(0, 2000);
 
   const flashcardSource = bullets.length >= 3 ? bullets : sents;
-  const flashcards = flashcardSource.slice(0, 8).map((line, i) => {
+  const flashcards = flashcardSource.slice(0, 8).map((line) => {
     const words = line.split(/\s+/);
     const term = words.slice(0, Math.min(4, words.length)).join(' ');
     const back = line.length > 120 ? line.slice(0, 117) + '...' : line;

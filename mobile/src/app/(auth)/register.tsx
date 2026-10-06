@@ -14,14 +14,25 @@ export default function RegisterScreen() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   async function submit() {
     setError('');
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
     setSubmitting(true);
     try {
-      await register({ firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), password });
+      await register({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        password,
+        confirmPassword,
+      });
       router.replace('/(tabs)');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to create the account.');
@@ -67,9 +78,17 @@ export default function RegisterScreen() {
           autoComplete="new-password"
           placeholder="At least 8 characters"
         />
+        <Field
+          label="Confirm password"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry
+          autoComplete="new-password"
+          placeholder="Re-enter your password"
+        />
         <Button
           title={submitting ? 'Creating account…' : 'Create account'}
-          disabled={submitting || !firstName || !lastName || !email || password.length < 8}
+          disabled={submitting || !firstName || !lastName || !email || password.length < 8 || !confirmPassword}
           onPress={submit}
         />
         <Pressable onPress={() => router.push('/(auth)/login')}>

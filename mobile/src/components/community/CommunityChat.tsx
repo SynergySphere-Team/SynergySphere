@@ -19,7 +19,6 @@ import {
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
 
 import { api } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
@@ -1010,8 +1009,6 @@ function LiveChat() {
 }
 
 function CommunityPosts() {
-  const { user } = useAuth();
-
   const {
     colors,
     theme,

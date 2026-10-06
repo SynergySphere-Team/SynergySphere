@@ -11,12 +11,12 @@
 
 import { query } from '../lib/db.js';
 import {
-  w3schoolsProgrammingDomain,
   W3SCHOOLS_BASE_SOURCE,
 } from '../data/w3schoolsCurriculumData.js';
-import type { LessonSpec, SubjectSpec, ModuleSpec } from '../data/lectureCurriculumTypes.js';
-import { materializeLesson } from '../data/curriculumLessonMaterial.js';
-import { resolveLessonEntry } from '../data/curriculumAliases.js';
+import type { FlatLessonEntry } from '../data/curriculumAliases.js';
+import { findLessonEntry, getAllFlatLessons } from '../data/curriculumCatalog.js';
+
+export { getAllFlatLessons };
 
 export const GROUNDING_CHAR_LIMIT = 8000;
 
@@ -82,47 +82,8 @@ export interface GroundingBundle {
   hasContext: boolean;
 }
 
-/* ─────────────────────────── curriculum lookup (mirrors curriculum routes) ─────────────────────────── */
-
-interface FlatLessonEntry {
-  lesson: LessonSpec;
-  subjectId: string;
-  subjectName: string;
-  moduleId: string;
-  moduleName: string;
-}
-
-let cachedFlatLessons: FlatLessonEntry[] | null = null;
-
-export function getAllFlatLessons(): FlatLessonEntry[] {
-  if (cachedFlatLessons) return cachedFlatLessons;
-
-  const result: FlatLessonEntry[] = [];
-  for (const subject of w3schoolsProgrammingDomain.subjects as SubjectSpec[]) {
-    for (const mod of subject.modules as ModuleSpec[]) {
-      for (const [lessonIndex, sourceLesson] of mod.lessons.entries()) {
-        const les = materializeLesson(
-          sourceLesson,
-          subject,
-          mod,
-          mod.lessons[lessonIndex - 1]?.title,
-        );
-        result.push({
-          lesson: les,
-          subjectId: subject.id,
-          subjectName: subject.name,
-          moduleId: mod.id,
-          moduleName: mod.name,
-        });
-      }
-    }
-  }
-  cachedFlatLessons = result;
-  return result;
-}
-
 function findLessonById(lessonId: string): FlatLessonEntry | undefined {
-  return resolveLessonEntry(lessonId, getAllFlatLessons())?.entry;
+  return findLessonEntry(lessonId)?.entry;
 }
 
 function toGroundedLesson(entry: FlatLessonEntry): GroundedLesson {
@@ -275,25 +236,7 @@ interface UploadRow {
   [key: string]: unknown;
 }
 
-function formatFlashcards(raw: unknown): string {
-  const cards = Array.isArray(raw) ? raw : [];
-  return cards
-    .slice(0, 6)
-    .map((c: { front?: string; back?: string }) => `- Q: ${c?.front ?? ''} → A: ${c?.back ?? ''}`)
-    .join('\n');
-}
 
-function formatQuiz(raw: unknown): string {
-  const items = Array.isArray(raw) ? raw : [];
-  return items
-    .slice(0, 4)
-    .map(
-      (q: { question?: string; options?: string[]; answer?: number }, i) =>
-        `${i + 1}. ${q?.question ?? ''}\n   Options: ${(q?.options ?? []).join(' | ')}` +
-        `${typeof q?.answer === 'number' ? `\n   Correct: ${q.options?.[q.answer] ?? q.answer}` : ''}`,
-    )
-    .join('\n');
-}
 
 function asFlashcards(raw: unknown): Array<{ front: string; back: string }> {
   return (Array.isArray(raw) ? raw : [])
@@ -579,6 +522,22 @@ function messageTokens(message: string): string[] {
 function questionRelatesToLesson(message: string, lesson: GroundedLesson): boolean {
   const tokens = messageTokens(message);
   if (tokens.length === 0) return true;
+
+  // If the user asks about a specific advanced topic from the glossary (e.g. closure, promise),
+  // but the lesson's title/key concepts don't teach that specific topic, treat as beyond lesson.
+  const glossaryTerm = tokens.find(
+    (t) => GENERAL_GLOSSARY[t] || (t === 'closures' && GENERAL_GLOSSARY.closure),
+  );
+  if (glossaryTerm) {
+    const coreTopics = [lesson.title, ...lesson.keyConcepts.map((c) => c.title)]
+      .join(' ')
+      .toLowerCase();
+    const normalizedTerm = glossaryTerm === 'closures' ? 'closure' : glossaryTerm;
+    if (!coreTopics.includes(normalizedTerm)) {
+      return false;
+    }
+  }
+
   const haystack = [
     lesson.title,
     lesson.moduleName,

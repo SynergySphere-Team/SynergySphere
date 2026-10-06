@@ -237,7 +237,7 @@ export default function LectureToLifePage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,.docx,.txt,.md,.csv"
+                  accept=".pptx,.docx,.pdf,.txt,.md,.csv"
                   className="hidden"
                   onChange={onFileChange}
                 />
@@ -249,7 +249,7 @@ export default function LectureToLifePage() {
                 >
                   <FileText className="mx-auto mb-3 h-8 w-8 text-primary" />
                   <p className="text-sm font-semibold text-white">Drag and drop lecture files here</p>
-                  <p className="mt-1 text-xs text-muted-foreground">PDF, DOCX, TXT, and MD supported</p>
+                  <p className="mt-1 text-xs text-muted-foreground">PPTX, DOCX, PDF, TXT, and MD supported</p>
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
                     <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} disabled={extracting}>
                       {extracting ? 'Reading file...' : 'Choose File'}

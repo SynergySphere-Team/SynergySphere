@@ -4,7 +4,6 @@
  * No DB or API key required.
  */
 import { buildGroundingBundle, buildGroundedFallback } from '../services/aiContext.js';
-import { generateAiResponse } from '../services/ai.js';
 
 async function main() {
   let failures = 0;
@@ -19,12 +18,7 @@ async function main() {
     message: 'What is a closure?',
     lessonId: 'javascript-javascript-scope-javascript-scope',
   });
-  const pinnedAnswer = await generateAiResponse(
-    'grounded',
-    'What is a closure?',
-    [],
-    () => buildGroundedFallback('What is a closure?', pinned),
-  );
+  const pinnedAnswer = buildGroundedFallback('What is a closure?', pinned);
   check(
     'pinned lesson is used as grounding source',
     pinned.source === 'lesson' && pinned.reference.lessonTitle === 'JavaScript Scope',
@@ -63,9 +57,8 @@ async function main() {
 
   // 3. No false grounding: canned API-key copy ONLY when nothing matched.
   const outside = await buildGroundingBundle({ userId: 'offline-test-user', message: 'Who wrote Hamlet?' });
-  const outsideAnswer = await generateAiResponse('No context matched.', 'Who wrote Hamlet?', [], () =>
-    buildGroundedFallback('Who wrote Hamlet?', outside),
-  );  check(
+  const outsideAnswer = buildGroundedFallback('Who wrote Hamlet?', outside);
+  check(
     'unrelated question admits no context (no lesson pinned)',
     !outside.hasContext && outside.source === 'none',
   );

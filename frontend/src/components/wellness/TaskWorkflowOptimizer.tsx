@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { Task, TaskDeconstruction } from './types';
 import { generateDynamicTaskDeconstruction } from './mockData';
 import {
-  Sparkles,
   ExternalLink,
   Clock,
   CheckCircle2,

@@ -1,7 +1,5 @@
 import type {
   InterviewQuestion,
-  QuestionDifficulty,
-  QuestionType,
   InterviewRole,
   InterviewType,
   InterviewerStyle,

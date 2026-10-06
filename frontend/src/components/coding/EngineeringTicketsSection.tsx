@@ -1,21 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/utils';
 import {
   GitPullRequest,
-  CheckCircle2,
-  AlertTriangle,
   FileCode,
   RotateCcw,
-  Sparkles,
   Loader2,
-  Terminal,
   ShieldCheck,
-  ChevronRight,
-  ExternalLink,
 } from 'lucide-react';
 
 interface TicketFile {

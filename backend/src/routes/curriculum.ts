@@ -7,20 +7,11 @@ import {
   w3schoolsProgrammingDomain,
   W3SCHOOLS_BASE_SOURCE,
 } from '../data/w3schoolsCurriculumData.js';
-import type { LessonSpec, SubjectSpec } from '../data/lectureCurriculumTypes.js';
-import { materializeLesson } from '../data/curriculumLessonMaterial.js';
 import { W3SchoolsSyncEngine } from '../services/w3schoolsSyncEngine.js';
-import {
-  resolveLessonEntry,
-  getCanonicalLessonId,
-  getAliasesForLesson,
-  type FlatLessonEntry,
-} from '../data/curriculumAliases.js';
+import { getCanonicalLessonId, getAliasesForLesson } from '../data/curriculumAliases.js';
+import { findLessonEntry, getAllFlatLessons, invalidateLessonCatalog } from '../data/curriculumCatalog.js';
 
 const router = Router();
-
-// In-memory fallback tracking for demo/guest users or when DB is offline
-const memoryCompletions = new Set<string>();
 
 // Optional auth middleware: extracts user if token exists, but doesn't block guests
 function optionalAuth(req: AuthRequest, _res: Response, next: NextFunction): void {
@@ -44,18 +35,9 @@ function optionalAuth(req: AuthRequest, _res: Response, next: NextFunction): voi
 
 router.use(optionalAuth);
 
-// Helper to retrieve set of completed lesson IDs for current user
+// Completed lesson IDs (canonical + legacy aliases) for the signed-in user.
 async function getUserCompletions(userId?: string): Promise<Set<string>> {
   const completed = new Set<string>();
-  for (const mId of memoryCompletions) {
-    completed.add(mId);
-    const canon = getCanonicalLessonId(mId);
-    if (canon) completed.add(canon);
-    for (const alias of getAliasesForLesson(mId)) {
-      completed.add(alias);
-    }
-  }
-
   if (!userId) return completed;
 
   try {
@@ -72,33 +54,9 @@ async function getUserCompletions(userId?: string): Promise<Set<string>> {
       }
     }
   } catch {
-    // DB offline or table empty, fallback to in-memory
+    // DB offline: report no completions rather than failing the request
   }
   return completed;
-}
-
-function getAllFlatLessons(): FlatLessonEntry[] {
-  const result: FlatLessonEntry[] = [];
-  for (const subject of w3schoolsProgrammingDomain.subjects) {
-    for (const mod of subject.modules) {
-      for (const [lessonIndex, sourceLesson] of mod.lessons.entries()) {
-        const les = materializeLesson(
-          sourceLesson,
-          subject,
-          mod,
-          mod.lessons[lessonIndex - 1]?.title,
-        );
-        result.push({
-          lesson: les,
-          subjectId: subject.id,
-          subjectName: subject.name,
-          moduleId: mod.id,
-          moduleName: mod.name,
-        });
-      }
-    }
-  }
-  return result;
 }
 
 // 1. GET /api/curriculum/technologies - list all technologies with progress
@@ -179,13 +137,8 @@ router.get('/technologies/:techId', async (req: AuthRequest, res) => {
     name: m.name,
     description: m.description,
     sortOrder: m.sortOrder,
-    lessons: m.lessons.map((sourceLesson, lessonIndex) => {
-      const l = materializeLesson(
-        sourceLesson,
-        subject,
-        m,
-        m.lessons[lessonIndex - 1]?.title,
-      );
+    lessons: m.lessons.map((sourceLesson) => {
+      const l = findLessonEntry(sourceLesson.id)?.entry.lesson ?? sourceLesson;
       return {
         id: l.id,
         title: l.title,
@@ -217,7 +170,7 @@ router.get('/technologies/:techId', async (req: AuthRequest, res) => {
 router.get('/lessons/:lessonId', async (req: AuthRequest, res) => {
   const lessonId = String(req.params.lessonId || '');
   const allEntries = getAllFlatLessons();
-  const match = resolveLessonEntry(lessonId, allEntries);
+  const match = findLessonEntry(lessonId);
 
   if (!match) {
     res.status(404).json({ error: `Lesson '${lessonId}' not found.` });
@@ -252,8 +205,7 @@ router.get('/lessons/:lessonId', async (req: AuthRequest, res) => {
 // 4. POST /api/curriculum/lessons/:lessonId/progress - mark complete or toggle
 router.post('/lessons/:lessonId/progress', async (req: AuthRequest, res) => {
   const lessonId = String(req.params.lessonId || '');
-  const allEntries = getAllFlatLessons();
-  const match = resolveLessonEntry(lessonId, allEntries);
+  const match = findLessonEntry(lessonId);
 
   if (!match) {
     res.status(404).json({ error: `Lesson '${lessonId}' not found.` });
@@ -266,26 +218,21 @@ router.post('/lessons/:lessonId/progress', async (req: AuthRequest, res) => {
   const desiredCompleted = req.body?.completed !== undefined ? Boolean(req.body.completed) : true;
   let xpEarned = 0;
 
-  if (desiredCompleted) {
-    memoryCompletions.add(canonicalId);
-    memoryCompletions.add(lessonId);
-  } else {
-    memoryCompletions.delete(canonicalId);
-    memoryCompletions.delete(lessonId);
-  }
-
   if (userId) {
     try {
       if (desiredCompleted) {
-        const existing = await queryOne<{ id: string }>(
-          `SELECT "id" FROM "LectureLessonProgress" WHERE "userId" = $1 AND ("lessonId" = $2 OR "lessonId" = $3)`,
-          [userId, canonicalId, lessonId],
+        // Single round trip: insert only if neither the canonical nor the requested alias is recorded.
+        const inserted = await queryOne<{ id: string }>(
+          `INSERT INTO "LectureLessonProgress" ("id", "userId", "lessonId")
+           SELECT $1, $2, $3
+           WHERE NOT EXISTS (
+             SELECT 1 FROM "LectureLessonProgress"
+             WHERE "userId" = $2 AND ("lessonId" = $3 OR "lessonId" = $4)
+           )
+           RETURNING "id"`,
+          [newId(), userId, canonicalId, lessonId],
         );
-        if (!existing) {
-          await queryOne(
-            `INSERT INTO "LectureLessonProgress" ("id", "userId", "lessonId") VALUES ($1, $2, $3) RETURNING "id"`,
-            [newId(), userId, canonicalId],
-          );
+        if (inserted) {
           // Award 20 XP for completing a curriculum lesson
           xpEarned = 20;
           await awardXp(userId, xpEarned, `Completed W3Schools lesson: ${entry.lesson.title}`);
@@ -352,6 +299,7 @@ router.get('/search', async (req: AuthRequest, res) => {
 router.post('/sync', async (req, res) => {
   const targetTech = req.body?.technologyId ? String(req.body.technologyId) : undefined;
   const syncResult = await W3SchoolsSyncEngine.runSync(targetTech);
+  invalidateLessonCatalog();
   res.json({
     source: W3SCHOOLS_BASE_SOURCE.name,
     licenseNote: W3SCHOOLS_BASE_SOURCE.licenseNote,
@@ -377,6 +325,7 @@ router.post('/sync/review-queue/:lessonId/resolve', (req, res) => {
   const lessonId = String(req.params.lessonId);
   const action = (req.body?.action || 'keep') as 'keep' | 'deprecate' | 'update';
   const result = W3SchoolsSyncEngine.resolveReviewItem(lessonId, action);
+  invalidateLessonCatalog();
   res.json(result);
 });
 
@@ -596,9 +545,8 @@ router.get('/role-paths', async (req: AuthRequest, res) => {
 });
 
 // ── 11. Spaced Repetition (SM-2) Flashcard Daily Review ──
-router.get('/flashcards/daily-review', async (req: AuthRequest, res) => {
+router.get('/flashcards/daily-review', async (_req: AuthRequest, res) => {
   try {
-    const userId = req.user?.userId;
     // Sample review cards for daily practice
     const cards = [
       {

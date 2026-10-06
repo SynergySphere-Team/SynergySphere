@@ -20,8 +20,7 @@
     "mobile"
   ],
   "devDependencies": {
-    "concurrently": "^9.1.2",
-    "expo-router": "~57.0.22"
+    "concurrently": "^9.1.2"
   },
   "overrides": {
     "react": "19.2.3",

@@ -823,10 +823,6 @@ const challengeHints: Record<string, string[]> = {
 
 /* ─────────────────────────── helpers ─────────────────────────── */
 
-function getChallengeKey(id: string): string {
-  return id;
-}
-
 function deepEqual(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((v, i) => deepEqual(v, b[i]));
@@ -970,13 +966,9 @@ export function CodingChallengesSection({ showHeading = true }: CodingChallenges
     setSubmitting(true);
     setSubmitResult(null);
 
-    let localResults: TestResult[] = [];
-    let allLocallyPassed = false;
-
     if (isLocallyRunnable(selected)) {
-      localResults = runLocalTests(code, selected.id);
+      const localResults = runLocalTests(code, selected.id);
       setTestResults(localResults);
-      allLocallyPassed = localResults.length > 0 && localResults.every((r) => r.passed);
     }
 
     try {

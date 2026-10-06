@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen, Loading, Notice } from '@/components/Screen';
-import { Button, Card, Heading } from '@/components/ui';
+import { Button, Heading } from '@/components/ui';
 import { api } from '@/services/api';
 import type { GithubActivity, Project } from '@/types/api';
 import { useTheme } from '@/context/ThemeContext';

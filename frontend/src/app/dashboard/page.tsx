@@ -11,6 +11,7 @@ import { SkillBar } from '@/components/ui/SkillBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/context/AuthContext';
 import { api, getLevelTitle } from '@/lib/utils';
+import { BringLectureToLifeModule } from '@/components/dashboard/BringLectureToLifeModule';
 import {
   ArrowRight,
   BookOpen,
@@ -92,13 +93,10 @@ function getTimeOfDayGreeting(): string {
 export default function DashboardPage() {
   const { user } = useAuth();
   const [data, setData] = useState<DashboardStatsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     api<DashboardStatsResponse>('/dashboard/stats')
       .then(setData)
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
+      .catch(() => setData(null));
   }, []);
 
   const greeting = getTimeOfDayGreeting();
@@ -301,6 +299,11 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Bring the Lecture to Life Module */}
+      <div className="mt-6">
+        <BringLectureToLifeModule />
       </div>
 
       {/* Real Weekly Events & Learning Hub Progress */}

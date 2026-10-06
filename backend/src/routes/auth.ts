@@ -19,7 +19,11 @@ const registerSchema = z.object({
   lastName: z.string().min(1).max(50),
   email: z.string().email(),
   password: z.string().min(8).max(100),
+  confirmPassword: z.string().min(8).max(100).optional(),
   role: z.enum(['STUDENT', 'ORGANIZATION']).optional(),
+}).refine((data) => !data.confirmPassword || data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
 });
 
 const loginSchema = z.object({
