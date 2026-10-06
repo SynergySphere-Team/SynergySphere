@@ -38,6 +38,14 @@ type InitiativeProject = {
   teamCapacity?: number | null;
   deliverableType?: string | null;
   githubUrl?: string | null;
+  githubFullName?: string | null;
+  githubOwner?: string | null;
+  githubRepo?: string | null;
+  githubVisibility?: string | null;
+  primaryLanguage?: string | null;
+  githubStars?: number | null;
+  githubForks?: number | null;
+  isGithubBacked?: boolean;
   _count?: {
     applications?: number;
   };
@@ -797,6 +805,36 @@ export function CommunityInitiatives() {
                       Manage
                     </Text>
                   </Pressable>
+
+                  {(project.githubFullName || project.githubUrl || project.isGithubBacked) ? (
+                    <Pressable
+                      onPress={() =>
+                        router.push({
+                          pathname: '/project-detail',
+                          params: { projectId: project.id },
+                        } as never)
+                      }
+                      style={[
+                        styles.secondaryButton,
+                        {
+                          borderColor: colors.border,
+                          flexDirection: 'row',
+                          gap: 4,
+                        },
+                      ]}
+                    >
+                      <Ionicons name="logo-github" size={13} color={colors.text} />
+                      <Text
+                        style={{
+                          color: colors.text,
+                          fontSize: 11,
+                          fontWeight: '800',
+                        }}
+                      >
+                        Repo
+                      </Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               </View>
             ),
@@ -1026,19 +1064,48 @@ export function CommunityInitiatives() {
                     styles.projectTopRow
                   }
                 >
-                  <Text
-                    style={[
-                      styles.categoryTag,
-                      {
-                        color:
-                          accentColor,
-                      },
-                    ]}
-                  >
-                    {categoryLabel(
-                      project.category,
-                    )}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.categoryTag,
+                        {
+                          color:
+                            accentColor,
+                        },
+                      ]}
+                    >
+                      {categoryLabel(
+                        project.category,
+                      )}
+                    </Text>
+
+                    {(project.githubFullName || project.githubUrl || project.isGithubBacked) ? (
+                      <View
+                        style={[
+                          styles.githubTagBadge,
+                          {
+                            backgroundColor:
+                              theme === 'dark'
+                                ? 'rgba(255,255,255,0.08)'
+                                : '#f0f3f6',
+                          },
+                        ]}
+                      >
+                        <Ionicons name="logo-github" size={10} color={colors.text} />
+                        <Text
+                          style={[
+                            styles.githubTagText,
+                            {
+                              color: colors.text,
+                            },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {project.githubFullName || 'GitHub'}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
 
                   {project.hasApplied ? (
                     <View
@@ -1367,6 +1434,20 @@ const styles =
       fontSize: 12,
       fontWeight: '800',
       textTransform: 'uppercase',
+    },
+
+    githubTagBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 6,
+    },
+
+    githubTagText: {
+      fontSize: 10,
+      fontWeight: '700',
     },
 
     projectTitle: {
