@@ -25,8 +25,15 @@ export async function extractTextFromFile(file: File): Promise<string> {
     return extractServerText(file);
   }
 
-  if (name.endsWith('.pptx') || name.endsWith('.ppt')) {
-    throw new Error('PowerPoint files are not parsed directly. Export slides to PDF or paste the slide text below.');
+  if (
+    type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+    name.endsWith('.pptx')
+  ) {
+    return extractServerText(file);
+  }
+
+  if (name.endsWith('.ppt')) {
+    throw new Error('Legacy .ppt files are not supported. Save as modern .pptx or export slides to PDF.');
   }
 
   if (name.endsWith('.doc')) {

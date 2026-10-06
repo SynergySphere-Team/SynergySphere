@@ -317,6 +317,7 @@ export default function HomeScreen() {
   const workspaces: { title: string; description: string; route: string; icon: keyof typeof Ionicons.glyphMap }[] = [
     { title: 'Learning Hub', description: 'Curriculum tracks, role paths & flashcards.', route: '/coding', icon: 'code-slash' },
     { title: 'AI Workspace', description: 'Staff Engineer tutor, review gym & chat.', route: '/ai-assistant', icon: 'sparkles' },
+    { title: 'Lecture to Life', description: 'Upload slides & docs to create study materials.', route: '/lecture-to-life', icon: 'school' },
     { title: 'Interview Coach', description: '10+ question sessions & live rubrics.', route: '/interviews', icon: 'chatbubbles' },
     { title: 'Community & GitHub', description: 'Join open projects & contribute PRs.', route: '/community', icon: 'people' },
     { title: 'Portfolio Evidence', description: 'Verified credentials & public share link.', route: '/portfolio', icon: 'briefcase' },

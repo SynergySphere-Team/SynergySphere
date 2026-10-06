@@ -63,8 +63,15 @@ export async function extractTextFromUpload(input: ExtractTextInput): Promise<st
     return extractDocxText(buffer);
   }
 
-  if (fileName.endsWith('.ppt') || fileName.endsWith('.pptx')) {
-    throw new Error('PowerPoint files are not parsed directly. Export slides to PDF or paste the slide text below.');
+  if (
+    mime === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+    fileName.endsWith('.pptx')
+  ) {
+    return extractPptxText(buffer);
+  }
+
+  if (fileName.endsWith('.ppt')) {
+    throw new Error('Legacy .ppt files are not supported. Save as modern .pptx or export slides to PDF.');
   }
 
   if (fileName.endsWith('.doc')) {
@@ -210,3 +217,73 @@ function decodeXmlEntities(value: string): string {
     }
   });
 }
+
+function extractPptxText(buffer: Buffer): string {
+  const unzipSync = loadUnzipSync();
+  let files: Record<string, Uint8Array>;
+  try {
+    files = unzipSync(new Uint8Array(buffer));
+  } catch {
+    throw new Error('This PowerPoint presentation could not be opened. Save it again as .pptx and retry.');
+  }
+
+  const slideRegex = /^ppt\/slides\/slide(\d+)\.xml$/i;
+  const slideKeys = Object.keys(files)
+    .filter((name) => slideRegex.test(name))
+    .sort((a, b) => {
+      const numA = Number.parseInt(a.match(slideRegex)?.[1] || '0', 10);
+      const numB = Number.parseInt(b.match(slideRegex)?.[1] || '0', 10);
+      return numA - numB;
+    });
+
+  const decoder = new TextDecoder('utf-8');
+  const slidesText = slideKeys
+    .map((name, index) => {
+      const xml = decoder.decode(files[name]);
+      const text = extractTextFromSlideXml(xml);
+      return text ? `Slide ${index + 1}:\n${text}` : '';
+    })
+    .filter(Boolean);
+
+  const notesRegex = /^ppt\/notesSlides\/notesSlide(\d+)\.xml$/i;
+  const notesKeys = Object.keys(files)
+    .filter((name) => notesRegex.test(name))
+    .sort((a, b) => {
+      const numA = Number.parseInt(a.match(notesRegex)?.[1] || '0', 10);
+      const numB = Number.parseInt(b.match(notesRegex)?.[1] || '0', 10);
+      return numA - numB;
+    });
+
+  const notesText = notesKeys
+    .map((name, index) => {
+      const xml = decoder.decode(files[name]);
+      const text = extractTextFromSlideXml(xml);
+      return text ? `Slide ${index + 1} Notes:\n${text}` : '';
+    })
+    .filter(Boolean);
+
+  const fullParts = [...slidesText];
+  if (notesText.length > 0) {
+    fullParts.push('--- Slide Notes ---', ...notesText);
+  }
+
+  const text = fullParts.join('\n\n').trim();
+  if (!text) {
+    throw new Error('No readable text found in this PowerPoint presentation.');
+  }
+  return text;
+}
+
+function extractTextFromSlideXml(xml: string): string {
+  const withBreaks = xml
+    .replace(/<a:br\b[^>]*\/>/gi, '\n')
+    .replace(/<\/a:p>/gi, '\n')
+    .replace(/<\/p:sp>/gi, '\n');
+
+  return decodeXmlEntities(withBreaks.replace(/<[^>]+>/g, ''))
+    .split(/\n+/)
+    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
