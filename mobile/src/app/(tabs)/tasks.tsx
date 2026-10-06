@@ -480,12 +480,7 @@ export default function TasksScreen() {
         <View style={styles.headerTitleCol}>
           <Text style={[styles.mainHeading, { color: colors.text }]}>Productivity Center</Text>
           <Text style={[styles.mainSubtitle, { color: colors.muted }]}>
-            Plan work, track focus, earn XP.
-          </Text>
-        </View>
-        <View style={[styles.xpBadge, { backgroundColor: isLight ? '#00875A' : colors.primaryDark }]}>
-          <Text style={[styles.xpBadgeText, { color: isLight ? '#FFFFFF' : colors.primary }]}>
-            ⚡ {user?.xp ?? 0} XP · Level {user?.level ?? 1}
+            Plan work and track focus.
           </Text>
         </View>
       </View>
@@ -788,7 +783,7 @@ export default function TasksScreen() {
             <Text style={styles.emptyIcon}>📋</Text>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No tasks yet</Text>
             <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
-              Tap + to add your first task and start earning XP.
+              Tap + to add your first task.
             </Text>
           </View>
         ) : (
