@@ -219,23 +219,28 @@ Provide a realistic, professional, GitHub-style Pull Request review. Return ONLY
   ]
 }`;
 
+    let isOfflineFallback = false;
     const rawResponse = await generateAiResponse(
       'You are a precise, supportive staff engineer conducting a thorough GitHub PR code review. Output only valid JSON.',
       prompt,
       [],
-      () => JSON.stringify({
-        approved: true,
-        score: 85,
-        summary: 'Solid implementation of the required ticket. Clean organization with minor suggestions for error boundaries.',
-        lineComments: [
-          {
-            file: files[0].path,
-            line: 1,
-            severity: 'suggestion',
-            comment: 'Good structure. Consider adding defensive null checks or query pagination limits.',
-          },
-        ],
-      }),
+      () => {
+        isOfflineFallback = true;
+        return JSON.stringify({
+          approved: false,
+          score: 65,
+          offlineDraft: true,
+          summary: `Offline static preview for "${ticketTitle}": Core files received. Live Staff Engineer evaluation and XP rewards require an active AI API key (add GEMINI_API_KEY to backend/.env).`,
+          lineComments: [
+            {
+              file: files[0].path,
+              line: 1,
+              severity: 'suggestion',
+              comment: 'Offline preview: Structure verified. Connect an AI provider to receive detailed line-by-line feedback.',
+            },
+          ],
+        });
+      },
     );
 
     // Parse JSON
@@ -249,9 +254,10 @@ Provide a realistic, professional, GitHub-style Pull Request review. Return ONLY
 
     if (!parsedReview) {
       parsedReview = {
-        approved: true,
-        score: 80,
-        summary: `PR for "${ticketTitle}" satisfies core objectives. Reviewed against ticket criteria.`,
+        approved: false,
+        score: 60,
+        offlineDraft: true,
+        summary: `PR for "${ticketTitle}" could not be fully parsed. Reviewed against ticket criteria.`,
         lineComments: [
           {
             file: files[0].path,
@@ -263,8 +269,8 @@ Provide a realistic, professional, GitHub-style Pull Request review. Return ONLY
       };
     }
 
-    // Award XP if score >= 70
-    if (parsedReview.score >= 70) {
+    // Award XP only for live evaluated reviews with passing score >= 70
+    if (!isOfflineFallback && !parsedReview.offlineDraft && parsedReview.score >= 70) {
       await awardXp(req.user!.userId, 60, `Completed Take-Home PR: ${ticketTitle}`);
     }
 

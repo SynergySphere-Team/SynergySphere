@@ -6,10 +6,6 @@ import {
   resolveTrack,
   selectSessionQuestions,
   ALL_INTERVIEW_TRACKS,
-  ALL_INTERVIEW_ROLES,
-  ALL_INTERVIEW_TYPES,
-  ALL_DIFFICULTIES,
-  ALL_INTERVIEWER_STYLES,
   normalizeQuestion,
   ALL_QUESTIONS,
   type InterviewQuestion,
@@ -24,35 +20,9 @@ import {
   type TopicLevel,
   type UserTopicProgressData,
 } from '../data/interviewBank/index.js';
-import { w3schoolsProgrammingDomain } from '../data/w3schoolsCurriculumData.js';
-
 // In-memory fallback cache for sessions and progress (ensures resilience during offline / transient DB drops)
 const inMemoryInterviews = new Map<string, any>();
 const inMemoryTopicProgress = new Map<string, Map<string, UserTopicProgressData>>();
-
-interface FlatLesson {
-  id: string;
-  title: string;
-  subjectId: string;
-  subjectName: string;
-}
-
-function getCurriculumLessons(): FlatLesson[] {
-  const lessons: FlatLesson[] = [];
-  for (const subject of w3schoolsProgrammingDomain.subjects) {
-    for (const mod of subject.modules) {
-      for (const lesson of mod.lessons) {
-        lessons.push({
-          id: lesson.id,
-          title: lesson.title,
-          subjectId: subject.id,
-          subjectName: subject.name,
-        });
-      }
-    }
-  }
-  return lessons;
-}
 
 export interface StartInterviewParams {
   userId: string;
@@ -304,7 +274,7 @@ export interface FollowUpParams {
 }
 
 export async function getFollowUpQuestion(params: FollowUpParams) {
-  const { interviewId, questionIndex, answer } = params;
+  const { interviewId, questionIndex } = params;
   let session = inMemoryInterviews.get(interviewId);
   if (!session) {
     const row = await queryOne<{ questions: string | InterviewQuestion[]; interviewerStyle: string }>(

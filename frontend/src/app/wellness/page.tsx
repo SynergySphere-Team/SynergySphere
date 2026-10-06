@@ -18,17 +18,12 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
-  Layers,
   Moon,
   Droplets,
   Tag,
   BarChart3,
-  Calendar,
-  Flame,
-  ArrowRight,
   Plus,
   Minus,
-  Check,
 } from 'lucide-react';
 
 import {
@@ -39,7 +34,6 @@ import {
 } from '@/components/wellness/types';
 import {
   MOOD_TAG_OPTIONS,
-  GRATITUDE_PROMPT_PRESETS,
   generateSeedAnalyticsEntries,
 } from '@/components/wellness/mockData';
 import { TaskWorkflowOptimizer } from '@/components/wellness/TaskWorkflowOptimizer';
@@ -175,8 +169,7 @@ export default function WellnessPage() {
   const [insights, setInsights] = useState<Insights | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Quick Reset Collapsible Reference
-  const [quickResetOpen, setQuickResetOpen] = useState(false);
+
 
   // Initial Load
   useEffect(() => {
@@ -738,7 +731,9 @@ export default function WellnessPage() {
                   risk={currentBurnoutRisk}
                   avgStress={insights?.averages?.stress ?? stress}
                   avgEnergy={insights?.averages?.energy ?? energy}
-                  onActivateReset={() => setQuickResetOpen(true)}
+                  onActivateReset={() => {
+                    document.getElementById('quick-resets-section')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
                 />
 
                 {/* Task & Workflow Optimizer Component */}
@@ -775,7 +770,9 @@ export default function WellnessPage() {
             </Card>
 
             {/* 2. Quick Resets Collapsible Micro-Toolbox */}
-            <QuickResets onLogGratitudeWin={handleLogGratitudeWin} />
+            <div id="quick-resets-section">
+              <QuickResets onLogGratitudeWin={handleLogGratitudeWin} />
+            </div>
           </div>
         </div>
       )}

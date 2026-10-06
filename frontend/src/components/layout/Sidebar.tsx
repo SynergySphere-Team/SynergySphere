@@ -18,7 +18,6 @@ import {
   Bell,
   BarChart3,
   LogOut,
-  Sparkles,
   Settings,
   Upload,
 } from 'lucide-react';

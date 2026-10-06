@@ -197,7 +197,6 @@ export default function PortfolioPage() {
   const [toolOutputs, setToolOutputs] = useState<Record<string, string>>({});
   const [toolLoading, setToolLoading] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [customRoleInput, setCustomRoleInput] = useState('');
 
   // Jobs tool state
   const [jobsData, setJobsData] = useState<JobsResponse | null>(null);

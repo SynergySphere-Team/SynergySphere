@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen, Notice } from '@/components/Screen';
-import { Button, Card, Field, Heading } from '@/components/ui';
+import { Field, Heading } from '@/components/ui';
 import { github } from '@/services/github';
 import { api } from '@/services/api';
 import { useTheme } from '@/context/ThemeContext';

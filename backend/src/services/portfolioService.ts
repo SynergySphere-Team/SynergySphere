@@ -294,7 +294,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
 
   const javaHub = hubSkills.find((h) => h.id === 'java')?.percent || 0;
   const sqlHub = hubSkills.find((h) => h.id === 'sql')?.percent || 0;
-  const jsHub = hubSkills.find((h) => h.id === 'javascript')?.percent || 0;
   const javaOrSqlScore = Math.max(interviewScores['java'] || 0, interviewScores['sql'] || 0);
 
   const checklist = [

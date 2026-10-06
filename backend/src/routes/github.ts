@@ -4,7 +4,7 @@ import { newId, query, queryOne } from '../lib/db.js';
 import { authenticate, type AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { awardXp } from '../services/gamification.js';
-import { accessTokenForUser, beginDeviceAuthorization, githubConnection, githubProfile, githubRequest, GithubError, isValidWebhookSignature, pollDeviceAuthorization, revokeGithubConnection, saveGithubToken } from '../services/github.js';
+import { accessTokenForUser, beginDeviceAuthorization, githubConnection, githubRequest, GithubError, isValidWebhookSignature, pollDeviceAuthorization, revokeGithubConnection, saveGithubToken } from '../services/github.js';
 import { decryptSecret, encryptSecret } from '../services/crypto.js';
 import { generateCommunityProject, type WizardInput } from '../services/projectGeneration.js';
 

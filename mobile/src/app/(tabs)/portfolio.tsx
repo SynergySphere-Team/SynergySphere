@@ -5,7 +5,6 @@ import {
   Linking,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -13,7 +12,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as SecureStore from 'expo-secure-store';
 import { Screen, Loading, Notice } from '@/components/Screen';
-import { Button, Card, Field, Heading } from '@/components/ui';
+import { Button, Card, Field } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/services/api';
@@ -270,24 +269,6 @@ export default function PortfolioScreen() {
         },
       ],
     );
-  }
-
-  function handleOpenGitHub() {
-    if (links.github) {
-      const url = links.github.startsWith('http') ? links.github : `https://github.com/${links.github}`;
-      void Linking.openURL(url);
-    } else {
-      setShowLinksModal(true);
-    }
-  }
-
-  function handleOpenLinkedIn() {
-    if (links.linkedin) {
-      const url = links.linkedin.startsWith('http') ? links.linkedin : `https://linkedin.com/in/${links.linkedin}`;
-      void Linking.openURL(url);
-    } else {
-      setShowLinksModal(true);
-    }
   }
 
   if (!loaded) return <Loading />;

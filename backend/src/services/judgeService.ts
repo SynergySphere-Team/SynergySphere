@@ -1,5 +1,5 @@
 import vm from 'node:vm';
-import { pool, query } from '../lib/db.js';
+import { pool } from '../lib/db.js';
 
 export interface TestCase {
   label: string;
@@ -217,7 +217,7 @@ export async function judgeJavaScript(
  * Creates an isolated transient database schema or transaction with dummy tables,
  * runs the student's SQL query, and checks output rows.
  */
-export async function judgeSql(queryText: string, challengeTitle: string): Promise<JudgeResult> {
+export async function judgeSql(queryText: string, _challengeTitle?: string): Promise<JudgeResult> {
   const client = await pool.connect();
   const testResults: TestResult[] = [];
   try {
@@ -352,7 +352,7 @@ function detectFunctionName(code: string): string | null {
 function testGenericFunction(
   code: string,
   fnName: string,
-  referenceSolution: string,
+  _referenceSolution?: string,
 ): JudgeResult {
   try {
     const sandbox: Record<string, unknown> = {

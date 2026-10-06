@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Screen, Notice } from '@/components/Screen';
 import { Button, Card, Heading } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
@@ -213,7 +213,6 @@ const DEFAULT_QUESTIONS: QuestionItem[] = [
 ];
 
 export default function InterviewsScreen() {
-  const router = useRouter();
   const searchParams = useLocalSearchParams<{ autoPractice?: string }>();
   const { colors, theme } = useTheme();
   const isLight = theme === 'light';

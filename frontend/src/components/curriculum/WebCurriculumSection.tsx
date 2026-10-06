@@ -15,7 +15,6 @@ import {
   Terminal,
   Search,
   ExternalLink,
-  Sparkles,
   RefreshCw,
   ArrowLeft,
   ArrowRight,

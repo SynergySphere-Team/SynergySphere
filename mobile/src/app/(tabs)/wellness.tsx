@@ -5,7 +5,6 @@ import {
   View,
   ScrollView,
   Pressable,
-  TextInput,
   TouchableOpacity,
   Platform,
   Image,
@@ -22,7 +21,6 @@ import { api } from '@/services/api';
 import type { WellnessEntry, WellnessInsights } from '@/types/api';
 import {
   WELLNESS_MODULES,
-  MOOD_TAG_OPTIONS,
   MOOD_TAG_CATEGORIES,
   STRESS_ANCHORS,
   MOOD_ANCHORS,

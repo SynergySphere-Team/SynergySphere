@@ -11,18 +11,14 @@ import {
   Code2,
   MessageCircle,
   PhoneOff,
-  Radio,
   Star,
   UserRoundCheck,
   Sparkles,
   BookOpen,
-  CheckCircle2,
   AlertCircle,
   Lightbulb,
-  RotateCcw,
   Zap,
   ArrowRight,
-  HelpCircle,
   Layers,
 } from 'lucide-react';
 

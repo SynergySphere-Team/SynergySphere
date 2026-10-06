@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { AppState, Image, Pressable, StyleSheet, Text as RNText, Vibration, View, type TextProps } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Screen, Loading, Notice } from '@/components/Screen';
-import { Card, Stat } from '@/components/ui';
+import { Card } from '@/components/ui';
 import { WorkspaceMenu } from '@/components/WorkspaceMenu';
 import { useTheme } from '@/context/ThemeContext';
 import { useAccessibility } from '@/context/AccessibilityContext';

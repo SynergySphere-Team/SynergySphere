@@ -92,13 +92,10 @@ function getTimeOfDayGreeting(): string {
 export default function DashboardPage() {
   const { user } = useAuth();
   const [data, setData] = useState<DashboardStatsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     api<DashboardStatsResponse>('/dashboard/stats')
       .then(setData)
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
+      .catch(() => setData(null));
   }, []);
 
   const greeting = getTimeOfDayGreeting();

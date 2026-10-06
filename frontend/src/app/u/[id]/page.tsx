@@ -13,9 +13,7 @@ import {
   Briefcase,
   CheckCircle2,
   Code2,
-  ExternalLink,
   Github,
-  Globe,
   Layers,
   Linkedin,
   Loader2,
@@ -118,7 +116,7 @@ export default function PublicProfilePage() {
     );
   }
 
-  const { user, profile, hubSkills, challenges, bestInterviewScores, offerReadiness, starBullets, joinedProjects, featuredProjects } = data;
+  const { user, profile, hubSkills, challenges, bestInterviewScores, offerReadiness, starBullets, joinedProjects } = data;
   const activeHubSkills = hubSkills.filter((s) => s.percent > 0);
 
   return (

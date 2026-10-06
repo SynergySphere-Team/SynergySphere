@@ -230,7 +230,37 @@ export default function AIAssistantScreen() {
     send(prompts[action], context);
   }
 
-  function clearChat() {
+  // Fetch chat history on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const history = await api.get<Array<{ id: string; role: 'user' | 'assistant'; content: string }>>(
+          '/ai/chat/history'
+        );
+        if (!cancelled && Array.isArray(history) && history.length > 0) {
+          setMessages(
+            history.map((m) => ({
+              role: m.role,
+              content: m.content,
+            }))
+          );
+        }
+      } catch {
+        // Continue with default welcome message
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function clearChat() {
+    try {
+      await api.delete('/ai/chat/history');
+    } catch {
+      // ignore
+    }
     setMessages([
       {
         role: 'assistant',

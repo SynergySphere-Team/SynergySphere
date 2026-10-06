@@ -5,11 +5,7 @@ import { WellnessEntry, ModuleMetadata } from './types';
 import {
   Calendar,
   Layers,
-  Sparkles,
-  TrendingUp,
-  AlertCircle,
   Zap,
-  Heart,
   Clock,
   CheckCircle2,
   Activity,

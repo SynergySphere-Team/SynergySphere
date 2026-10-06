@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/utils';
-import { CheckCircle2, KeyRound, Loader2, Lock, Sparkles } from 'lucide-react';
+import { CheckCircle2, KeyRound, Loader2, Lock } from 'lucide-react';
 
 function ResetPasswordForm() {
   const router = useRouter();
