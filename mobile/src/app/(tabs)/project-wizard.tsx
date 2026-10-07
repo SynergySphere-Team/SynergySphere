@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Screen, Notice } from '@/components/Screen';
+import { Screen, Notice, BackButton } from '@/components/Screen';
 import { Field, Heading } from '@/components/ui';
 import { github } from '@/services/github';
 import { api } from '@/services/api';
@@ -118,28 +118,18 @@ export default function ProjectWizardScreen() {
 
   const progressPercent = `${Math.round(((step + 1) / STEPS.length) * 100)}%`;
 
-  return (
-    <Screen>
-      {/* Top Back Navigation Bar */}
-      <View style={styles.topNavRow}>
-        <Pressable
-          style={[styles.backNavButton, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}
-          onPress={() => {
-            if (step > 0) {
-              setStep(step - 1);
-            } else {
-              router.replace('/community?tab=initiatives' as never);
-            }
-          }}
-          hitSlop={8}
-        >
-          <Ionicons name="chevron-back" size={18} color={colors.text} />
-          <Text style={[styles.backNavText, { color: colors.text }]}>
-            {step > 0 ? 'Previous Step' : 'Community'}
-          </Text>
-        </Pressable>
-      </View>
+  const handleWizardBack = () => {
+    if (step > 0) {
+      setStep(step - 1);
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/community' as never);
+    }
+  };
 
+  return (
+    <Screen onBack={handleWizardBack} onSwipeBack={handleWizardBack}>
       <Heading subtitle={`Step ${step + 1} of ${STEPS.length} · ${STEPS[step]}`}>
         Create a community project
       </Heading>

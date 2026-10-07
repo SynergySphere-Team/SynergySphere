@@ -976,15 +976,6 @@ export default function ManageProjectScreen() {
   if (!project) {
     return (
       <Screen>
-        <BackButton
-          onPress={() =>
-            router.back()
-          }
-          color={
-            colors.text
-          }
-        />
-
         <Notice>
           {error ||
             'Project not found.'}
@@ -996,15 +987,6 @@ export default function ManageProjectScreen() {
   if (!canManage) {
     return (
       <Screen>
-        <BackButton
-          onPress={() =>
-            router.back()
-          }
-          color={
-            colors.text
-          }
-        />
-
         <Heading subtitle="Only the project owner or an administrator can manage this project.">
           Manage Project
         </Heading>
@@ -1030,15 +1012,6 @@ export default function ManageProjectScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <BackButton
-        onPress={() =>
-          router.back()
-        }
-        color={
-          colors.text
-        }
-      />
-
       <Heading subtitle="Update project information, connect GitHub, review applicants and control whether the initiative is active.">
         Manage Project
       </Heading>

@@ -17,6 +17,9 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { usePathname, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { useAccessibility } from '@/context/AccessibilityContext';
+import { BackButton } from '@/components/BackButton';
+
+export { BackButton };
 
 export interface ScreenProps {
   children: ReactNode;
@@ -25,6 +28,9 @@ export interface ScreenProps {
   onRefresh?: () => void | Promise<void>;
   swipeBack?: boolean;
   onSwipeBack?: () => void;
+  showBackButton?: boolean;
+  onBack?: () => void;
+  headerRight?: ReactNode;
   keyboardAvoiding?: boolean;
   keyboardOffset?: number;
   style?: StyleProp<ViewStyle>;
@@ -40,6 +46,9 @@ export function Screen({
   onRefresh,
   swipeBack = true,
   onSwipeBack,
+  showBackButton,
+  onBack,
+  headerRight,
   keyboardAvoiding = true,
   keyboardOffset = 0,
   style,
@@ -122,10 +131,40 @@ export function Screen({
 
   const isMainTabRoot =
     pathname === '/' ||
+    pathname === '/(tabs)' ||
+    pathname === '/(tabs)/index' ||
     pathname === '/tasks' ||
+    pathname === '/(tabs)/tasks' ||
     pathname === '/wellness' ||
-    pathname === '/explore';
+    pathname === '/(tabs)/wellness' ||
+    pathname === '/explore' ||
+    pathname === '/(tabs)/explore' ||
+    pathname === '/coding' ||
+    pathname === '/(tabs)/coding' ||
+    pathname === '/ai-assistant' ||
+    pathname === '/(tabs)/ai-assistant' ||
+    pathname === '/lecture-to-life' ||
+    pathname === '/(tabs)/lecture-to-life' ||
+    pathname === '/interviews' ||
+    pathname === '/(tabs)/interviews' ||
+    pathname === '/leaderboard' ||
+    pathname === '/(tabs)/leaderboard' ||
+    pathname === '/portfolio' ||
+    pathname === '/(tabs)/portfolio' ||
+    pathname === '/community' ||
+    pathname === '/(tabs)/community' ||
+    pathname === '/settings' ||
+    pathname === '/(tabs)/settings' ||
+    pathname === '/more' ||
+    pathname === '/(tabs)/more' ||
+    pathname === '/notifications' ||
+    pathname === '/(tabs)/notifications' ||
+    pathname === '/profile' ||
+    pathname === '/(tabs)/profile' ||
+    pathname === '/login' ||
+    pathname === '/(auth)/login';
 
+  const shouldShowBack = showBackButton !== undefined ? showBackButton : !isMainTabRoot;
   const canPerformBack = swipeBack && (!isMainTabRoot || router.canGoBack());
 
   const edgeSwipeGesture = Gesture.Pan()
@@ -153,6 +192,20 @@ export function Screen({
         contentStyle,
       ]}
     >
+      {(shouldShowBack || headerRight) && (
+        <View style={styles.topNavRow}>
+          {shouldShowBack ? (
+            <BackButton onPress={onBack || handleBack} />
+          ) : (
+            <View style={{ width: 38 }} />
+          )}
+          {headerRight ? (
+            <View style={styles.topNavRight}>
+              {headerRight}
+            </View>
+          ) : null}
+        </View>
+      )}
       {children}
     </View>
   );
@@ -289,6 +342,18 @@ const styles = StyleSheet.create({
     maxWidth: 720,
     width: '100%',
     alignSelf: 'center',
+  },
+  topNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 38,
+    marginBottom: 2,
+  },
+  topNavRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   center: {
     flex: 1,

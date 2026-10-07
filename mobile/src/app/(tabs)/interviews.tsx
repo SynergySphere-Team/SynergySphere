@@ -837,50 +837,70 @@ export default function InterviewsScreen() {
   const currentQ = activeInterview?.questions[step];
 
   return (
-    <Screen scrollViewRef={interviewScrollRef} refreshing={refreshing} onRefresh={handleRefresh}>
-      {/* Studio Header & Context Switcher */}
-      <View style={styles.header}>
-        <View style={styles.badgeRow}>
-          {(activeInterview || practiceSession || evaluationResult) && (
-            <View style={[styles.proBadge, { backgroundColor: `${primaryAccent}20` }]}>
-              <Ionicons name="sparkles" size={12} color={primaryAccent} />
-              <Text style={[styles.proBadgeText, { color: primaryAccent }]}>
-                {activeInterview
-                  ? 'LIVE SIMULATION'
-                  : practiceSession
-                  ? 'FOCUSED PRACTICE'
-                  : 'SESSION REVIEW'}
-              </Text>
-            </View>
-          )}
-
-          {activeInterview ? (
-            <Pressable
-              onPress={confirmExitInterview}
-              style={[styles.exitSessionBtn, { backgroundColor: isLight ? '#FEE2E2' : '#450a0a' }]}
-            >
-              <Ionicons name="close-circle" size={14} color="#dc2626" />
-              <Text style={{ fontSize: 11, fontWeight: '800', color: '#dc2626' }}>Exit Session</Text>
-            </Pressable>
-          ) : practiceSession ? (
-            <Pressable
-              onPress={confirmExitPractice}
-              style={[styles.exitSessionBtn, { backgroundColor: isLight ? '#FEE2E2' : '#450a0a' }]}
-            >
-              <Ionicons name="close-circle" size={14} color="#dc2626" />
-              <Text style={{ fontSize: 11, fontWeight: '800', color: '#dc2626' }}>Exit Practice</Text>
-            </Pressable>
-          ) : (
-            <View style={[styles.statusBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)' }]}>
-              <View style={[styles.statusDot, { backgroundColor: primaryAccent }]} />
-              <Text style={[styles.statusText, { color: primaryAccent }]}>ACTIVE AI COACH</Text>
-            </View>
-          )}
+    <Screen
+      scrollViewRef={interviewScrollRef}
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+    >
+      {/* INTERVIEW COACH HEADER */}
+      <View style={styles.headerRow}>
+        <View
+          style={[
+            styles.coachLogoWrapper,
+            {
+              backgroundColor:
+                theme === 'dark'
+                  ? 'rgba(16, 33, 40, 0.7)'
+                  : 'rgba(237, 243, 239, 0.85)',
+              borderColor:
+                theme === 'dark'
+                  ? 'rgba(145, 219, 94, 0.28)'
+                  : 'rgba(145, 219, 94, 0.45)',
+              shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
+            },
+          ]}
+        >
+          <Ionicons
+            name="chatbubbles"
+            size={28}
+            color={colors.primary}
+          />
         </View>
 
-        <Heading subtitle="Production-ready simulated interviews, real-time AI rubric scoring, and adaptive practice.">
-          Interview Coach
-        </Heading>
+        <View style={styles.headerText}>
+          <Text
+            allowFontScaling
+            style={[styles.headerTitle, { color: colors.text }]}
+          >
+            Interview{'\n'}Coach
+          </Text>
+
+          <Text
+            allowFontScaling
+            numberOfLines={2}
+            style={[styles.headerSubtitle, { color: colors.muted }]}
+          >
+            Simulated technical interviews, real-time AI rubrics, and adaptive practice.
+          </Text>
+        </View>
+
+        {activeInterview ? (
+          <Pressable
+            onPress={confirmExitInterview}
+            style={[styles.exitSessionBtn, { backgroundColor: isLight ? '#FEE2E2' : '#450a0a' }]}
+          >
+            <Ionicons name="close-circle" size={14} color="#dc2626" />
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#dc2626' }}>Exit</Text>
+          </Pressable>
+        ) : practiceSession ? (
+          <Pressable
+            onPress={confirmExitPractice}
+            style={[styles.exitSessionBtn, { backgroundColor: isLight ? '#FEE2E2' : '#450a0a' }]}
+          >
+            <Ionicons name="close-circle" size={14} color="#dc2626" />
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#dc2626' }}>Exit</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
@@ -985,7 +1005,7 @@ export default function InterviewsScreen() {
           <Card>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <Text style={[styles.cardHeaderTitle, { color: colors.text, marginBottom: 0 }]}>Interview Readiness</Text>
-              <View style={[styles.streakBadge, { backgroundColor: `${primaryAccent}15` }]}>
+              <View style={[styles.streakBadge, { backgroundColor: `${primaryAccent}15`, borderColor: `${primaryAccent}30`, borderWidth: 1 }]}>
                 <Ionicons name="flame" size={13} color={primaryAccent} />
                 <Text style={{ fontSize: 11, fontWeight: '800', color: primaryAccent }}>
                   {homeStats?.analytics?.currentStreak || 1}d Streak
@@ -1051,40 +1071,24 @@ export default function InterviewsScreen() {
           {homeStats?.recommendedPractice && homeStats.recommendedPractice.length > 0 ? (
             homeStats.recommendedPractice.map((item) => (
               <Card key={item.id}>
-                <View style={{ gap: 6 }}>
+                <View style={{ gap: 8 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text }}>{item.topic}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 }}>
+                      <Ionicons name="sparkles" size={15} color={primaryAccent} />
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text, flexShrink: 1 }}>{item.topic}</Text>
+                    </View>
                     <View
                       style={[
                         styles.levelBadge,
                         {
-                          backgroundColor:
-                            item.status === 'Strong'
-                              ? `${primaryAccent}20`
-                              : item.status === 'Improving'
-                              ? '#3b82f620'
-                              : item.status === 'Developing'
-                              ? '#eab30820'
-                              : '#ef444420',
+                          backgroundColor: `${primaryAccent}15`,
+                          borderColor: `${primaryAccent}35`,
+                          borderWidth: 1,
                         },
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.levelBadgeText,
-                          {
-                            color:
-                              item.status === 'Strong'
-                                ? primaryAccent
-                                : item.status === 'Improving'
-                                ? '#3b82f6'
-                                : item.status === 'Developing'
-                                ? '#ca8a04'
-                                : '#dc2626',
-                          },
-                        ]}
-                      >
-                        {item.status}
+                      <Text style={[styles.levelBadgeText, { color: primaryAccent }]}>
+                        {item.status === 'Developing' ? 'Needs Practice' : item.status}
                       </Text>
                     </View>
                   </View>
@@ -1092,13 +1096,15 @@ export default function InterviewsScreen() {
                   <Text style={{ fontSize: 13, color: colors.muted, lineHeight: 18 }}>{item.reason}</Text>
 
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>Category: {item.category}</Text>
+                    <View style={[styles.tagBadge, { backgroundColor: colors.surfaceElevated }]}>
+                      <Text style={[styles.tagText, { color: colors.muted }]}>Track: {item.category}</Text>
+                    </View>
                     <Pressable
                       onPress={() => startPractice(item.topic)}
                       style={({ pressed }) => [
                         styles.practiseNowBtn,
                         { backgroundColor: primaryAccent },
-                        pressed && { opacity: 0.8 },
+                        pressed && { opacity: 0.85 },
                       ]}
                     >
                       <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>Practise Topic</Text>
@@ -1829,14 +1835,9 @@ export default function InterviewsScreen() {
                       style={[
                         styles.ratingBadge,
                         {
-                          backgroundColor:
-                            dimVal.rating === 'Strong'
-                              ? `${primaryAccent}20`
-                              : dimVal.rating === 'Improving'
-                              ? '#3b82f620'
-                              : dimVal.rating === 'Developing'
-                              ? '#eab30820'
-                              : '#ef444420',
+                          backgroundColor: `${primaryAccent}15`,
+                          borderColor: `${primaryAccent}35`,
+                          borderWidth: 1,
                         },
                       ]}
                     >
@@ -1844,14 +1845,7 @@ export default function InterviewsScreen() {
                         style={[
                           styles.ratingBadgeText,
                           {
-                            color:
-                              dimVal.rating === 'Strong'
-                                ? primaryAccent
-                                : dimVal.rating === 'Improving'
-                                ? '#3b82f6'
-                                : dimVal.rating === 'Developing'
-                                ? '#ca8a04'
-                                : '#dc2626',
+                            color: primaryAccent,
                           },
                         ]}
                       >
@@ -1868,17 +1862,23 @@ export default function InterviewsScreen() {
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <View style={{ flex: 1 }}>
               <Card>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: primaryAccent, marginBottom: 4 }}>Strengths</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <Ionicons name="checkmark-circle" size={15} color={primaryAccent} />
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: primaryAccent }}>Strengths</Text>
+                </View>
                 {evaluationResult.strengths?.map((s, idx) => (
-                  <Text key={idx} style={{ fontSize: 12, color: colors.muted, lineHeight: 17 }}>✓ {s}</Text>
+                  <Text key={idx} style={{ fontSize: 12, color: colors.muted, lineHeight: 17, marginBottom: 2 }}>✓ {s}</Text>
                 ))}
               </Card>
             </View>
             <View style={{ flex: 1 }}>
               <Card>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: '#eab308', marginBottom: 4 }}>Areas to Grow</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <Ionicons name="trending-up" size={15} color={primaryAccent} />
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: primaryAccent }}>Areas to Grow</Text>
+                </View>
                 {evaluationResult.weaknesses?.map((w, idx) => (
-                  <Text key={idx} style={{ fontSize: 12, color: colors.muted, lineHeight: 17 }}>• {w}</Text>
+                  <Text key={idx} style={{ fontSize: 12, color: colors.muted, lineHeight: 17, marginBottom: 2 }}>• {w}</Text>
                 ))}
               </Card>
             </View>
@@ -2102,7 +2102,7 @@ export default function InterviewsScreen() {
                 <View style={[styles.statusTransitionBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
                   <View style={{ alignItems: 'center' }}>
                     <Text style={{ fontSize: 10, color: colors.muted }}>Previous Status</Text>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#ef4444' }}>{practiceResult.previousStatus}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.muted }}>{practiceResult.previousStatus}</Text>
                   </View>
                   <Ionicons name="arrow-forward" size={18} color={primaryAccent} />
                   <View style={{ alignItems: 'center' }}>
@@ -2112,27 +2112,33 @@ export default function InterviewsScreen() {
                 </View>
 
                 <View style={{ gap: 4 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>WHAT YOU LEARNED</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="checkmark-circle" size={15} color={primaryAccent} />
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>WHAT YOU LEARNED</Text>
+                  </View>
                   {practiceResult.whatYouLearned.map((item, idx) => (
-                    <Text key={idx} style={{ fontSize: 12, color: colors.muted }}>✓ {item}</Text>
+                    <Text key={idx} style={{ fontSize: 12, color: colors.muted, lineHeight: 17 }}>✓ {item}</Text>
                   ))}
                 </View>
 
                 {practiceResult.stillNeedsPractice && practiceResult.stillNeedsPractice.length > 0 && (
                   <View style={{ gap: 4 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#eab308' }}>STILL NEEDS PRACTICE</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="sparkles" size={15} color={primaryAccent} />
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: primaryAccent }}>IDENTIFIED FOCUS AREAS</Text>
+                    </View>
                     {practiceResult.stillNeedsPractice.map((item, idx) => (
-                      <Text key={idx} style={{ fontSize: 12, color: colors.muted }}>• {item}</Text>
+                      <Text key={idx} style={{ fontSize: 12, color: colors.muted, lineHeight: 17 }}>• {item}</Text>
                     ))}
                   </View>
                 )}
 
-                <View style={[styles.nextRecBox, { backgroundColor: `${primaryAccent}15`, borderColor: primaryAccent }]}>
+                <View style={[styles.nextRecBox, { backgroundColor: `${primaryAccent}15`, borderColor: `${primaryAccent}30`, borderWidth: 1 }]}>
                   <Text style={{ fontSize: 11, fontWeight: '800', color: primaryAccent }}>NEXT RECOMMENDED PRACTICE</Text>
                   <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>
                     {practiceResult.nextRecommendedPractice.topic}
                   </Text>
-                  <Text style={{ fontSize: 11, color: colors.muted }}>
+                  <Text style={{ fontSize: 11, color: colors.muted, lineHeight: 16 }}>
                     {practiceResult.nextRecommendedPractice.reason}
                   </Text>
                   <Button
@@ -2209,14 +2215,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
-    paddingRight: 48,
   },
-  proBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  proBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   proBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 10, fontWeight: '800' },
-  exitSessionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  exitSessionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
 
   // 4-Tab Segmented Control
   segmentedControl: {
@@ -2262,9 +2267,9 @@ const styles = StyleSheet.create({
   statBox: { alignItems: 'center', flex: 1 },
   statValue: { fontSize: 24, fontWeight: '900' },
   statLabel: { fontSize: 10, fontWeight: '600', textAlign: 'center', marginTop: 2 },
-  streakBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  streakBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   focusBox: { padding: 10, borderRadius: 8, borderWidth: 1, gap: 4, marginVertical: 6 },
-  levelBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  levelBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   levelBadgeText: { fontSize: 11, fontWeight: '800' },
   practiseNowBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
@@ -2355,4 +2360,50 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   modalTitle: { fontSize: 16, fontWeight: '800' },
   closeBtn: { padding: 4 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 12,
+    minHeight: 88,
+    width: '100%',
+  },
+  headerRowLarge: {
+    alignItems: 'flex-start',
+  },
+  coachLogoWrapper: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    padding: 2,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 3,
+    flexShrink: 0,
+  },
+  coachLogoWrapperLarge: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+    lineHeight: 28,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
 });

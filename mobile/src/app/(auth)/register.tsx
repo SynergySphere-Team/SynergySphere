@@ -45,7 +45,7 @@ export default function RegisterScreen() {
   const brandGreen = isLight ? '#1e6827' : colors.primary;
 
   return (
-    <Screen>
+    <Screen showBackButton>
       <View style={styles.hero}>
         <View style={styles.mark}>
           <Image

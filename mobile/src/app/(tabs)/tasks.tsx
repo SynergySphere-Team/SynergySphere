@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text as RNText, TextInput as RNTextInput, Vibration, View, type TextProps, type TextInputProps } from 'react-native';
+import { AppState, Image, Pressable, StyleSheet, Text as RNText, TextInput as RNTextInput, Vibration, View, type TextProps, type TextInputProps } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams } from 'expo-router';
@@ -102,6 +102,7 @@ function TextInput({
 
 export default function TasksScreen() {
   const { colors, theme } = useTheme();
+  const { fontSize, largerText } = useAccessibility();
   const { user, refresh: refreshAuth } = useAuth();
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeModule, setActiveModule] = useState<'productivity' | 'my-work'>(
@@ -416,31 +417,108 @@ export default function TasksScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      {/* Module Switcher: Tasks & Focus vs GitHub My Work */}
-      <View style={[styles.moduleTabSwitcher, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {/* PRODUCTIVITY CENTER HEADER */}
+      <View
+        style={[
+          styles.headerRow,
+          largerText && styles.headerRowLarge,
+        ]}
+      >
+        <View
+          style={[
+            styles.productivityLogoWrapper,
+            largerText && styles.productivityLogoWrapperLarge,
+            {
+              backgroundColor:
+                theme === 'dark'
+                  ? 'rgba(16, 33, 40, 0.7)'
+                  : 'rgba(237, 243, 239, 0.85)',
+              borderColor:
+                theme === 'dark'
+                  ? 'rgba(145, 219, 94, 0.28)'
+                  : 'rgba(145, 219, 94, 0.45)',
+              shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
+            },
+          ]}
+        >
+          <Image
+            source={require('../../../assets/images/productivity-logo.png')}
+            style={[
+              styles.productivityLogo,
+              largerText && styles.productivityLogoLarge,
+            ]}
+            resizeMode="contain"
+            accessibilityIgnoresInvertColors
+          />
+        </View>
+
+        <View style={styles.headerText}>
+          <RNText
+            allowFontScaling
+            style={[
+              styles.headerTitle,
+              {
+                color: colors.text,
+                fontSize: fontSize(24),
+              },
+            ]}
+          >
+            Productivity{'\n'}Center
+          </RNText>
+
+          <RNText
+            allowFontScaling
+            numberOfLines={2}
+            style={[
+              styles.headerSubtitle,
+              {
+                color: colors.muted,
+                fontSize: fontSize(13),
+                lineHeight: fontSize(18),
+              },
+            ]}
+          >
+            Plan work, track focus sessions &amp; organize tasks.
+          </RNText>
+        </View>
+      </View>
+
+      {error ? <Notice tone="error">{error}</Notice> : null}
+      {success ? <Notice tone="success">{success}</Notice> : null}
+
+      {/* Top Navigation Tabs */}
+      <View style={[styles.tabBar, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
         <Pressable
           accessibilityRole="button"
           onPress={() => setActiveModule('productivity')}
           style={[
-            styles.moduleTabBtn,
-            activeModule === 'productivity' && [styles.moduleTabBtnActive, { backgroundColor: brandGreen }],
+            styles.tabButton,
+            activeModule === 'productivity' && {
+              backgroundColor: colors.surface,
+              borderColor: brandGreen,
+              borderWidth: 1,
+            },
           ]}
         >
           <Ionicons
             name="checkbox-outline"
-            size={16}
-            color={activeModule === 'productivity' ? '#FFFFFF' : colors.muted}
+            size={14}
+            color={activeModule === 'productivity' ? brandGreen : colors.muted}
+            style={{ flexShrink: 0 }}
           />
           <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
             style={[
-              styles.moduleTabBtnText,
+              styles.tabText,
               {
-                color: activeModule === 'productivity' ? '#FFFFFF' : colors.text,
+                color: activeModule === 'productivity' ? colors.text : colors.muted,
                 fontWeight: activeModule === 'productivity' ? '800' : '600',
               },
             ]}
           >
-            Tasks & Focus
+            Tasks &amp; Focus
           </Text>
         </Pressable>
 
@@ -448,20 +526,28 @@ export default function TasksScreen() {
           accessibilityRole="button"
           onPress={() => setActiveModule('my-work')}
           style={[
-            styles.moduleTabBtn,
-            activeModule === 'my-work' && [styles.moduleTabBtnActive, { backgroundColor: brandGreen }],
+            styles.tabButton,
+            activeModule === 'my-work' && {
+              backgroundColor: colors.surface,
+              borderColor: brandGreen,
+              borderWidth: 1,
+            },
           ]}
         >
           <Ionicons
             name="git-pull-request-outline"
-            size={16}
-            color={activeModule === 'my-work' ? '#FFFFFF' : colors.muted}
+            size={14}
+            color={activeModule === 'my-work' ? brandGreen : colors.muted}
+            style={{ flexShrink: 0 }}
           />
           <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
             style={[
-              styles.moduleTabBtnText,
+              styles.tabText,
               {
-                color: activeModule === 'my-work' ? '#FFFFFF' : colors.text,
+                color: activeModule === 'my-work' ? colors.text : colors.muted,
                 fontWeight: activeModule === 'my-work' ? '800' : '600',
               },
             ]}
@@ -475,20 +561,7 @@ export default function TasksScreen() {
         <MyWorkView showBackButton={false} wrapInScreen={false} />
       ) : (
         <>
-          {/* Productivity Center Header */}
-      <View style={styles.headerRow}>
-        <View style={styles.headerTitleCol}>
-          <Text style={[styles.mainHeading, { color: colors.text }]}>Productivity Center</Text>
-          <Text style={[styles.mainSubtitle, { color: colors.muted }]}>
-            Plan work and track focus.
-          </Text>
-        </View>
-      </View>
-
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      {success ? <Notice tone="success">{success}</Notice> : null}
-
-      {/* Focus Timer Card */}
+          {/* Focus Timer Card */}
       <Card>
         <View style={styles.cardHeader}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>Focus Timer</Text>
@@ -859,52 +932,86 @@ export default function TasksScreen() {
 }
 
 const styles = StyleSheet.create({
-  moduleTabSwitcher: {
+  headerRow: {
     flexDirection: 'row',
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 4,
-    gap: 6,
-    marginBottom: 10,
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 12,
+    minHeight: 88,
+    width: '100%',
   },
-  moduleTabBtn: {
+  headerRowLarge: {
+    alignItems: 'flex-start',
+  },
+  productivityLogoWrapper: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    padding: 2,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 3,
+    flexShrink: 0,
+  },
+  productivityLogoWrapperLarge: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+  },
+  productivityLogo: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 27,
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  productivityLogoLarge: {
+    borderRadius: 31,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+    lineHeight: 28,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 3,
+    marginBottom: 12,
+    width: '100%',
+  },
+  tabButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
-    paddingVertical: 9,
-    borderRadius: 10,
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 9,
+    minWidth: 0,
   },
-  moduleTabBtnActive: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  moduleTabBtnText: {
-    fontSize: 13,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-    gap: 12,
-  },
-  headerTitleCol: {
-    flex: 1,
-  },
-  mainHeading: {
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  mainSubtitle: {
-    fontSize: 13,
-    marginTop: 2,
-    lineHeight: 18,
+  tabText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    flexShrink: 1,
   },
   xpBadge: {
     borderRadius: 20,

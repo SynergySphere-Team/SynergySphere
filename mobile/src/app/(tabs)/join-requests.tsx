@@ -56,7 +56,7 @@ export default function JoinRequestsScreen() {
   if (!loaded) return <Loading />;
 
   return (
-    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
+    <Screen showBackButton refreshing={refreshing} onRefresh={handleRefresh}>
       <Heading subtitle="Approving a request sends an official GitHub collaborator invitation.">
         {title ? `${title} requests` : 'Join requests'}
       </Heading>

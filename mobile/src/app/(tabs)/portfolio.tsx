@@ -277,27 +277,52 @@ export default function PortfolioScreen() {
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <View style={styles.container}>
         {/* Top Header & Actions */}
-        <View style={styles.topHeader}>
-          <Image
-            source={require('../../../assets/images/portfolio-logo.png')}
-            style={styles.portfolioLogo}
-            resizeMode="contain"
-          />
+        <View style={styles.headerRow}>
+          <View
+            style={[
+              styles.portfolioLogoWrapper,
+              {
+                backgroundColor:
+                  theme === 'dark'
+                    ? 'rgba(16, 33, 40, 0.7)'
+                    : 'rgba(237, 243, 239, 0.85)',
+                borderColor:
+                  theme === 'dark'
+                    ? 'rgba(145, 219, 94, 0.28)'
+                    : 'rgba(145, 219, 94, 0.45)',
+                shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
+              },
+            ]}
+          >
+            <Image
+              source={require('../../../assets/images/portfolio-logo.png')}
+              style={styles.portfolioLogo}
+              resizeMode="contain"
+              accessibilityIgnoresInvertColors
+            />
+          </View>
 
-          <View style={styles.headerTextContainer}>
-            <Text style={[styles.kicker, { color: primaryAccent }]}>
-              PORTFOLIO & CAREER CENTER
+          <View style={styles.headerText}>
+            <Text
+              allowFontScaling
+              style={[
+                styles.headerTitle,
+                { color: colors.text },
+              ]}
+            >
+              Portfolio{'\n'}Center
             </Text>
 
-            <View style={styles.portfolioHeadingWrap}>
-              <Text style={[styles.portfolioHeading, { color: colors.text }]}>
-                Career Profile
-              </Text>
-
-              <Text style={[styles.portfolioSubtitle, { color: colors.muted }]}>
-                Showcase your projects, skills, achievements, and career readiness.
-              </Text>
-            </View>
+            <Text
+              allowFontScaling
+              numberOfLines={2}
+              style={[
+                styles.headerSubtitle,
+                { color: colors.muted },
+              ]}
+            >
+              Showcase your projects, skills, achievements, and career readiness.
+            </Text>
           </View>
         </View>
 
@@ -724,41 +749,61 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingBottom: 40,
   },
-  topHeader: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 14,
-},
-portfolioLogo: {
-  width: 64,
-  height: 64,
-  borderRadius: 16,
-},
-headerTextContainer: {
-  flex: 1,
-},
-portfolioHeadingWrap: {
-  gap: 3,
-},
-
-portfolioHeading: {
-  fontSize: 24,
-  fontWeight: '900',
-  letterSpacing: -0.6,
-  lineHeight: 29,
-},
-
-portfolioSubtitle: {
-  fontSize: 13,
-  fontWeight: '500',
-  lineHeight: 19,
-  maxWidth: 320,
-},
-  kicker: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    marginBottom: 2,
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 12,
+    minHeight: 88,
+    width: '100%',
+  },
+  headerRowLarge: {
+    alignItems: 'flex-start',
+  },
+  portfolioLogoWrapper: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    padding: 2,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 3,
+    flexShrink: 0,
+  },
+  portfolioLogoWrapperLarge: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+  },
+  portfolioLogo: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 27,
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  portfolioLogoLarge: {
+    borderRadius: 31,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+    lineHeight: 28,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   quickActionRow: {
     flexDirection: 'row',
