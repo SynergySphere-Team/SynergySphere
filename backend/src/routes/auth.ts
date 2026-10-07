@@ -11,6 +11,7 @@ import {
   signToken,
 } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
+import { sendPasswordResetEmail } from '../lib/email.js';
 
 const router = Router();
 
@@ -257,10 +258,14 @@ const forgotPasswordSchema = z.object({
 router.post('/forgot-password', validateBody(forgotPasswordSchema), async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await queryOne<{ id: string }>(`SELECT "id" FROM "User" WHERE "email" = $1`, [email]);
+    const user = await queryOne<{ id: string; firstName: string }>(
+      `SELECT "id", "firstName" FROM "User" WHERE "email" = $1`,
+      [email],
+    );
+
     if (!user) {
       // Return 200 for security so email enumeration is mitigated
-      res.json({ message: 'If an account exists with this email, a reset token has been issued.' });
+      res.json({ message: 'If an account exists with this email, a password reset link has been sent.' });
       return;
     }
 
@@ -274,11 +279,19 @@ router.post('/forgot-password', validateBody(forgotPasswordSchema), async (req, 
       [resetToken, expiresAt, user.id],
     );
 
-    // In production, an email is sent; for junior dev workflow we return token in response for quick testing
-    res.json({
-      message: 'Password reset token generated successfully.',
+    const emailResult = await sendPasswordResetEmail({
+      to: email,
       resetToken,
-      expiresAt,
+      userName: user.firstName,
+    });
+
+    res.json({
+      message: emailResult.simulated
+        ? 'Password reset token generated. Note: SMTP email service is not configured in backend/.env, so the email could not be delivered to your inbox.'
+        : 'A password reset link has been sent to your email address.',
+      emailDelivered: !emailResult.simulated,
+      resetToken,
+      resetUrl: emailResult.resetUrl,
     });
   } catch (error) {
     console.error('Forgot password error:', error);

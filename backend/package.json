@@ -16,6 +16,7 @@
     "test:interview": "tsx --test src/tests/interviewSimulator.test.ts"
   },
   "dependencies": {
+    "@types/nodemailer": "^8.0.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -24,6 +25,7 @@
     "fflate": "^0.8.3",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^10.0.16",
     "pdfreader": "^3.0.8",
     "pg": "^8.22.0",
     "zod": "^3.24.1"

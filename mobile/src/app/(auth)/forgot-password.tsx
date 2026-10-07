@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Linking from 'expo-linking';
 import { Screen, Notice } from '@/components/Screen';
 import { Button, Field } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
@@ -40,7 +41,8 @@ export default function ForgotPasswordScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [resetUrl, setResetUrl] = useState<string | null>(null);
+  const [emailDelivered, setEmailDelivered] = useState(false);
 
   // Deep linking: If token is provided in route params, jump straight to reset step
   useEffect(() => {
@@ -90,17 +92,25 @@ export default function ForgotPasswordScreen() {
         message?: string;
         resetToken?: string;
         expiresAt?: string;
+        emailDelivered?: boolean;
+        resetUrl?: string;
       }>('/auth/forgot-password', { email: trimmedEmail });
 
       triggerSuccessHaptic();
 
+      if (res?.emailDelivered) {
+        setEmailDelivered(true);
+      }
+      if (res?.resetUrl) {
+        setResetUrl(res.resetUrl);
+      }
+
       if (res?.resetToken) {
         setToken(res.resetToken);
-        setExpiresAt(res.expiresAt || null);
         setInfoMessage('Reset token generated. For testing, it has been pre-filled for you.');
         setStep('reset');
       } else {
-        setInfoMessage('If an account exists with this email, a reset token has been issued.');
+        setInfoMessage('If an account exists with this email, a reset link or token has been sent.');
         setStep('reset');
       }
     } catch (e: any) {
@@ -186,7 +196,7 @@ export default function ForgotPasswordScreen() {
           <View style={styles.form}>
             <Text style={[styles.title, { color: colors.text }]}>Forgot Password</Text>
             <Text style={[styles.copy, { color: colors.muted }]}>
-              Enter your registered email address to receive an expiring verification token.
+              Enter your registered email address to receive an expiring verification token or reset link.
             </Text>
 
             {error ? <Notice>{error}</Notice> : null}
@@ -212,7 +222,7 @@ export default function ForgotPasswordScreen() {
             />
 
             <Button
-              title={submitting ? 'Generating Token…' : 'Send Verification Token'}
+              title={submitting ? 'Sending Request…' : 'Send Password Reset Request'}
               disabled={submitting || !email.trim()}
               onPress={handleRequestToken}
             />
@@ -244,6 +254,22 @@ export default function ForgotPasswordScreen() {
               <View style={[styles.infoBanner, { backgroundColor: isLight ? '#eff6ff' : '#1e3a8a', borderColor: '#3b82f6' }]}>
                 <Ionicons name="information-circle" size={16} color="#3b82f6" />
                 <Text style={{ fontSize: 12, color: isLight ? '#1e40af' : '#bfdbfe', flex: 1 }}>{infoMessage}</Text>
+              </View>
+            ) : null}
+
+            {/* Development shortcut button if resetUrl exists */}
+            {resetUrl ? (
+              <View style={[styles.infoBanner, { backgroundColor: isLight ? '#fef3c7' : '#78350f', borderColor: '#d97706', marginBottom: 8 }]}>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: isLight ? '#92400e' : '#fde68a' }}>
+                    Development Reset Link Available:
+                  </Text>
+                  <Button
+                    title="Open Reset Link (Browser)"
+                    onPress={() => resetUrl && Linking.openURL(resetUrl)}
+                    secondary
+                  />
+                </View>
               </View>
             ) : null}
 
@@ -296,7 +322,7 @@ export default function ForgotPasswordScreen() {
                         styles.strengthBar,
                         {
                           backgroundColor:
-                            strengthScore >= level
+                            level <= strengthScore
                               ? strengthScore <= 1
                                 ? '#ef4444'
                                 : strengthScore <= 2

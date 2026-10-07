@@ -153,27 +153,34 @@ export default function ProjectDetailScreen() {
         <Pressable
           style={[styles.backNavButton, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}
           onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace('/(tabs)/community' as never);
-            }
+            router.navigate('/community?tab=initiatives' as never);
           }}
           hitSlop={8}
         >
           <Ionicons name="chevron-back" size={18} color={colors.text} />
-          <Text style={[styles.backNavText, { color: colors.text }]}>Community</Text>
+          <Text style={[styles.backNavText, { color: colors.text }]}>Back to Initiatives</Text>
         </Pressable>
       </View>
 
-      <Heading subtitle={`${project.githubFullName || project.organization} · ${project.primaryLanguage || 'Community project'}`}>
+      <Heading subtitle={`${project.organization || 'Community'} · ${project.primaryLanguage || 'Community project'}`}>
         {project.title}
       </Heading>
 
       {error ? <Notice>{error}</Notice> : null}
 
-      {/* Repository Hero Card */}
-      <View style={[styles.heroCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {/* Opportunity Details */}
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={[styles.sectionHeading, { color: colors.text }]}>
+            Opportunity Details
+          </Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.muted }]}>
+            Learn about the project and how you can contribute.
+          </Text>
+        </View>
+      </View>
+
+<View style={[styles.heroCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {/* Category & XP Banner */}
         <View style={styles.badgeRow}>
           <View style={[styles.categoryBadge, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
@@ -209,7 +216,105 @@ export default function ProjectDetailScreen() {
         </View>
 
         {/* Description */}
-        <Text style={[styles.heroDescription, { color: colors.text }]}>{project.description}</Text>
+        <Text style={[styles.heroDescription, { color: colors.text }]}>
+          {project.description}
+        </Text>
+
+        {/* Opportunity Information */}
+        <View style={styles.opportunityInfoGrid}>
+          <View style={styles.opportunityInfoItem}>
+            <Ionicons name="business-outline" size={16} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.opportunityInfoLabel, { color: colors.muted }]}>
+                Organisation
+              </Text>
+              <Text style={[styles.opportunityInfoValue, { color: colors.text }]}>
+                {project.organization || 'Community'}
+              </Text>
+            </View>
+          </View>
+
+          {project.location ? (
+            <View style={styles.opportunityInfoItem}>
+              <Ionicons name="location-outline" size={16} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.opportunityInfoLabel, { color: colors.muted }]}>
+                  Location
+                </Text>
+                <Text style={[styles.opportunityInfoValue, { color: colors.text }]}>
+                  {project.location}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {project.techStack ? (
+            <View style={styles.opportunityInfoItem}>
+              <Ionicons name="layers-outline" size={16} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.opportunityInfoLabel, { color: colors.muted }]}>
+                  Tech Stack
+                </Text>
+                <Text style={[styles.opportunityInfoValue, { color: colors.text }]}>
+                  {project.techStack}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {project.teamCapacity ? (
+            <View style={styles.opportunityInfoItem}>
+              <Ionicons name="people-outline" size={16} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.opportunityInfoLabel, { color: colors.muted }]}>
+                  Team Capacity
+                </Text>
+                <Text style={[styles.opportunityInfoValue, { color: colors.text }]}>
+                  {project.teamCapacity} members
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {project.deliverableType ? (
+            <View style={styles.opportunityInfoItem}>
+              <Ionicons name="cube-outline" size={16} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.opportunityInfoLabel, { color: colors.muted }]}>
+                  Deliverable
+                </Text>
+                <Text style={[styles.opportunityInfoValue, { color: colors.text }]}>
+                  {project.deliverableType}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+        </View>
+
+        {project.requirements ? (
+          <View
+            style={[
+              styles.requirementsBox,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.requirementsHeader}>
+              <Ionicons name="checkmark-circle-outline" size={17} color={colors.primary} />
+              <Text style={[styles.requirementsTitle, { color: colors.text }]}>
+                Requirements
+              </Text>
+            </View>
+
+            <Text style={[styles.requirementsText, { color: colors.muted }]}>
+              {project.requirements}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Metrics Bar */}
 
         {/* Metrics Bar */}
         <View style={styles.metricsBar}>
@@ -550,6 +655,21 @@ export default function ProjectDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  sectionHeader: {
+  marginTop: 4,
+  marginBottom: 2,
+},
+
+sectionHeading: {
+  fontSize: 18,
+  fontWeight: '800',
+},
+
+sectionSubtitle: {
+  fontSize: 12,
+  marginTop: 2,
+},
+
   heroCard: {
     borderRadius: 20,
     borderWidth: 1.5,
@@ -607,6 +727,51 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  opportunityInfoGrid: {
+  gap: 10,
+},
+
+opportunityInfoItem: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  gap: 9,
+},
+
+opportunityInfoLabel: {
+  fontSize: 10,
+  fontWeight: '700',
+  textTransform: 'uppercase',
+  letterSpacing: 0.4,
+},
+
+opportunityInfoValue: {
+  fontSize: 13,
+  fontWeight: '600',
+  marginTop: 2,
+},
+
+requirementsBox: {
+  borderWidth: 1,
+  borderRadius: 14,
+  padding: 12,
+  gap: 6,
+},
+
+requirementsHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+},
+
+requirementsTitle: {
+  fontSize: 13,
+  fontWeight: '800',
+},
+
+requirementsText: {
+  fontSize: 12,
+  lineHeight: 18,
+},
   metricsBar: {
     flexDirection: 'row',
     flexWrap: 'wrap',
