@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '@/components/Screen';
 import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 import { onboardingStorage } from '@/services/api';
 import { triggerLightHaptic } from '@/services/nativePolish';
 
@@ -105,6 +106,7 @@ const SLIDES: OnboardingSlide[] = [
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -114,14 +116,20 @@ export default function OnboardingScreen() {
   const isLight = theme === 'light';
   const isLastSlide = currentIndex === SLIDES.length - 1;
 
-  async function completeOnboarding(targetRoute: '/(auth)/register' | '/(auth)/login') {
+  async function completeOnboarding(targetRoute?: '/(auth)/register' | '/(auth)/login' | '/(tabs)') {
     triggerLightHaptic();
     try {
       await onboardingStorage.setCompleted();
     } catch {
       // Storage fallback
     }
-    router.replace(targetRoute as never);
+    if (targetRoute) {
+      router.replace(targetRoute as never);
+    } else if (user) {
+      router.replace('/(tabs)');
+    } else {
+      router.replace('/(auth)/register');
+    }
   }
 
   function handleNext() {
@@ -133,7 +141,7 @@ export default function OnboardingScreen() {
       });
       setCurrentIndex(currentIndex + 1);
     } else {
-      void completeOnboarding('/(auth)/register');
+      void completeOnboarding(user ? '/(tabs)' : '/(auth)/register');
     }
   }
 
@@ -173,7 +181,7 @@ export default function OnboardingScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Skip onboarding"
-            onPress={() => completeOnboarding('/(auth)/login')}
+            onPress={() => completeOnboarding(user ? '/(tabs)' : '/(auth)/login')}
             hitSlop={12}
             style={({ pressed }) => [
               styles.skipButton,
@@ -346,7 +354,11 @@ export default function OnboardingScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={
-                isLastSlide ? 'Get Started' : 'Next slide'
+                isLastSlide
+                  ? user
+                    ? 'Enter SynergySphere'
+                    : 'Get Started'
+                  : 'Next slide'
               }
               onPress={handleNext}
               style={({ pressed }) => [
@@ -364,7 +376,11 @@ export default function OnboardingScreen() {
                   { color: isLight ? '#FFFFFF' : '#0B1E13' },
                 ]}
               >
-                {isLastSlide ? 'Get Started' : 'Next'}
+                {isLastSlide
+                  ? user
+                    ? 'Enter SynergySphere'
+                    : 'Get Started'
+                  : 'Next'}
               </Text>
               <Ionicons
                 name={isLastSlide ? 'rocket' : 'arrow-forward'}
@@ -373,26 +389,46 @@ export default function OnboardingScreen() {
               />
             </Pressable>
 
-            <View style={styles.signInRow}>
-              <Text style={[styles.signInPrompt, { color: colors.muted }]}>
-                Already have an account?
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Sign in"
-                onPress={() => completeOnboarding('/(auth)/login')}
-                hitSlop={8}
-              >
-                <Text
-                  style={[
-                    styles.signInLink,
-                    { color: isLight ? '#1e6827' : colors.primary },
-                  ]}
+            {user ? (
+              <View style={styles.signInRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Skip to dashboard"
+                  onPress={() => completeOnboarding('/(tabs)')}
+                  hitSlop={8}
                 >
-                  Sign In
+                  <Text
+                    style={[
+                      styles.signInLink,
+                      { color: isLight ? '#1e6827' : colors.primary },
+                    ]}
+                  >
+                    Skip directly to workspace →
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.signInRow}>
+                <Text style={[styles.signInPrompt, { color: colors.muted }]}>
+                  Already have an account?
                 </Text>
-              </Pressable>
-            </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Sign in"
+                  onPress={() => completeOnboarding('/(auth)/login')}
+                  hitSlop={8}
+                >
+                  <Text
+                    style={[
+                      styles.signInLink,
+                      { color: isLight ? '#1e6827' : colors.primary },
+                    ]}
+                  >
+                    Sign In
+                  </Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         </View>
       </View>

@@ -54,8 +54,6 @@ import { api } from '@/services/api';
 
 import { github } from '@/services/github';
 
-import { DiagnosticProblemModal } from '@/components/DiagnosticProblemModal';
-
 import type { GithubConnection, UserTicket } from '@/types/api';
 
 interface SettingsData {
@@ -551,7 +549,6 @@ export default function SettingsScreen() {
   const [loadingTickets, setLoadingTickets] = useState(false);
   const [ticketsLoaded, setTicketsLoaded] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
-  const [showDiagnosticModal, setShowDiagnosticModal] = useState(false);
   const [ticketCategory, setTicketCategory] = useState<string>('Bug / Technical Issue');
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketDescription, setTicketDescription] = useState('');
@@ -3491,28 +3488,6 @@ function confirmDeleteAccount() {
               Submit support tickets directly from your student account, track your logged issues, or read FAQs.
             </Text>
 
-            {/* Diagnostic Triage Modal Trigger */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Report with Diagnostics"
-              onPress={() => setShowDiagnosticModal(true)}
-              style={({ pressed }) => [
-                styles.reportIssueBtn,
-                {
-                  backgroundColor: isLight ? '#0f172a' : '#1e293b',
-                  borderWidth: 1,
-                  borderColor: primaryAccent,
-                  opacity: pressed ? 0.85 : 1,
-                  marginBottom: 8,
-                },
-              ]}
-            >
-              <Ionicons name="hardware-chip-outline" size={18} color={primaryAccent} />
-              <Text style={[styles.reportIssueBtnText, { color: '#FFFFFF' }]}>
-                Diagnostic Problem Reporter (Admin Triage)
-              </Text>
-            </Pressable>
-
             {/* Report an Issue Button / Form */}
             {!showReportForm ? (
               <Pressable
@@ -3528,7 +3503,7 @@ function confirmDeleteAccount() {
                 ]}
               >
                 <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-                <Text style={styles.reportIssueBtnText}>Report an Issue (Quick Form)</Text>
+                <Text style={styles.reportIssueBtnText}>Report an Issue</Text>
               </Pressable>
             ) : (
               <Card style={{ padding: 14, gap: 12, borderWidth: 1, borderColor: colors.border, marginTop: 4 }}>
@@ -4045,15 +4020,6 @@ function confirmDeleteAccount() {
         />
 
       </View>
-
-      <DiagnosticProblemModal
-        visible={showDiagnosticModal}
-        onClose={() => setShowDiagnosticModal(false)}
-        initialScreenContext="Settings & Support"
-        onTicketCreated={() => {
-          loadUserTickets();
-        }}
-      />
 
     </Screen>
 

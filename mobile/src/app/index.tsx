@@ -28,7 +28,10 @@ export default function Index() {
   }, []);
 
   if (loading || checkingOnboarding) return <Loading />;
-  if (user) return <Redirect href="/(tabs)" />;
+  if (user) {
+    if (!onboardingDone) return <Redirect href="/(auth)/onboarding" />;
+    return <Redirect href="/(tabs)" />;
+  }
   if (!onboardingDone) return <Redirect href="/(auth)/onboarding" />;
   return <Redirect href="/(auth)/login" />;
 }

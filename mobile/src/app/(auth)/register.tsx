@@ -33,7 +33,7 @@ export default function RegisterScreen() {
         password,
         confirmPassword,
       });
-      router.replace('/(tabs)');
+      router.replace('/(auth)/onboarding');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to create the account.');
     } finally {
