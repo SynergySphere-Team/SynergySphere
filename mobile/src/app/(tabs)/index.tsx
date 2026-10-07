@@ -81,6 +81,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user, refresh: refreshAuth } = useAuth();
   const { colors, theme } = useTheme();
+  const { largerText, fontSize } = useAccessibility();
   const [data, setData] = useState<DashboardStats | null>(null);
   const [activeTasks, setActiveTasks] = useState<Task[]>([]);
   const [communityActivity, setCommunityActivity] = useState<GithubActivity[]>([]);
@@ -335,74 +336,33 @@ export default function HomeScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      {/* HOME HEADER */}
-      <View style={styles.headerRow}>
-        <View
-          style={[
-            styles.brandLogoWrapper,
+      {/* Top Utility Nav Bar */}
+      <View style={styles.topUtilityRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open workspace menu"
+          onPress={() => setMenuOpen(true)}
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.utilityIconButton,
             {
-              backgroundColor:
-                theme === 'dark'
-                  ? 'rgba(16, 33, 40, 0.7)'
-                  : 'rgba(237, 243, 239, 0.85)',
-              borderColor:
-                theme === 'dark'
-                  ? 'rgba(145, 219, 94, 0.28)'
-                  : 'rgba(145, 219, 94, 0.45)',
-              shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
+              backgroundColor: isLight ? 'rgba(237, 243, 239, 0.95)' : colors.surfaceElevated,
+              borderColor: isLight ? 'rgba(145, 219, 94, 0.35)' : colors.border,
             },
+            pressed && styles.pressedBtn,
           ]}
         >
-          <Image
-            source={require('../../../assets/images/synergysphere-brand-icon.png')}
-            style={styles.brandLogo}
-            resizeMode="contain"
-            accessibilityIgnoresInvertColors
-          />
-        </View>
+          <Ionicons name="menu" size={20} color={colors.text} />
+        </Pressable>
 
-        <View style={styles.headerText}>
-          <Text
-            allowFontScaling
-            style={[styles.headerTitle, { color: colors.text }]}
-          >
-            SynergySphere{'\n'}<Text style={{ color: primaryAccent }}>Workspace</Text>
-          </Text>
-
-          <Text
-            allowFontScaling
-            numberOfLines={2}
-            style={[styles.headerSubtitle, { color: colors.muted }]}
-          >
-            {getGreeting()}, {user?.firstName ?? 'Developer'}! · {levelTitle || 'Learn. Build. Thrive.'}
-          </Text>
-        </View>
-
-        <View style={styles.headerRightActions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open workspace menu"
-            onPress={() => setMenuOpen(true)}
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.navIconButton,
-              {
-                backgroundColor: isLight ? 'rgba(237, 243, 239, 0.95)' : colors.surfaceElevated,
-                borderColor: isLight ? 'rgba(145, 219, 94, 0.35)' : colors.border,
-              },
-              pressed && styles.pressedBtn,
-            ]}
-          >
-            <Ionicons name="menu" size={21} color={colors.text} />
-          </Pressable>
-
+        <View style={styles.topUtilityRight}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Notifications"
             onPress={() => router.push('/notifications' as never)}
             hitSlop={8}
             style={({ pressed }) => [
-              styles.navIconButton,
+              styles.utilityIconButton,
               {
                 backgroundColor: isLight ? 'rgba(237, 243, 239, 0.95)' : colors.surfaceElevated,
                 borderColor: isLight ? 'rgba(145, 219, 94, 0.35)' : colors.border,
@@ -410,7 +370,7 @@ export default function HomeScreen() {
               pressed && styles.pressedBtn,
             ]}
           >
-            <Ionicons name="notifications-outline" size={19} color={colors.text} />
+            <Ionicons name="notifications-outline" size={18} color={colors.text} />
             {(data?.stats?.unreadNotifications ?? 0) > 0 ? (
               <View style={[styles.unreadDot, { backgroundColor: colors.danger }]} />
             ) : null}
@@ -453,6 +413,72 @@ export default function HomeScreen() {
               )}
             </View>
           </Pressable>
+        </View>
+      </View>
+
+      {/* STANDARDIZED HOME HEADER WITH PROMINENT LOGO */}
+      <View
+        style={[
+          styles.headerRow,
+          largerText && styles.headerRowLarge,
+        ]}
+      >
+        <View
+          style={[
+            styles.brandLogoWrapper,
+            largerText && styles.brandLogoWrapperLarge,
+            {
+              backgroundColor:
+                theme === 'dark'
+                  ? 'rgba(16, 33, 40, 0.7)'
+                  : 'rgba(237, 243, 239, 0.85)',
+              borderColor:
+                theme === 'dark'
+                  ? 'rgba(145, 219, 94, 0.28)'
+                  : 'rgba(145, 219, 94, 0.45)',
+              shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
+            },
+          ]}
+        >
+          <Image
+            source={require('../../../assets/images/wellness-logo.png')}
+            style={[
+              styles.brandLogo,
+              largerText && styles.brandLogoLarge,
+            ]}
+            resizeMode="contain"
+            accessibilityIgnoresInvertColors
+          />
+        </View>
+
+        <View style={styles.headerText}>
+          <Text
+            allowFontScaling
+            style={[
+              styles.headerTitle,
+              {
+                color: colors.text,
+                fontSize: fontSize(24),
+              },
+            ]}
+          >
+            SynergySphere{'\n'}<Text style={{ color: primaryAccent }}>Workspace</Text>
+          </Text>
+
+          <Text
+            allowFontScaling
+            numberOfLines={2}
+            style={[
+              styles.headerSubtitle,
+              {
+                color: colors.muted,
+                fontSize: fontSize(13),
+                lineHeight: fontSize(18),
+              },
+            ]}
+          >
+            {getGreeting()}, {user?.firstName ?? 'Developer'}! · {levelTitle || 'Learn. Build. Thrive.'}
+          </Text>
         </View>
       </View>
 
@@ -760,6 +786,27 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  topUtilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+    marginBottom: 4,
+  },
+  topUtilityRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  utilityIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -767,6 +814,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     minHeight: 88,
     width: '100%',
+  },
+  headerRowLarge: {
+    alignItems: 'flex-start',
   },
   brandLogoWrapper: {
     width: 58,
@@ -782,12 +832,20 @@ const styles = StyleSheet.create({
     elevation: 3,
     flexShrink: 0,
   },
+  brandLogoWrapperLarge: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+  },
   brandLogo: {
     width: '100%',
     height: '100%',
     borderRadius: 27,
     backgroundColor: 'transparent',
     overflow: 'hidden',
+  },
+  brandLogoLarge: {
+    borderRadius: 31,
   },
   headerText: {
     flex: 1,
@@ -805,21 +863,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  headerRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 0,
-  },
-  navIconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
   pressedBtn: {
     opacity: 0.75,
     transform: [{ scale: 0.96 }],
@@ -828,9 +871,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 5,
     right: 5,
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   avatarBtn: {
     justifyContent: 'center',
