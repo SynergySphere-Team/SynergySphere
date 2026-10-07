@@ -391,6 +391,94 @@ async function main() {
       [newId(), studentId],
     );
 
+    // Seed SuperAdmin
+    const superadminPassword = await bcrypt.hash('superadmin123', 12);
+    await client.query(
+      `INSERT INTO "User" ("id", "firstName", "lastName", "email", "password", "role", "status", "xp", "level")
+       VALUES ($1, 'Super', 'Admin', 'superadmin@synergysphere.com', $2, 'SUPERADMIN', 'active', 5000, 5)
+       ON CONFLICT ("email") DO UPDATE SET "role" = 'SUPERADMIN', "status" = 'active'`,
+      [newId(), superadminPassword],
+    );
+
+    // Seed Moderator
+    const moderatorPassword = await bcrypt.hash('moderator123', 12);
+    await client.query(
+      `INSERT INTO "User" ("id", "firstName", "lastName", "email", "password", "role", "status", "xp", "level")
+       VALUES ($1, 'Sarah', 'Moderator', 'moderator@synergysphere.com', $2, 'MODERATOR', 'active', 1500, 3)
+       ON CONFLICT ("email") DO UPDATE SET "role" = 'MODERATOR', "status" = 'active'`,
+      [newId(), moderatorPassword],
+    );
+
+    // Seed Pending Users for Approval workflow
+    const pendingPass = await bcrypt.hash('pending123', 12);
+    await client.query(
+      `INSERT INTO "User" ("id", "firstName", "lastName", "email", "password", "role", "status", "studentId", "xp", "level")
+       VALUES
+         ($1, 'Alex', 'Johnson', 'pending.alex@campus.edu', $3, 'STUDENT', 'pending', 'STU-2026-1042', 0, 1),
+         ($2, 'Priya', 'Naidoo', 'pending.priya@campus.edu', $3, 'STUDENT', 'pending', 'STU-2026-1043', 0, 1)
+       ON CONFLICT ("email") DO NOTHING`,
+      [newId(), newId(), pendingPass],
+    );
+
+    // Seed Suspended User
+    await client.query(
+      `INSERT INTO "User" ("id", "firstName", "lastName", "email", "password", "role", "status", "studentId", "rejectionReason")
+       VALUES ($1, 'Bad', 'Actor', 'suspended.badactor@campus.edu', $2, 'STUDENT', 'suspended', 'STU-2026-0999', 'Multiple community guideline violations and harassment.')
+       ON CONFLICT ("email") DO NOTHING`,
+      [newId(), pendingPass],
+    );
+
+    // Update studentId for student
+    await client.query(
+      `UPDATE "User" SET "studentId" = 'STU-2026-0001', "status" = 'active' WHERE "id" = $1`,
+      [studentId],
+    );
+
+    // Seed Support Tickets
+    await client.query(
+      `INSERT INTO "SupportTicket" ("id", "ticketNumber", "userId", "category", "title", "description", "status", "priority", "adminNotes")
+       VALUES
+         ($1, 'SS-1048', $2, 'Account & Login', 'Unable to upload profile picture', 'Whenever I try to upload my profile photo in Settings, it fails with a validation error. Need help updating my avatar.', 'in_progress', 'medium', 'Investigated upload endpoint. The issue was related to image MIME format payload.'),
+         ($3, 'SS-1032', $2, 'Bug / Technical Issue', 'Syntax highlighting glitch in Java coding editor', 'On dark mode, keywords inside ternary expressions sometimes do not highlight correctly.', 'resolved', 'low', 'Patched syntax highlighting theme definitions.'),
+         ($4, 'SS-1049', $2, 'Bug / Technical Issue', 'Intermittent timeout during peak test runs', 'Code execution runner timed out on complex test suites during the evening rush.', 'open', 'critical', NULL),
+         ($5, 'SS-1050', $2, 'Feature Request', 'Dark mode high-contrast theme option', 'Would love a high-contrast mode for improved readability during long evening coding sessions.', 'open', 'low', NULL)
+       ON CONFLICT ("ticketNumber") DO NOTHING`,
+      [newId(), studentId, newId(), newId(), newId()],
+    );
+
+    // Seed Complaints
+    await client.query(
+      `INSERT INTO "Complaint" ("id", "complaintNumber", "reporterId", "targetType", "targetId", "reason", "details", "status")
+       VALUES
+         ($1, 'CMP-2001', $2, 'post', $3, 'Spam / Commercial Advertising', 'Repeated unauthorized promotional links in public community channel.', 'pending'),
+         ($4, 'CMP-2002', $2, 'comment', $2, 'Harassment / Uncivil Conduct', 'Aggressive and inappropriate comments during code review.', 'reviewed')
+       ON CONFLICT ("complaintNumber") DO NOTHING`,
+      [newId(), studentId, newId(), newId()],
+    );
+
+    // Seed Events
+    await client.query(
+      `INSERT INTO "CommunityEvent" ("id", "title", "description", "organizerName", "eventDate", "location", "capacity", "status", "isFeatured", "category")
+       VALUES
+         ($1, 'Full-Stack TypeScript Hackathon 2026', 'Build collaborative tools for student developers. 48-hour team sprint with mentor support and prizes.', 'SynergySphere Open Source Guild', NOW() + INTERVAL '3 days', 'Main Engineering Hall & Online', 120, 'APPROVED', true, 'Hackathon'),
+         ($2, 'AI in Software Engineering Workshop', 'Hands-on session using LLMs, AST parsing, and AI coding assistants for test-driven development.', 'AI Research Group', NOW() + INTERVAL '6 days', 'Virtual Discord Stage', 250, 'APPROVED', true, 'Workshop'),
+         ($3, 'Spring Boot & Microservices Masterclass', 'Deep dive into transaction isolation levels, PostgreSQL pooling, and Docker orchestration.', 'Eduvos Faculty of IT', NOW() + INTERVAL '12 days', 'Campus Lab 4', 40, 'APPROVED', false, 'Masterclass')
+       ON CONFLICT ("id") DO NOTHING`,
+      [newId(), newId(), newId()],
+    );
+
+    // Seed Initial Admin Audit Logs
+    await client.query(
+      `INSERT INTO "AdminAuditLog" ("id", "adminName", "action", "targetType", "targetId", "description", "createdAt")
+       VALUES
+         ($1, 'System Admin', 'USER_APPROVED', 'User', $2, 'Admin approved user #1042 (Alex Johnson)', NOW() - INTERVAL '5 minutes'),
+         ($3, 'Sarah Moderator', 'POST_HIDDEN', 'CommunityPost', 'sample-post', 'Moderator Sarah removed flagged commercial link', NOW() - INTERVAL '18 minutes'),
+         ($4, 'System Admin', 'ROLE_CHANGED', 'User', $2, 'Admin changed user role from User → Moderator', NOW() - INTERVAL '32 minutes'),
+         ($5, 'System Admin', 'TICKET_RESOLVED', 'SupportTicket', 'SS-1032', 'Support ticket #SS-1032 was marked as resolved', NOW() - INTERVAL '1 hour')
+       ON CONFLICT DO NOTHING`,
+      [newId(), studentId, newId(), newId(), newId()],
+    );
+
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
@@ -401,7 +489,9 @@ async function main() {
 
   console.log('Seed completed!');
   console.log('Demo accounts:');
+  console.log('  SuperAdmin: superadmin@synergysphere.com / superadmin123');
   console.log('  Admin: admin@synergysphere.com / admin123456');
+  console.log('  Moderator: moderator@synergysphere.com / moderator123');
   console.log('  Student: student@synergysphere.com / student123');
 }
 

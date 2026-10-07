@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { cn, isModerator } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import {
   LayoutDashboard,
@@ -20,6 +20,7 @@ import {
   LogOut,
   Settings,
   Upload,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface NavItem {
@@ -129,30 +130,24 @@ export function Sidebar() {
           </div>
         ))}
 
-        {user?.role === 'ADMIN' && (
+        {isModerator(user) && (
           <div className="space-y-1 pt-2 border-t border-white/[0.06]">
-            <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/60">
-              Admin
+            <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-400/80 flex items-center justify-between">
+              <span>Management</span>
+              <span className="rounded bg-amber-500/20 px-1 py-0.5 text-[9px] text-amber-300 font-mono">PORTAL</span>
             </p>
-            {adminItems.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    'group flex items-center gap-2.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all',
-                    active
-                      ? 'border-primary/30 bg-primary/[0.12] text-primary'
-                      : 'border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              );
-            })}
+            <Link
+              href="/admin"
+              className={cn(
+                'group flex items-center gap-2.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-all',
+                pathname.startsWith('/admin')
+                  ? 'border-amber-500/30 bg-amber-500/[0.12] text-amber-400 font-semibold shadow-inner shadow-amber-500/10'
+                  : 'border-transparent text-muted-foreground hover:border-white/[0.06] hover:bg-secondary/60 hover:text-foreground'
+              )}
+            >
+              <ShieldCheck className={cn('h-4 w-4 shrink-0', pathname.startsWith('/admin') ? 'text-amber-400' : 'text-muted-foreground group-hover:text-amber-400')} />
+              <span className="truncate">Admin Portal</span>
+            </Link>
           </div>
         )}
       </nav>

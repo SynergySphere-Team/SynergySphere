@@ -43,6 +43,8 @@ type SafeUser = {
   lastName: string;
   email: string;
   role: string;
+  status?: string;
+  studentId?: string | null;
   profilePicture: string | null;
   xp: number;
   level: number;
@@ -130,7 +132,7 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
     const { email, password } = req.body;
 
     const user = await queryOne<UserWithPassword>(
-      `SELECT "id", "firstName", "lastName", "email", "password", "role", "profilePicture", "xp", "level", "createdAt"
+      `SELECT "id", "firstName", "lastName", "email", "password", "role", "status", "studentId", "profilePicture", "xp", "level", "createdAt"
        FROM "User"
        WHERE "email" = $1`,
       [email],
@@ -146,6 +148,16 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
       (password === 'student123' || password === 'student12345');
     if (!valid && !isStudentDemoAlias) {
       res.status(401).json({ error: 'Invalid email or password' });
+      return;
+    }
+
+    if (user.status === 'suspended') {
+      res.status(403).json({ error: 'Your account has been suspended by an administrator. Please contact support.' });
+      return;
+    }
+
+    if (user.status === 'rejected') {
+      res.status(403).json({ error: 'Your account registration was not approved.' });
       return;
     }
 
@@ -174,7 +186,7 @@ router.post('/logout', (_req, res) => {
 router.get('/me', authenticate, async (req: AuthRequest, res) => {
   try {
     const user = await queryOne<SafeUser>(
-      `SELECT "id", "firstName", "lastName", "email", "role", "profilePicture", "xp", "level", "createdAt"
+      `SELECT "id", "firstName", "lastName", "email", "role", "status", "studentId", "profilePicture", "xp", "level", "createdAt"
        FROM "User"
        WHERE "id" = $1`,
       [req.user!.userId],

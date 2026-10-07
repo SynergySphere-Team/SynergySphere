@@ -101,12 +101,56 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
   }
 }
 
+export type AppRole = 'superadmin' | 'admin' | 'moderator' | 'user';
+
+export function normalizeRole(role?: string | null): AppRole {
+  if (!role) return 'user';
+  const r = role.toLowerCase().trim();
+  if (r === 'superadmin') return 'superadmin';
+  if (r === 'admin') return 'admin';
+  if (r === 'moderator') return 'moderator';
+  return 'user';
+}
+
+const ROLE_RANKS: Record<AppRole, number> = {
+  superadmin: 4,
+  admin: 3,
+  moderator: 2,
+  user: 1,
+};
+
+export function hasPermission(userRole: string | undefined, requiredRole: AppRole): boolean {
+  const normUser = normalizeRole(userRole);
+  return ROLE_RANKS[normUser] >= ROLE_RANKS[requiredRole];
+}
+
 export function requireRole(...roles: string[]) {
+  const normalizedTargets = roles.map((r) => normalizeRole(r));
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    const current = normalizeRole(req.user.role);
+    if (!normalizedTargets.includes(current) && current !== 'superadmin') {
       res.status(403).json({ error: 'Insufficient permissions' });
       return;
     }
     next();
   };
 }
+
+export function requireAdmin(minRole: AppRole = 'moderator') {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    if (!hasPermission(req.user.role, minRole)) {
+      res.status(403).json({ error: `Forbidden: requires ${minRole} authority or higher` });
+      return;
+    }
+    next();
+  };
+}
+

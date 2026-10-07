@@ -18,10 +18,11 @@ import learningRoutes from './routes/learning.js';
 import curriculumRoutes from './routes/curriculum.js';
 import githubRoutes, { githubWebhookRoutes, pollGithubActivity } from './routes/github.js';
 import communityChatRoutes from './routes/communityChat.js';
+import settingsRoutes from './routes/settings.js';
 import { pool } from './lib/db.js';
 import { runMigrations } from './scripts/migrate.js';
 
-const app = express();
+export const app = express();
 const PORT = Number(process.env.PORT) || 4000;
 const HOST = process.env.HOST || '0.0.0.0';
 
@@ -139,6 +140,7 @@ app.use('/api/learning', learningRoutes);
 app.use('/api/curriculum', curriculumRoutes);
 app.use('/api/github', githubRoutes);
 app.use('/api/community-chat', communityChatRoutes);
+app.use('/api/settings', settingsRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });

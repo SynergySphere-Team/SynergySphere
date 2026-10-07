@@ -17,6 +17,7 @@ import {
   Github,
   Globe,
   KeyRound,
+  LifeBuoy,
   Linkedin,
   Loader2,
   Lock,
@@ -25,6 +26,7 @@ import {
   Trash2,
   User,
 } from 'lucide-react';
+import { HelpSupportSection } from '@/components/settings/HelpSupportSection';
 
 interface SettingsData {
   user: {
@@ -49,10 +51,17 @@ export default function SettingsPage() {
   const { user, refreshUser, logout } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'security'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'security' | 'support'>('profile');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const tabParam = new URLSearchParams(window.location.search).get('tab');
+      if (tabParam === 'support') setActiveTab('support');
+    }
+  }, []);
 
   // Form state
   const [form, setForm] = useState({
@@ -186,6 +195,17 @@ export default function SettingsPage() {
         >
           <Shield className="h-4 w-4" />
           Security & Account
+        </button>
+        <button
+          onClick={() => { setActiveTab('support'); setMessage(null); }}
+          className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
+            activeTab === 'support'
+              ? 'border-primary text-primary font-semibold'
+              : 'border-transparent text-muted-foreground hover:text-white'
+          }`}
+        >
+          <LifeBuoy className="h-4 w-4" />
+          Help & Support
         </button>
       </div>
 
@@ -393,7 +413,7 @@ export default function SettingsPage() {
             Save Preferences
           </Button>
         </div>
-      ) : (
+      ) : activeTab === 'security' ? (
         <div className="space-y-6 max-w-2xl">
           <Card className="border-white/[0.08] bg-[#071015]/90">
             <CardHeader>
@@ -477,6 +497,8 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </div>
+      ) : (
+        <HelpSupportSection />
       )}
     </DashboardLayout>
   );

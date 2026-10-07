@@ -19,9 +19,25 @@ export interface User {
   lastName: string;
   email: string;
   role: string;
+  status?: string;
+  studentId?: string;
   profilePicture?: string;
   xp: number;
   level: number;
+}
+
+export function isSuperAdmin(user?: User | null): boolean {
+  return user?.role?.toUpperCase() === 'SUPERADMIN';
+}
+
+export function isAdmin(user?: User | null): boolean {
+  const r = user?.role?.toUpperCase();
+  return r === 'ADMIN' || r === 'SUPERADMIN';
+}
+
+export function isModerator(user?: User | null): boolean {
+  const r = user?.role?.toUpperCase();
+  return r === 'MODERATOR' || r === 'ADMIN' || r === 'SUPERADMIN';
 }
 
 export function clearAuth() {
