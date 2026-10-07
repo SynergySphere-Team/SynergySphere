@@ -29,6 +29,9 @@ import { usePathname, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { triggerLightHaptic } from '@/services/nativePolish';
+import { BackButton } from '@/components/BackButton';
+
+export { BackButton };
 
 export interface ScreenProps {
   children: ReactNode;
@@ -40,6 +43,9 @@ export interface ScreenProps {
   onSwipeBack?: () => void;
   swipeBackEdgeWidth?: number;
   allowBothEdges?: boolean;
+  showBackButton?: boolean;
+  onBack?: () => void;
+  headerRight?: ReactNode;
   keyboardAvoiding?: boolean;
   keyboardOffset?: number;
   style?: StyleProp<ViewStyle>;
@@ -58,6 +64,9 @@ export function Screen({
   onSwipeBack,
   swipeBackEdgeWidth = 28,
   allowBothEdges = true,
+  showBackButton,
+  onBack,
+  headerRight,
   keyboardAvoiding = true,
   keyboardOffset = 0,
   style,
@@ -145,10 +154,40 @@ export function Screen({
 
   const isMainTabRoot =
     pathname === '/' ||
+    pathname === '/(tabs)' ||
+    pathname === '/(tabs)/index' ||
     pathname === '/tasks' ||
+    pathname === '/(tabs)/tasks' ||
     pathname === '/wellness' ||
-    pathname === '/explore';
+    pathname === '/(tabs)/wellness' ||
+    pathname === '/explore' ||
+    pathname === '/(tabs)/explore' ||
+    pathname === '/coding' ||
+    pathname === '/(tabs)/coding' ||
+    pathname === '/ai-assistant' ||
+    pathname === '/(tabs)/ai-assistant' ||
+    pathname === '/lecture-to-life' ||
+    pathname === '/(tabs)/lecture-to-life' ||
+    pathname === '/interviews' ||
+    pathname === '/(tabs)/interviews' ||
+    pathname === '/leaderboard' ||
+    pathname === '/(tabs)/leaderboard' ||
+    pathname === '/portfolio' ||
+    pathname === '/(tabs)/portfolio' ||
+    pathname === '/community' ||
+    pathname === '/(tabs)/community' ||
+    pathname === '/settings' ||
+    pathname === '/(tabs)/settings' ||
+    pathname === '/more' ||
+    pathname === '/(tabs)/more' ||
+    pathname === '/notifications' ||
+    pathname === '/(tabs)/notifications' ||
+    pathname === '/profile' ||
+    pathname === '/(tabs)/profile' ||
+    pathname === '/login' ||
+    pathname === '/(auth)/login';
 
+  const shouldShowBack = showBackButton !== undefined ? showBackButton : !isMainTabRoot;
   const canPerformBack = !disableSwipeBack && swipeBack && (!isMainTabRoot || router.canGoBack());
 
   // Handle Android hardware back press
@@ -269,6 +308,20 @@ export function Screen({
         contentStyle,
       ]}
     >
+      {(shouldShowBack || headerRight) && (
+        <View style={styles.topNavRow}>
+          {shouldShowBack ? (
+            <BackButton onPress={onBack || handleBack} />
+          ) : (
+            <View style={{ width: 38 }} />
+          )}
+          {headerRight ? (
+            <View style={styles.topNavRight}>
+              {headerRight}
+            </View>
+          ) : null}
+        </View>
+      )}
       {children}
     </View>
   );
@@ -421,6 +474,18 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 12,
+  },
+  topNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 38,
+    marginBottom: 2,
+  },
+  topNavRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   center: {
     flex: 1,

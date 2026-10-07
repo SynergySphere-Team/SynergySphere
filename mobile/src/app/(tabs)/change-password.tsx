@@ -378,48 +378,9 @@ export default function ChangePasswordScreen() {
 
   return (
     <Screen>
-      <View
-        style={
-          styles.topRow
-        }
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back to Settings"
-          onPress={() => {
-            router.replace(
-              '/(tabs)/settings' as never,
-            );
-          }}
-          style={[
-            styles.backButton,
-            {
-              backgroundColor:
-                colors.surface,
-              borderColor:
-                colors.border,
-            },
-          ]}
-        >
-          <Ionicons
-            name="arrow-back"
-            size={20}
-            color={
-              colors.text
-            }
-          />
-        </Pressable>
-
-        <View
-          style={{
-            flex: 1,
-          }}
-        >
-          <Heading subtitle="Protect your account with a strong, unique password.">
-            Change Password
-          </Heading>
-        </View>
-      </View>
+      <Heading subtitle="Protect your account with a strong, unique password.">
+        Change Password
+      </Heading>
 
       {message ? (
         <Notice

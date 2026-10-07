@@ -61,7 +61,7 @@ export default function ProjectChatScreen() {
   const brandGreen = isLight ? '#1e6827' : colors.primary;
 
   return (
-    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
+    <Screen showBackButton refreshing={refreshing} onRefresh={handleRefresh}>
       <Heading subtitle={title ? `Coordinate with the people involved in ${title}.` : 'Coordinate with the people involved in this project.'}>
         Project discussion
       </Heading>

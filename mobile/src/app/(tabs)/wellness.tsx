@@ -407,15 +407,33 @@ export default function WellnessScreen() {
           largerText && styles.headerRowLarge,
         ]}
       >
-        <Image
-          source={require('../../../assets/images/wellness-logo.png')}
+        <View
           style={[
-            styles.wellnessLogo,
-            largerText && styles.wellnessLogoLarge,
+            styles.wellnessLogoWrapper,
+            largerText && styles.wellnessLogoWrapperLarge,
+            {
+              backgroundColor:
+                theme === 'dark'
+                  ? 'rgba(16, 33, 40, 0.7)'
+                  : 'rgba(237, 243, 239, 0.85)',
+              borderColor:
+                theme === 'dark'
+                  ? 'rgba(145, 219, 94, 0.28)'
+                  : 'rgba(145, 219, 94, 0.45)',
+              shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
+            },
           ]}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
+        >
+          <Image
+            source={require('../../../assets/images/wellness-logo.png')}
+            style={[
+              styles.wellnessLogo,
+              largerText && styles.wellnessLogoLarge,
+            ]}
+            resizeMode="contain"
+            accessibilityIgnoresInvertColors
+          />
+        </View>
 
         <View style={styles.headerText}>
           <Text
@@ -428,11 +446,12 @@ export default function WellnessScreen() {
               },
             ]}
           >
-            Wellness OS
+            SynergySphere{'\n'}Wellness
           </Text>
 
           <Text
             allowFontScaling
+            numberOfLines={2}
             style={[
               styles.headerSubtitle,
               {
@@ -442,7 +461,7 @@ export default function WellnessScreen() {
               },
             ]}
           >
-            Track mental bandwidth, prevent burnout & optimize tasks.
+            Track mental bandwidth, prevent burnout &amp; optimize tasks.
           </Text>
         </View>
       </View>
@@ -452,12 +471,12 @@ export default function WellnessScreen() {
       {interventionNotice ? <Notice tone="success">{interventionNotice}</Notice> : null}
 
       {/* Top Navigation Tabs */}
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
         <Pressable
           onPress={() => setActiveTab('checkin')}
           style={[
             styles.tabButton,
-            activeTab === 'checkin' && { backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.18)', borderColor: colors.primary },
+            activeTab === 'checkin' && { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 1 },
           ]}
         >
           <Ionicons
@@ -472,7 +491,7 @@ export default function WellnessScreen() {
             minimumFontScale={0.8}
             style={[
               styles.tabText,
-              { color: activeTab === 'checkin' ? (isLight ? '#1e6827' : colors.primary) : colors.muted },
+              { color: activeTab === 'checkin' ? colors.text : colors.muted, fontWeight: activeTab === 'checkin' ? '800' : '600' },
             ]}
           >
             Check-In &amp; AI Coach
@@ -483,7 +502,7 @@ export default function WellnessScreen() {
           onPress={() => setActiveTab('trends')}
           style={[
             styles.tabButton,
-            activeTab === 'trends' && { backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.18)', borderColor: colors.primary },
+            activeTab === 'trends' && { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 1 },
           ]}
         >
           <Ionicons
@@ -498,7 +517,7 @@ export default function WellnessScreen() {
             minimumFontScale={0.8}
             style={[
               styles.tabText,
-              { color: activeTab === 'trends' ? (isLight ? '#1e6827' : colors.primary) : colors.muted },
+              { color: activeTab === 'trends' ? colors.text : colors.muted, fontWeight: activeTab === 'trends' ? '800' : '600' },
             ]}
           >
             Trends &amp; Heatmap
@@ -595,12 +614,14 @@ export default function WellnessScreen() {
           {/* Main Daily Check-In Form */}
           <Card>
             <View style={styles.cardHeaderRow}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>1. Daily Wellness Log</Text>
-              <Text style={[styles.subtleBadge, { color: colors.primary }]}>Step 1 of 2</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Daily Check-In</Text>
+              <View style={[styles.statusPill, { backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)' }]}>
+                <Text style={[styles.statusPillText, { color: isLight ? '#1e6827' : colors.primary }]}>Today</Text>
+              </View>
             </View>
 
             {/* Module Picker */}
-            <Text style={[styles.sectionSubtitle, { color: colors.muted }]}>Linked SynergySphere Module</Text>
+            <Text style={[styles.sectionSubtitle, { color: colors.muted }]}>Linked Module</Text>
             <View style={styles.moduleGrid}>
               {WELLNESS_MODULES.map((m) => {
                 const isSelected = moduleId === m.id;
@@ -632,7 +653,7 @@ export default function WellnessScreen() {
 
             {/* Task Input */}
             <Field
-              label="Active Task or Blocker (optional)"
+              label="Active Task or Blocker"
               value={taskTitle}
               onChangeText={setTaskTitle}
               placeholder="e.g. Debugging Spring Security, LeetCode Binary Search..."
@@ -936,7 +957,7 @@ export default function WellnessScreen() {
 
             {/* Categorized Focus & Mood Keywords */}
             <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 12 }]}>
-              Focus &amp; Mood Context (Categorized)
+              Focus &amp; Mood Tags
             </Text>
             <View style={{ gap: 8, marginBottom: 8 }}>
               {MOOD_TAG_CATEGORIES.map((cat) => (
@@ -988,7 +1009,7 @@ export default function WellnessScreen() {
 
             {/* Notes */}
             <Field
-              label="Session Notes (optional)"
+              label="Session Notes"
               value={notes}
               onChangeText={setNotes}
               multiline
@@ -1002,17 +1023,17 @@ export default function WellnessScreen() {
             />
           </Card>
 
-          {/* AI Burnout Risk Meter: Step 4 Active Actionable Tool & 1-Tap Interventions */}
+          {/* AI Burnout Risk Meter: Active Actionable Tool & 1-Tap Interventions */}
           <Card>
             <View style={styles.burnoutHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
                 <Ionicons
                   name={burnoutRisk.level === 'CRITICAL' ? 'flame' : burnoutRisk.level === 'MODERATE' ? 'warning' : 'shield-checkmark'}
-                  size={16}
+                  size={18}
                   color={burnoutRisk.color}
                   style={{ flexShrink: 0 }}
                 />
-                <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Predictive Burnout Risk</Text>
+                <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Burnout Risk Assessment</Text>
               </View>
               <View
                 style={[
@@ -1045,9 +1066,9 @@ export default function WellnessScreen() {
               </View>
             ) : null}
 
-            {/* 1-Tap Contextual Interventions */}
+            {/* Quick Interventions */}
             <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 10 }]}>
-              Contextual Interventions (1-Tap):
+              Quick Interventions
             </Text>
             <View style={styles.interventionGrid}>
               <Pressable
@@ -1089,7 +1110,7 @@ export default function WellnessScreen() {
 
             {/* Triggers Checklist */}
             <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 12 }]}>
-              Proactive Recovery Checklist:
+              Recovery Checklist
             </Text>
             {burnoutRisk.triggers.map((trigger, idx) => {
               const isChecked = !!checkedTriggers[idx];
@@ -1126,8 +1147,8 @@ export default function WellnessScreen() {
             <Card>
               <View style={styles.optimizerHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
-                  <Ionicons name="sparkles" size={16} color="#06b6d4" style={{ flexShrink: 0 }} />
-                  <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Task &amp; Workflow Optimizer</Text>
+                  <Ionicons name="sparkles" size={18} color="#06b6d4" style={{ flexShrink: 0 }} />
+                  <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Workflow Optimizer</Text>
                 </View>
                 {isHighStrain ? (
                   <View style={[styles.strainBadge, { backgroundColor: 'rgba(244,114,182,0.2)', flexShrink: 0 }]}>
@@ -1142,7 +1163,7 @@ export default function WellnessScreen() {
 
               {/* Subtasks */}
               <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 10 }]}>
-                Low-Friction 25m Pomodoro Slices:
+                Actionable Focus Slices
               </Text>
               {taskDeconstruction.subtasks.map((sub, i) => {
                 const done = !!completedSubtasks[sub.id];
@@ -1189,7 +1210,7 @@ export default function WellnessScreen() {
               {taskDeconstruction.curatedResources.length > 0 ? (
                 <>
                   <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 12 }]}>
-                    Curated Guides for Your Blocker:
+                    Curated Resources
                   </Text>
                   {taskDeconstruction.curatedResources.map((res) => (
                     <TouchableOpacity
@@ -1219,8 +1240,8 @@ export default function WellnessScreen() {
               style={styles.cardHeaderRow}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
-                <Ionicons name="leaf" size={16} color="#f472b6" style={{ flexShrink: 0 }} />
-                <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Quick Resets &amp; Micro-Tools</Text>
+                <Ionicons name="leaf" size={18} color="#f472b6" style={{ flexShrink: 0 }} />
+                <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Quick Resets</Text>
               </View>
               <Ionicons
                 name={resetSectionOpen ? 'chevron-up' : 'chevron-down'}
@@ -1334,11 +1355,11 @@ export default function WellnessScreen() {
                   </View>
                 ) : null}
 
-                {/* 3. Gratitude Win */}
+                {/* Gratitude Win */}
                 {activeResetTool === 'gratitude' ? (
                   <View style={styles.gratitudeContainer}>
                     <Text style={[styles.resetHelper, { color: colors.muted }]}>
-                      Tap 1 micro-win to anchor positive momentum before signing off:
+                      Celebrate a micro-win to anchor positive momentum:
                     </Text>
                     <View style={styles.gratitudePillWrap}>
                       {GRATITUDE_PROMPT_PRESETS.map((preset, i) => (
@@ -1363,7 +1384,7 @@ export default function WellnessScreen() {
           {/* Time Range Filter */}
           <Card>
             <View style={styles.timeRangeBar}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Timeframe:</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Timeframe</Text>
               <View style={styles.timeRangeButtons}>
                 {(['7D', '30D', 'SEMESTER'] as TimeRange[]).map((tr) => (
                   <Pressable
@@ -1871,9 +1892,9 @@ export default function WellnessScreen() {
           style={styles.cardHeaderRow}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
-            <Ionicons name="git-branch" size={16} color="#3b82f6" style={{ flexShrink: 0 }} />
+            <Ionicons name="git-branch" size={18} color="#3b82f6" style={{ flexShrink: 0 }} />
             <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>
-              Developer Integrations &amp; Automated Hooks
+              Developer Integrations
             </Text>
           </View>
           <Ionicons
@@ -1890,11 +1911,11 @@ export default function WellnessScreen() {
 
         {devHooksOpen ? (
           <View style={{ marginTop: 8, gap: 10 }}>
-            {/* 1. Git Post-Commit Hook */}
+            {/* Git Post-Commit Hook */}
             <View style={[styles.hookCard, { borderColor: isLight ? '#E5E7EB' : colors.border, backgroundColor: isLight ? '#f8faf9' : 'rgba(255,255,255,0.03)' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="terminal" size={14} color="#10b981" />
-                <Text style={[styles.hookTitle, { color: colors.text }]}>1. Git Post-Commit Pacing Hook</Text>
+                <Ionicons name="terminal" size={15} color="#10b981" />
+                <Text style={[styles.hookTitle, { color: colors.text }]}>Git Post-Commit Hook</Text>
               </View>
               <Text style={[styles.hookDesc, { color: colors.muted }]}>
                 Triggers a micro check-in prompt when &gt;5 commits occur in 1 hour or during late-night hours (after 10 PM).
@@ -1906,11 +1927,11 @@ export default function WellnessScreen() {
               </View>
             </View>
 
-            {/* 2. VS Code / IDE Extension */}
+            {/* VS Code / IDE Extension */}
             <View style={[styles.hookCard, { borderColor: isLight ? '#E5E7EB' : colors.border, backgroundColor: isLight ? '#f8faf9' : 'rgba(255,255,255,0.03)' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="code-slash" size={14} color="#3b82f6" />
-                <Text style={[styles.hookTitle, { color: colors.text }]}>2. VS Code &amp; JetBrains Pacing Extension</Text>
+                <Ionicons name="code-slash" size={15} color="#3b82f6" />
+                <Text style={[styles.hookTitle, { color: colors.text }]}>IDE Pacing Extension</Text>
               </View>
               <Text style={[styles.hookDesc, { color: colors.muted }]}>
                 Monitors debug sessions exceeding 45 minutes and 3+ consecutive test failures, activating 4-7-8 breathing cues in your status bar.
@@ -1922,11 +1943,11 @@ export default function WellnessScreen() {
               </View>
             </View>
 
-            {/* 3. CI/CD Build Failures Hook */}
+            {/* CI/CD Build Failures Hook */}
             <View style={[styles.hookCard, { borderColor: isLight ? '#E5E7EB' : colors.border, backgroundColor: isLight ? '#f8faf9' : 'rgba(255,255,255,0.03)' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="cloud-upload" size={14} color="#f59e0b" />
-                <Text style={[styles.hookTitle, { color: colors.text }]}>3. CI/CD GitHub Actions Webhook</Text>
+                <Ionicons name="cloud-upload" size={15} color="#f59e0b" />
+                <Text style={[styles.hookTitle, { color: colors.text }]}>CI/CD Failure Webhook</Text>
               </View>
               <Text style={[styles.hookDesc, { color: colors.muted }]}>
                 Automatically pauses reminders and suggests a 5-minute decompress when broken builds trigger syntax frustration.
@@ -1948,7 +1969,9 @@ export default function WellnessScreen() {
 const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
-    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 3,
     marginBottom: 12,
     width: '100%',
   },
@@ -1957,12 +1980,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 10,
+    gap: 6,
+    paddingVertical: 8,
     paddingHorizontal: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 9,
     minWidth: 0,
   },
   tabText: {
@@ -2004,9 +2025,9 @@ const styles = StyleSheet.create({
   },
   xpChip: {
     flexShrink: 0,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
     alignSelf: 'flex-start',
   },
   xpChipText: {
@@ -2047,9 +2068,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 1,
     maxWidth: '100%',
   },
@@ -2067,11 +2088,23 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cardTitle: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.2,
     flex: 1,
     minWidth: 0,
     paddingRight: 4,
+  },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
+  },
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   subtleBadge: {
     fontSize: 11,
@@ -2080,10 +2113,10 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   sectionSubtitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
     marginBottom: 6,
   },
   moduleGrid: {
@@ -2135,7 +2168,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   ratingLabel: {
-    fontSize: 12,
+    fontSize: 13.5,
     fontWeight: '600',
     flex: 1,
     minWidth: 0,
@@ -2170,24 +2203,24 @@ const styles = StyleSheet.create({
   },
   scaleBtn: {
     flex: 1,
-    paddingVertical: 7,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1,
     minWidth: 0,
   },
   scaleBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
   },
   anchorCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     borderWidth: 1,
     backgroundColor: 'rgba(255,255,255,0.02)',
     width: '100%',
@@ -2199,7 +2232,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   anchorDescText: {
-    fontSize: 10,
+    fontSize: 11,
     flex: 1,
     minWidth: 0,
   },
@@ -2224,7 +2257,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   microTitle: {
-    fontSize: 11,
+    fontSize: 12.5,
     fontWeight: '700',
   },
   quickPresetRow: {
@@ -2306,7 +2339,7 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   categoryTagPillText: {
-    fontSize: 11,
+    fontSize: 12,
     flexShrink: 1,
   },
   burnoutHeader: {
@@ -2328,8 +2361,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   burnoutDesc: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 18,
     marginVertical: 6,
   },
   strainAlertBanner: {
@@ -2343,13 +2376,13 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   strainAlertTitle: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '800',
   },
   strainAlertSub: {
-    fontSize: 11,
+    fontSize: 11.5,
     marginTop: 2,
-    lineHeight: 15,
+    lineHeight: 16,
   },
   interventionGrid: {
     flexDirection: 'row',
@@ -2362,17 +2395,17 @@ const styles = StyleSheet.create({
   interventionBtn: {
     flex: 1,
     minWidth: '46%',
-    padding: 8,
+    padding: 9,
     borderRadius: 8,
     borderWidth: 1,
     gap: 2,
   },
   interventionBtnTitle: {
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
   },
   interventionBtnDesc: {
-    fontSize: 9,
+    fontSize: 10.5,
   },
   triggerRow: {
     flexDirection: 'row',
@@ -2382,7 +2415,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   triggerText: {
-    fontSize: 12,
+    fontSize: 12.5,
     flex: 1,
     minWidth: 0,
   },
@@ -2400,10 +2433,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   optimizerAdvice: {
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 18,
     marginTop: 6,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   subtaskItem: {
     flexDirection: 'row',
@@ -2416,11 +2449,11 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   subtaskTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   subtaskRationale: {
-    fontSize: 10,
+    fontSize: 11,
     marginTop: 2,
   },
   resourceCard: {
@@ -2431,17 +2464,17 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   resourceBadge: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '700',
     color: '#06b6d4',
   },
   resourceTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     marginTop: 2,
   },
   resourceDesc: {
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 2,
   },
   subToolTabs: {
@@ -2805,12 +2838,12 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   hookTitle: {
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 13.5,
+    fontWeight: '700',
   },
   hookDesc: {
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 17,
   },
   codeSnippet: {
     backgroundColor: '#1e293b',
@@ -2821,43 +2854,61 @@ const styles = StyleSheet.create({
   },
   codeText: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 10,
+    fontSize: 11,
     color: '#38bdf8',
-    lineHeight: 14,
+    lineHeight: 15,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 10,
-    paddingRight: 42,
+    gap: 14,
+    marginBottom: 12,
+    minHeight: 88,
     width: '100%',
   },
   headerRowLarge: {
     alignItems: 'flex-start',
   },
-  wellnessLogo: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#ffffff',
-    overflow: 'hidden',
+  wellnessLogoWrapper: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    padding: 2,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 3,
     flexShrink: 0,
   },
+  wellnessLogoWrapperLarge: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+  },
+  wellnessLogo: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 27,
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
   wellnessLogoLarge: {
-    width: 62,
-    height: 62,
     borderRadius: 31,
   },
   headerText: {
     flex: 1,
     minWidth: 0,
     gap: 3,
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: -0.3,
+    lineHeight: 28,
   },
   headerSubtitle: {
     fontSize: 13,

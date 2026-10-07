@@ -335,27 +335,44 @@ export default function HomeScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      {/* Top Header matching Picture 2 */}
+      {/* Top Header Bar */}
       <View style={styles.topHeader}>
         <View style={styles.topHeaderLeft}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Open workspace menu"
             onPress={() => setMenuOpen(true)}
-            hitSlop={10}
-            style={styles.headerBtn}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.navIconButton,
+              {
+                backgroundColor: isLight ? 'rgba(237, 243, 239, 0.95)' : colors.surfaceElevated,
+                borderColor: isLight ? 'rgba(145, 219, 94, 0.35)' : colors.border,
+              },
+              pressed && styles.pressedBtn,
+            ]}
           >
-            <Ionicons name="menu" size={26} color={colors.text} />
+            <Ionicons name="menu" size={22} color={colors.text} />
           </Pressable>
 
           <View style={styles.brandGroup}>
-            <Image
-              source={require('../../../assets/images/synergysphere-brand-icon.png')}
-              style={styles.brandIcon}
-              resizeMode="contain"
-            />
-            <Text style={[styles.brandTitle, { color: isLight ? '#144626' : colors.primary }]}>
-              SynergySphere
+            <View
+              style={[
+                styles.brandIconWrapper,
+                {
+                  backgroundColor: isLight ? 'rgba(145, 219, 94, 0.18)' : 'rgba(145, 219, 94, 0.12)',
+                  borderColor: isLight ? 'rgba(145, 219, 94, 0.45)' : 'rgba(145, 219, 94, 0.3)',
+                },
+              ]}
+            >
+              <Image
+                source={require('../../../assets/images/synergysphere-brand-icon.png')}
+                style={styles.brandIcon}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={[styles.brandTitle, { color: colors.text }]}>
+              Synergy<Text style={{ color: primaryAccent }}>Sphere</Text>
             </Text>
           </View>
         </View>
@@ -365,10 +382,17 @@ export default function HomeScreen() {
             accessibilityRole="button"
             accessibilityLabel="Notifications"
             onPress={() => router.push('/notifications' as never)}
-            hitSlop={10}
-            style={styles.headerBtn}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.navIconButton,
+              {
+                backgroundColor: isLight ? 'rgba(237, 243, 239, 0.95)' : colors.surfaceElevated,
+                borderColor: isLight ? 'rgba(145, 219, 94, 0.35)' : colors.border,
+              },
+              pressed && styles.pressedBtn,
+            ]}
           >
-            <Ionicons name="notifications-outline" size={23} color={colors.text} />
+            <Ionicons name="notifications-outline" size={20} color={colors.text} />
             {(data?.stats?.unreadNotifications ?? 0) > 0 ? (
               <View style={[styles.unreadDot, { backgroundColor: colors.danger }]} />
             ) : null}
@@ -379,16 +403,17 @@ export default function HomeScreen() {
             accessibilityLabel="View profile"
             onPress={() => router.push('/profile' as never)}
             hitSlop={8}
-            style={styles.avatarBtn}
+            style={({ pressed }) => [
+              styles.avatarBtn,
+              pressed && styles.pressedBtn,
+            ]}
           >
             <View
               style={[
                 styles.avatarCircle,
                 {
-                  backgroundColor: isLight
-                    ? '#0B2314'
-                    : '#0F3D24',
-                  borderColor: colors.border,
+                  backgroundColor: isLight ? '#0B2314' : '#0F3D24',
+                  borderColor: isLight ? '#1e6827' : colors.primary,
                 },
               ]}
             >
@@ -413,13 +438,33 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Greeting & Slogan */}
-      <View style={styles.greetingWrap}>
-        <Text style={[styles.greeting, { color: colors.text }]}>
+      {/* Hero Welcome Header */}
+      <View style={styles.heroGreetingWrap}>
+        <View style={styles.kickerRow}>
+          <View
+            style={[
+              styles.kickerPill,
+              {
+                backgroundColor: isLight ? 'rgba(30, 104, 39, 0.08)' : 'rgba(145, 219, 94, 0.12)',
+                borderColor: isLight ? 'rgba(30, 104, 39, 0.22)' : 'rgba(145, 219, 94, 0.28)',
+              },
+            ]}
+          >
+            <Ionicons name="sparkles" size={12} color={primaryAccent} />
+            <Text style={[styles.kickerText, { color: primaryAccent }]}>
+              {levelTitle ? levelTitle.toUpperCase() : 'DAILY WORKSPACE'}
+            </Text>
+          </View>
+          <Text style={[styles.dateText, { color: colors.muted }]}>
+            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+          </Text>
+        </View>
+
+        <Text style={[styles.heroGreeting, { color: colors.text }]}>
           {getGreeting()}, {user?.firstName ?? 'Developer'}!
         </Text>
-        <Text style={[styles.slogan, { color: colors.muted }]}>
-          Learn. Build. Thrive.{levelTitle ? ` · ${levelTitle}` : ''}
+        <Text style={[styles.heroSubtitle, { color: colors.muted }]} numberOfLines={2}>
+          Learn. Build. Thrive. · Ready to build momentum and hit your goals today.
         </Text>
       </View>
 
@@ -733,85 +778,123 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 4,
     marginTop: -2,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   topHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+  },
+  navIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  pressedBtn: {
+    opacity: 0.75,
+    transform: [{ scale: 0.96 }],
   },
   brandGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
+  brandIconWrapper: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   brandIcon: {
-    width: 28,
-    height: 28,
+    width: 22,
+    height: 22,
   },
   brandTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.3,
+    fontSize: 19,
+    fontWeight: '900',
+    letterSpacing: -0.4,
   },
   topHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-  },
-  headerBtn: {
-    padding: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
+    gap: 10,
   },
   unreadDot: {
     position: 'absolute',
-    top: 2,
-    right: 2,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 6,
+    right: 6,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   avatarBtn: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarCircle: {
-  width: 32,
-  height: 32,
-  borderRadius: 16,
-  justifyContent: 'center',
-  alignItems: 'center',
-  overflow: 'hidden',
-  borderWidth: 1,
-},
-
-avatarImage: {
-  width: '100%',
-  height: '100%',
-  borderRadius: 16,
-},
-
-avatarInitials: {
-  color: '#FFFFFF',
-  fontSize: 13,
-  fontWeight: '800',
-  letterSpacing: 0.5,
-},
-  greetingWrap: {
-    marginTop: 2,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1.5,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 19,
+  },
+  avatarInitials: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  heroGreetingWrap: {
+    marginTop: 4,
+    marginBottom: 14,
+    gap: 4,
+  },
+  kickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 4,
-    gap: 3,
   },
-  greeting: {
-    fontSize: 16,
-    fontWeight: '700',
+  kickerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 14,
+    borderWidth: 1,
   },
-  slogan: {
-    fontSize: 14,
+  kickerText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  dateText: {
+    fontSize: 12,
     fontWeight: '600',
-    lineHeight: 20,
+  },
+  heroGreeting: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.4,
+    lineHeight: 28,
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   xpRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },
   xp: { fontSize: 32, fontWeight: '800' },

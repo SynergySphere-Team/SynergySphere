@@ -39,6 +39,33 @@ const attemptSchema = z.object({
   testResults: z.any().optional(),
 });
 
+router.post('/:id/test', authenticate, validateBody(attemptSchema), async (req: AuthRequest, res) => {
+  const challenge = await queryOne<{
+    id: string;
+    title: string;
+    language: string | null;
+    solution: string | null;
+    xpReward: number;
+  }>(
+    `SELECT "id", "title", "language", "solution", "xpReward"
+     FROM "Challenge"
+     WHERE "id" = $1`,
+    [paramId(req)],
+  );
+  if (!challenge) {
+    res.status(404).json({ error: 'Challenge not found' });
+    return;
+  }
+
+  const judgeResult = await judgeChallengeSubmission(challenge, req.body.code);
+  res.json({
+    passed: judgeResult.passed,
+    testResults: judgeResult.testResults,
+    output: judgeResult.output,
+    error: judgeResult.error,
+  });
+});
+
 router.post('/:id/submit', authenticate, validateBody(attemptSchema), async (req: AuthRequest, res) => {
   const challenge = await queryOne<{
     id: string;

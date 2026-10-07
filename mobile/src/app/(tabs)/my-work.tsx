@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Screen, Loading, Notice } from '@/components/Screen';
+import { Screen, Loading, Notice, BackButton } from '@/components/Screen';
 import { Button, Heading } from '@/components/ui';
 import { api } from '@/services/api';
 import { useTheme } from '@/context/ThemeContext';
@@ -170,39 +170,24 @@ export function MyWorkView({
 
   const content = (
     <>
-      {showBackButton ? (
-        <View style={styles.topNavRow}>
-          <Pressable
-            style={[styles.backNavButton, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/(tabs)/community' as never);
-              }
-            }}
-            hitSlop={8}
-          >
-            <Ionicons name="chevron-back" size={18} color={colors.text} />
-            <Text style={[styles.backNavText, { color: colors.text }]}>Community</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
       {/* Header */}
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
-          <Heading subtitle="Your assigned tasks, active PRs, and synced repositories.">
+          <Heading
+            subtitle="Your assigned tasks, active PRs, and synced repositories."
+            rightAction={
+              <Pressable
+                style={[styles.refreshIconButton, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}
+                onPress={load}
+                accessibilityLabel="Refresh GitHub data"
+              >
+                <Ionicons name="reload" size={18} color={colors.primary} />
+              </Pressable>
+            }
+          >
             My Work
           </Heading>
         </View>
-        <Pressable
-          style={[styles.refreshIconButton, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}
-          onPress={load}
-          accessibilityLabel="Refresh GitHub data"
-        >
-          <Ionicons name="reload" size={18} color={colors.primary} />
-        </Pressable>
       </View>
 
       {/* Disconnected state banner */}
@@ -753,7 +738,11 @@ export function MyWorkView({
   );
 
   if (wrapInScreen) {
-    return <Screen>{content}</Screen>;
+    return (
+      <Screen>
+        {content}
+      </Screen>
+    );
   }
 
   return <View style={{ gap: 12 }}>{content}</View>;

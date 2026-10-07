@@ -480,41 +480,6 @@ export default function OpportunityDetailsScreen() {
   if (!project) {
     return (
       <Screen>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={() =>
-            router.back()
-          }
-          style={({
-            pressed,
-          }) => [
-            styles.backButton,
-            pressed &&
-              styles.pressed,
-          ]}
-        >
-          <Ionicons
-            name="arrow-back"
-            size={20}
-            color={
-              colors.text
-            }
-          />
-
-          <Text
-            style={[
-              styles.backText,
-              {
-                color:
-                  colors.text,
-              },
-            ]}
-          >
-            Back
-          </Text>
-        </Pressable>
-
         <Notice>
           {error ||
             'Project not found.'}
@@ -530,43 +495,6 @@ export default function OpportunityDetailsScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      {/* BACK */}
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        onPress={() =>
-          router.back()
-        }
-        style={({
-          pressed,
-        }) => [
-          styles.backButton,
-          pressed &&
-            styles.pressed,
-        ]}
-      >
-        <Ionicons
-          name="arrow-back"
-          size={20}
-          color={
-            colors.text
-          }
-        />
-
-        <Text
-          style={[
-            styles.backText,
-            {
-              color:
-                colors.text,
-            },
-          ]}
-        >
-          Back
-        </Text>
-      </Pressable>
-
       {/* HEADER */}
 
       <Heading

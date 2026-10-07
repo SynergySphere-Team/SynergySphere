@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import * as Linking from 'expo-linking';
 import { Ionicons } from '@expo/vector-icons';
-import { Screen, Notice } from '@/components/Screen';
+import { Screen, Notice, BackButton } from '@/components/Screen';
 import { Button, Heading } from '@/components/ui';
 import { github } from '@/services/github';
 import type { GithubDeviceAuthorization } from '@/types/api';
@@ -157,18 +157,7 @@ export default function GithubConnectScreen() {
   const parts = authorization?.userCode ? authorization.userCode.split('-') : [];
 
   return (
-    <Screen onSwipeBack={navigateBackOrToReturn}>
-      <View style={styles.topNavRow}>
-        <Pressable
-          style={[styles.backNavButton, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}
-          onPress={navigateBackOrToReturn}
-          hitSlop={8}
-        >
-          <Ionicons name="chevron-back" size={18} color={colors.text} />
-          <Text style={[styles.backNavText, { color: colors.text }]}>Back</Text>
-        </Pressable>
-      </View>
-
+    <Screen onBack={navigateBackOrToReturn} onSwipeBack={navigateBackOrToReturn}>
       <Heading subtitle="Connect your GitHub account to create repositories, request access, and collaborate.">
         Connect GitHub
       </Heading>

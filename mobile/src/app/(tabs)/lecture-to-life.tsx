@@ -6,6 +6,7 @@ import { File } from 'expo-file-system';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card, Field, Heading } from '@/components/ui';
+import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import type { LectureUpload } from '@/types/api';
@@ -23,6 +24,7 @@ const asArray = <T,>(value: T[] | string | null | undefined): T[] =>
 
 export default function LectureToLifeScreen() {
   const { colors, theme } = useTheme();
+  const { fontSize, largerText } = useAccessibility();
 
   const [uploads, setUploads] = useState<LectureUpload[]>([]);
   const [selected, setSelected] = useState<LectureUpload | null>(null);
@@ -168,9 +170,67 @@ export default function LectureToLifeScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <Heading subtitle="Upload lecture slides, documents, or notes to create interactive study tools.">
-        Lecture to Life
-      </Heading>
+      {/* LECTURE TO LIFE HEADER */}
+      <View
+        style={[
+          styles.headerRow,
+          largerText && styles.headerRowLarge,
+        ]}
+      >
+        <View
+          style={[
+            styles.lectureLogoWrapper,
+            largerText && styles.lectureLogoWrapperLarge,
+            {
+              backgroundColor:
+                theme === 'dark'
+                  ? 'rgba(16, 33, 40, 0.7)'
+                  : 'rgba(237, 243, 239, 0.85)',
+              borderColor:
+                theme === 'dark'
+                  ? 'rgba(145, 219, 94, 0.28)'
+                  : 'rgba(145, 219, 94, 0.45)',
+              shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
+            },
+          ]}
+        >
+          <Ionicons
+            name="school"
+            size={28}
+            color={colors.primary}
+          />
+        </View>
+
+        <View style={styles.headerText}>
+          <Text
+            allowFontScaling
+            style={[
+              styles.headerTitle,
+              {
+                color: colors.text,
+                fontSize: fontSize(24),
+              },
+            ]}
+          >
+            Lecture{'\n'}to Life
+          </Text>
+
+          <Text
+            allowFontScaling
+            numberOfLines={2}
+            style={[
+              styles.headerSubtitle,
+              {
+                color: colors.muted,
+                fontSize: fontSize(13),
+                lineHeight: fontSize(18),
+              },
+            ]}
+          >
+            Upload lecture slides &amp; documents to generate study cards and quizzes.
+          </Text>
+        </View>
+      </View>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
 
@@ -521,6 +581,52 @@ const styles = StyleSheet.create({
   projectItem: { marginTop: 8, gap: 4 },
   projectTitle: { fontSize: 14, fontWeight: '700' },
   exerciseItem: { marginTop: 10, gap: 4 },
-  exerciseHint: { fontSize: 12, fontStyle: 'italic', marginTop: 2 },
+  exerciseHint: { fontSize: 12, fontWeight: '600', marginTop: 2 },
   pressed: { opacity: 0.75 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 12,
+    minHeight: 88,
+    width: '100%',
+  },
+  headerRowLarge: {
+    alignItems: 'flex-start',
+  },
+  lectureLogoWrapper: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    padding: 2,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 3,
+    flexShrink: 0,
+  },
+  lectureLogoWrapperLarge: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+    lineHeight: 28,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
 });

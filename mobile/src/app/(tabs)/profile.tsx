@@ -59,6 +59,7 @@ export default function ProfileScreen() {
 
   return (
     <Screen
+      showBackButton
       refreshing={refreshing}
       onRefresh={handleRefresh}
     >

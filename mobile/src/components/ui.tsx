@@ -166,41 +166,50 @@ export function Field({
 export function Heading({
   children,
   subtitle,
+  rightAction,
 }: {
   children: ReactNode;
   subtitle?: string;
+  rightAction?: ReactNode;
 }) {
   const { colors } = useTheme();
   const { fontSize } = useAccessibility();
 
   return (
-    <View>
-      <Text
-        style={[
-          styles.heading,
-          {
-            color: colors.text,
-            fontSize: fontSize(25),
-          },
-        ]}
-      >
-        {children}
-      </Text>
-
-      {subtitle ? (
+    <View style={styles.headingContainer}>
+      <View style={styles.headingTextGroup}>
         <Text
+          allowFontScaling
           style={[
-            styles.subtitle,
+            styles.heading,
             {
-              color: colors.muted,
-              fontSize: fontSize(14),
-              lineHeight: fontSize(20),
+              color: colors.text,
+              fontSize: fontSize(24),
+              lineHeight: fontSize(28),
             },
           ]}
         >
-          {subtitle}
+          {children}
         </Text>
-      ) : null}
+
+        {subtitle ? (
+          <Text
+            allowFontScaling
+            numberOfLines={2}
+            style={[
+              styles.subtitle,
+              {
+                color: colors.muted,
+                fontSize: fontSize(13),
+                lineHeight: fontSize(18),
+              },
+            ]}
+          >
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      {rightAction}
     </View>
   );
 }
@@ -314,17 +323,26 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     paddingVertical: 8,
   },
+  headingContainer: {
+    minHeight: 88,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 12,
+    width: '100%',
+  },
+  headingTextGroup: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+    justifyContent: 'center',
+  },
   heading: {
-    fontSize: 25,
-    fontWeight: '800',
+    fontWeight: '900',
     letterSpacing: -0.3,
   },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 4,
-    fontWeight: '500',
-  },
+  subtitle: {},
   stat: {
     flex: 1,
     padding: 14,

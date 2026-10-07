@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Screen, Loading, Notice } from '@/components/Screen';
+import { Screen, Loading, Notice, BackButton } from '@/components/Screen';
 import { Button, Heading } from '@/components/ui';
 import { api } from '@/services/api';
 import type { GithubActivity, Project } from '@/types/api';
@@ -138,7 +138,7 @@ export default function ProjectDetailScreen() {
   if (loading) return <Loading />;
   if (!project) {
     return (
-      <Screen>
+      <Screen showBackButton>
         <Notice>{error || 'Project not found.'}</Notice>
       </Screen>
     );
@@ -162,7 +162,7 @@ export default function ProjectDetailScreen() {
         </Pressable>
       </View>
 
-      <Heading subtitle={`${project.organization || 'Community'} · ${project.primaryLanguage || 'Community project'}`}>
+      <Heading subtitle={`${project.githubFullName || project.organization || 'Community'} · ${project.primaryLanguage || 'Community project'}`}>
         {project.title}
       </Heading>
 

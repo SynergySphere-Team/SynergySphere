@@ -55,11 +55,45 @@ export default function LeaderboardScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <View style={styles.headerWrap}>
-        <Text style={[styles.kicker, { color: colors.primary }]}>COMMUNITY RANKINGS</Text>
-        <Heading subtitle="Top learners, builders, and contributors across SynergySphere.">
-          Leaderboard
-        </Heading>
+      <View style={styles.headerRow}>
+        <View
+          style={[
+            styles.leaderboardLogoWrapper,
+            {
+              backgroundColor:
+                theme === 'dark'
+                  ? 'rgba(16, 33, 40, 0.7)'
+                  : 'rgba(237, 243, 239, 0.85)',
+              borderColor:
+                theme === 'dark'
+                  ? 'rgba(145, 219, 94, 0.28)'
+                  : 'rgba(145, 219, 94, 0.45)',
+              shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
+            },
+          ]}
+        >
+          <Ionicons name="trophy" size={26} color={accentColor} />
+        </View>
+
+        <View style={styles.headerText}>
+          <Text
+            allowFontScaling
+            style={[styles.headerTitle, { color: colors.text }]}
+          >
+            Community{'\n'}Leaderboard
+          </Text>
+
+          <Text
+            allowFontScaling
+            numberOfLines={2}
+            style={[
+              styles.headerSubtitle,
+              { color: colors.muted },
+            ]}
+          >
+            Top learners, builders, and contributors across SynergySphere.
+          </Text>
+        </View>
       </View>
 
       {error ? <Notice>{error}</Notice> : null}
@@ -137,14 +171,43 @@ export default function LeaderboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerWrap: {
-    marginBottom: 4,
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 12,
+    minHeight: 88,
+    width: '100%',
   },
-  kicker: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    marginBottom: 2,
+  leaderboardLogoWrapper: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    padding: 2,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 3,
+    flexShrink: 0,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+    lineHeight: 28,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   cardRow: {
     flexDirection: 'row',

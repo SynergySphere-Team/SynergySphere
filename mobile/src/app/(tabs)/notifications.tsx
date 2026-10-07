@@ -18,6 +18,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import {
+  BackButton,
   Loading,
   Notice,
   Screen,
@@ -327,51 +328,9 @@ export default function NotificationsScreen() {
       refreshing={refreshing}
       onRefresh={handleRefresh}
     >
-      <View
-        style={
-          styles.topRow
-        }
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace(
-                '/(tabs)/community' as never,
-              );
-            }
-          }}
-          style={({
-            pressed,
-          }) => [
-            styles.backButton,
-
-            pressed &&
-              styles.pressed,
-          ]}
-        >
-          <Ionicons
-            name="arrow-back"
-            size={21}
-            color={
-              colors.text
-            }
-          />
-        </Pressable>
-
-        <View
-          style={
-            styles.headingWrap
-          }
-        >
-          <Heading subtitle="Project, Community, comment, like and system updates.">
-            Notifications
-          </Heading>
-        </View>
-      </View>
+      <Heading subtitle="Project, Community, comment, like and system updates.">
+        Notifications
+      </Heading>
 
       {error ? (
         <Notice>

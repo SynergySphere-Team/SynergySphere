@@ -143,48 +143,9 @@ export default function NotificationSettingsScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <View
-        style={
-          styles.headerRow
-        }
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back to Settings"
-          onPress={() =>
-            router.replace(
-              '/(tabs)/settings' as never,
-            )
-          }
-          style={[
-            styles.backButton,
-            {
-              backgroundColor:
-                colors.surface,
-              borderColor:
-                colors.border,
-            },
-          ]}
-        >
-          <Ionicons
-            name="arrow-back"
-            size={20}
-            color={
-              colors.text
-            }
-          />
-        </Pressable>
-
-        <View
-          style={{
-            flex: 1,
-          }}
-        >
-          <Heading subtitle="Choose how SynergySphere keeps you informed.">
-            Notifications
-          </Heading>
-        </View>
-      </View>
+      <Heading subtitle="Choose how SynergySphere keeps you informed.">
+        Notification Settings
+      </Heading>
 
       {message ? (
         <Notice

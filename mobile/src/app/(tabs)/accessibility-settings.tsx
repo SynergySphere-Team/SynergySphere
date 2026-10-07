@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { Screen } from '@/components/Screen';
+import { Heading } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { useAccessibility } from '@/context/AccessibilityContext';
 
@@ -93,56 +94,11 @@ export default function AccessibilitySettingsScreen() {
       : colors.primary;
 
   return (
-    <Screen>
+    <Screen onBack={goBackToSettings}>
       <View style={styles.page}>
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back to Settings"
-            hitSlop={12}
-            onPress={goBackToSettings}
-            style={({ pressed }) => [
-              styles.backButton,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-              },
-              pressed && styles.pressed,
-            ]}
-          >
-            <Ionicons
-              name="arrow-back"
-              size={22}
-              color={colors.text}
-            />
-          </Pressable>
-
-          <View style={styles.headerText}>
-            <Text
-              style={[
-                styles.title,
-                {
-                  color: colors.text,
-                  fontSize: fontSize(30),
-                },
-              ]}
-            >
-              Accessibility
-            </Text>
-
-            <Text
-              style={[
-                styles.subtitle,
-                {
-                  color: colors.muted,
-                  fontSize: fontSize(15),
-                },
-              ]}
-            >
-              Adjust text, contrast and motion preferences.
-            </Text>
-          </View>
-        </View>
+        <Heading subtitle="Adjust text, contrast and motion preferences.">
+          Accessibility
+        </Heading>
 
         <Text
           style={[

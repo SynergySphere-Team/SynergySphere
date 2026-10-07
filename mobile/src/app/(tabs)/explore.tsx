@@ -83,15 +83,33 @@ export default function ExploreScreen() {
           largerText && styles.headerRowLarge,
         ]}
       >
-        <Image
-          source={require('../../../assets/images/explore-logo.png')}
+        <View
           style={[
-            styles.exploreLogo,
-            largerText && styles.exploreLogoLarge,
+            styles.exploreLogoWrapper,
+            largerText && styles.exploreLogoWrapperLarge,
+            {
+              backgroundColor:
+                theme === 'dark'
+                  ? 'rgba(16, 33, 40, 0.7)'
+                  : 'rgba(237, 243, 239, 0.85)',
+              borderColor:
+                theme === 'dark'
+                  ? 'rgba(145, 219, 94, 0.28)'
+                  : 'rgba(145, 219, 94, 0.45)',
+              shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
+            },
           ]}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
+        >
+          <Image
+            source={require('../../../assets/images/explore-logo.png')}
+            style={[
+              styles.exploreLogo,
+              largerText && styles.exploreLogoLarge,
+            ]}
+            resizeMode="contain"
+            accessibilityIgnoresInvertColors
+          />
+        </View>
 
         <View style={styles.headerText}>
           <Text
@@ -109,6 +127,7 @@ export default function ExploreScreen() {
 
           <Text
             allowFontScaling
+            numberOfLines={2}
             style={[
               styles.headerSubtitle,
               {
@@ -383,33 +402,54 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 10,
-    paddingRight: 42,
+    gap: 14,
+    marginBottom: 12,
+    minHeight: 88,
+    width: '100%',
   },
   headerRowLarge: {
     alignItems: 'flex-start',
   },
+  exploreLogoWrapper: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    padding: 2,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 3,
+    flexShrink: 0,
+  },
+  exploreLogoWrapperLarge: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+  },
   exploreLogo: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#ffffff',
+    width: '100%',
+    height: '100%',
+    borderRadius: 27,
+    backgroundColor: 'transparent',
     overflow: 'hidden',
   },
   exploreLogoLarge: {
-    width: 62,
-    height: 62,
     borderRadius: 31,
   },
   headerText: {
     flex: 1,
+    minWidth: 0,
     gap: 3,
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: -0.3,
+    lineHeight: 28,
   },
   headerSubtitle: {
     fontSize: 13,
