@@ -183,9 +183,10 @@ export function Screen({
     pathname === '/notifications' ||
     pathname === '/(tabs)/notifications' ||
     pathname === '/profile' ||
-    pathname === '/(tabs)/profile' ||
     pathname === '/login' ||
-    pathname === '/(auth)/login';
+    pathname === '/(auth)/login' ||
+    pathname === '/onboarding' ||
+    pathname === '/(auth)/onboarding';
 
   const shouldShowBack = showBackButton !== undefined ? showBackButton : !isMainTabRoot;
   const canPerformBack = !disableSwipeBack && swipeBack && (!isMainTabRoot || router.canGoBack());
