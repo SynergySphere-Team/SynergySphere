@@ -127,10 +127,8 @@ export default function ProjectWizardScreen() {
           onPress={() => {
             if (step > 0) {
               setStep(step - 1);
-            } else if (router.canGoBack()) {
-              router.back();
             } else {
-              router.replace('/(tabs)/community' as never);
+              router.replace('/community?tab=initiatives' as never);
             }
           }}
           hitSlop={8}

@@ -4,7 +4,6 @@ import {
   useMemo,
   useState,
 } from 'react';
-
 import {
   ActivityIndicator,
   Pressable,
@@ -13,14 +12,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-
 import { api } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-
 type InitiativeProject = {
   id: string;
   title: string;
@@ -50,7 +46,6 @@ type InitiativeProject = {
     applications?: number;
   };
 };
-
 const CATEGORIES = [
   { value: 'OPEN_SOURCE', label: 'Open Source', icon: 'code-slash-outline' as const },
   { value: 'GREEN_SOFTWARE', label: 'Green Software', icon: 'leaf-outline' as const },
@@ -62,14 +57,12 @@ const CATEGORIES = [
   { value: 'GREEN_INFRASTRUCTURE', label: 'Green Infrastructure', icon: 'business-outline' as const },
   { value: 'OTHER', label: 'Other', icon: 'folder-outline' as const },
 ];
-
 function categoryLabel(value?: string | null) {
   return String(value ?? 'OTHER')
     .replaceAll('_', ' ')
     .toLowerCase()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
-
 function statusLabel(status?: string | null) {
   switch (String(status ?? '').toUpperCase()) {
     case 'APPROVED':
@@ -88,48 +81,36 @@ function statusLabel(status?: string | null) {
       return status || 'Submitted';
   }
 }
-
 export function CommunityInitiatives() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors, theme } = useTheme();
-
   const accentColor =
     theme === 'light'
       ? '#1e6827'
       : colors.primary;
-
   const [projects, setProjects] =
     useState<InitiativeProject[]>([]);
-
   const [search, setSearch] =
     useState('');
-
   const [
     selectedCategory,
     setSelectedCategory,
   ] = useState('ALL');
-
   const [loading, setLoading] =
     useState(true);
-
   const [searching, setSearching] =
     useState(false);
-
   const [error, setError] =
     useState('');
-
   const role =
     String(user?.role ?? '').toUpperCase();
-
   const isAdmin =
     role === 'ADMIN';
-
   const canCreate =
     role === 'STUDENT' ||
     role === 'ORGANIZATION' ||
     role === 'ADMIN';
-
   const loadProjects =
     useCallback(
       async (
@@ -139,9 +120,7 @@ export function CommunityInitiatives() {
         try {
           setError('');
           setSearching(true);
-
           const params: string[] = [];
-
           if (query.trim()) {
             params.push(
               `search=${encodeURIComponent(
@@ -149,7 +128,6 @@ export function CommunityInitiatives() {
               )}`,
             );
           }
-
           if (
             category &&
             category !== 'ALL'
@@ -160,19 +138,16 @@ export function CommunityInitiatives() {
               )}`,
             );
           }
-
           const queryString =
             params.length
               ? `?${params.join('&')}`
               : '';
-
           const result =
             await api.get<
               InitiativeProject[]
             >(
               `/projects${queryString}`,
             );
-
           setProjects(
             Array.isArray(result)
               ? result
@@ -180,7 +155,6 @@ export function CommunityInitiatives() {
           );
         } catch (e) {
           setProjects([]);
-
           setError(
             e instanceof Error
               ? e.message
@@ -193,11 +167,9 @@ export function CommunityInitiatives() {
       },
       [],
     );
-
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
-
   const myProjects =
     useMemo(
       () =>
@@ -212,7 +184,6 @@ export function CommunityInitiatives() {
             ),
       [projects, isAdmin],
     );
-
   const myApplications =
     useMemo(
       () =>
@@ -223,7 +194,6 @@ export function CommunityInitiatives() {
         ),
       [projects],
     );
-
   const opportunities =
     useMemo(
       () =>
@@ -233,51 +203,41 @@ export function CommunityInitiatives() {
         ),
       [projects],
     );
-
   function searchProjects() {
     setSelectedCategory('ALL');
-
     loadProjects(
       search,
       'ALL',
     );
   }
-
   function clearSearch() {
     setSearch('');
     setSelectedCategory('ALL');
-
     loadProjects(
       '',
       'ALL',
     );
   }
-
   function selectCategory(
     category: string,
   ) {
     setSelectedCategory(
       category,
     );
-
     setSearch('');
-
     loadProjects(
       '',
       category,
     );
   }
-
   function showAll() {
     setSelectedCategory('ALL');
     setSearch('');
-
     loadProjects(
       '',
       'ALL',
     );
   }
-
   function openProject(
     projectId: string,
   ) {
@@ -285,7 +245,6 @@ export function CommunityInitiatives() {
       `/community/${projectId}` as never,
     );
   }
-
   if (loading) {
     return (
       <View
@@ -304,7 +263,6 @@ export function CommunityInitiatives() {
             accentColor
           }
         />
-
         <Text
           style={{
             color:
@@ -316,7 +274,6 @@ export function CommunityInitiatives() {
       </View>
     );
   }
-
   return (
     <View
       style={
@@ -340,7 +297,6 @@ export function CommunityInitiatives() {
             size={18}
             color="#B3261E"
           />
-
           <Text
             style={[
               styles.errorText,
@@ -352,7 +308,6 @@ export function CommunityInitiatives() {
           >
             {error}
           </Text>
-
           <Pressable
             onPress={() =>
               setError('')
@@ -368,7 +323,6 @@ export function CommunityInitiatives() {
           </Pressable>
         </View>
       ) : null}
-
       <View
         style={[
           styles.searchCard,
@@ -391,7 +345,6 @@ export function CommunityInitiatives() {
         >
           Find projects
         </Text>
-
         <View
           style={
             styles.searchRow
@@ -421,7 +374,6 @@ export function CommunityInitiatives() {
               },
             ]}
           />
-
           <Pressable
             onPress={
               searchProjects
@@ -455,7 +407,6 @@ export function CommunityInitiatives() {
             )}
           </Pressable>
         </View>
-
         {search.trim() ? (
           <Pressable
             onPress={
@@ -476,7 +427,6 @@ export function CommunityInitiatives() {
           </Pressable>
         ) : null}
       </View>
-
       <View
         style={
           styles.sectionHeader
@@ -493,7 +443,6 @@ export function CommunityInitiatives() {
         >
           Explore Categories
         </Text>
-
         {selectedCategory !==
         'ALL' ? (
           <Pressable
@@ -515,7 +464,6 @@ export function CommunityInitiatives() {
           </Pressable>
         ) : null}
       </View>
-
       <View
         style={
           styles.categoryGrid
@@ -528,7 +476,6 @@ export function CommunityInitiatives() {
             const selected =
               selectedCategory ===
               category.value;
-
             return (
               <Pressable
                 key={
@@ -544,7 +491,6 @@ export function CommunityInitiatives() {
                   {
                     backgroundColor:
                       colors.surface,
-
                     borderColor:
                       selected
                         ? accentColor
@@ -571,7 +517,6 @@ export function CommunityInitiatives() {
                     }
                   />
                 </View>
-
                 <Text
                   style={[
                     styles.categoryText,
@@ -590,7 +535,31 @@ export function CommunityInitiatives() {
           },
         )}
       </View>
-
+      <Pressable
+        onPress={() => router.push('/github-connect' as never)}
+        style={[
+          styles.githubConnectCard,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <View
+          style={[
+            styles.githubConnectIcon,
+            { backgroundColor: colors.surfaceElevated },
+          ]}
+        >
+          <Ionicons name="logo-github" size={24} color={colors.text} />
+        </View>
+        <View style={styles.githubConnectCopy}>
+          <Text style={[styles.githubConnectTitle, { color: colors.text }]}>
+            Connect to GitHub
+          </Text>
+          <Text style={[styles.githubConnectDescription, { color: colors.muted }]}>
+            Connect your GitHub account to link repositories and use GitHub features in Community projects.
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={accentColor} />
+      </Pressable>
       {canCreate ? (
         <Pressable
           onPress={() =>
@@ -611,7 +580,6 @@ export function CommunityInitiatives() {
             size={19}
             color="#FFFFFF"
           />
-
           <Text
             style={
               styles.primaryButtonText
@@ -621,7 +589,6 @@ export function CommunityInitiatives() {
           </Text>
         </Pressable>
       ) : null}
-
       {myProjects.length >
       0 ? (
         <View
@@ -640,7 +607,6 @@ export function CommunityInitiatives() {
           >
             My Community Projects
           </Text>
-
           {myProjects.map(
             (
               project,
@@ -654,7 +620,6 @@ export function CommunityInitiatives() {
                   {
                     backgroundColor:
                       colors.surface,
-
                     borderColor:
                       colors.border,
                   },
@@ -673,7 +638,6 @@ export function CommunityInitiatives() {
                     project.category,
                   )}
                 </Text>
-
                 <Text
                   style={[
                     styles.projectTitle,
@@ -687,7 +651,6 @@ export function CommunityInitiatives() {
                     project.title
                   }
                 </Text>
-
                 <Text
                   style={[
                     styles.projectMeta,
@@ -703,7 +666,6 @@ export function CommunityInitiatives() {
                     ? ` • ${project.location}`
                     : ''}
                 </Text>
-
                 <Text
                   numberOfLines={
                     3
@@ -720,7 +682,6 @@ export function CommunityInitiatives() {
                     project.description
                   }
                 </Text>
-
                 <View
                   style={
                     styles.applicationInfo
@@ -733,7 +694,6 @@ export function CommunityInitiatives() {
                       colors.muted
                     }
                   />
-
                   <Text
                     style={[
                       styles.projectMeta,
@@ -749,7 +709,6 @@ export function CommunityInitiatives() {
                     application(s)
                   </Text>
                 </View>
-
                 <View
                   style={
                     styles.projectButtons
@@ -782,7 +741,6 @@ export function CommunityInitiatives() {
                       Join Requests
                     </Text>
                   </Pressable>
-
                   <Pressable
                     onPress={() =>
                       router.push(
@@ -805,7 +763,6 @@ export function CommunityInitiatives() {
                       Manage
                     </Text>
                   </Pressable>
-
                   {(project.githubFullName || project.githubUrl || project.isGithubBacked) ? (
                     <Pressable
                       onPress={() =>
@@ -841,7 +798,6 @@ export function CommunityInitiatives() {
           )}
         </View>
       ) : null}
-
       {myApplications.length >
       0 ? (
         <View
@@ -860,7 +816,6 @@ export function CommunityInitiatives() {
           >
             My Applications
           </Text>
-
           {myApplications.map(
             (
               project,
@@ -879,7 +834,6 @@ export function CommunityInitiatives() {
                   {
                     backgroundColor:
                       colors.surface,
-
                     borderColor:
                       colors.border,
                   },
@@ -904,7 +858,6 @@ export function CommunityInitiatives() {
                       project.title
                     }
                   </Text>
-
                   <Text
                     style={[
                       styles.projectMeta,
@@ -918,7 +871,6 @@ export function CommunityInitiatives() {
                       'Community'}
                   </Text>
                 </View>
-
                 <View
                   style={[
                     styles.statusBadge,
@@ -947,7 +899,6 @@ export function CommunityInitiatives() {
           )}
         </View>
       ) : null}
-
       <View
         style={
           styles.section
@@ -969,7 +920,6 @@ export function CommunityInitiatives() {
           >
             Featured Opportunities
           </Text>
-
           <Text
             style={[
               styles.resultCount,
@@ -987,7 +937,6 @@ export function CommunityInitiatives() {
               : 's'}
           </Text>
         </View>
-
         {opportunities.length ===
         0 ? (
           <View
@@ -1008,7 +957,6 @@ export function CommunityInitiatives() {
                 accentColor
               }
             />
-
             <Text
               style={[
                 styles.emptyTitle,
@@ -1020,7 +968,6 @@ export function CommunityInitiatives() {
             >
               No opportunities found
             </Text>
-
             <Text
               style={[
                 styles.description,
@@ -1078,35 +1025,7 @@ export function CommunityInitiatives() {
                         project.category,
                       )}
                     </Text>
-
-                    {(project.githubFullName || project.githubUrl || project.isGithubBacked) ? (
-                      <View
-                        style={[
-                          styles.githubTagBadge,
-                          {
-                            backgroundColor:
-                              theme === 'dark'
-                                ? 'rgba(255,255,255,0.08)'
-                                : '#f0f3f6',
-                          },
-                        ]}
-                      >
-                        <Ionicons name="logo-github" size={10} color={colors.text} />
-                        <Text
-                          style={[
-                            styles.githubTagText,
-                            {
-                              color: colors.text,
-                            },
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {project.githubFullName || 'GitHub'}
-                        </Text>
-                      </View>
-                    ) : null}
                   </View>
-
                   {project.hasApplied ? (
                     <View
                       style={[
@@ -1134,7 +1053,6 @@ export function CommunityInitiatives() {
                     </View>
                   ) : null}
                 </View>
-
                 <Text
                   style={[
                     styles.projectTitle,
@@ -1148,7 +1066,6 @@ export function CommunityInitiatives() {
                     project.title
                   }
                 </Text>
-
                 <View
                   style={
                     styles.infoRow
@@ -1161,7 +1078,6 @@ export function CommunityInitiatives() {
                       colors.muted
                     }
                   />
-
                   <Text
                     style={[
                       styles.projectMeta,
@@ -1175,7 +1091,6 @@ export function CommunityInitiatives() {
                       'Community'}
                   </Text>
                 </View>
-
                 {project.location ? (
                   <View
                     style={
@@ -1189,7 +1104,6 @@ export function CommunityInitiatives() {
                         colors.muted
                       }
                     />
-
                     <Text
                       style={[
                         styles.projectMeta,
@@ -1205,7 +1119,6 @@ export function CommunityInitiatives() {
                     </Text>
                   </View>
                 ) : null}
-
                 <Text
                   numberOfLines={
                     4
@@ -1222,7 +1135,45 @@ export function CommunityInitiatives() {
                     project.description
                   }
                 </Text>
-
+                {project.techStack ? (
+                  <View style={styles.techStackRow}>
+                    <Ionicons name="code-slash-outline" size={14} color={colors.muted} />
+                    <Text numberOfLines={2} style={[styles.techStackText, { color: colors.muted }]}>
+                      {project.techStack}
+                    </Text>
+                  </View>
+                ) : null}
+                {(project.githubFullName || project.githubUrl || project.isGithubBacked) ? (
+                  <View style={[styles.repositoryCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                    <View style={styles.repositoryHeader}>
+                      <View style={styles.repositoryNameRow}>
+                        <Ionicons name="logo-github" size={17} color={colors.text} />
+                        <Text numberOfLines={1} style={[styles.repositoryName, { color: colors.text }]}>
+                          {project.githubFullName || 'GitHub repository'}
+                        </Text>
+                      </View>
+                      <Text style={[styles.githubBackedText, { color: accentColor }]}>GitHub-backed</Text>
+                    </View>
+                    <View style={styles.repositoryStats}>
+                      {project.primaryLanguage ? (
+                        <View style={styles.repositoryStat}>
+                          <Ionicons name="code-slash-outline" size={13} color={colors.muted} />
+                          <Text style={[styles.repositoryStatText, { color: colors.muted }]}>
+                            {project.primaryLanguage}
+                          </Text>
+                        </View>
+                      ) : null}
+                      <View style={styles.repositoryStat}>
+                        <Ionicons name="star-outline" size={13} color={colors.muted} />
+                        <Text style={[styles.repositoryStatText, { color: colors.muted }]}>{project.githubStars ?? 0}</Text>
+                      </View>
+                      <View style={styles.repositoryStat}>
+                        <Ionicons name="git-branch-outline" size={13} color={colors.muted} />
+                        <Text style={[styles.repositoryStatText, { color: colors.muted }]}>{project.githubForks ?? 0}</Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : null}
                 <View
                   style={
                     styles.bottomRow
@@ -1241,7 +1192,6 @@ export function CommunityInitiatives() {
                       0}{' '}
                     XP
                   </Text>
-
                   <View
                     style={
                       styles.viewRow
@@ -1259,7 +1209,6 @@ export function CommunityInitiatives() {
                     >
                       View opportunity
                     </Text>
-
                     <Ionicons
                       name="chevron-forward"
                       size={15}
@@ -1277,13 +1226,11 @@ export function CommunityInitiatives() {
     </View>
   );
 }
-
 const styles =
   StyleSheet.create({
     wrap: {
       gap: 14,
     },
-
     loadingCard: {
       minHeight: 170,
       borderWidth: 1,
@@ -1292,7 +1239,6 @@ const styles =
       justifyContent: 'center',
       gap: 10,
     },
-
     errorBox: {
       minHeight: 46,
       borderWidth: 1,
@@ -1302,29 +1248,24 @@ const styles =
       gap: 8,
       paddingHorizontal: 12,
     },
-
     errorText: {
       flex: 1,
       fontSize: 11,
     },
-
     searchCard: {
       borderWidth: 1,
       borderRadius: 18,
       padding: 13,
       gap: 9,
     },
-
     label: {
       fontSize: 13,
       fontWeight: '800',
     },
-
     searchRow: {
       flexDirection: 'row',
       gap: 8,
     },
-
     searchInput: {
       flex: 1,
       minHeight: 44,
@@ -1333,7 +1274,6 @@ const styles =
       paddingHorizontal: 12,
       fontSize: 12,
     },
-
     searchButton: {
       width: 44,
       height: 44,
@@ -1341,41 +1281,34 @@ const styles =
       alignItems: 'center',
       justifyContent: 'center',
     },
-
     clearText: {
       fontSize: 11,
       fontWeight: '800',
     },
-
     section: {
       gap: 10,
     },
-
     sectionHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 8,
     },
-
     sectionTitle: {
       fontSize: 18,
       fontWeight: '800',
       marginTop: 4,
     },
-
     resultCount: {
       fontSize: 10,
       fontWeight: '700',
     },
-
     categoryGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       justifyContent: 'space-between',
       gap: 12,
     },
-
     categoryCard: {
       width: '48%',
       minHeight: 105,
@@ -1385,7 +1318,6 @@ const styles =
       justifyContent: 'center',
       gap: 7,
     },
-
     categoryIcon: {
       width: 40,
       height: 40,
@@ -1393,13 +1325,39 @@ const styles =
       alignItems: 'center',
       justifyContent: 'center',
     },
-
     categoryText: {
       fontSize: 13,
       lineHeight: 17,
       fontWeight: '800',
     },
-
+    githubConnectCard: {
+      minHeight: 84,
+      borderWidth: 1,
+      borderRadius: 18,
+      padding: 13,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 11,
+    },
+    githubConnectIcon: {
+      width: 46,
+      height: 46,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    githubConnectCopy: {
+      flex: 1,
+      gap: 3,
+    },
+    githubConnectTitle: {
+      fontSize: 14,
+      fontWeight: '900',
+    },
+    githubConnectDescription: {
+      fontSize: 11,
+      lineHeight: 16,
+    },
     primaryButton: {
       minHeight: 47,
       borderRadius: 15,
@@ -1409,33 +1367,28 @@ const styles =
       gap: 7,
       paddingHorizontal: 12,
     },
-
     primaryButtonText: {
       color: '#FFFFFF',
       fontSize: 12,
       fontWeight: '900',
     },
-
     projectCard: {
       borderWidth: 1,
       borderRadius: 18,
       padding: 16,
       gap: 8,
     },
-
     projectTopRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 8,
     },
-
     categoryTag: {
       fontSize: 12,
       fontWeight: '800',
       textTransform: 'uppercase',
     },
-
     githubTagBadge: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1444,45 +1397,37 @@ const styles =
       paddingVertical: 2,
       borderRadius: 6,
     },
-
     githubTagText: {
       fontSize: 10,
       fontWeight: '700',
     },
-
     projectTitle: {
       fontSize: 17,
       fontWeight: '800',
     },
-
     projectMeta: {
       fontSize: 13,
       lineHeight: 20,
     },
-
     description: {
       fontSize: 13,
       lineHeight: 20,
     },
-
     infoRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 5,
     },
-
     applicationInfo: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 5,
     },
-
     projectButtons: {
       flexDirection: 'row',
       gap: 8,
       marginTop: 2,
     },
-
     secondaryButton: {
       flex: 1,
       minHeight: 39,
@@ -1491,7 +1436,6 @@ const styles =
       alignItems: 'center',
       justifyContent: 'center',
     },
-
     smallPrimaryButton: {
       flex: 1,
       minHeight: 39,
@@ -1499,13 +1443,11 @@ const styles =
       alignItems: 'center',
       justifyContent: 'center',
     },
-
     smallPrimaryText: {
       color: '#FFFFFF',
       fontSize: 11,
       fontWeight: '900',
     },
-
     applicationCard: {
       minHeight: 68,
       borderWidth: 1,
@@ -1515,18 +1457,15 @@ const styles =
       alignItems: 'center',
       gap: 10,
     },
-
     applicationTitle: {
       fontSize: 13,
       fontWeight: '900',
     },
-
     statusBadge: {
       borderRadius: 999,
       paddingHorizontal: 9,
       paddingVertical: 5,
     },
-
     bottomRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1534,18 +1473,68 @@ const styles =
       gap: 8,
       marginTop: 2,
     },
-
     xpText: {
       fontSize: 13,
       fontWeight: '800',
     },
-
     viewRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 2,
     },
-
+    techStackRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 6,
+    },
+    techStackText: {
+      flex: 1,
+      fontSize: 11,
+      lineHeight: 16,
+      fontWeight: '600',
+    },
+    repositoryCard: {
+      borderWidth: 1,
+      borderRadius: 13,
+      padding: 11,
+      gap: 8,
+    },
+    repositoryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    repositoryNameRow: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    repositoryName: {
+      flex: 1,
+      fontSize: 11,
+      fontWeight: '800',
+    },
+    githubBackedText: {
+      fontSize: 9,
+      fontWeight: '900',
+    },
+    repositoryStats: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 12,
+    },
+    repositoryStat: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    repositoryStatText: {
+      fontSize: 10,
+      fontWeight: '700',
+    },
     emptyCard: {
       minHeight: 160,
       borderWidth: 1,
@@ -1555,7 +1544,6 @@ const styles =
       gap: 8,
       padding: 20,
     },
-
     emptyTitle: {
       fontSize: 15,
       fontWeight: '900',
