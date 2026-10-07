@@ -1391,19 +1391,19 @@ export default function WellnessScreen() {
               <View style={styles.averagesRow}>
                 <View style={styles.avgBox}>
                   <Text style={[styles.avgVal, { color: '#f472b6' }]}>
-                    {insights.averages.stress.toFixed(1)}
+                    {Number(insights.averages.stress ?? 0).toFixed(1)}
                   </Text>
                   <Text style={[styles.avgLbl, { color: colors.muted }]}>Avg Stress</Text>
                 </View>
                 <View style={styles.avgBox}>
                   <Text style={[styles.avgVal, { color: '#c084fc' }]}>
-                    {insights.averages.mood.toFixed(1)}
+                    {Number(insights.averages.mood ?? 0).toFixed(1)}
                   </Text>
                   <Text style={[styles.avgLbl, { color: colors.muted }]}>Avg Mood</Text>
                 </View>
                 <View style={styles.avgBox}>
                   <Text style={[styles.avgVal, { color: '#2dd4bf' }]}>
-                    {insights.averages.energy.toFixed(1)}
+                    {Number(insights.averages.energy ?? 0).toFixed(1)}
                   </Text>
                   <Text style={[styles.avgLbl, { color: colors.muted }]}>Avg Energy</Text>
                 </View>
@@ -1573,8 +1573,8 @@ export default function WellnessScreen() {
             {/* Active Modules List */}
             {activeModules.map((mod) => {
               const stats = insights?.moduleBreakdown?.[mod.id];
-              const avgStress = stats ? stats.avgStress : 0;
-              const avgEnergy = stats ? stats.avgEnergy : 0;
+              const avgStress = Number(stats?.avgStress ?? 0) || 0;
+              const avgEnergy = Number(stats?.avgEnergy ?? 0) || 0;
               const netStrain = Number((avgStress - avgEnergy).toFixed(1));
               const count = stats ? stats.count : 0;
 

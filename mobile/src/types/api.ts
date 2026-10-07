@@ -167,7 +167,31 @@ export interface LectureUpload {
   codingExercises: { title: string; description: string }[] | string;
 }
 export interface ProductivityStats { tasksCompletedToday: number; totalTasksCompleted: number; focusSessionsToday: number; focusMinutesToday: number; focusHoursToday: string; wellnessScore: number | null; statusCounts: Record<string, number>; learnedTasks: { id: string; title: string; learnedNote: string | null }[]; }
-export interface AdminOverview { totalUsers: number; activeUsers: number; dailyLogins: number; challengesCompleted: number; projectApplications: number; avgInterviewScore: number; avgStressLevel: number; avgMood: number; avgEnergy: number; recentUsers: { firstName: string; lastName: string; email: string; role: string; createdAt: string }[]; }
+export interface AdminOverviewKpis {
+  totalActiveUsers?: number;
+  totalUsers?: number;
+  pendingApprovals?: number;
+  openTickets?: number;
+  criticalTickets?: number;
+  unreviewedComplaints?: number;
+  scheduledEventsWeek?: number;
+  totalCommunityPosts?: number;
+  suspendedUsers?: number;
+}
+
+export interface AdminOverview {
+  totalUsers?: number | null;
+  activeUsers?: number | null;
+  dailyLogins?: number | null;
+  challengesCompleted?: number | null;
+  projectApplications?: number | null;
+  avgInterviewScore?: number | null;
+  avgStressLevel?: number | null;
+  avgMood?: number | null;
+  avgEnergy?: number | null;
+  recentUsers?: { firstName: string; lastName: string; email: string; role: string; createdAt: string }[];
+  kpis?: AdminOverviewKpis;
+}
 
 export interface InterviewPrepStats {
   interviewsCompleted: number;

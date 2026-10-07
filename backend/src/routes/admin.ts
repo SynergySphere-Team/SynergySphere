@@ -45,6 +45,7 @@ router.get('/overview', async (_req, res) => {
       totalCommunityPosts,
       suspendedUsers,
       recentActivity,
+      platformStats,
     ] = await Promise.all([
       countTable('"User"', '', []),
       countTable('"User"', 'WHERE "status" = $1 AND "updatedAt" >= $2', ['active', weekAgo]),
@@ -61,9 +62,12 @@ router.get('/overview', async (_req, res) => {
          ORDER BY "createdAt" DESC
          LIMIT 15`,
       ),
+      getPlatformStats(),
     ]);
 
     res.json({
+      // Legacy platform analytics (consumed by the mobile Analytics tab)
+      ...platformStats,
       kpis: {
         totalActiveUsers: activeUsers || totalUsers,
         totalUsers,
@@ -82,6 +86,94 @@ router.get('/overview', async (_req, res) => {
     res.status(500).json({ error: 'Failed to load administrative overview.' });
   }
 });
+
+/**
+ * Platform-wide engagement metrics (users, challenges, interviews, wellness).
+ * Each query is isolated so one missing table cannot break the whole overview.
+ */
+async function getPlatformStats() {
+  const now = Date.now();
+  const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
+  const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+  const safe = async <T,>(fn: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await fn();
+    } catch (err) {
+      console.warn('Platform stats query failed:', err instanceof Error ? err.message : err);
+      return fallback;
+    }
+  };
+
+  const [
+    totalUsers,
+    activeUsers,
+    dailyLogins,
+    challengesCompleted,
+    projectApplications,
+    interview,
+    wellness,
+    wellnessTrend,
+    recentUsers,
+  ] = await Promise.all([
+    safe(() => countTable('"User"', '', []), 0),
+    safe(() => countTable('"User"', 'WHERE "updatedAt" >= $1', [weekAgo]), 0),
+    safe(() => countTable('"User"', 'WHERE "updatedAt" >= $1', [dayAgo]), 0),
+    safe(() => countTable('"ChallengeAttempt"', 'WHERE "passed" = true', []), 0),
+    safe(() => countTable('"ProjectApplication"', '', []), 0),
+    safe(
+      () => queryOne<{ avgScore: number | null }>(
+        `SELECT AVG("score")::float AS "avgScore" FROM "Interview" WHERE "score" IS NOT NULL`,
+      ),
+      null,
+    ),
+    safe(
+      () => queryOne<{ avgStressLevel: number | null; avgMood: number | null; avgEnergyLevel: number | null }>(
+        `SELECT
+           AVG("stressLevel")::float AS "avgStressLevel",
+           AVG("mood")::float AS "avgMood",
+           AVG("energyLevel")::float AS "avgEnergyLevel"
+         FROM "Wellness"
+         WHERE "date" >= $1`,
+        [weekAgo],
+      ),
+      null,
+    ),
+    safe(
+      () => query(
+        `SELECT "stressLevel", "mood", "energyLevel", "date"
+         FROM "Wellness"
+         WHERE "date" >= $1
+         ORDER BY "date" DESC
+         LIMIT 100`,
+        [weekAgo],
+      ),
+      [] as unknown[],
+    ),
+    safe(
+      () => query(
+        `SELECT "firstName", "lastName", "email", "role", "createdAt"
+         FROM "User"
+         ORDER BY "createdAt" DESC
+         LIMIT 10`,
+      ),
+      [] as unknown[],
+    ),
+  ]);
+
+  return {
+    totalUsers,
+    activeUsers,
+    dailyLogins,
+    challengesCompleted,
+    projectApplications,
+    avgInterviewScore: interview?.avgScore ?? 0,
+    avgStressLevel: wellness?.avgStressLevel ?? 0,
+    avgMood: wellness?.avgMood ?? 0,
+    avgEnergy: wellness?.avgEnergyLevel ?? 0,
+    wellnessTrend: [...wellnessTrend].reverse(),
+    recentUsers,
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. User Management & Pending Approvals
