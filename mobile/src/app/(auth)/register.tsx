@@ -5,6 +5,7 @@ import { Screen, Notice } from '@/components/Screen';
 import { Button, Field } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import { onboardingStorage } from '@/services/api';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -68,6 +69,7 @@ export default function RegisterScreen() {
         password,
         confirmPassword,
       });
+      await onboardingStorage.reset();
       router.replace('/(auth)/onboarding');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to create the account.');

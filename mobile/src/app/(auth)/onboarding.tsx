@@ -1,24 +1,22 @@
 import { useRef, useState } from 'react';
 import {
-  Dimensions,
   FlatList,
   Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
-  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Screen } from '@/components/Screen';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { onboardingStorage } from '@/services/api';
-import { triggerLightHaptic } from '@/services/nativePolish';
 
 interface OnboardingSlide {
   id: string;
@@ -108,16 +106,15 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors, theme } = useTheme();
-  const insets = useSafeAreaInsets();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList<OnboardingSlide>>(null);
 
-  const windowWidth = Dimensions.get('window').width;
   const isLight = theme === 'light';
   const isLastSlide = currentIndex === SLIDES.length - 1;
+  const isCompact = screenHeight < 740;
 
   async function completeOnboarding(targetRoute?: '/(auth)/register' | '/(auth)/login' | '/(tabs)') {
-    triggerLightHaptic();
     try {
       await onboardingStorage.setCompleted();
     } catch {
@@ -133,7 +130,6 @@ export default function OnboardingScreen() {
   }
 
   function handleNext() {
-    triggerLightHaptic();
     if (currentIndex < SLIDES.length - 1) {
       flatListRef.current?.scrollToIndex({
         index: currentIndex + 1,
@@ -147,14 +143,13 @@ export default function OnboardingScreen() {
 
   function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const offsetX = e.nativeEvent.contentOffset.x;
-    const index = Math.round(offsetX / windowWidth);
+    const index = Math.round(offsetX / screenWidth);
     if (index >= 0 && index < SLIDES.length && index !== currentIndex) {
       setCurrentIndex(index);
     }
   }
 
   function goToSlide(index: number) {
-    triggerLightHaptic();
     flatListRef.current?.scrollToIndex({
       index,
       animated: true,
@@ -163,283 +158,300 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <Screen scroll={false} showBackButton={false}>
-      <View style={[styles.container, { paddingTop: Math.max(insets.top, 12) }]}>
-        {/* Top Header */}
-        <View style={styles.topBar}>
-          <View style={styles.brandBadge}>
-            <Image
-              source={require('../../../assets/images/synergysphere-brand-icon.png')}
-              style={styles.topBrandIcon}
-              resizeMode="contain"
-            />
-            <Text style={[styles.topBrandText, { color: colors.text }]}>
-              SynergySphere
-            </Text>
-          </View>
+    <SafeAreaView
+      edges={['top', 'bottom', 'left', 'right']}
+      style={[styles.root, { backgroundColor: colors.background }]}
+    >
+      {/* Top Header Bar */}
+      <View style={styles.topBar}>
+        <View style={styles.brandBadge}>
+          <Image
+            source={require('../../../assets/images/synergysphere-brand-icon.png')}
+            style={styles.topBrandIcon}
+            resizeMode="contain"
+          />
+          <Text style={[styles.topBrandText, { color: colors.text }]}>
+            SynergySphere
+          </Text>
+        </View>
 
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Skip onboarding"
+          onPress={() => completeOnboarding(user ? '/(tabs)' : '/(auth)/login')}
+          hitSlop={12}
+          style={({ pressed }) => [
+            styles.skipButton,
+            {
+              backgroundColor: isLight
+                ? 'rgba(0,0,0,0.05)'
+                : 'rgba(255,255,255,0.08)',
+              borderColor: colors.border,
+            },
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={[styles.skipText, { color: colors.muted }]}>Skip</Text>
+          <Ionicons name="chevron-forward" size={13} color={colors.muted} />
+        </Pressable>
+      </View>
+
+      {/* Carousel Slides */}
+      <FlatList
+        ref={flatListRef}
+        data={SLIDES}
+        keyExtractor={(item) => item.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleScroll}
+        scrollEventThrottle={16}
+        bounces={false}
+        style={styles.flatList}
+        renderItem={({ item }) => (
+          <View style={[styles.slideCard, { width: screenWidth }]}>
+            <ScrollView
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.slideScrollContent}
+            >
+              {/* Emblem Badge Icon */}
+              <View
+                style={[
+                  styles.imageContainer,
+                  isCompact && styles.imageContainerCompact,
+                  {
+                    backgroundColor:
+                      theme === 'dark'
+                        ? 'rgba(16, 33, 40, 0.75)'
+                        : 'rgba(237, 243, 239, 0.95)',
+                    borderColor:
+                      theme === 'dark'
+                        ? 'rgba(145, 219, 94, 0.3)'
+                        : 'rgba(30, 104, 39, 0.25)',
+                  },
+                ]}
+              >
+                <Image
+                  source={item.image}
+                  style={[
+                    styles.slideImage,
+                    isCompact && styles.slideImageCompact,
+                  ]}
+                  resizeMode="contain"
+                  accessibilityIgnoresInvertColors
+                />
+              </View>
+
+              {/* Badge Tag */}
+              <View
+                style={[
+                  styles.badgePill,
+                  {
+                    backgroundColor: isLight
+                      ? 'rgba(30, 104, 39, 0.08)'
+                      : 'rgba(145, 219, 94, 0.12)',
+                    borderColor: isLight
+                      ? 'rgba(30, 104, 39, 0.22)'
+                      : 'rgba(145, 219, 94, 0.28)',
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="sparkles"
+                  size={12}
+                  color={isLight ? '#1e6827' : colors.primary}
+                />
+                <Text
+                  style={[
+                    styles.badgeText,
+                    { color: isLight ? '#1e6827' : colors.primary },
+                  ]}
+                >
+                  {item.badge}
+                </Text>
+              </View>
+
+              {/* Title & Subtitle */}
+              <Text
+                style={[
+                  styles.slideTitle,
+                  isCompact && styles.slideTitleCompact,
+                  { color: colors.text },
+                ]}
+              >
+                {item.title}
+              </Text>
+              <Text
+                style={[
+                  styles.slideSubtitle,
+                  isCompact && styles.slideSubtitleCompact,
+                  { color: colors.muted },
+                ]}
+              >
+                {item.subtitle}
+              </Text>
+
+              {/* Key Highlight Chips */}
+              <View style={styles.highlightsWrap}>
+                {item.highlights.map((h, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.highlightChip,
+                      {
+                        backgroundColor: isLight
+                          ? '#FFFFFF'
+                          : colors.surfaceElevated,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={h.icon}
+                      size={14}
+                      color={isLight ? '#1e6827' : colors.primary}
+                    />
+                    <Text
+                      style={[styles.highlightText, { color: colors.text }]}
+                    >
+                      {h.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
+      />
+
+      {/* Bottom Controls */}
+      <View style={styles.bottomControls}>
+        {/* Pagination Dots */}
+        <View style={styles.dotsRow}>
+          {SLIDES.map((slide, index) => {
+            const active = index === currentIndex;
+            return (
+              <Pressable
+                key={slide.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Go to slide ${index + 1}`}
+                onPress={() => goToSlide(index)}
+                hitSlop={8}
+                style={[
+                  styles.dot,
+                  active
+                    ? [
+                        styles.dotActive,
+                        {
+                          backgroundColor: isLight
+                            ? '#1e6827'
+                            : colors.primary,
+                        },
+                      ]
+                    : [
+                        styles.dotInactive,
+                        {
+                          backgroundColor: isLight
+                            ? 'rgba(0,0,0,0.18)'
+                            : 'rgba(255,255,255,0.22)',
+                        },
+                      ],
+                ]}
+              />
+            );
+          })}
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.buttonsWrap}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Skip onboarding"
-            onPress={() => completeOnboarding(user ? '/(tabs)' : '/(auth)/login')}
-            hitSlop={12}
+            accessibilityLabel={
+              isLastSlide
+                ? user
+                  ? 'Enter SynergySphere'
+                  : 'Get Started'
+                : 'Next slide'
+            }
+            onPress={handleNext}
             style={({ pressed }) => [
-              styles.skipButton,
+              styles.primaryBtn,
               {
-                backgroundColor: isLight
-                  ? 'rgba(0,0,0,0.04)'
-                  : 'rgba(255,255,255,0.06)',
-                borderColor: colors.border,
+                backgroundColor: isLight ? '#1e6827' : colors.primary,
+                shadowColor: isLight ? '#1e6827' : colors.primary,
               },
               pressed && styles.pressed,
             ]}
           >
-            <Text style={[styles.skipText, { color: colors.muted }]}>Skip</Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.muted} />
-          </Pressable>
-        </View>
-
-        {/* Carousel Slides */}
-        <FlatList
-          ref={flatListRef}
-          data={SLIDES}
-          keyExtractor={(item) => item.id}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={handleScroll}
-          scrollEventThrottle={16}
-          bounces={false}
-          style={styles.flatList}
-          renderItem={({ item }) => (
-            <View style={[styles.slideCard, { width: windowWidth }]}>
-              <View style={styles.slideContent}>
-                {/* Emblem Badge Icon */}
-                <View
-                  style={[
-                    styles.imageContainer,
-                    {
-                      backgroundColor: isLight
-                        ? 'rgba(237, 243, 239, 0.95)'
-                        : 'rgba(16, 33, 40, 0.75)',
-                      borderColor: isLight
-                        ? 'rgba(30, 104, 39, 0.25)'
-                        : 'rgba(145, 219, 94, 0.3)',
-                    },
-                  ]}
-                >
-                  <Image
-                    source={item.image}
-                    style={styles.slideImage}
-                    resizeMode="contain"
-                    accessibilityIgnoresInvertColors
-                  />
-                </View>
-
-                {/* Badge Tag */}
-                <View
-                  style={[
-                    styles.badgePill,
-                    {
-                      backgroundColor: isLight
-                        ? 'rgba(30, 104, 39, 0.08)'
-                        : 'rgba(145, 219, 94, 0.12)',
-                      borderColor: isLight
-                        ? 'rgba(30, 104, 39, 0.22)'
-                        : 'rgba(145, 219, 94, 0.28)',
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name="sparkles"
-                    size={12}
-                    color={isLight ? '#1e6827' : colors.primary}
-                  />
-                  <Text
-                    style={[
-                      styles.badgeText,
-                      { color: isLight ? '#1e6827' : colors.primary },
-                    ]}
-                  >
-                    {item.badge}
-                  </Text>
-                </View>
-
-                {/* Title & Subtitle */}
-                <Text style={[styles.slideTitle, { color: colors.text }]}>
-                  {item.title}
-                </Text>
-                <Text style={[styles.slideSubtitle, { color: colors.muted }]}>
-                  {item.subtitle}
-                </Text>
-
-                {/* Key Highlight Chips */}
-                <View style={styles.highlightsWrap}>
-                  {item.highlights.map((h, i) => (
-                    <View
-                      key={i}
-                      style={[
-                        styles.highlightChip,
-                        {
-                          backgroundColor: isLight
-                            ? '#FFFFFF'
-                            : colors.surfaceElevated,
-                          borderColor: colors.border,
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={h.icon}
-                        size={15}
-                        color={isLight ? '#1e6827' : colors.primary}
-                      />
-                      <Text
-                        style={[styles.highlightText, { color: colors.text }]}
-                      >
-                        {h.label}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </View>
-          )}
-        />
-
-        {/* Bottom Navigation & Actions */}
-        <View
-          style={[
-            styles.bottomControls,
-            { paddingBottom: Math.max(insets.bottom, 20) },
-          ]}
-        >
-          {/* Pagination Dots */}
-          <View style={styles.dotsRow}>
-            {SLIDES.map((slide, index) => {
-              const active = index === currentIndex;
-              return (
-                <Pressable
-                  key={slide.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Go to slide ${index + 1}`}
-                  onPress={() => goToSlide(index)}
-                  hitSlop={8}
-                  style={[
-                    styles.dot,
-                    active
-                      ? [
-                          styles.dotActive,
-                          {
-                            backgroundColor: isLight
-                              ? '#1e6827'
-                              : colors.primary,
-                          },
-                        ]
-                      : [
-                          styles.dotInactive,
-                          {
-                            backgroundColor: isLight
-                              ? 'rgba(0,0,0,0.15)'
-                              : 'rgba(255,255,255,0.2)',
-                          },
-                        ],
-                  ]}
-                />
-              );
-            })}
-          </View>
-
-          {/* Action Buttons */}
-          <View style={styles.buttonsWrap}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                isLastSlide
-                  ? user
-                    ? 'Enter SynergySphere'
-                    : 'Get Started'
-                  : 'Next slide'
-              }
-              onPress={handleNext}
-              style={({ pressed }) => [
-                styles.primaryBtn,
-                {
-                  backgroundColor: isLight ? '#1e6827' : colors.primary,
-                  shadowColor: isLight ? '#1e6827' : colors.primary,
-                },
-                pressed && styles.pressed,
+            <Text
+              style={[
+                styles.primaryBtnText,
+                { color: isLight ? '#FFFFFF' : '#0B1E13' },
               ]}
             >
-              <Text
-                style={[
-                  styles.primaryBtnText,
-                  { color: isLight ? '#FFFFFF' : '#0B1E13' },
-                ]}
-              >
-                {isLastSlide
-                  ? user
-                    ? 'Enter SynergySphere'
-                    : 'Get Started'
-                  : 'Next'}
-              </Text>
-              <Ionicons
-                name={isLastSlide ? 'rocket' : 'arrow-forward'}
-                size={18}
-                color={isLight ? '#FFFFFF' : '#0B1E13'}
-              />
-            </Pressable>
+              {isLastSlide
+                ? user
+                  ? 'Enter SynergySphere'
+                  : 'Get Started'
+                : 'Next'}
+            </Text>
+            <Ionicons
+              name={isLastSlide ? 'rocket' : 'arrow-forward'}
+              size={18}
+              color={isLight ? '#FFFFFF' : '#0B1E13'}
+            />
+          </Pressable>
 
-            {user ? (
-              <View style={styles.signInRow}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Skip to dashboard"
-                  onPress={() => completeOnboarding('/(tabs)')}
-                  hitSlop={8}
+          {user ? (
+            <View style={styles.signInRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Skip to dashboard"
+                onPress={() => completeOnboarding('/(tabs)')}
+                hitSlop={8}
+              >
+                <Text
+                  style={[
+                    styles.signInLink,
+                    { color: isLight ? '#1e6827' : colors.primary },
+                  ]}
                 >
-                  <Text
-                    style={[
-                      styles.signInLink,
-                      { color: isLight ? '#1e6827' : colors.primary },
-                    ]}
-                  >
-                    Skip directly to workspace →
-                  </Text>
-                </Pressable>
-              </View>
-            ) : (
-              <View style={styles.signInRow}>
-                <Text style={[styles.signInPrompt, { color: colors.muted }]}>
-                  Already have an account?
+                  Skip directly to workspace →
                 </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Sign in"
-                  onPress={() => completeOnboarding('/(auth)/login')}
-                  hitSlop={8}
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.signInRow}>
+              <Text style={[styles.signInPrompt, { color: colors.muted }]}>
+                Already have an account?
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Sign in"
+                onPress={() => completeOnboarding('/(auth)/login')}
+                hitSlop={8}
+              >
+                <Text
+                  style={[
+                    styles.signInLink,
+                    { color: isLight ? '#1e6827' : colors.primary },
+                  ]}
                 >
-                  <Text
-                    style={[
-                      styles.signInLink,
-                      { color: isLight ? '#1e6827' : colors.primary },
-                    ]}
-                  >
-                    Sign In
-                  </Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
+                  Sign In
+                </Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       </View>
-    </Screen>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    justifyContent: 'space-between',
   },
   topBar: {
     flexDirection: 'row',
@@ -454,12 +466,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   topBrandIcon: {
-    width: 26,
-    height: 26,
+    width: 28,
+    height: 28,
   },
   topBrandText: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 19,
+    fontWeight: '900',
     letterSpacing: -0.3,
   },
   skipButton: {
@@ -472,44 +484,53 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   skipText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12.5,
+    fontWeight: '700',
   },
   flatList: {
     flex: 1,
   },
   slideCard: {
     flex: 1,
+  },
+  slideScrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  slideContent: {
-    alignItems: 'center',
-    maxWidth: 420,
-    width: '100%',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
   imageContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.2,
     shadowRadius: 10,
     elevation: 4,
   },
+  imageContainerCompact: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    marginBottom: 12,
+  },
   slideImage: {
-    width: 60,
-    height: 60,
+    width: 72,
+    height: 72,
+  },
+  slideImageCompact: {
+    width: 58,
+    height: 58,
   },
   badgePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 4.5,
     borderRadius: 14,
@@ -522,26 +543,36 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   slideTitle: {
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: '800',
+    fontSize: 27,
+    lineHeight: 33,
+    fontWeight: '900',
     textAlign: 'center',
     letterSpacing: -0.5,
     marginBottom: 10,
+  },
+  slideTitleCompact: {
+    fontSize: 23,
+    lineHeight: 28,
+    marginBottom: 6,
   },
   slideSubtitle: {
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
-    paddingHorizontal: 12,
-    marginBottom: 20,
+    paddingHorizontal: 14,
+    marginBottom: 18,
+  },
+  slideSubtitleCompact: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
   },
   highlightsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 4,
+    marginTop: 2,
   },
   highlightChip: {
     flexDirection: 'row',
@@ -558,55 +589,56 @@ const styles = StyleSheet.create({
   },
   highlightText: {
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   bottomControls: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 10,
-    gap: 16,
+    paddingBottom: 12,
+    gap: 14,
   },
   dotsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
   },
   dot: {
-    height: 8,
-    borderRadius: 4,
+    height: 7,
+    borderRadius: 3.5,
   },
   dotActive: {
     width: 24,
   },
   dotInactive: {
-    width: 8,
+    width: 7,
   },
   buttonsWrap: {
-    gap: 12,
+    gap: 10,
   },
   primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    height: 52,
+    height: 50,
     borderRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
   primaryBtnText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 0.2,
   },
   signInRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 4,
+    gap: 5,
+    paddingVertical: 2,
   },
   signInPrompt: {
     fontSize: 13,

@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { BackHandler, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { triggerLightHaptic } from '@/services/nativePolish';
 
 export interface UseSwipeBackOptions {
   /**
@@ -17,14 +16,13 @@ export interface UseSwipeBackOptions {
 
 /**
  * Hook for coordinating gesture and hardware back navigation per screen.
- * Handles Android BackHandler listeners and haptic feedback.
+ * Handles Android BackHandler listeners and smooth navigation.
  */
 export function useSwipeBack({ onBack, disabled = false }: UseSwipeBackOptions = {}) {
   const router = useRouter();
 
   const handleBack = () => {
     if (disabled) return;
-    triggerLightHaptic();
     if (onBack) {
       onBack();
     } else if (router.canGoBack()) {
