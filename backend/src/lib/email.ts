@@ -21,22 +21,36 @@ function getFrontendBaseUrl(): string {
   return firstUrl.replace(/\/$/, '');
 }
 
+function getSmtpCredentials() {
+  const user = (process.env.SMTP_USER || process.env.EMAIL_USER)?.trim();
+  const rawPass = (process.env.SMTP_PASS || process.env.SMTP_PASSWORD || process.env.EMAIL_APP_PASSWORD || process.env.APP_PASSWORD)?.trim();
+  const pass = rawPass ? rawPass.replace(/\s+/g, '') : undefined;
+  const service = process.env.SMTP_SERVICE || (process.env.SMTP_HOST?.includes('gmail') ? 'gmail' : undefined);
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT) || 587;
+  const secure = process.env.SMTP_SECURE === 'true' || port === 465;
+  const from = process.env.SMTP_FROM || process.env.EMAIL_FROM || (user ? `"SynergySphere" <${user}>` : '"SynergySphere" <noreply@synergysphere.com>');
+
+  return { service, host, user, pass, port, secure, from };
+}
+
 export function isSmtpConfigured(): boolean {
-  return Boolean(
-    (process.env.SMTP_HOST || process.env.SMTP_SERVICE) &&
-    process.env.SMTP_USER &&
-    process.env.SMTP_PASS,
-  );
+  const { host, service, user, pass } = getSmtpCredentials();
+  return Boolean((host || service) && user && pass);
 }
 
 function createTransporter() {
-  const service = process.env.SMTP_SERVICE;
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const { service, host, user, pass, port, secure } = getSmtpCredentials();
 
   if ((!host && !service) || !user || !pass) {
     return null;
+  }
+
+  if (service === 'gmail') {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user, pass },
+    });
   }
 
   if (service) {
@@ -45,9 +59,6 @@ function createTransporter() {
       auth: { user, pass },
     });
   }
-
-  const port = Number(process.env.SMTP_PORT) || 587;
-  const secure = process.env.SMTP_SECURE === 'true' || port === 465;
 
   return nodemailer.createTransport({
     host,
@@ -67,7 +78,7 @@ export async function sendPasswordResetEmail({
 }: PasswordResetEmailOptions): Promise<SendEmailResult> {
   const baseUrl = getFrontendBaseUrl();
   const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
-  const from = process.env.SMTP_FROM || process.env.EMAIL_FROM || '"SynergySphere" <noreply@synergysphere.com>';
+  const { from } = getSmtpCredentials();
   const recipientName = userName ? userName.trim() : 'there';
 
   const transporter = createTransporter();
