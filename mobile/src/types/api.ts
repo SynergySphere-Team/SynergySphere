@@ -191,7 +191,109 @@ export interface AdminOverview {
   avgEnergy?: number | null;
   recentUsers?: { firstName: string; lastName: string; email: string; role: string; createdAt: string }[];
   kpis?: AdminOverviewKpis;
+  recentActivity?: {
+    id: string;
+    userId: string;
+    adminName: string;
+    action: string;
+    targetType: string;
+    targetId: string;
+    description: string;
+    createdAt: string;
+  }[];
 }
+
+export interface UserTicket {
+  id: string;
+  ticketNumber: string;
+  category: string;
+  title: string;
+  description: string;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  adminNotes?: string | null;
+  attachmentName?: string | null;
+  attachmentUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  status: string;
+  studentId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  xp?: number;
+  level?: number;
+  rejectionReason?: string | null;
+}
+
+export interface AdminPost {
+  id: string;
+  title: string;
+  content: string;
+  tags?: string[];
+  likesCount: number;
+  commentsCount: number;
+  isHidden: boolean;
+  commentsLocked: boolean;
+  isDeleted: boolean;
+  deletedReason?: string | null;
+  deletedByName?: string | null;
+  authorName: string;
+  authorEmail: string;
+  authorRole: string;
+  reportsCount: number;
+  createdAt: string;
+}
+
+export interface AdminComplaint {
+  id: string;
+  complaintNumber?: string;
+  reporterId: string;
+  reporterName: string;
+  reporterEmail: string;
+  targetType: string;
+  targetId: string;
+  reason: string;
+  details?: string | null;
+  status: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
+  adminNotes?: string | null;
+  resolvedByName?: string | null;
+  resolvedAt?: string | null;
+  createdAt: string;
+}
+
+export interface AdminEvent {
+  id: string;
+  title: string;
+  description: string;
+  eventDate: string;
+  location: string;
+  capacity: number;
+  status: 'PENDING' | 'APPROVED' | 'CANCELLED';
+  isFeatured: boolean;
+  organizerName: string;
+  organizerEmail: string;
+  createdAt: string;
+}
+
+export interface AdminDatabaseHealth {
+  status: 'healthy' | 'degraded';
+  postgresVersion: string;
+  latencyMs: number;
+  activeConnections: number;
+  tables: {
+    table: string;
+    rowCount: number;
+  }[];
+}
+
 
 export interface InterviewPrepStats {
   interviewsCompleted: number;

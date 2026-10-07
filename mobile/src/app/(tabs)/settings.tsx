@@ -54,7 +54,7 @@ import { api } from '@/services/api';
 
 import { github } from '@/services/github';
 
-import type { GithubConnection } from '@/types/api';
+import type { GithubConnection, UserTicket } from '@/types/api';
 
 interface SettingsData {
 
@@ -539,10 +539,81 @@ export default function SettingsScreen() {
   const [
 
     resetSending,
-
     setResetSending,
-
   ] = useState(false);
+
+  // Help & Support ticketing state
+  const [userTickets, setUserTickets] = useState<UserTicket[]>([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
+  const [ticketsLoaded, setTicketsLoaded] = useState(false);
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [ticketCategory, setTicketCategory] = useState<string>('Bug / Technical Issue');
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketDescription, setTicketDescription] = useState('');
+  const [ticketSubmitting, setTicketSubmitting] = useState(false);
+  const [ticketMessage, setTicketMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [expandedFaq, setExpandedFaq] = useState<string | null>('faq-1');
+  const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null);
+
+  const loadUserTickets = useCallback(async () => {
+    try {
+      setLoadingTickets(true);
+      const list = await api.get<UserTicket[]>('/settings/tickets');
+      setUserTickets(Array.isArray(list) ? list : []);
+    } catch {
+      // background fetch error
+    } finally {
+      setLoadingTickets(false);
+      setTicketsLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (expanded === 'support' && !ticketsLoaded) {
+      void loadUserTickets();
+    }
+  }, [expanded, ticketsLoaded, loadUserTickets]);
+
+  const handleSubmitTicket = async () => {
+    const trimmedSubj = ticketSubject.trim();
+    const trimmedDesc = ticketDescription.trim();
+    if (!trimmedSubj) {
+      setTicketMessage({ type: 'error', text: 'Please enter an issue subject.' });
+      return;
+    }
+    if (trimmedSubj.length < 3) {
+      setTicketMessage({ type: 'error', text: 'Subject must be at least 3 characters long.' });
+      return;
+    }
+    if (!trimmedDesc || trimmedDesc.length < 10) {
+      setTicketMessage({ type: 'error', text: 'Please describe the problem in at least 10 characters.' });
+      return;
+    }
+    setTicketSubmitting(true);
+    setTicketMessage(null);
+    try {
+      const created = await api.post<UserTicket>('/settings/tickets', {
+        category: ticketCategory,
+        title: trimmedSubj,
+        description: trimmedDesc,
+      });
+      setTicketMessage({
+        type: 'success',
+        text: `Support request submitted successfully! Your Ticket #${created?.ticketNumber || 'created'} has been received by our support team.`,
+      });
+      setTicketSubject('');
+      setTicketDescription('');
+      setShowReportForm(false);
+      await loadUserTickets();
+    } catch (e: any) {
+      setTicketMessage({
+        type: 'error',
+        text: e?.message || 'Failed to submit support request. Please check your network and try again.',
+      });
+    } finally {
+      setTicketSubmitting(false);
+    }
+  };
 
   useEffect(() => {
 
@@ -3436,37 +3507,306 @@ function confirmDeleteAccount() {
           <View style={[styles.expandedPanel, { borderBottomColor: colors.border }]}>
             <Text style={[styles.panelTitle, { color: colors.text }]}>Help & Support</Text>
             <Text style={[styles.description, { color: colors.muted }]}>
-              Find help for common SynergySphere questions, technical problems and accessibility features.
+              Submit support tickets directly from your student account, track your logged issues, or read FAQs.
             </Text>
 
-            <View style={[styles.supportInfoBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-              <Text style={[styles.supportInfoTitle, { color: colors.text }]}>Frequently Asked Questions</Text>
-              <Text style={[styles.description, { color: colors.muted }]}>• Account: Use Account Information to update your profile details.</Text>
-              <Text style={[styles.description, { color: colors.muted }]}>• Password: Use Change Password to request a secure reset token.</Text>
-              <Text style={[styles.description, { color: colors.muted }]}>• Accessibility: Larger Text, High Contrast and Reduce Motion can be managed from Accessibility Settings.</Text>
+            {/* Report an Issue Button / Form */}
+            {!showReportForm ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Report an issue"
+                onPress={() => {
+                  setShowReportForm(true);
+                  setTicketMessage(null);
+                }}
+                style={({ pressed }) => [
+                  styles.reportIssueBtn,
+                  { backgroundColor: primaryAccent, opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+                <Text style={styles.reportIssueBtnText}>Report an Issue</Text>
+              </Pressable>
+            ) : (
+              <Card style={{ padding: 14, gap: 12, borderWidth: 1, borderColor: colors.border, marginTop: 4 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={[styles.supportInfoTitle, { color: colors.text, fontSize: 16 }]}>
+                    Report an Issue
+                  </Text>
+                  <Pressable onPress={() => setShowReportForm(false)}>
+                    <Ionicons name="close-circle" size={22} color={colors.muted} />
+                  </Pressable>
+                </View>
+
+                <View style={[styles.authNoticeBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                  <Ionicons name="shield-checkmark" size={18} color={primaryAccent} />
+                  <Text style={[styles.description, { color: colors.muted, flex: 1 }]}>
+                    Logged in as {user?.firstName} {user?.lastName} ({user?.email}). Your session is automatically linked — no email input required.
+                  </Text>
+                </View>
+
+                {/* Category Selection */}
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>Category</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {(
+                    [
+                      'Bug / Technical Issue',
+                      'Account & Login',
+                      'Feature Request',
+                      'Community Issue',
+                      'Event Issue',
+                      'Other',
+                    ] as const
+                  ).map((cat) => (
+                    <Pressable
+                      key={cat}
+                      onPress={() => setTicketCategory(cat)}
+                      style={[
+                        styles.catChip,
+                        {
+                          backgroundColor: ticketCategory === cat ? primaryAccent : colors.surfaceElevated,
+                          borderColor: ticketCategory === cat ? primaryAccent : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.catChipText,
+                          { color: ticketCategory === cat ? '#FFFFFF' : colors.text },
+                        ]}
+                      >
+                        {cat}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Field
+                  label="Subject / Title"
+                  value={ticketSubject}
+                  onChangeText={setTicketSubject}
+                  placeholder="e.g. Cannot submit challenge solution"
+                  maxLength={100}
+                />
+
+                <Field
+                  label="Description"
+                  value={ticketDescription}
+                  onChangeText={setTicketDescription}
+                  multiline
+                  numberOfLines={4}
+                  style={{ minHeight: 88, textAlignVertical: 'top' }}
+                  placeholder="Please describe what happened, what you expected, and steps to reproduce..."
+                />
+
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <Button
+                    title={ticketSubmitting ? 'Submitting...' : 'Submit Support Ticket'}
+                    disabled={ticketSubmitting}
+                    onPress={handleSubmitTicket}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    title="Cancel"
+                    secondary
+                    onPress={() => setShowReportForm(false)}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              </Card>
+            )}
+
+            {/* Notification Banner */}
+            {ticketMessage ? (
+              <View
+                style={[
+                  styles.ticketNoticeBox,
+                  {
+                    backgroundColor:
+                      ticketMessage.type === 'success' ? '#ECFDF3' : '#FEF3F2',
+                    borderColor:
+                      ticketMessage.type === 'success' ? '#12B76A' : '#F04438',
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={ticketMessage.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+                  size={20}
+                  color={ticketMessage.type === 'success' ? '#12B76A' : '#F04438'}
+                />
+                <Text
+                  style={{
+                    color: ticketMessage.type === 'success' ? '#027A48' : '#B42318',
+                    fontSize: 13,
+                    fontWeight: '600',
+                    flex: 1,
+                  }}
+                >
+                  {ticketMessage.text}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* My Submitted Issues */}
+            <View style={{ gap: 8, marginTop: 8 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={[styles.supportInfoTitle, { color: colors.text }]}>
+                  My Submitted Issues ({userTickets.length})
+                </Text>
+                <Pressable
+                  onPress={() => void loadUserTickets()}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1, padding: 4 }]}
+                >
+                  <Ionicons name="refresh" size={18} color={primaryAccent} />
+                </Pressable>
+              </View>
+
+              {loadingTickets && userTickets.length === 0 ? (
+                <Text style={[styles.description, { color: colors.muted }]}>Loading tickets...</Text>
+              ) : userTickets.length === 0 ? (
+                <View
+                  style={[
+                    styles.supportInfoBox,
+                    { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                  ]}
+                >
+                  <Text style={[styles.description, { color: colors.muted }]}>
+                    No support issues logged yet. If you run into a bug or need assistance, tap "Report an Issue" above.
+                  </Text>
+                </View>
+              ) : (
+                userTickets.map((t) => {
+                  const isExpanded = expandedTicketId === t.id;
+                  const statusColors: Record<string, { bg: string; text: string }> = {
+                    open: { bg: '#FEF08A', text: '#854D0E' },
+                    in_progress: { bg: '#BAE6FD', text: '#0369A1' },
+                    resolved: { bg: '#BBF7D0', text: '#15803D' },
+                    closed: { bg: '#E2E8F0', text: '#475569' },
+                  };
+                  const sc = statusColors[t.status] || { bg: '#E2E8F0', text: '#475569' };
+                  return (
+                    <Pressable
+                      key={t.id}
+                      onPress={() => setExpandedTicketId(isExpanded ? null : t.id)}
+                      style={[
+                        styles.ticketCard,
+                        { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontWeight: '800', fontSize: 13, color: primaryAccent }}>
+                          #{t.ticketNumber}
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                          <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
+                            <Text style={[styles.statusBadgeText, { color: sc.text }]}>
+                              {t.status.replace('_', ' ').toUpperCase()}
+                            </Text>
+                          </View>
+                          <Ionicons
+                            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                            size={16}
+                            color={colors.muted}
+                          />
+                        </View>
+                      </View>
+
+                      <Text style={{ fontWeight: '700', fontSize: 14, color: colors.text, marginTop: 4 }}>
+                        {t.title}
+                      </Text>
+                      <Text style={[styles.description, { color: colors.muted, fontSize: 11 }]}>
+                        {t.category} · {new Date(t.createdAt).toLocaleDateString()}
+                      </Text>
+
+                      {isExpanded ? (
+                        <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border, gap: 6 }}>
+                          <Text style={[styles.description, { color: colors.text }]}>
+                            {t.description}
+                          </Text>
+                          {t.adminNotes ? (
+                            <View style={[styles.adminNoteBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: primaryAccent }}>
+                                Admin Response:
+                              </Text>
+                              <Text style={[styles.description, { color: colors.text }]}>
+                                {t.adminNotes}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })
+              )}
             </View>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Report a problem"
-              onPress={() => { void openSupportEmail('problem'); }}
-              style={({ pressed }) => [styles.supportAction, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
-            >
-              <View style={styles.supportActionLeft}>
-                <Ionicons name="bug-outline" size={20} color={primaryAccent} />
-                <View style={styles.supportActionCopy}>
-                  <Text style={[styles.supportActionTitle, { color: colors.text }]}>Report a Problem</Text>
-                  <Text style={[styles.description, { color: colors.muted }]}>Tell us about a bug or technical issue.</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-            </Pressable>
+            {/* FAQs Accordion */}
+            <View style={{ gap: 8, marginTop: 10 }}>
+              <Text style={[styles.supportInfoTitle, { color: colors.text }]}>
+                Frequently Asked Questions
+              </Text>
+              {[
+                {
+                  id: 'faq-1',
+                  q: 'How do I log a support ticket?',
+                  a: 'Tap "Report an Issue" above, select a category, write a quick description, and tap Submit. A ticket number (#SS-xxxx) is created automatically and linked to your signed-in account with no email entry needed.',
+                },
+                {
+                  id: 'faq-2',
+                  q: 'How are student account approvals handled?',
+                  a: 'Student profiles are verified by platform administrators. Once approved, you gain full access to verified community features, mentorship pairing, and code repositories.',
+                },
+                {
+                  id: 'faq-3',
+                  q: 'How does issue triage work?',
+                  a: 'Administrators review tickets in the Admin Portal, assign priorities (Low, Medium, High, Critical), investigate technical issues, and provide resolutions visible in your ticket list.',
+                },
+                {
+                  id: 'faq-4',
+                  q: 'How are student data and code protected?',
+                  a: 'SynergySphere complies with POPIA standards. Your code exercises, project repositories, and wellness logs remain strictly confidential.',
+                },
+              ].map((faq) => {
+                const isOpen = expandedFaq === faq.id;
+                return (
+                  <Pressable
+                    key={faq.id}
+                    onPress={() => setExpandedFaq(isOpen ? null : faq.id)}
+                    style={[
+                      styles.faqItem,
+                      { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                    ]}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontWeight: '700', fontSize: 13, color: colors.text, flex: 1, paddingRight: 8 }}>
+                        {faq.q}
+                      </Text>
+                      <Ionicons
+                        name={isOpen ? 'chevron-up' : 'chevron-down'}
+                        size={16}
+                        color={colors.muted}
+                      />
+                    </View>
+                    {isOpen ? (
+                      <Text style={[styles.description, { color: colors.muted, marginTop: 6, lineHeight: 18 }]}>
+                        {faq.a}
+                      </Text>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
 
+            {/* Accessibility Support */}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Accessibility support"
               onPress={() => router.push('/accessibility-settings' as never)}
-              style={({ pressed }) => [styles.supportAction, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+              style={({ pressed }) => [
+                styles.supportAction,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.border, opacity: pressed ? 0.7 : 1, marginTop: 10 },
+              ]}
             >
               <View style={styles.supportActionLeft}>
                 <Ionicons name="accessibility-outline" size={20} color={primaryAccent} />
@@ -3476,22 +3816,6 @@ function confirmDeleteAccount() {
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Contact support"
-              onPress={() => { void openSupportEmail('support'); }}
-              style={({ pressed }) => [styles.supportAction, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
-            >
-              <View style={styles.supportActionLeft}>
-                <Ionicons name="mail-outline" size={20} color={primaryAccent} />
-                <View style={styles.supportActionCopy}>
-                  <Text style={[styles.supportActionTitle, { color: colors.text }]}>Contact Support</Text>
-                  <Text style={[styles.description, { color: colors.muted }]}>Open your email app to prepare a support request.</Text>
-                </View>
-              </View>
-              <Ionicons name="open-outline" size={18} color={colors.muted} />
             </Pressable>
           </View>
         ) : null}
@@ -4210,6 +4534,73 @@ const styles =
     },
 
 
+    reportIssueBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 12,
+      borderRadius: 14,
+      marginTop: 4,
+    },
+    reportIssueBtnText: {
+      color: '#FFFFFF',
+      fontWeight: '800',
+      fontSize: 14,
+    },
+    authNoticeBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      padding: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+    },
+    catChip: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1,
+    },
+    catChipText: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    ticketNoticeBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      marginTop: 4,
+    },
+    ticketCard: {
+      padding: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+      gap: 2,
+    },
+    statusBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 8,
+    },
+    statusBadgeText: {
+      fontSize: 10,
+      fontWeight: '900',
+    },
+    adminNoteBox: {
+      padding: 8,
+      borderRadius: 10,
+      borderWidth: 1,
+      gap: 3,
+    },
+    faqItem: {
+      padding: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+    },
     supportInfoBox: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 6 },
     supportInfoTitle: { fontSize: 14, fontWeight: '900', marginBottom: 2 },
     supportAction: { minHeight: 66, borderWidth: 1, borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },

@@ -90,8 +90,8 @@ router.post('/tickets', validateBody(createTicketSchema), async (req: AuthReques
   }
 });
 
-// GET /api/settings/tickets/me
-router.get('/tickets/me', async (req: AuthRequest, res) => {
+// GET /api/settings/tickets and /api/settings/tickets/me
+router.get(['/tickets', '/tickets/me'], async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const tickets = await query(

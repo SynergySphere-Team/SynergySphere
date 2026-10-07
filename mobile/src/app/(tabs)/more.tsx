@@ -32,11 +32,11 @@ export default function MoreScreen() {
       ))}
       {user?.role === 'ADMIN' ? (
         <Card>
-          <Text style={[styles.title, { color: colors.text }]}>Analytics</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Admin Portal</Text>
           <Text style={[styles.description, { color: colors.muted }]}>
-            Review platform-wide learning and wellness metrics.
+            Overview, user management, approvals, moderation, events, tickets, reports & database maintenance.
           </Text>
-          <Button title="Open analytics" secondary onPress={() => router.push('/admin' as never)} />
+          <Button title="Open Admin Portal" secondary onPress={() => router.push('/admin' as never)} />
         </Card>
       ) : null}
     </Screen>
