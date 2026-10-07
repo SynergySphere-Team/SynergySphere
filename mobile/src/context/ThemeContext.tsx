@@ -131,12 +131,15 @@ type ThemeContextValue = {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 const STORAGE_KEY = 'synergysphere.theme';
+const LEGACY_STORAGE_KEY = 'synergysphere-theme';
 
 async function readStoredTheme(): Promise<string | null> {
   if (Platform.OS === 'web') {
-    return typeof window !== 'undefined'
-      ? window.localStorage.getItem(STORAGE_KEY)
-      : null;
+    if (typeof window === 'undefined') return null;
+    return (
+      window.localStorage.getItem(STORAGE_KEY) ||
+      window.localStorage.getItem(LEGACY_STORAGE_KEY)
+    );
   }
 
   return SecureStore.getItemAsync(STORAGE_KEY);
@@ -146,6 +149,7 @@ async function saveStoredTheme(theme: ThemeName): Promise<void> {
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(STORAGE_KEY, theme);
+      window.localStorage.setItem(LEGACY_STORAGE_KEY, theme);
     }
     return;
   }
@@ -153,22 +157,40 @@ async function saveStoredTheme(theme: ThemeName): Promise<void> {
   await SecureStore.setItemAsync(STORAGE_KEY, theme);
 }
 
+function getInitialTheme(): ThemeName {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    try {
+      const stored =
+        window.localStorage.getItem(STORAGE_KEY) ||
+        window.localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (stored === 'light' || stored === 'dark') return stored;
+    } catch {
+      // fallback
+    }
+  }
+  return 'dark';
+}
+
 export function ThemeProvider({
   children,
 }: {
   children: ReactNode;
 }) {
-  const [theme, setThemeState] = useState<ThemeName>('dark');
+  const [theme, setThemeState] = useState<ThemeName>(getInitialTheme);
   const { highContrast } = useAccessibility();
 
   useEffect(() => {
+    let mounted = true;
     readStoredTheme()
       .then((value) => {
-        if (value === 'light' || value === 'dark') {
+        if (mounted && (value === 'light' || value === 'dark')) {
           setThemeState(value);
         }
       })
       .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const value = useMemo<ThemeContextValue>(
@@ -179,7 +201,11 @@ export function ThemeProvider({
         : themes[theme],
       setTheme: async (nextTheme) => {
         setThemeState(nextTheme);
-        await saveStoredTheme(nextTheme);
+        try {
+          await saveStoredTheme(nextTheme);
+        } catch {
+          // ignore storage error
+        }
       },
     }),
     [theme, highContrast],

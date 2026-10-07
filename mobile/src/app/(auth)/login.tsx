@@ -7,31 +7,15 @@ import { Button, Field } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
-const THEME_STORAGE_KEY = 'synergysphere-theme';
-
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
-  const { colors, theme, setTheme } = useTheme();
+  const { colors, theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-
-    try {
-      const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-
-      if (savedTheme === 'light' || savedTheme === 'dark') {
-        setTheme(savedTheme);
-      }
-    } catch {
-      // Ignore storage failures and keep the current theme.
-    }
-  }, [setTheme]);
 
   function isValidEmail(val: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());

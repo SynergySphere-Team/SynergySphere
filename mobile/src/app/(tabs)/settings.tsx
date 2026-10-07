@@ -74,6 +74,8 @@ interface SettingsData {
 
     emailNotifications: boolean;
 
+    profilePicture?: string | null;
+
   };
 
   profile: {
@@ -663,12 +665,9 @@ export default function SettingsScreen() {
 
           setEmailNotifications(data.value.user.emailNotifications ?? true);
 
-          if (data.value.user.theme === 'dark' || data.value.user.theme === 'light') {
-
-            setTheme(data.value.user.theme);
-
+          if ((data.value.user as any).profilePicture) {
+            setPhoto((data.value.user as any).profilePicture);
           }
-
         }
 
         if (data.value.profile) {
@@ -716,67 +715,82 @@ export default function SettingsScreen() {
   }, [loadSettings]);
 
   async function choosePhoto() {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setMessage({
+          type: 'error',
+          text: 'Photo-library access is needed to choose a profile photo.',
+        });
+        return;
+      }
 
-    const permission =
-
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-
-      setMessage({
-
-        type: 'error',
-
-        text: 'Photo-library access is needed to choose a profile photo.',
-
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+        base64: true,
       });
 
-      return;
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        let base64Data = asset.base64;
+        if (!base64Data && asset.uri) {
+          try {
+            const FileSystem = await import('expo-file-system/legacy');
+            base64Data = await FileSystem.readAsStringAsync(asset.uri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+          } catch (e) {
+            console.warn('Fallback base64 read failed:', e);
+          }
+        }
 
+        if (base64Data) {
+          const dataUri = `data:image/jpeg;base64,${base64Data}`;
+          setPhoto(dataUri);
+          setMessage({
+            type: 'success',
+            text: 'Profile photo selected. Updating profile...',
+          });
+
+          // Save immediately to backend so it persists across sessions
+          try {
+            setSaving(true);
+            await updateProfile({
+              firstName: firstName.trim() || user?.firstName || 'User',
+              lastName: lastName.trim() || user?.lastName || '',
+              profilePicture: dataUri,
+            });
+            await api.patch('/auth/settings', {
+              profilePicture: dataUri,
+            });
+            setMessage({
+              type: 'success',
+              text: 'Profile picture updated successfully!',
+            });
+          } catch (err: any) {
+            setMessage({
+              type: 'error',
+              text: err?.message || 'Picture selected locally, but failed to save to server.',
+            });
+          } finally {
+            setSaving(false);
+          }
+        } else {
+          setMessage({
+            type: 'error',
+            text: 'Could not process selected image. Please try a different photo.',
+          });
+        }
+      }
+    } catch (err: any) {
+      setMessage({
+        type: 'error',
+        text: err?.message || 'Error opening photo library.',
+      });
     }
-
-    const result =
-
-      await ImagePicker.launchImageLibraryAsync(
-
-        {
-
-          mediaTypes: [
-
-            'images',
-
-          ],
-
-          allowsEditing: true,
-
-          aspect: [1, 1],
-
-          quality: 0.55,
-
-          base64: true,
-
-        },
-
-      );
-
-    if (
-
-      !result.canceled &&
-
-      result.assets[0]
-
-        ?.base64
-
-    ) {
-
-      setPhoto(
-
-        `data:image/jpeg;base64,${result.assets[0].base64}`,
-
-      );
-
-    }
-
   }
 
   async function saveSettings() {
@@ -842,6 +856,8 @@ export default function SettingsScreen() {
           theme,
 
           emailNotifications,
+
+          profilePicture: photo || undefined,
 
         },
 
@@ -2409,19 +2425,7 @@ function confirmDeleteAccount() {
 
                     val ? 'dark' : 'light';
 
-                  setTheme(nextTheme);
-
-                  if (Platform.OS === 'web') {
-
-                    window.localStorage.setItem(
-
-                      'synergysphere-theme',
-
-                      nextTheme,
-
-                    );
-
-                  }
+                  await setTheme(nextTheme);
 
                   try {
 
@@ -2437,35 +2441,9 @@ function confirmDeleteAccount() {
 
                     );
 
-                    setMessage({
+                  } catch {
 
-                      type: 'success',
-
-                      text:
-
-                        nextTheme === 'dark'
-
-                          ? 'Dark mode saved.'
-
-                          : 'Light mode saved.',
-
-                    });
-
-                  } catch (error) {
-
-                    setMessage({
-
-                      type: 'error',
-
-                      text:
-
-                        error instanceof Error
-
-                          ? error.message
-
-                          : 'Could not save appearance preference.',
-
-                    });
+                    // silent backend sync
 
                   }
 

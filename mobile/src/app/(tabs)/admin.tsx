@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,8 @@ import {
   View,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card, Field, Heading, Stat } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
@@ -453,18 +456,79 @@ export default function AdminScreen() {
     }
   };
 
-  // Action: Export CSV simulation alert
+  // Action: Export CSV document with native share sheet / file download
   const handleExportCsv = async (type: string) => {
     try {
       setActionLoading(true);
       const rows = await api.get<any[]>(`/admin/reports?type=${type}`);
-      const count = Array.isArray(rows) ? rows.length : 0;
-      Alert.alert(
-        'CSV Export Generated',
-        `Successfully generated ${type.toUpperCase()} report with ${count} record(s). Ready for audit.`,
-      );
+      const dataList = Array.isArray(rows) ? rows : [];
+
+      let csvContent = '';
+      if (dataList.length === 0) {
+        csvContent = 'No records found\n';
+      } else {
+        const headers = Object.keys(dataList[0]);
+        const headerRow = headers.join(',');
+        const bodyRows = dataList.map((row) =>
+          headers
+            .map((field) => {
+              const val = row[field] == null ? '' : String(row[field]);
+              return `"${val.replace(/"/g, '""')}"`;
+            })
+            .join(',')
+        );
+        csvContent = [headerRow, ...bodyRows].join('\n');
+      }
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `synergysphere_${type}_report_${timestamp}.csv`;
+
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof document !== 'undefined') {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        setFeedbackNotice({
+          type: 'success',
+          text: `CSV document downloaded: ${filename} (${dataList.length} records)`,
+        });
+        return;
+      }
+
+      // Native (iOS & Android)
+      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/csv',
+          dialogTitle: `Export ${type.toUpperCase()} Report Document`,
+          UTI: 'public.comma-separated-values-text',
+        });
+        setFeedbackNotice({
+          type: 'success',
+          text: `Export document ready: ${filename} (${dataList.length} records)`,
+        });
+      } else {
+        Alert.alert(
+          'Document Saved',
+          `Report document saved with ${dataList.length} records to:\n${fileUri}`,
+        );
+      }
     } catch (e: any) {
-      Alert.alert('Export Failed', e?.message || 'Could not generate report.');
+      Alert.alert('Export Failed', e?.message || 'Could not generate report document.');
+      setFeedbackNotice({
+        type: 'error',
+        text: e?.message || 'Failed to export document.',
+      });
     } finally {
       setActionLoading(false);
     }
@@ -850,7 +914,7 @@ export default function AdminScreen() {
           ) : pendingUsers.length === 0 ? (
             <Card style={styles.cardPad}>
               <Text style={[styles.copy, { color: colors.muted, textAlign: 'center' }]}>
-                ✓ All user registrations are up to date! No pending approvals.
+                All user registrations are up to date. No pending approvals.
               </Text>
             </Card>
           ) : (
@@ -897,12 +961,12 @@ export default function AdminScreen() {
 
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                   <Button
-                    title="✓ Approve User"
+                    title="Approve User"
                     onPress={() => void handleUpdateUserStatus(u.id, 'active')}
                     style={{ flex: 1, backgroundColor: '#10B981' }}
                   />
                   <Button
-                    title="✕ Reject"
+                    title="Reject"
                     danger
                     onPress={() => setRejectPromptUserId(u.id)}
                     style={{ flex: 1 }}
@@ -1029,7 +1093,7 @@ export default function AdminScreen() {
 
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                   <Button
-                    title="✓ Resolve"
+                    title="Resolve"
                     onPress={() => void handleUpdateComplaintStatus(c.id, 'resolved')}
                     style={{ flex: 1, backgroundColor: '#10B981' }}
                   />
@@ -1090,7 +1154,7 @@ export default function AdminScreen() {
                   <View style={{ flexDirection: 'row', gap: 4 }}>
                     {ev.isFeatured ? (
                       <View style={[styles.tagBadge, { backgroundColor: '#FEF3C7' }]}>
-                        <Text style={[styles.tagBadgeText, { color: '#B45309' }]}>⭐ FEATURED</Text>
+                        <Text style={[styles.tagBadgeText, { color: '#B45309' }]}>FEATURED</Text>
                       </View>
                     ) : null}
                     <View style={[styles.tagBadge, { backgroundColor: ev.status === 'APPROVED' ? '#DCFCE7' : '#FEE2E2' }]}>
@@ -1115,7 +1179,7 @@ export default function AdminScreen() {
                     />
                   ) : null}
                   <Button
-                    title={ev.isFeatured ? 'Unfeature' : '⭐ Feature'}
+                    title={ev.isFeatured ? 'Unfeature' : 'Feature'}
                     secondary
                     onPress={() => void handleUpdateEvent(ev.id, { isFeatured: !ev.isFeatured })}
                     style={{ flex: 1 }}
@@ -1274,10 +1338,10 @@ export default function AdminScreen() {
               Generate compliant audit exports for platform metrics and records.
             </Text>
             <View style={{ gap: 8 }}>
-              <Button title="📥 Export Users CSV Report" secondary onPress={() => void handleExportCsv('users')} />
-              <Button title="📥 Export Tickets CSV Report" secondary onPress={() => void handleExportCsv('tickets')} />
-              <Button title="📥 Export Complaints CSV Report" secondary onPress={() => void handleExportCsv('complaints')} />
-              <Button title="📥 Export Events CSV Report" secondary onPress={() => void handleExportCsv('events')} />
+              <Button title="Export Users CSV Report" secondary onPress={() => void handleExportCsv('users')} />
+              <Button title="Export Tickets CSV Report" secondary onPress={() => void handleExportCsv('tickets')} />
+              <Button title="Export Complaints CSV Report" secondary onPress={() => void handleExportCsv('complaints')} />
+              <Button title="Export Events CSV Report" secondary onPress={() => void handleExportCsv('events')} />
             </View>
           </Card>
 
@@ -1348,22 +1412,22 @@ export default function AdminScreen() {
 
             <View style={{ gap: 8 }}>
               <Button
-                title="⚡ Refresh Diagnostics & Telemetry"
+                title="Refresh Diagnostics & Telemetry"
                 secondary
                 onPress={() => void loadDatabase()}
               />
               <Button
-                title="🧹 Clear System Cache"
+                title="Clear System Cache"
                 onPress={() => void handleRunMaintenance('clear_cache')}
                 style={{ backgroundColor: primaryAccent }}
               />
               <Button
-                title="⚙️ Vacuum & Optimize Database Tables"
+                title="Vacuum & Optimize Database Tables"
                 secondary
                 onPress={() => void handleRunMaintenance('vacuum')}
               />
               <Button
-                title="🗑️ Purge Soft-Deleted Records"
+                title="Purge Soft-Deleted Records"
                 danger
                 onPress={() =>
                   Alert.alert('Purge Deleted Records', 'Permanently remove soft-deleted records from storage?', [

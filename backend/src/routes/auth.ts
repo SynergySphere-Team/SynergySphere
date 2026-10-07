@@ -34,7 +34,7 @@ const loginSchema = z.object({
 const updateProfileSchema = z.object({
   firstName: z.string().trim().min(1).max(50),
   lastName: z.string().trim().min(1).max(50),
-  profilePicture: z.string().regex(/^data:image\/(png|jpeg|webp);base64,/, 'Profile photo must be a PNG, JPEG, or WebP image.').max(7_000_000).nullable().optional(),
+  profilePicture: z.string().regex(/^data:image\/(png|jpeg|jpg|webp);base64,/, 'Profile photo must be a PNG, JPEG, or WebP image.').max(7_000_000).nullable().optional(),
 });
 
 type SafeUser = {
@@ -229,12 +229,16 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
 
 router.patch('/me', authenticate, validateBody(updateProfileSchema), async (req: AuthRequest, res) => {
   try {
+    const hasPhoto = 'profilePicture' in req.body;
     const user = await queryOne<SafeUser>(
       `UPDATE "User"
-       SET "firstName" = $1, "lastName" = $2, "profilePicture" = COALESCE($3, "profilePicture"), "updatedAt" = CURRENT_TIMESTAMP
-       WHERE "id" = $4
+       SET "firstName" = $1,
+           "lastName" = $2,
+           "profilePicture" = (CASE WHEN $3 THEN $4 ELSE "profilePicture" END),
+           "updatedAt" = CURRENT_TIMESTAMP
+       WHERE "id" = $5
        RETURNING "id", "firstName", "lastName", "email", "role", "profilePicture", "xp", "level", "createdAt"`,
-      [req.body.firstName, req.body.lastName, req.body.profilePicture, req.user!.userId],
+      [req.body.firstName, req.body.lastName, hasPhoto, req.body.profilePicture ?? null, req.user!.userId],
     );
     if (!user) { res.status(404).json({ error: 'User not found' }); return; }
     res.json(user);
@@ -329,6 +333,7 @@ const settingsSchema = z.object({
   linkedinUrl: z.string().max(255).nullable().optional(),
   targetRole: z.string().max(120).nullable().optional(),
   location: z.string().max(120).nullable().optional(),
+  profilePicture: z.string().regex(/^data:image\/(png|jpeg|jpg|webp);base64,/, 'Profile photo must be a PNG, JPEG, or WebP image.').max(7_000_000).nullable().optional(),
 });
 
 router.get('/settings', authenticate, async (req: AuthRequest, res) => {
@@ -343,9 +348,10 @@ router.get('/settings', authenticate, async (req: AuthRequest, res) => {
       bio: string | null;
       theme: string;
       emailNotifications: boolean;
+      profilePicture: string | null;
       createdAt: Date;
     }>(
-      `SELECT "id", "firstName", "lastName", "email", "role", "bio", "theme", "emailNotifications", "createdAt"
+      `SELECT "id", "firstName", "lastName", "email", "role", "bio", "theme", "emailNotifications", "profilePicture", "createdAt"
        FROM "User"
        WHERE "id" = $1`,
       [userId],
@@ -383,7 +389,9 @@ router.get('/settings', authenticate, async (req: AuthRequest, res) => {
 router.patch('/settings', authenticate, validateBody(settingsSchema), async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const { firstName, lastName, bio, theme, emailNotifications, githubUrl, linkedinUrl, targetRole, location } = req.body;
+    const { firstName, lastName, bio, theme, emailNotifications, profilePicture, githubUrl, linkedinUrl, targetRole, location } = req.body;
+
+    const hasPhoto = 'profilePicture' in req.body;
 
     // Update User table
     await query(
@@ -394,9 +402,10 @@ router.patch('/settings', authenticate, validateBody(settingsSchema), async (req
          "bio" = COALESCE($3, "bio"),
          "theme" = COALESCE($4, "theme"),
          "emailNotifications" = COALESCE($5, "emailNotifications"),
+         "profilePicture" = (CASE WHEN $6 THEN $7 ELSE "profilePicture" END),
          "updatedAt" = CURRENT_TIMESTAMP
-       WHERE "id" = $6`,
-      [firstName, lastName, bio, theme, emailNotifications, userId],
+       WHERE "id" = $8`,
+      [firstName, lastName, bio, theme, emailNotifications, hasPhoto, profilePicture ?? null, userId],
     );
 
     // Update PortfolioProfile
