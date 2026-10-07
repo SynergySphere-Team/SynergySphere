@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -7,15 +7,18 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 
 import { Screen } from '@/components/Screen';
 import { CommunityChat } from '@/components/community/CommunityChat';
 import { CommunityInitiatives } from '@/components/community/CommunityInitiatives';
+import { CommunityGithub } from '@/components/community/CommunityGithub';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 
 export default function CommunityScreen() {
   const { colors, theme } = useTheme();
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
 
   const {
     fontSize,
@@ -23,7 +26,13 @@ export default function CommunityScreen() {
   } = useAccessibility();
 
   const [activeTab, setActiveTab] =
-    useState<'chat' | 'initiatives'>('chat');
+    useState<'chat' | 'initiatives' | 'github'>('chat');
+
+  useEffect(() => {
+    if (tab === 'github' || tab === 'initiatives' || tab === 'chat') {
+      setActiveTab(tab);
+    }
+  }, [tab]);
 
   const isLight = theme === 'light';
 
@@ -36,7 +45,6 @@ export default function CommunityScreen() {
   return (
     <Screen>
       {/* COMMUNITY HEADER */}
-
       <View
         style={[
           styles.headerRow,
@@ -80,14 +88,12 @@ export default function CommunityScreen() {
               },
             ]}
           >
-            Chat with peers, ask questions, and
-            collaborate on software initiatives.
+            Chat with peers, collaborate on initiatives, and build with GitHub.
           </Text>
         </View>
       </View>
 
       {/* COMMUNITY TABS */}
-
       <View style={styles.topTabBarRow}>
         <View
           accessibilityRole="tablist"
@@ -101,7 +107,6 @@ export default function CommunityScreen() {
           ]}
         >
           {/* COMMUNITY CHAT */}
-
           <Pressable
             accessibilityRole="tab"
             accessibilityLabel="Community Chat"
@@ -111,18 +116,13 @@ export default function CommunityScreen() {
             onPress={() => setActiveTab('chat')}
             style={({ pressed }) => [
               styles.topTabButton,
-
-              largerText &&
-                styles.topTabButtonLarge,
-
+              largerText && styles.topTabButtonLarge,
               activeTab === 'chat' && [
                 styles.topTabButtonActive,
                 {
-                  backgroundColor:
-                    activeBackground,
+                  backgroundColor: activeBackground,
                 },
               ],
-
               pressed && styles.pressed,
             ]}
           >
@@ -132,7 +132,7 @@ export default function CommunityScreen() {
                   ? 'chatbubble-ellipses'
                   : 'chatbubble-ellipses-outline'
               }
-              size={largerText ? 19 : 16}
+              size={largerText ? 18 : 15}
               color={
                 activeTab === 'chat'
                   ? activeTextColor
@@ -142,9 +142,7 @@ export default function CommunityScreen() {
 
             <Text
               allowFontScaling
-              numberOfLines={
-                largerText ? 2 : 1
-              }
+              numberOfLines={largerText ? 2 : 1}
               style={[
                 styles.topTabText,
                 {
@@ -152,52 +150,45 @@ export default function CommunityScreen() {
                     activeTab === 'chat'
                       ? activeTextColor
                       : colors.text,
-
                   fontWeight:
                     activeTab === 'chat'
                       ? '800'
                       : '600',
-
-                  fontSize: fontSize(13),
+                  fontSize: fontSize(12),
                 },
               ]}
             >
-              Community Chat
+              Chat
             </Text>
           </Pressable>
 
           {/* INITIATIVES */}
-
           <Pressable
             accessibilityRole="tab"
             accessibilityLabel="Initiatives"
             accessibilityState={{
-              selected:
-                activeTab === 'initiatives',
+              selected: activeTab === 'initiatives',
             }}
-            onPress={() =>
-              setActiveTab('initiatives')
-            }
+            onPress={() => setActiveTab('initiatives')}
             style={({ pressed }) => [
               styles.topTabButton,
-
-              largerText &&
-                styles.topTabButtonLarge,
-
+              largerText && styles.topTabButtonLarge,
               activeTab === 'initiatives' && [
                 styles.topTabButtonActive,
                 {
-                  backgroundColor:
-                    activeBackground,
+                  backgroundColor: activeBackground,
                 },
               ],
-
               pressed && styles.pressed,
             ]}
           >
             <Ionicons
-              name="layers-outline"
-              size={largerText ? 19 : 16}
+              name={
+                activeTab === 'initiatives'
+                  ? 'layers'
+                  : 'layers-outline'
+              }
+              size={largerText ? 18 : 15}
               color={
                 activeTab === 'initiatives'
                   ? activeTextColor
@@ -207,41 +198,84 @@ export default function CommunityScreen() {
 
             <Text
               allowFontScaling
-              numberOfLines={
-                largerText ? 2 : 1
-              }
+              numberOfLines={largerText ? 2 : 1}
               style={[
                 styles.topTabText,
                 {
                   color:
-                    activeTab ===
-                    'initiatives'
+                    activeTab === 'initiatives'
                       ? activeTextColor
                       : colors.text,
-
                   fontWeight:
-                    activeTab ===
-                    'initiatives'
+                    activeTab === 'initiatives'
                       ? '800'
                       : '600',
-
-                  fontSize: fontSize(13),
+                  fontSize: fontSize(12),
                 },
               ]}
             >
               Initiatives
             </Text>
           </Pressable>
+
+          {/* GITHUB INTEGRATION */}
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityLabel="GitHub Projects"
+            accessibilityState={{
+              selected: activeTab === 'github',
+            }}
+            onPress={() => setActiveTab('github')}
+            style={({ pressed }) => [
+              styles.topTabButton,
+              largerText && styles.topTabButtonLarge,
+              activeTab === 'github' && [
+                styles.topTabButtonActive,
+                {
+                  backgroundColor: activeBackground,
+                },
+              ],
+              pressed && styles.pressed,
+            ]}
+          >
+            <Ionicons
+              name="logo-github"
+              size={largerText ? 18 : 15}
+              color={
+                activeTab === 'github'
+                  ? activeTextColor
+                  : colors.muted
+              }
+            />
+
+            <Text
+              allowFontScaling
+              numberOfLines={largerText ? 2 : 1}
+              style={[
+                styles.topTabText,
+                {
+                  color:
+                    activeTab === 'github'
+                      ? activeTextColor
+                      : colors.text,
+                  fontWeight:
+                    activeTab === 'github'
+                      ? '800'
+                      : '600',
+                  fontSize: fontSize(12),
+                },
+              ]}
+            >
+              GitHub
+            </Text>
+          </Pressable>
         </View>
       </View>
 
       {/* COMMUNITY CONTENT */}
-
-      {activeTab === 'chat' ? (
-        <CommunityChat />
-      ) : (
-        <CommunityInitiatives />
-      )}
+      {activeTab === 'chat' && <CommunityChat />}
+      {activeTab === 'initiatives' && <CommunityInitiatives />}
+      {activeTab === 'github' && <CommunityGithub />}
     </Screen>
   );
 }
@@ -290,7 +324,7 @@ const styles = StyleSheet.create({
   topTabBarRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
 
   topTabBar: {
@@ -312,16 +346,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
+    gap: 6,
     paddingVertical: 9,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     borderRadius: 12,
   },
 
   topTabButtonLarge: {
-    minHeight: 54,
+    minHeight: 52,
     paddingVertical: 10,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
   },
 
   topTabButtonActive: {
@@ -336,7 +370,7 @@ const styles = StyleSheet.create({
   },
 
   topTabText: {
-    fontSize: 13,
+    fontSize: 12,
     textAlign: 'center',
     flexShrink: 1,
   },

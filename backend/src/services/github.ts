@@ -239,15 +239,15 @@ export async function githubProfile(token: string) {
 export async function saveGithubToken(userId: string, token: string) {
   let profile: GithubProfile;
   if (token.startsWith('gho_mock_') || !isGithubConfigured()) {
-    const user = await queryOne<{ username?: string; firstName?: string; avatarUrl?: string }>(
-      `SELECT "username", "firstName", "avatarUrl" FROM "User" WHERE "id" = $1`, [userId]
+    const user = await queryOne<{ firstName?: string; profilePicture?: string | null }>(
+      `SELECT "firstName", "profilePicture" FROM "User" WHERE "id" = $1`, [userId]
     );
-    const rawUsername = user?.username || (user?.firstName ? `${user.firstName.toLowerCase()}-dev` : 'developer');
+    const rawUsername = user?.firstName ? `${user.firstName.toLowerCase()}-dev` : 'developer';
     const cleanUsername = rawUsername.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
     profile = {
       id: 9990001,
       login: cleanUsername,
-      avatar_url: user?.avatarUrl || 'https://avatars.githubusercontent.com/u/9919?v=4',
+      avatar_url: user?.profilePicture || 'https://avatars.githubusercontent.com/u/9919?v=4',
     };
   } else {
     profile = await githubProfile(token);

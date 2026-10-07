@@ -190,11 +190,31 @@ export default function GithubConnectScreen() {
         {/* Device Code Display Box */}
         {authorization ? (
           <View style={[styles.codeDisplayCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-            <Text style={[styles.codeInstructionLabel, { color: colors.muted }]}>
-              {authorization.userCode.startsWith('SSPH-') || authorization.userCode.startsWith('MOCK-')
-                ? 'Development Mode: Simulated authorization code'
-                : 'Enter this one-time code at GitHub'}
-            </Text>
+            {authorization.userCode.startsWith('SSPH-') || authorization.userCode.startsWith('MOCK-') ? (
+              <View
+                style={[
+                  styles.mockNoticeBox,
+                  {
+                    backgroundColor: isDark ? 'rgba(59, 130, 246, 0.12)' : '#EFF6FF',
+                    borderColor: isDark ? '#1d4ed8' : '#93C5FD',
+                  },
+                ]}
+              >
+                <Ionicons name="construct-outline" size={18} color="#3B82F6" />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={[styles.mockNoticeTitle, { color: colors.text }]}>
+                    Simulated Development Mode Active
+                  </Text>
+                  <Text style={[styles.mockNoticeText, { color: colors.muted }]}>
+                    GitHub Client ID is not configured in backend. Tap below to connect the simulated account locally (do not enter on github.com).
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <Text style={[styles.codeInstructionLabel, { color: colors.muted }]}>
+                Enter this one-time code at GitHub
+              </Text>
+            )}
 
             <View style={styles.codeBoxesRow}>
               {parts.map((part, index) => (
@@ -206,19 +226,35 @@ export default function GithubConnectScreen() {
               ))}
             </View>
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.openVerificationBtn,
-                { backgroundColor: colors.primary },
-                pressed && styles.pressed,
-              ]}
-              onPress={() => Linking.openURL(authorization.verificationUri)}
-            >
-              <Ionicons name="open-outline" size={16} color={colors.primaryText} />
-              <Text style={[styles.openVerificationText, { color: colors.primaryText }]}>
-                Open GitHub Verification
-              </Text>
-            </Pressable>
+            {authorization.userCode.startsWith('SSPH-') || authorization.userCode.startsWith('MOCK-') ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.openVerificationBtn,
+                  { backgroundColor: colors.primary },
+                  pressed && styles.pressed,
+                ]}
+                onPress={handleManualCheck}
+              >
+                <Ionicons name="flash-outline" size={16} color={colors.primaryText} />
+                <Text style={[styles.openVerificationText, { color: colors.primaryText, fontWeight: '800' }]}>
+                  Authorize Simulated Account
+                </Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.openVerificationBtn,
+                  { backgroundColor: colors.primary },
+                  pressed && styles.pressed,
+                ]}
+                onPress={() => Linking.openURL(authorization.verificationUri)}
+              >
+                <Ionicons name="open-outline" size={16} color={colors.primaryText} />
+                <Text style={[styles.openVerificationText, { color: colors.primaryText }]}>
+                  Open GitHub Verification
+                </Text>
+              </Pressable>
+            )}
 
             {/* Live Polling Status Indicator */}
             <View style={styles.pollingStatusRow}>
@@ -342,6 +378,23 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     gap: 12,
+  },
+  mockNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    width: '100%',
+  },
+  mockNoticeTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  mockNoticeText: {
+    fontSize: 11,
+    lineHeight: 15,
   },
   codeInstructionLabel: {
     fontSize: 12,

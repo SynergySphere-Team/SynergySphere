@@ -178,13 +178,13 @@ export function MyWorkView({
               if (router.canGoBack()) {
                 router.back();
               } else {
-                router.replace('/(tabs)/tasks' as never);
+                router.replace('/(tabs)/community' as never);
               }
             }}
             hitSlop={8}
           >
             <Ionicons name="chevron-back" size={18} color={colors.text} />
-            <Text style={[styles.backNavText, { color: colors.text }]}>Tasks</Text>
+            <Text style={[styles.backNavText, { color: colors.text }]}>Community</Text>
           </Pressable>
         </View>
       ) : null}
