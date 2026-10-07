@@ -335,9 +335,50 @@ export default function HomeScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      {/* Top Header Bar */}
-      <View style={styles.topHeader}>
-        <View style={styles.topHeaderLeft}>
+      {/* HOME HEADER */}
+      <View style={styles.headerRow}>
+        <View
+          style={[
+            styles.brandLogoWrapper,
+            {
+              backgroundColor:
+                theme === 'dark'
+                  ? 'rgba(16, 33, 40, 0.7)'
+                  : 'rgba(237, 243, 239, 0.85)',
+              borderColor:
+                theme === 'dark'
+                  ? 'rgba(145, 219, 94, 0.28)'
+                  : 'rgba(145, 219, 94, 0.45)',
+              shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
+            },
+          ]}
+        >
+          <Image
+            source={require('../../../assets/images/synergysphere-brand-icon.png')}
+            style={styles.brandLogo}
+            resizeMode="contain"
+            accessibilityIgnoresInvertColors
+          />
+        </View>
+
+        <View style={styles.headerText}>
+          <Text
+            allowFontScaling
+            style={[styles.headerTitle, { color: colors.text }]}
+          >
+            SynergySphere{'\n'}<Text style={{ color: primaryAccent }}>Workspace</Text>
+          </Text>
+
+          <Text
+            allowFontScaling
+            numberOfLines={2}
+            style={[styles.headerSubtitle, { color: colors.muted }]}
+          >
+            {getGreeting()}, {user?.firstName ?? 'Developer'}! · {levelTitle || 'Learn. Build. Thrive.'}
+          </Text>
+        </View>
+
+        <View style={styles.headerRightActions}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Open workspace menu"
@@ -352,32 +393,9 @@ export default function HomeScreen() {
               pressed && styles.pressedBtn,
             ]}
           >
-            <Ionicons name="menu" size={22} color={colors.text} />
+            <Ionicons name="menu" size={21} color={colors.text} />
           </Pressable>
 
-          <View style={styles.brandGroup}>
-            <View
-              style={[
-                styles.brandIconWrapper,
-                {
-                  backgroundColor: isLight ? 'rgba(145, 219, 94, 0.18)' : 'rgba(145, 219, 94, 0.12)',
-                  borderColor: isLight ? 'rgba(145, 219, 94, 0.45)' : 'rgba(145, 219, 94, 0.3)',
-                },
-              ]}
-            >
-              <Image
-                source={require('../../../assets/images/synergysphere-brand-icon.png')}
-                style={styles.brandIcon}
-                resizeMode="contain"
-              />
-            </View>
-            <Text style={[styles.brandTitle, { color: colors.text }]}>
-              Synergy<Text style={{ color: primaryAccent }}>Sphere</Text>
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.topHeaderRight}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Notifications"
@@ -392,7 +410,7 @@ export default function HomeScreen() {
               pressed && styles.pressedBtn,
             ]}
           >
-            <Ionicons name="notifications-outline" size={20} color={colors.text} />
+            <Ionicons name="notifications-outline" size={19} color={colors.text} />
             {(data?.stats?.unreadNotifications ?? 0) > 0 ? (
               <View style={[styles.unreadDot, { backgroundColor: colors.danger }]} />
             ) : null}
@@ -436,36 +454,6 @@ export default function HomeScreen() {
             </View>
           </Pressable>
         </View>
-      </View>
-
-      {/* Hero Welcome Header */}
-      <View style={styles.heroGreetingWrap}>
-        <View style={styles.kickerRow}>
-          <View
-            style={[
-              styles.kickerPill,
-              {
-                backgroundColor: isLight ? 'rgba(30, 104, 39, 0.08)' : 'rgba(145, 219, 94, 0.12)',
-                borderColor: isLight ? 'rgba(30, 104, 39, 0.22)' : 'rgba(145, 219, 94, 0.28)',
-              },
-            ]}
-          >
-            <Ionicons name="sparkles" size={12} color={primaryAccent} />
-            <Text style={[styles.kickerText, { color: primaryAccent }]}>
-              {levelTitle ? levelTitle.toUpperCase() : 'DAILY WORKSPACE'}
-            </Text>
-          </View>
-          <Text style={[styles.dateText, { color: colors.muted }]}>
-            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-          </Text>
-        </View>
-
-        <Text style={[styles.heroGreeting, { color: colors.text }]}>
-          {getGreeting()}, {user?.firstName ?? 'Developer'}!
-        </Text>
-        <Text style={[styles.heroSubtitle, { color: colors.muted }]} numberOfLines={2}>
-          Learn. Build. Thrive. · Ready to build momentum and hit your goals today.
-        </Text>
       </View>
 
       {error ? <Notice>{error}</Notice> : null}
@@ -772,22 +760,60 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  topHeader: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-    marginTop: -2,
-    marginBottom: 8,
+    gap: 14,
+    marginBottom: 12,
+    minHeight: 88,
+    width: '100%',
   },
-  topHeaderLeft: {
+  brandLogoWrapper: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    padding: 2,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 3,
+    flexShrink: 0,
+  },
+  brandLogo: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 27,
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+    lineHeight: 28,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+    flexShrink: 0,
   },
   navIconButton: {
-    width: 38,
-    height: 38,
+    width: 36,
+    height: 36,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
@@ -798,37 +824,10 @@ const styles = StyleSheet.create({
     opacity: 0.75,
     transform: [{ scale: 0.96 }],
   },
-  brandGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  brandIconWrapper: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brandIcon: {
-    width: 22,
-    height: 22,
-  },
-  brandTitle: {
-    fontSize: 19,
-    fontWeight: '900',
-    letterSpacing: -0.4,
-  },
-  topHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
   unreadDot: {
     position: 'absolute',
-    top: 6,
-    right: 6,
+    top: 5,
+    right: 5,
     width: 7,
     height: 7,
     borderRadius: 3.5,
@@ -838,9 +837,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -849,52 +848,13 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 19,
+    borderRadius: 18,
   },
   avatarInitials: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,
-  },
-  heroGreetingWrap: {
-    marginTop: 4,
-    marginBottom: 14,
-    gap: 4,
-  },
-  kickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  kickerPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 3.5,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  kickerText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-  },
-  dateText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  heroGreeting: {
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: -0.4,
-    lineHeight: 28,
-  },
-  heroSubtitle: {
-    fontSize: 13,
-    lineHeight: 18,
   },
   xpRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },
   xp: { fontSize: 32, fontWeight: '800' },
