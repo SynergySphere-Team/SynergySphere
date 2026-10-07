@@ -344,10 +344,16 @@ export function Screen({
     <ScrollView
       ref={activeScrollRef}
       style={styles.scroller}
-      contentContainerStyle={[styles.scroll, contentContainerStyle]}
+      contentContainerStyle={[
+        styles.scroll,
+        contentContainerStyle,
+        keyboardAvoiding && keyboardHeight > 0
+          ? { paddingBottom: Math.max(keyboardHeight + 36, 100) }
+          : { paddingBottom: 36 },
+      ]}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
-      automaticallyAdjustKeyboardInsets={!keyboardAvoiding}
+      automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
       nestedScrollEnabled
       showsVerticalScrollIndicator={false}
       refreshControl={refreshComponent}
@@ -361,7 +367,7 @@ export function Screen({
   const body = keyboardAvoiding ? (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + keyboardOffset : keyboardOffset}
     >
       {innerContent}

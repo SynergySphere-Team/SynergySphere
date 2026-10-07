@@ -105,6 +105,6 @@ const styles = StyleSheet.create({
   logoImage: { width: '100%', height: '100%' },
   brand: { fontSize: 24, fontWeight: '800' },
   title: { fontSize: 28, fontWeight: '800', textAlign: 'center' },
-  form: { marginTop: 24, gap: 14 },
+  form: { marginTop: 24, gap: 14, paddingBottom: 40 },
   link: { textAlign: 'center', marginTop: 6, fontWeight: '700', fontSize: 14 },
 });
