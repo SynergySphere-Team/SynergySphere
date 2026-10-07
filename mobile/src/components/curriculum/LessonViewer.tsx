@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import { CodeBlock } from './CodeBlock';
+import { MarkdownView } from '@/components/MarkdownView';
 import type { LessonDetail } from '@/types/curriculum';
 
 interface LessonViewerProps {
@@ -291,9 +292,7 @@ export function LessonViewer({
             EXPLANATION
           </Text>
         </View>
-        <Text style={[styles.explanationBody, { color: colors.text }]}>
-          {lesson.content.explanation}
-        </Text>
+        <MarkdownView content={lesson.content.explanation} />
       </View>
 
       {/* 6. Syntax Reference (if present) */}

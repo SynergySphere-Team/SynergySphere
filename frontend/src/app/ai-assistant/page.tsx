@@ -6,6 +6,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MarkdownView } from '@/components/ui/MarkdownView';
 import { api } from '@/lib/utils';
 import {
   Bot,
@@ -434,7 +435,11 @@ function AIAssistantInner() {
                           : 'border-white/[0.08] bg-secondary/45 text-muted-foreground'
                       }`}
                     >
-                      <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
+                      {msg.role === 'assistant' ? (
+                        <MarkdownView content={msg.content} />
+                      ) : (
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      )}
                     </div>
                     {msg.role === 'assistant' && msg.lessonTitle && (
                       <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">

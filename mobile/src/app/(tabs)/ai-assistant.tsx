@@ -7,6 +7,7 @@ import { Button, Card } from '@/components/ui';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
+import { MarkdownView } from '@/components/MarkdownView';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -471,7 +472,11 @@ export default function AIAssistantScreen() {
               </View>
             ) : null}
           </View>
-          <Text style={[styles.msgBody, { color: colors.text }]}>{item.content}</Text>
+          {item.role === 'assistant' ? (
+            <MarkdownView content={item.content} />
+          ) : (
+            <Text style={[styles.msgBody, { color: colors.text }]}>{item.content}</Text>
+          )}
         </Card>
       ))}
 

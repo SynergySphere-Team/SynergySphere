@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/utils';
+import { MarkdownView } from '@/components/ui/MarkdownView';
 import {
   BookOpen,
   CheckCircle2,
@@ -113,66 +114,7 @@ interface SearchResult {
 }
 
 function FormattedExplanation({ content }: { content: string }) {
-  if (!content || !content.includes('### ')) {
-    return (
-      <p className="text-sm leading-7 text-slate-200 whitespace-pre-line">
-        {content}
-      </p>
-    );
-  }
-
-  const rawSections = content.split(/(?=### )/g);
-
-  return (
-    <div className="space-y-4">
-      {rawSections.map((section, idx) => {
-        const trimmed = section.trim();
-        if (!trimmed) return null;
-        if (trimmed.startsWith('### ')) {
-          const lines = trimmed.split('\n');
-          const heading = lines[0].replace('### ', '').trim();
-          const body = lines.slice(1).join('\n').trim();
-
-          const codeBlockMatch = body.match(/```([a-z0-9_-]*)\n([\s\S]*?)```/i);
-
-          return (
-            <div key={idx} className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 space-y-2.5">
-              <h4 className="text-sm font-bold text-sky-400 flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
-                {heading}
-              </h4>
-              {codeBlockMatch ? (
-                <div className="space-y-2">
-                  {body.split(/```[a-z0-9_-]*\n[\s\S]*?```/i)[0]?.trim() && (
-                    <p className="text-xs leading-6 text-slate-300 whitespace-pre-line">
-                      {body.split(/```[a-z0-9_-]*\n[\s\S]*?```/i)[0].trim()}
-                    </p>
-                  )}
-                  <pre className="rounded-lg border border-white/[0.08] bg-[#0d1117] p-3 font-mono text-xs text-sky-300 overflow-x-auto whitespace-pre-wrap">
-                    <code>{codeBlockMatch[2].trim()}</code>
-                  </pre>
-                  {body.split(/```[a-z0-9_-]*\n[\s\S]*?```/i)[1]?.trim() && (
-                    <div className="text-xs leading-6 text-slate-300 whitespace-pre-line pt-1">
-                      {body.split(/```[a-z0-9_-]*\n[\s\S]*?```/i)[1].trim()}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-xs leading-6 text-slate-300 whitespace-pre-line">
-                  {body}
-                </div>
-              )}
-            </div>
-          );
-        }
-        return (
-          <p key={idx} className="text-xs leading-6 text-slate-300 whitespace-pre-line">
-            {trimmed}
-          </p>
-        );
-      })}
-    </div>
-  );
+  return <MarkdownView content={content} className="text-sm leading-7 text-slate-200" />;
 }
 
 export function WebCurriculumSection() {
