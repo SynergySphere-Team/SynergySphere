@@ -54,6 +54,8 @@ function AppLayout() {
             backgroundColor: colors.background,
           },
           gestureEnabled: true,
+          fullScreenGestureEnabled: false,
+          gestureDirection: 'horizontal',
           animation: reduceMotion
             ? 'none'
             : 'slide_from_right',

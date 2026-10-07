@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
+  Dimensions,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -14,9 +16,19 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  runOnJS,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 import { usePathname, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { useAccessibility } from '@/context/AccessibilityContext';
+import { triggerLightHaptic } from '@/services/nativePolish';
 
 export interface ScreenProps {
   children: ReactNode;
@@ -24,7 +36,10 @@ export interface ScreenProps {
   refreshing?: boolean;
   onRefresh?: () => void | Promise<void>;
   swipeBack?: boolean;
+  disableSwipeBack?: boolean;
   onSwipeBack?: () => void;
+  swipeBackEdgeWidth?: number;
+  allowBothEdges?: boolean;
   keyboardAvoiding?: boolean;
   keyboardOffset?: number;
   style?: StyleProp<ViewStyle>;
@@ -39,7 +54,10 @@ export function Screen({
   refreshing = false,
   onRefresh,
   swipeBack = true,
+  disableSwipeBack = false,
   onSwipeBack,
+  swipeBackEdgeWidth = 28,
+  allowBothEdges = true,
   keyboardAvoiding = true,
   keyboardOffset = 0,
   style,
@@ -56,6 +74,11 @@ export function Screen({
   const activeScrollRef = scrollViewRef || internalScrollRef;
 
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Animated values for smooth swipe-to-back transitions
+  const screenWidth = Dimensions.get('window').width;
+  const translateX = useSharedValue(0);
+  const opacity = useSharedValue(1);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -74,7 +97,7 @@ export function Screen({
     };
   }, []);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     if (onSwipeBack) {
       onSwipeBack();
       return;
@@ -92,7 +115,7 @@ export function Screen({
         pathname.startsWith('/community')
       ) {
         router.replace('/(tabs)/community' as never);
-      } else if (pathname === '/(auth)/register') {
+      } else if (pathname === '/(auth)/register' || pathname === '/(auth)/forgot-password') {
         router.replace('/(auth)/login' as never);
       } else if (
         pathname === '/coding' ||
@@ -118,7 +141,7 @@ export function Screen({
         router.replace('/' as never);
       }
     }
-  };
+  }, [onSwipeBack, router, pathname]);
 
   const isMainTabRoot =
     pathname === '/' ||
@@ -126,20 +149,113 @@ export function Screen({
     pathname === '/wellness' ||
     pathname === '/explore';
 
-  const canPerformBack = swipeBack && (!isMainTabRoot || router.canGoBack());
+  const canPerformBack = !disableSwipeBack && swipeBack && (!isMainTabRoot || router.canGoBack());
 
-  const edgeSwipeGesture = Gesture.Pan()
-    .hitSlop({ left: 0, width: 44 })
-    .activeOffsetX(15)
-    .failOffsetY([-25, 25])
+  // Handle Android hardware back press
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const onHardwareBack = () => {
+      if (disableSwipeBack) {
+        // Block hardware back if screen explicitly locked (e.g. active timed session)
+        return true;
+      }
+      if (canPerformBack) {
+        triggerLightHaptic();
+        handleBack();
+        return true;
+      }
+      return false;
+    };
+
+    const backSub = BackHandler.addEventListener('hardwareBackPress', onHardwareBack);
+    return () => backSub.remove();
+  }, [disableSwipeBack, canPerformBack, handleBack]);
+
+  const finishGestureBack = useCallback(() => {
+    triggerLightHaptic();
+    handleBack();
+    // Reset shared values after navigation transition completes
+    setTimeout(() => {
+      translateX.value = 0;
+      opacity.value = 1;
+    }, 200);
+  }, [handleBack, translateX, opacity]);
+
+  const edgeWidth = Math.max(20, Math.min(swipeBackEdgeWidth, 50));
+
+  // 1. Left Edge: Swiping left-to-right (→) within outer edge bounds
+  const leftEdgeGesture = Gesture.Pan()
+    .enabled(canPerformBack)
+    .hitSlop({ left: 0, width: edgeWidth })
+    .activeOffsetX(12)
+    .failOffsetY([-22, 22])
     .cancelsTouchesInView(false)
-    .runOnJS(true)
+    .onUpdate((event) => {
+      if (!canPerformBack) return;
+      if (event.translationX > 0) {
+        translateX.value = event.translationX;
+        opacity.value = interpolate(
+          event.translationX,
+          [0, screenWidth],
+          [1, 0.72],
+          Extrapolation.CLAMP
+        );
+      }
+    })
     .onEnd((event) => {
       if (!canPerformBack) return;
-      if (event.translationX > 40 || event.velocityX > 250) {
-        handleBack();
+      if (event.translationX > 70 || event.velocityX > 350) {
+        translateX.value = withTiming(screenWidth, { duration: 160 }, () => {
+          runOnJS(finishGestureBack)();
+        });
+        opacity.value = withTiming(0.4, { duration: 160 });
+      } else {
+        translateX.value = withSpring(0, { damping: 22, stiffness: 240 });
+        opacity.value = withTiming(1, { duration: 140 });
       }
     });
+
+  // 2. Right Edge: Swiping right-to-left (←) within outer edge bounds
+  const rightEdgeGesture = Gesture.Pan()
+    .enabled(canPerformBack && allowBothEdges)
+    .hitSlop({ right: 0, width: edgeWidth })
+    .activeOffsetX(-12)
+    .failOffsetY([-22, 22])
+    .cancelsTouchesInView(false)
+    .onUpdate((event) => {
+      if (!canPerformBack) return;
+      if (event.translationX < 0) {
+        translateX.value = event.translationX;
+        opacity.value = interpolate(
+          Math.abs(event.translationX),
+          [0, screenWidth],
+          [1, 0.72],
+          Extrapolation.CLAMP
+        );
+      }
+    })
+    .onEnd((event) => {
+      if (!canPerformBack) return;
+      if (event.translationX < -70 || event.velocityX < -350) {
+        translateX.value = withTiming(-screenWidth, { duration: 160 }, () => {
+          runOnJS(finishGestureBack)();
+        });
+        opacity.value = withTiming(0.4, { duration: 160 });
+      } else {
+        translateX.value = withSpring(0, { damping: 22, stiffness: 240 });
+        opacity.value = withTiming(1, { duration: 140 });
+      }
+    });
+
+  const composedSwipeGesture = allowBothEdges
+    ? Gesture.Race(leftEdgeGesture, rightEdgeGesture)
+    : leftEdgeGesture;
+
+  const animatedScreenStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+    opacity: opacity.value,
+  }));
 
   const content = (
     <View
@@ -214,8 +330,10 @@ export function Screen({
   }
 
   return (
-    <GestureDetector gesture={edgeSwipeGesture}>
-      {screenView}
+    <GestureDetector gesture={composedSwipeGesture}>
+      <Animated.View style={[{ flex: 1 }, animatedScreenStyle]}>
+        {screenView}
+      </Animated.View>
     </GestureDetector>
   );
 }
@@ -259,36 +377,50 @@ export function Notice({
       ? '#C5221F'
       : colors.danger
     : isLight
-      ? '#00875A'
+      ? '#1e6827'
       : colors.primary;
 
   return (
-    <Text
+    <View
+      accessibilityRole="alert"
+      accessibilityLiveRegion="assertive"
       style={[
         styles.notice,
         {
           backgroundColor: bgColor,
-          color: textColor,
-          fontSize: fontSize(14),
+          borderColor: isError ? colors.danger : colors.primary,
         },
       ]}
     >
-      {children}
-    </Text>
+      <Text
+        style={[
+          styles.noticeText,
+          {
+            color: textColor,
+            fontSize: fontSize(13),
+          },
+        ]}
+      >
+        {children}
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  scroller: { flex: 1 },
-  scroll: { flexGrow: 1 },
+  safe: {
+    flex: 1,
+  },
+  scroller: {
+    flex: 1,
+  },
+  scroll: {
+    flexGrow: 1,
+  },
   content: {
+    flex: 1,
     paddingHorizontal: 16,
     paddingTop: 12,
-    gap: 12,
-    maxWidth: 720,
-    width: '100%',
-    alignSelf: 'center',
   },
   center: {
     flex: 1,
@@ -296,9 +428,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   notice: {
-    borderRadius: 10,
     padding: 12,
-    fontSize: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  noticeText: {
     fontWeight: '600',
   },
 });

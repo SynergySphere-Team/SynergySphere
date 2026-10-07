@@ -560,12 +560,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
   },
   categoryBadge: {
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 10,
     borderWidth: 1,
+    flexShrink: 1,
   },
   categoryText: {
     fontSize: 11,
@@ -577,6 +579,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexShrink: 0,
   },
   visibilityPill: {
     flexDirection: 'row',

@@ -395,7 +395,11 @@ export default function WellnessScreen() {
   const isHighStrain = stress > 6 || energy < 5;
 
   return (
-    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
+    <Screen
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+      disableSwipeBack={isBreathingActive || isPomoRunning}
+    >
       {/* WELLNESS HEADER */}
       <View
         style={[
@@ -2057,7 +2061,7 @@ const styles = StyleSheet.create({
   cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
     width: '100%',
     gap: 8,
@@ -2065,11 +2069,15 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14,
     fontWeight: '800',
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 4,
   },
   subtleBadge: {
     fontSize: 11,
     fontWeight: '700',
     flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   sectionSubtitle: {
     fontSize: 11,

@@ -513,7 +513,7 @@ export default function HomeScreen() {
                         color={isInProgress ? primaryAccent : colors.muted}
                       />
                     </Pressable>
-                    <View style={{ flex: 1, gap: 2 }}>
+                    <View style={{ flex: 1, minWidth: 0, paddingRight: 6, gap: 2 }}>
                       <Text style={[styles.activeTaskTitle, { color: colors.text }]}>{task.title}</Text>
                       {task.description ? (
                         <Text numberOfLines={2} style={[styles.activeTaskDesc, { color: colors.muted }]}>
@@ -830,7 +830,7 @@ avatarInitials: {
   activeTaskTitle: { fontSize: 15, fontWeight: '700' },
   activeTaskDesc: { fontSize: 13, lineHeight: 18 },
   taskMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  inProgressBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  inProgressBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexShrink: 0, alignSelf: 'flex-start' },
   inProgressBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   taskDueText: { fontSize: 11 },
   taskDivider: { borderTopWidth: 1 },
@@ -871,6 +871,7 @@ avatarInitials: {
     borderRadius: 8,
     borderWidth: 1,
     alignSelf: 'center',
+    flexShrink: 0,
   },
   quickActionChipText: {
     fontSize: 11,

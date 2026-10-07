@@ -127,6 +127,19 @@ export default function LoginScreen() {
             }
           />
 
+          <View style={styles.forgotRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Forgot password?"
+              onPress={() => router.push('/(auth)/forgot-password')}
+              hitSlop={8}
+            >
+              <Text style={[styles.forgotLink, { color: brandGreen }]}>
+                Forgot password?
+              </Text>
+            </Pressable>
+          </View>
+
           <Button
             title={submitting ? 'Signing in…' : 'Sign in to SynergySphere'}
             disabled={submitting || !email.trim() || !password}
@@ -218,6 +231,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  forgotRow: {
+    alignItems: 'flex-end',
+    marginTop: -4,
+    marginBottom: 4,
+  },
+  forgotLink: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   link: {
     textAlign: 'center',

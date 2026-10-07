@@ -924,6 +924,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
+    flexShrink: 0,
   },
   statusPillText: {
     fontSize: 11,
@@ -932,11 +933,14 @@ const styles = StyleSheet.create({
   },
   repoPill: {
     flex: 1,
+    minWidth: 0,
+    paddingRight: 4,
     fontSize: 12,
     fontWeight: '600',
   },
   timeAgo: {
     fontSize: 11,
+    flexShrink: 0,
   },
   itemTitle: {
     fontSize: 15,
@@ -997,12 +1001,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     flex: 1,
+    minWidth: 0,
+    paddingRight: 6,
   },
   visibilityBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
     borderWidth: 1,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   visibilityText: {
     fontSize: 11,

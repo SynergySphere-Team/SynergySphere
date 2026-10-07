@@ -188,8 +188,8 @@ export default function ExploreScreen() {
           </View>
 
           <View style={{ backgroundColor: colors.surfaceElevated, padding: 10, borderRadius: 8, gap: 4 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.muted, textTransform: 'uppercase' }}>Current Focus</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', flex: 1, minWidth: 0, paddingRight: 4 }}>Current Focus</Text>
               <View style={[styles.dueBadge, { backgroundColor: `${primaryAccent}20` }]}>
                 <Text style={[styles.dueText, { color: primaryAccent }]}>
                   {statsData?.interviewPrep?.recommendedPractice?.[0]?.status || 'Needs Practice'}
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
   kpiIcon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   progressBarTrack: { height: 7, borderRadius: 4, overflow: 'hidden' },
   progressBarFill: { height: '100%', borderRadius: 4 },
-  dueBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  dueBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexShrink: 0, alignSelf: 'flex-start' },
   dueText: { fontSize: 11, fontWeight: '700' },
   activityContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 130, paddingTop: 10 },
   barCol: { flex: 1, alignItems: 'center', gap: 6 },
@@ -369,14 +369,14 @@ const styles = StyleSheet.create({
   dayLabel: { fontSize: 11, fontWeight: '600' },
   tracksList: { gap: 10 },
   trackItem: { gap: 4 },
-  trackLabels: { flexDirection: 'row', justifyContent: 'space-between' },
-  trackName: { fontSize: 13, fontWeight: '600' },
-  trackPercent: { fontSize: 12, fontWeight: '700' },
+  trackLabels: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
+  trackName: { fontSize: 13, fontWeight: '600', flex: 1, minWidth: 0, paddingRight: 4 },
+  trackPercent: { fontSize: 12, fontWeight: '700', flexShrink: 0, alignSelf: 'flex-start' },
   trackTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
   trackFill: { height: '100%', borderRadius: 3 },
-  taskRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, gap: 8 },
+  taskRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingVertical: 10, gap: 8 },
   taskDivider: { borderTopWidth: 1 },
-  taskBody: { flex: 1, gap: 2 },
+  taskBody: { flex: 1, minWidth: 0, paddingRight: 4, gap: 2 },
   taskTitle: { fontSize: 14, fontWeight: '700' },
   taskDesc: { fontSize: 12 },
   workspacePressed: { opacity: 0.65 },

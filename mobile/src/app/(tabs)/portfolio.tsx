@@ -867,15 +867,20 @@ portfolioSubtitle: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     marginTop: 6,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '800',
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 4,
   },
   countBadge: {
     fontSize: 12,
     fontWeight: '600',
+    flexShrink: 0,
   },
 
   // Project Card Styles
@@ -883,17 +888,22 @@ portfolioSubtitle: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    gap: 8,
   },
   projectTitle: {
     fontSize: 15,
     fontWeight: '800',
     flex: 1,
+    minWidth: 0,
+    paddingRight: 6,
   },
   projectActions: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 6,
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
+  },
 
 projectActionBtn: {
   padding: 6,
@@ -945,6 +955,7 @@ projectActionBtn: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 6,
     marginBottom: 4,
   },
   toolIconWrap: {
@@ -958,6 +969,8 @@ projectActionBtn: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   toolBadgeText: {
     fontSize: 9,
@@ -1003,15 +1016,21 @@ projectActionBtn: {
   skillHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: 8,
   },
   skillName: {
     fontSize: 13,
     fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 4,
   },
   skillPercent: {
     fontSize: 13,
     fontWeight: '800',
+    flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   progressTrack: {
     height: 7,

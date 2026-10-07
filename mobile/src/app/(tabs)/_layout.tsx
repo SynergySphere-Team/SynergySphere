@@ -78,42 +78,31 @@ export default function TabsLayout() {
       return;
     }
 
-    // Handle swipe-back on sub-screens.
-    if (direction === 'right') {
-      if (router.canGoBack()) {
-        router.back();
-      } else if (
-        pathname.startsWith(
-          '/project-',
-        ) ||
-        pathname ===
-          '/github-connect' ||
-        pathname === '/my-work'
-      ) {
-        router.replace(
-          '/(tabs)/community' as never,
-        );
-      } else {
-        router.replace(
-          '/(tabs)/explore' as never,
-        );
-      }
-    }
+    // Sub-screens handle their own edge-swipe navigation via Screen component
   };
 
+  const isMainTabRoot =
+    activeIndex !== -1 &&
+    (pathname === '/' ||
+      pathname === '/tasks' ||
+      pathname === '/wellness' ||
+      pathname === '/explore');
+
   const panGesture = Gesture.Pan()
+    .enabled(isMainTabRoot)
     .runOnJS(true)
-    .activeOffsetX([-25, 25])
-    .failOffsetY([-20, 20])
+    .activeOffsetX([-40, 40])
+    .failOffsetY([-18, 18])
     .onEnd((event) => {
+      if (!isMainTabRoot) return;
       if (
-        event.translationX < -50 ||
-        event.velocityX < -350
+        event.translationX < -75 ||
+        event.velocityX < -450
       ) {
         handleSwipe('left');
       } else if (
-        event.translationX > 50 ||
-        event.velocityX > 350
+        event.translationX > 75 ||
+        event.velocityX > 450
       ) {
         handleSwipe('right');
       }

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  Platform,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
@@ -16,6 +17,36 @@ import { Screen, Notice } from '@/components/Screen';
 import { Button, Card, Heading } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
+import { InterviewTimer } from '@/components/interview/InterviewTimer';
+import { VoiceWaveformInput } from '@/components/interview/VoiceWaveformInput';
+import { PersonaHeader } from '@/components/interview/PersonaHeader';
+import { FAANGScorecardView } from '@/components/interview/FAANGScorecardView';
+import { MobileCodeEditor } from '@/components/coding/MobileCodeEditor';
+import { TestExecutionRunner } from '@/components/coding/TestExecutionRunner';
+import { executeCodeTestSuite } from '@/services/codeRunner';
+import {
+  triggerMediumHaptic,
+  triggerSuccessHaptic,
+  enableKeepAwake,
+  disableKeepAwake,
+} from '@/services/nativePolish';
+import {
+  saveInterviewDraft,
+  loadInterviewDraft,
+  clearInterviewDraft,
+} from '@/services/interviewStorage';
+import {
+  INTERVIEWER_PERSONAS,
+  generate4StageInterview,
+  evaluateDynamicFollowUp,
+  generateFAANGScorecard,
+} from '@/services/interviewEngine';
+import type {
+  InterviewSessionState,
+  InterviewerPersonaId,
+  FAANGScorecard,
+  TestExecutionReport,
+} from '@/types/interview';
 import type {
   InterviewEvaluationResult,
   RecommendedPracticeItem,
@@ -237,6 +268,26 @@ export default function InterviewsScreen() {
   const [selectedLanguage, setSelectedLanguage] = useState('TypeScript');
   const [selectedStyle, setSelectedStyle] = useState('Professional');
 
+  // Phase 1 & 2: Realistic Interview Engine & Coding Test Runner State
+  const [realisticSession, setRealisticSession] = useState<InterviewSessionState | null>(null);
+  const [savedDraft, setSavedDraft] = useState<InterviewSessionState | null>(null);
+  const [faangScorecard, setFaangScorecard] = useState<FAANGScorecard | null>(null);
+  const [selectedPersonaId, setSelectedPersonaId] = useState<InterviewerPersonaId>('strict');
+  const [isSessionPaused, setIsSessionPaused] = useState(false);
+  const [codingTestReport, setCodingTestReport] = useState<TestExecutionReport | null>(null);
+
+  // Phase 4: Screen Keep-Awake during active realistic session
+  useEffect(() => {
+    if (realisticSession && !isSessionPaused) {
+      enableKeepAwake('realistic-interview');
+    } else {
+      disableKeepAwake('realistic-interview');
+    }
+    return () => {
+      disableKeepAwake('realistic-interview');
+    };
+  }, [realisticSession, isSessionPaused]);
+
   // Topic library filter & search
   const [topicSearch, setTopicSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -355,6 +406,223 @@ export default function InterviewsScreen() {
       startPractice(searchParams.autoPractice);
     }
   }, [searchParams?.autoPractice]);
+
+  // Draft Restoration on mount
+  useEffect(() => {
+    loadInterviewDraft().then((draft) => {
+      if (draft && draft.currentStage !== 'COMPLETED') {
+        setSavedDraft(draft);
+      }
+    });
+  }, []);
+
+  // Timer Hook for Realistic 4-Stage Interview
+  useEffect(() => {
+    if (!realisticSession || isSessionPaused) return;
+
+    const interval = setInterval(() => {
+      setRealisticSession((prev) => {
+        if (!prev || prev.isPaused) return prev;
+        const currentIdx = prev.currentStageIndex;
+        const currentTime = prev.stageTimesRemaining[currentIdx] ?? 300;
+        const nextTime = Math.max(0, currentTime - 1);
+
+        const updatedTimes = {
+          ...prev.stageTimesRemaining,
+          [currentIdx]: nextTime,
+        };
+
+        const updatedState = {
+          ...prev,
+          stageTimesRemaining: updatedTimes,
+        };
+
+        // Auto-save draft every 15 seconds
+        if (nextTime > 0 && nextTime % 15 === 0) {
+          saveInterviewDraft(updatedState);
+        }
+
+        return updatedState;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [realisticSession, isSessionPaused]);
+
+  function startRealisticInterview(resumeDraft = false) {
+    if (resumeDraft && savedDraft) {
+      setRealisticSession(savedDraft);
+      setFaangScorecard(null);
+      setActiveInterview(null);
+      setSavedDraft(null);
+      setIsSessionPaused(false);
+      return;
+    }
+
+    const stages = generate4StageInterview(
+      selectedRole,
+      selectedDifficulty as any,
+      selectedLanguage
+    );
+
+    const initialTimes: Record<number, number> = {};
+    stages.forEach((s, i) => {
+      initialTimes[i] = s.timeLimitSeconds;
+    });
+
+    const newSession: InterviewSessionState = {
+      sessionId: `faang-${Date.now()}`,
+      candidateRole: selectedRole,
+      difficulty: selectedDifficulty as any,
+      personaId: selectedPersonaId,
+      currentStage: stages[0].stage,
+      currentStageIndex: 0,
+      stages,
+      answers: {},
+      codeDrafts: {
+        2: stages[2]?.starterCode || '',
+      },
+      stageTimesRemaining: initialTimes,
+      isPaused: false,
+      startedAt: Date.now(),
+      lastSavedAt: Date.now(),
+      activeFollowUp: null,
+    };
+
+    setRealisticSession(newSession);
+    setFaangScorecard(null);
+    setActiveInterview(null);
+    setSavedDraft(null);
+    setIsSessionPaused(false);
+    saveInterviewDraft(newSession);
+  }
+
+  function handleRealisticAnswerChange(text: string) {
+    if (!realisticSession) return;
+    const stageIdx = realisticSession.currentStageIndex;
+    const persona = INTERVIEWER_PERSONAS[realisticSession.personaId] || INTERVIEWER_PERSONAS.strict;
+
+    let followUp = realisticSession.activeFollowUp;
+    if (!followUp && text.trim().split(/\s+/).length >= 15) {
+      const probeResult = evaluateDynamicFollowUp(persona, stageIdx, text);
+      if (probeResult) {
+        followUp = {
+          question: probeResult.question,
+          stageIndex: stageIdx,
+          parentTriggerId: probeResult.parentTriggerId,
+        };
+      }
+    }
+
+    const nextState: InterviewSessionState = {
+      ...realisticSession,
+      answers: {
+        ...realisticSession.answers,
+        [stageIdx]: text,
+      },
+      activeFollowUp: followUp,
+      lastSavedAt: Date.now(),
+    };
+    setRealisticSession(nextState);
+    saveInterviewDraft(nextState);
+  }
+
+  function handleRealisticVoiceAppend(text: string) {
+    if (!realisticSession) return;
+    const stageIdx = realisticSession.currentStageIndex;
+    const current = realisticSession.answers[stageIdx] || '';
+    const updated = current ? `${current}\n\n${text}` : text;
+    handleRealisticAnswerChange(updated);
+  }
+
+  function handleRealisticCodeChange(code: string) {
+    if (!realisticSession) return;
+    const stageIdx = realisticSession.currentStageIndex;
+    const nextState: InterviewSessionState = {
+      ...realisticSession,
+      codeDrafts: {
+        ...realisticSession.codeDrafts,
+        [stageIdx]: code,
+      },
+      lastSavedAt: Date.now(),
+    };
+    setRealisticSession(nextState);
+    saveInterviewDraft(nextState);
+  }
+
+  async function handleRunRealisticCodeTests(): Promise<TestExecutionReport> {
+    if (!realisticSession) {
+      throw new Error('No active realistic interview session.');
+    }
+    const currentStage = realisticSession.stages[realisticSession.currentStageIndex];
+    const candidateCode =
+      realisticSession.codeDrafts[realisticSession.currentStageIndex] ||
+      currentStage?.starterCode ||
+      '';
+    const testCases = currentStage?.testCases || [];
+
+    const report = await executeCodeTestSuite(candidateCode, testCases);
+    setCodingTestReport(report);
+    return report;
+  }
+
+  function handleRealisticNextStage() {
+    if (!realisticSession) return;
+    triggerMediumHaptic();
+    const nextIdx = realisticSession.currentStageIndex + 1;
+    if (nextIdx < realisticSession.stages.length) {
+      const nextStage = realisticSession.stages[nextIdx].stage;
+      const nextState: InterviewSessionState = {
+        ...realisticSession,
+        currentStageIndex: nextIdx,
+        currentStage: nextStage,
+        activeFollowUp: null,
+        lastSavedAt: Date.now(),
+      };
+      setRealisticSession(nextState);
+      saveInterviewDraft(nextState);
+      setCodingTestReport(null);
+      interviewScrollRef.current?.scrollTo({ y: 0, animated: true });
+    } else {
+      completeRealisticInterview();
+    }
+  }
+
+  function completeRealisticInterview() {
+    if (!realisticSession) return;
+    triggerSuccessHaptic();
+    setEvaluating(true);
+    setTimeout(() => {
+      const scorecard = generateFAANGScorecard(realisticSession);
+      setFaangScorecard(scorecard);
+      setRealisticSession(null);
+      setCodingTestReport(null);
+      setEvaluating(false);
+      clearInterviewDraft();
+      loadDashboardData();
+    }, 1200);
+  }
+
+  function handleRealisticExit() {
+    Alert.alert(
+      'Exit Simulated Interview?',
+      'Your progress has been preserved to local draft storage. You can resume anytime from the Practice Hub.',
+      [
+        { text: 'Keep Going', style: 'cancel' },
+        {
+          text: 'Save & Exit',
+          style: 'destructive',
+          onPress: () => {
+            if (realisticSession) {
+              saveInterviewDraft(realisticSession);
+              setSavedDraft(realisticSession);
+            }
+            setRealisticSession(null);
+          },
+        },
+      ]
+    );
+  }
 
   // Accurate Timer Hook
   useEffect(() => {
@@ -837,15 +1105,22 @@ export default function InterviewsScreen() {
   const currentQ = activeInterview?.questions[step];
 
   return (
-    <Screen scrollViewRef={interviewScrollRef} refreshing={refreshing} onRefresh={handleRefresh}>
+    <Screen
+      scrollViewRef={interviewScrollRef}
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+      disableSwipeBack={Boolean(realisticSession || activeInterview || practiceSession)}
+    >
       {/* Studio Header & Context Switcher */}
       <View style={styles.header}>
         <View style={styles.badgeRow}>
-          {(activeInterview || practiceSession || evaluationResult) && (
+          {(realisticSession || activeInterview || practiceSession || evaluationResult || faangScorecard) && (
             <View style={[styles.proBadge, { backgroundColor: `${primaryAccent}20` }]}>
               <Ionicons name="sparkles" size={12} color={primaryAccent} />
               <Text style={[styles.proBadgeText, { color: primaryAccent }]}>
-                {activeInterview
+                {realisticSession
+                  ? 'FAANG SIMULATION ROUND'
+                  : activeInterview
                   ? 'LIVE SIMULATION'
                   : practiceSession
                   ? 'FOCUSED PRACTICE'
@@ -854,7 +1129,15 @@ export default function InterviewsScreen() {
             </View>
           )}
 
-          {activeInterview ? (
+          {realisticSession ? (
+            <Pressable
+              onPress={handleRealisticExit}
+              style={[styles.exitSessionBtn, { backgroundColor: isLight ? '#FEE2E2' : '#450a0a' }]}
+            >
+              <Ionicons name="close-circle" size={14} color="#dc2626" />
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#dc2626' }}>Save & Exit</Text>
+            </Pressable>
+          ) : activeInterview ? (
             <Pressable
               onPress={confirmExitInterview}
               style={[styles.exitSessionBtn, { backgroundColor: isLight ? '#FEE2E2' : '#450a0a' }]}
@@ -901,7 +1184,7 @@ export default function InterviewsScreen() {
       )}
 
       {/* Main 4-Segment Top Navigation Bar (When in Idle Hub) */}
-      {!activeInterview && !evaluationResult && !practiceSession && !evaluating && (
+      {!realisticSession && !faangScorecard && !activeInterview && !evaluationResult && !practiceSession && !evaluating && (
         <View style={[styles.segmentedControl, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
           <Pressable
             onPress={() => setActiveTab('hub')}
@@ -979,8 +1262,55 @@ export default function InterviewsScreen() {
       {/* ========================================================================= */}
       {/* 1. PRACTICE HUB VIEW                                                      */}
       {/* ========================================================================= */}
-      {!activeInterview && !evaluationResult && !practiceSession && !evaluating && activeTab === 'hub' && (
+      {!realisticSession && !faangScorecard && !activeInterview && !evaluationResult && !practiceSession && !evaluating && activeTab === 'hub' && (
         <View style={styles.viewContainer}>
+          {/* Unfinished Draft Recovery Card */}
+          {savedDraft && (
+            <Card>
+              <View style={{ gap: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="document-text" size={16} color={primaryAccent} />
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: primaryAccent }}>
+                      ACTIVE INTERVIEW DRAFT DETECTED
+                    </Text>
+                  </View>
+                  <View style={[styles.streakBadge, { backgroundColor: `${primaryAccent}15` }]}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: primaryAccent }}>
+                      Stage {savedDraft.currentStageIndex + 1}/4
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text }}>
+                  {savedDraft.candidateRole} ({savedDraft.difficulty})
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.muted, lineHeight: 17 }}>
+                  Evaluated by {INTERVIEWER_PERSONAS[savedDraft.personaId]?.name || 'Bar Raiser'}. Resuming restores your elapsed time, written architecture, and code drafts.
+                </Text>
+
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      title="Discard"
+                      secondary
+                      onPress={() => {
+                        clearInterviewDraft();
+                        setSavedDraft(null);
+                      }}
+                    />
+                  </View>
+                  <View style={{ flex: 2 }}>
+                    <Button
+                      title="Resume Interview Round →"
+                      onPress={() => startRealisticInterview(true)}
+                    />
+                  </View>
+                </View>
+              </View>
+            </Card>
+          )}
+
           {/* Quick Actions Hero Card */}
           <Card>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -1051,9 +1381,9 @@ export default function InterviewsScreen() {
           {homeStats?.recommendedPractice && homeStats.recommendedPractice.length > 0 ? (
             homeStats.recommendedPractice.map((item) => (
               <Card key={item.id}>
-                <View style={{ gap: 6 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text }}>{item.topic}</Text>
+                <View style={{ gap: 8 }}>
+                  <View style={styles.cardHeaderRow}>
+                    <Text style={[styles.cardTitleText, { color: colors.text }]}>{item.topic}</Text>
                     <View
                       style={[
                         styles.levelBadge,
@@ -1128,9 +1458,9 @@ export default function InterviewsScreen() {
               {homeStats.learningPaths.map((path) => (
                 <Card key={path.id}>
                   <View style={{ gap: 8 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>{path.title}</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: primaryAccent }}>{path.progress}%</Text>
+                    <View style={styles.cardHeaderRow}>
+                      <Text style={[styles.cardTitleText, { color: colors.text, fontSize: 14 }]}>{path.title}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: primaryAccent, flexShrink: 0, alignSelf: 'flex-start' }}>{path.progress}%</Text>
                     </View>
                     <View style={[styles.progressTrack, { backgroundColor: colors.surfaceElevated }]}>
                       <View style={[styles.progressFill, { width: `${path.progress}%`, backgroundColor: primaryAccent }]} />
@@ -1284,31 +1614,53 @@ export default function InterviewsScreen() {
                 </ScrollView>
               </View>
 
-              {/* Interviewer Persona Style */}
+              {/* Interviewer Persona Selection */}
               <View>
-                <Text style={[styles.fieldLabel, { color: colors.text }]}>Interviewer Persona Style</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                  {interviewerStyles.map((st) => (
-                    <Pressable
-                      key={st.id}
-                      onPress={() => setSelectedStyle(st.id)}
-                      style={[
-                        styles.choicePill,
-                        { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
-                        selectedStyle === st.id && { backgroundColor: `${primaryAccent}20`, borderColor: primaryAccent },
-                      ]}
-                    >
-                      <Text style={[styles.choiceText, { color: selectedStyle === st.id ? primaryAccent : colors.text }]}>
-                        {st.label}
-                      </Text>
-                    </Pressable>
-                  ))}
+                <Text style={[styles.fieldLabel, { color: colors.text }]}>Interviewer Persona & Rubric Focus</Text>
+                <View style={{ gap: 8 }}>
+                  {Object.values(INTERVIEWER_PERSONAS).map((p) => {
+                    const isSelected = selectedPersonaId === p.id;
+                    return (
+                      <Pressable
+                        key={p.id}
+                        onPress={() => setSelectedPersonaId(p.id)}
+                        style={[
+                          styles.personaChoiceCard,
+                          {
+                            backgroundColor: isSelected ? `${p.accentColor}12` : colors.surfaceElevated,
+                            borderColor: isSelected ? p.accentColor : colors.border,
+                          },
+                        ]}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <View style={[styles.avatarBox, { backgroundColor: `${p.accentColor}20`, width: 36, height: 36, borderRadius: 18 }]}>
+                            <Ionicons name={p.avatarIcon as any} size={18} color={p.accentColor} />
+                          </View>
+                          <View style={{ flex: 1, gap: 2 }}>
+                            <View style={styles.cardHeaderRow}>
+                              <Text style={[styles.cardTitleText, { fontSize: 13, color: colors.text }]}>{p.name}</Text>
+                              <View style={[styles.badge, { backgroundColor: `${p.accentColor}20`, flexShrink: 0, alignSelf: 'flex-start' }]}>
+                                <Text style={[styles.badgeText, { color: p.accentColor }]}>{p.badge}</Text>
+                              </View>
+                            </View>
+                            <Text style={{ fontSize: 11, color: colors.muted }}>{p.toneDescription}</Text>
+                          </View>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
 
-              <View style={{ marginTop: 10 }}>
+              <View style={{ marginTop: 12, gap: 8 }}>
                 <Button
-                  title={loading ? 'Preparing Session...' : 'Launch Simulated Interview'}
+                  title="Launch 4-Stage FAANG Simulation (Recommended) 🚀"
+                  onPress={() => startRealisticInterview(false)}
+                />
+
+                <Button
+                  title={loading ? 'Preparing Session...' : 'Launch Single-Track Interview'}
+                  secondary
                   onPress={startInterview}
                   disabled={loading}
                 />
@@ -1321,7 +1673,7 @@ export default function InterviewsScreen() {
       {/* ========================================================================= */}
       {/* 3. TOPIC LIBRARY VIEW (Browse & 1-Tap Practice)                           */}
       {/* ========================================================================= */}
-      {!activeInterview && !evaluationResult && !practiceSession && !evaluating && activeTab === 'library' && (
+      {!realisticSession && !faangScorecard && !activeInterview && !evaluationResult && !practiceSession && !evaluating && activeTab === 'library' && (
         <View style={styles.viewContainer}>
           {/* Search & Filter Bar */}
           <Card>
@@ -1370,12 +1722,12 @@ export default function InterviewsScreen() {
           {filteredTracks.map((tr) => (
             <Card key={tr.id}>
               <View style={{ gap: 8 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Ionicons name="code-slash" size={18} color={primaryAccent} />
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>{tr.name}</Text>
+                <View style={styles.cardHeaderRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, paddingRight: 6 }}>
+                    <Ionicons name="code-slash" size={18} color={primaryAccent} style={{ flexShrink: 0 }} />
+                    <Text style={[styles.cardTitleText, { fontSize: 16, color: colors.text }]}>{tr.name}</Text>
                   </View>
-                  <View style={[styles.tagBadge, { backgroundColor: `${primaryAccent}15` }]}>
+                  <View style={[styles.tagBadge, { backgroundColor: `${primaryAccent}15`, flexShrink: 0, alignSelf: 'flex-start' }]}>
                     <Text style={[styles.tagText, { color: primaryAccent }]}>{tr.category.toUpperCase()}</Text>
                   </View>
                 </View>
@@ -1414,7 +1766,7 @@ export default function InterviewsScreen() {
       {/* ========================================================================= */}
       {/* 4. HISTORY & ANALYTICS VIEW                                               */}
       {/* ========================================================================= */}
-      {!activeInterview && !evaluationResult && !practiceSession && !evaluating && activeTab === 'history' && (
+      {!realisticSession && !faangScorecard && !activeInterview && !evaluationResult && !practiceSession && !evaluating && activeTab === 'history' && (
         <View style={styles.viewContainer}>
           {/* Performance KPIs */}
           <Text style={[styles.section, { color: colors.text, marginTop: 0 }]}>Interview & Practice Analytics</Text>
@@ -1457,9 +1809,9 @@ export default function InterviewsScreen() {
               <Pressable key={item.id} onPress={() => viewHistoryDetail(item.id)}>
                 <Card>
                   <View style={{ gap: 6 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text }}>{item.role || item.topic}</Text>
-                      <View style={[styles.scorePill, { backgroundColor: `${primaryAccent}20` }]}>
+                    <View style={styles.cardHeaderRow}>
+                      <Text style={[styles.cardTitleText, { color: colors.text }]}>{item.role || item.topic}</Text>
+                      <View style={[styles.scorePill, { backgroundColor: `${primaryAccent}20`, flexShrink: 0, alignSelf: 'flex-start' }]}>
                         <Text style={[styles.scorePillText, { color: primaryAccent }]}>{item.score || 0}%</Text>
                       </View>
                     </View>
@@ -1491,6 +1843,238 @@ export default function InterviewsScreen() {
               </View>
             </Card>
           )}
+        </View>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4.5. REALISTIC 4-STAGE INTERVIEW SESSION (FAANG ROUND)                    */}
+      {/* ========================================================================= */}
+      {realisticSession && (
+        <View style={styles.viewContainer}>
+          {/* Persona Header with dynamic probe speech bubble */}
+          <PersonaHeader
+            persona={INTERVIEWER_PERSONAS[realisticSession.personaId] || INTERVIEWER_PERSONAS.strict}
+            stageTitle={realisticSession.stages[realisticSession.currentStageIndex]?.title || 'Interview Stage'}
+            activeFollowUpQuestion={realisticSession.activeFollowUp?.question}
+          />
+
+          {/* Per-Stage Countdown Timer */}
+          <InterviewTimer
+            secondsRemaining={realisticSession.stageTimesRemaining[realisticSession.currentStageIndex] ?? 300}
+            totalAllocatedSeconds={realisticSession.stages[realisticSession.currentStageIndex]?.timeLimitSeconds ?? 300}
+            isPaused={isSessionPaused}
+            onTogglePause={() => setIsSessionPaused((p) => !p)}
+            onTimeExpired={handleRealisticNextStage}
+          />
+
+          {/* 4-Stage Step Tracker */}
+          <View style={[styles.stageTrackContainer, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+            {realisticSession.stages.map((stg, sIdx) => {
+              const isCurrent = sIdx === realisticSession.currentStageIndex;
+              const isPast = sIdx < realisticSession.currentStageIndex;
+              return (
+                <View
+                  key={stg.stage}
+                  style={[
+                    styles.stageChip,
+                    isCurrent && { backgroundColor: `${primaryAccent}20`, borderColor: primaryAccent },
+                    isPast && { backgroundColor: isLight ? '#f1f5f9' : '#1e293b' },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.stageChipNum,
+                      { color: isCurrent ? primaryAccent : isPast ? colors.text : colors.muted },
+                    ]}
+                  >
+                    {isPast ? '✓' : String(sIdx + 1)}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.stageChipLabel,
+                      { color: isCurrent ? primaryAccent : isPast ? colors.text : colors.muted, fontWeight: isCurrent ? '800' : '600' },
+                    ]}
+                  >
+                    {stg.stage === 'BEHAVIORAL'
+                      ? 'STAR'
+                      : stg.stage === 'SYSTEM_DESIGN'
+                      ? 'System'
+                      : stg.stage === 'CODING'
+                      ? 'Coding'
+                      : 'Debrief'}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Question / Scenario Card */}
+          <Card>
+            <View style={{ gap: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={[styles.tagBadge, { backgroundColor: `${primaryAccent}15` }]}>
+                  <Text style={[styles.tagText, { color: primaryAccent }]}>
+                    {realisticSession.stages[realisticSession.currentStageIndex]?.category.toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.muted }}>
+                  {realisticSession.difficulty.toUpperCase()} CALIBRATION
+                </Text>
+              </View>
+
+              <Text style={[styles.questionText, { color: colors.text }]}>
+                {realisticSession.stages[realisticSession.currentStageIndex]?.prompt}
+              </Text>
+
+              {realisticSession.stages[realisticSession.currentStageIndex]?.scenarioContext && (
+                <View
+                  style={[
+                    styles.scenarioBox,
+                    { backgroundColor: isLight ? '#f8fafc' : '#0f172a', borderColor: colors.border },
+                  ]}
+                >
+                  <Ionicons name="information-circle-outline" size={16} color={primaryAccent} />
+                  <Text style={[styles.scenarioText, { color: colors.muted }]}>
+                    {realisticSession.stages[realisticSession.currentStageIndex]?.scenarioContext}
+                  </Text>
+                </View>
+              )}
+
+              {/* Constraints if present */}
+              {realisticSession.stages[realisticSession.currentStageIndex]?.constraints && (
+                <View style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.text }}>CONSTRAINTS & REQUIREMENTS:</Text>
+                  {realisticSession.stages[realisticSession.currentStageIndex]?.constraints?.map((c, i) => (
+                    <Text key={i} style={{ fontSize: 12, color: colors.muted }}>
+                      • {c}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Live Answer or Coding Input */}
+              {realisticSession.stages[realisticSession.currentStageIndex]?.stage === 'CODING' ? (
+                <View style={{ gap: 10 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.text }}>
+                    SOLUTION IMPLEMENTATION ({realisticSession.stages[realisticSession.currentStageIndex]?.language || 'TypeScript'}):
+                  </Text>
+                  <MobileCodeEditor
+                    value={
+                      realisticSession.codeDrafts[realisticSession.currentStageIndex] ??
+                      realisticSession.stages[realisticSession.currentStageIndex]?.starterCode ??
+                      ''
+                    }
+                    onChangeText={handleRealisticCodeChange}
+                    language={realisticSession.stages[realisticSession.currentStageIndex]?.language || 'TypeScript'}
+                    minHeight={210}
+                  />
+
+                  {realisticSession.stages[realisticSession.currentStageIndex]?.testCases &&
+                   realisticSession.stages[realisticSession.currentStageIndex].testCases!.length > 0 && (
+                    <TestExecutionRunner
+                      testCases={realisticSession.stages[realisticSession.currentStageIndex].testCases!}
+                      onRunTests={handleRunRealisticCodeTests}
+                      report={codingTestReport}
+                    />
+                  )}
+                </View>
+              ) : (
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.text }}>YOUR STRUCTURED EXPLANATION:</Text>
+                  <TextInput
+                    value={realisticSession.answers[realisticSession.currentStageIndex] || ''}
+                    onChangeText={handleRealisticAnswerChange}
+                    multiline
+                    placeholder="Type your explanation, architecture breakdown, or trade-offs here..."
+                    placeholderTextColor={colors.muted}
+                    keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
+                    style={[
+                      styles.answerInput,
+                      {
+                        backgroundColor: colors.surfaceElevated,
+                        borderColor: colors.border,
+                        color: colors.text,
+                        minHeight: 120,
+                      },
+                    ]}
+                  />
+                </View>
+              )}
+
+              {/* Speech-to-Text Voice Waveform Input */}
+              <VoiceWaveformInput
+                onAppendTranscription={handleRealisticVoiceAppend}
+                accentColor={primaryAccent}
+              />
+
+              {/* Hints Accordion */}
+              {realisticSession.stages[realisticSession.currentStageIndex]?.hints && (
+                <View style={[styles.hintsContainer, { backgroundColor: `${primaryAccent}08`, borderColor: primaryAccent }]}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: primaryAccent }}>
+                    INTERVIEW SCALING HINTS
+                  </Text>
+                  {realisticSession.stages[realisticSession.currentStageIndex]?.hints.map((h, i) => (
+                    <Text key={i} style={{ fontSize: 12, color: colors.text, lineHeight: 17 }}>
+                      • {h}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Navigation buttons */}
+              <View style={styles.navRow}>
+                <Button
+                  title="← Previous Stage"
+                  secondary
+                  disabled={realisticSession.currentStageIndex === 0}
+                  onPress={() => {
+                    const prevIdx = realisticSession.currentStageIndex - 1;
+                    if (prevIdx >= 0) {
+                      const nextState: InterviewSessionState = {
+                        ...realisticSession,
+                        currentStageIndex: prevIdx,
+                        currentStage: realisticSession.stages[prevIdx].stage,
+                      };
+                      setRealisticSession(nextState);
+                      saveInterviewDraft(nextState);
+                    }
+                  }}
+                />
+
+                {realisticSession.currentStageIndex < realisticSession.stages.length - 1 ? (
+                  <Button
+                    title="Next Stage →"
+                    onPress={handleRealisticNextStage}
+                  />
+                ) : (
+                  <Button
+                    title="Submit & Generate FAANG Scorecard ✨"
+                    onPress={completeRealisticInterview}
+                  />
+                )}
+              </View>
+            </View>
+          </Card>
+        </View>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4.6. FAANG SCORECARD VIEW                                                 */}
+      {/* ========================================================================= */}
+      {faangScorecard && (
+        <View style={styles.viewContainer}>
+          <FAANGScorecardView
+            scorecard={faangScorecard}
+            onRetake={() => {
+              setFaangScorecard(null);
+              startRealisticInterview(false);
+            }}
+            onExit={() => {
+              setFaangScorecard(null);
+              setActiveTab('hub');
+            }}
+          />
         </View>
       )}
 
@@ -2256,6 +2840,20 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
 
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  cardTitleText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 20,
+    paddingRight: 6,
+  },
   section: { fontSize: 16, fontWeight: '800', marginTop: 8, marginBottom: 2 },
   cardHeaderTitle: { fontSize: 15, fontWeight: '800', marginBottom: 8 },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
@@ -2264,12 +2862,12 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 10, fontWeight: '600', textAlign: 'center', marginTop: 2 },
   streakBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   focusBox: { padding: 10, borderRadius: 8, borderWidth: 1, gap: 4, marginVertical: 6 },
-  levelBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  levelBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, flexShrink: 0, alignSelf: 'flex-start' },
   levelBadgeText: { fontSize: 11, fontWeight: '800' },
   practiseNowBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },
-  scorePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  scorePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, flexShrink: 0, alignSelf: 'flex-start' },
   scorePillText: { fontSize: 13, fontWeight: '800' },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   kpiBox: { flexBasis: '48%', flexGrow: 1, borderWidth: 1, borderRadius: 12, padding: 12, gap: 4, alignItems: 'center' },
@@ -2299,9 +2897,9 @@ const styles = StyleSheet.create({
   lowTimeWarning: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   questionMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   tagsRow: { flexDirection: 'row', gap: 4, flexWrap: 'wrap' },
-  tagBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  tagBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexShrink: 0, alignSelf: 'flex-start' },
   tagText: { fontSize: 10, fontWeight: '700' },
-  diffBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  diffBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexShrink: 0, alignSelf: 'flex-start' },
   diffText: { fontSize: 11, fontWeight: '800' },
   questionText: { fontSize: 15, fontWeight: '700', lineHeight: 22, marginBottom: 12 },
   answerInput: { minHeight: 110, textAlignVertical: 'top', padding: 12, borderRadius: 10, borderWidth: 1, fontSize: 14, lineHeight: 20, marginBottom: 10 },
@@ -2348,6 +2946,67 @@ const styles = StyleSheet.create({
   assessmentBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, alignSelf: 'flex-start' },
   statusTransitionBox: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', padding: 12, borderRadius: 8, borderWidth: 1 },
   nextRecBox: { padding: 12, borderRadius: 8, borderWidth: 1, gap: 4 },
+
+  // Phase 1: Realistic Interview Layout
+  stageTrackContainer: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+  },
+  stageChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  stageChipNum: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  stageChipLabel: {
+    fontSize: 11,
+  },
+  scenarioBox: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  scenarioText: {
+    fontSize: 12,
+    lineHeight: 17,
+    flex: 1,
+  },
+  personaChoiceCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  avatarBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
 
   // Modals
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },

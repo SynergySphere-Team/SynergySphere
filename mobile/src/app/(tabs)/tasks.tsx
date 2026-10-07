@@ -694,7 +694,7 @@ export default function TasksScreen() {
       {/* Tasks Section Card */}
       <Card>
         <View style={styles.cardHeader}>
-          <View>
+          <View style={{ flex: 1, minWidth: 0, paddingRight: 6 }}>
             <Text style={[styles.cardTitle, { color: colors.text }]}>Tasks</Text>
             <Text style={[styles.tasksSubtitle, { color: colors.muted }]}>
               {completedCount}/{tasks.length} completed
@@ -911,6 +911,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     alignSelf: 'flex-start',
+    flexShrink: 0,
   },
   xpBadgeText: {
     fontSize: 13,
@@ -919,16 +920,22 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: 8,
     marginBottom: 12,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 4,
   },
   cardSubtitleRight: {
     fontSize: 13,
     fontWeight: '500',
+    flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   tasksSubtitle: {
     fontSize: 12,
@@ -940,6 +947,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   timerCircleContainer: {
     alignItems: 'center',
