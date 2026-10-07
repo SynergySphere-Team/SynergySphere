@@ -357,30 +357,12 @@ export default function HomeScreen() {
           </Pressable>
 
           <View style={styles.brandGroup}>
-            <View
-              style={[
-                styles.brandLogoWrapper,
-                {
-                  backgroundColor:
-                    theme === 'dark'
-                      ? 'rgba(16, 33, 40, 0.7)'
-                      : 'rgba(237, 243, 239, 0.85)',
-                  borderColor:
-                    theme === 'dark'
-                      ? 'rgba(145, 219, 94, 0.28)'
-                      : 'rgba(145, 219, 94, 0.45)',
-                  shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
-                },
-              ]}
-            >
-              <Image
-                source={require('../../../assets/images/wellness-logo.png')}
-                style={styles.brandLogo}
-                resizeMode="contain"
-                accessibilityIgnoresInvertColors
-              />
-            </View>
-
+            <Image
+              source={require('../../../assets/images/synergysphere-brand-icon.png')}
+              style={styles.brandIcon}
+              resizeMode="contain"
+              accessibilityIgnoresInvertColors
+            />
             <Text style={[styles.brandTitle, { color: isLight ? '#144626' : colors.primary }]}>
               SynergySphere
             </Text>
@@ -448,28 +430,8 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* GREETING & STATUS BANNER */}
+      {/* Greeting & Slogan */}
       <View style={styles.greetingWrap}>
-        <View style={styles.kickerRow}>
-          <View
-            style={[
-              styles.kickerPill,
-              {
-                backgroundColor: isLight ? 'rgba(30, 104, 39, 0.08)' : 'rgba(145, 219, 94, 0.12)',
-                borderColor: isLight ? 'rgba(30, 104, 39, 0.22)' : 'rgba(145, 219, 94, 0.28)',
-              },
-            ]}
-          >
-            <Ionicons name="sparkles" size={11} color={primaryAccent} />
-            <Text style={[styles.kickerText, { color: primaryAccent }]}>
-              {levelTitle ? levelTitle.toUpperCase() : 'DAILY WORKSPACE'}
-            </Text>
-          </View>
-          <Text style={[styles.dateText, { color: colors.muted }]}>
-            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-          </Text>
-        </View>
-
         <Text
           allowFontScaling
           style={[
@@ -490,7 +452,7 @@ export default function HomeScreen() {
             largerText && { fontSize: fontSize(13), lineHeight: fontSize(18) },
           ]}
         >
-          Learn. Build. Thrive.{levelTitle ? ` · ${levelTitle}` : ''}
+          Learn. Build. Thrive.
         </Text>
       </View>
 
@@ -818,26 +780,9 @@ const styles = StyleSheet.create({
     gap: 9,
     flex: 1,
   },
-  brandLogoWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    padding: 2,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.16,
-    shadowRadius: 6,
-    elevation: 3,
-    flexShrink: 0,
-  },
-  brandLogo: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 20,
-    backgroundColor: 'transparent',
-    overflow: 'hidden',
+  brandIcon: {
+    width: 34,
+    height: 34,
   },
   brandTitle: {
     fontSize: 21,
