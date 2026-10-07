@@ -4,6 +4,7 @@ import { judgeChallengeSubmission, judgeJavaScript, judgeSql } from '../services
 import { getProfileSignals } from '../services/portfolioService.js';
 import { selectSessionQuestions, ALL_INTERVIEW_TRACKS } from '../data/interviewBank/index.js';
 import { pool, query, queryOne } from '../lib/db.js';
+import { sendPasswordResetEmail } from '../lib/email.js';
 
 describe('1. Server-Side Challenge Judge Integrity', () => {
   it('passes a correct implementation of Hello World', async () => {
@@ -293,6 +294,49 @@ describe('6. Productivity Center Task Enhancements & Career Boost', () => {
     assert.ok(portItem);
     assert.equal(portItem.title, 'OAuth2 & JWT Microservice');
     assert.equal(portItem.projectLink, 'https://synergysphere.io/docs/auth');
+  });
+
+  it('dispatches a valid password reset email link with the reset token', async () => {
+    const testEmail = 'student@synergysphere.com';
+    const testToken = 'testresettoken1234567890';
+    const result = await sendPasswordResetEmail({
+      to: testEmail,
+      resetToken: testToken,
+      userName: 'Student',
+    });
+
+    assert.equal(result.success, true);
+    assert.ok(result.resetUrl.includes('/reset-password?token=testresettoken1234567890'));
+  });
+
+  it('updates resetPasswordToken and expiresAt in the database', async () => {
+    const user = await queryOne<{ id: string; email: string }>('SELECT "id", "email" FROM "User" LIMIT 1');
+    assert.ok(user, 'User must exist');
+
+    const testToken = 'token_' + Date.now();
+    const expiresAt = new Date(Date.now() + 3600000);
+
+    await query(
+      `UPDATE "User"
+       SET "resetPasswordToken" = $1, "resetPasswordExpires" = $2
+       WHERE "id" = $3`,
+      [testToken, expiresAt, user.id],
+    );
+
+    const updatedUser = await queryOne<{ resetPasswordToken: string; resetPasswordExpires: Date }>(
+      `SELECT "resetPasswordToken", "resetPasswordExpires" FROM "User" WHERE "id" = $1`,
+      [user.id],
+    );
+
+    assert.ok(updatedUser);
+    assert.equal(updatedUser.resetPasswordToken, testToken);
+    assert.ok(new Date(updatedUser.resetPasswordExpires).getTime() > Date.now());
+
+    // Clean up reset token
+    await query(
+      `UPDATE "User" SET "resetPasswordToken" = NULL, "resetPasswordExpires" = NULL WHERE "id" = $1`,
+      [user.id],
+    );
   });
 });
 
