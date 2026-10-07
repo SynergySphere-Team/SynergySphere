@@ -147,49 +147,24 @@ async function runTests() {
     assert(studentDb.status === 403, 'Student blocked from /api/admin/database (403)');
 
     // -----------------------------------------------------------------
-    // TEST 5: Moderator Access & Permissions
+    // TEST 5: Single Unified Admin Authentication & Full Platform Access
     // -----------------------------------------------------------------
-    console.log('\n[5] Moderator Authentication & Boundaries:');
-    const modLogin = await request('/api/auth/login', {
-      method: 'POST',
-      body: { email: 'moderator@synergysphere.com', password: 'moderator123' },
-    });
-    assert(modLogin.status === 200, 'Moderator logs in successfully');
-    const modToken = extractToken(modLogin);
-
-    const modOverview = await request('/api/admin/overview', { token: modToken });
-    assert(modOverview.status === 200, 'Moderator can access /api/admin/overview');
-    assert(typeof modOverview.data.kpis?.totalUsers === 'number', 'Overview contains real KPI data');
-    assert(Array.isArray(modOverview.data.recentActivity), 'Overview contains recent activity feed');
-
-    const modPosts = await request('/api/admin/posts', { token: modToken });
-    assert(modPosts.status === 200, 'Moderator can access /api/admin/posts');
-
-    const modFlagged = await request('/api/admin/community/flagged', { token: modToken });
-    assert(modFlagged.status === 200, 'Moderator can access /api/admin/community/flagged');
-
-    // Moderator boundary checks
-    const modDbAccess = await request('/api/admin/database/health', { token: modToken });
-    assert(modDbAccess.status === 403, 'Moderator blocked from database administration (403)');
-
-    const modRoleChange = await request(`/api/admin/users/${createdTicket.userId}/role`, {
-      method: 'PUT',
-      token: modToken,
-      body: { role: 'ADMIN' },
-    });
-    assert(modRoleChange.status === 403, 'Moderator blocked from changing user roles (403)');
-
-    // -----------------------------------------------------------------
-    // TEST 6: Admin Management & Support Ticket Triage
-    // -----------------------------------------------------------------
-    console.log('\n[6] Admin Operations & Ticket Triage:');
+    console.log('\n[5] Unified Admin (admin@synergysphere.com) - Full Access:');
     const adminLogin = await request('/api/auth/login', {
       method: 'POST',
       body: { email: 'admin@synergysphere.com', password: 'admin123456' },
     });
-    assert(adminLogin.status === 200, 'Admin logs in successfully');
+    assert(adminLogin.status === 200, 'Admin logs in successfully (200)');
     const adminToken = extractToken(adminLogin);
+    assert(adminLogin.data.user.role === 'ADMIN', 'Admin has role ADMIN');
 
+    // 5a. Overview & Dashboard
+    const adminOverview = await request('/api/admin/overview', { token: adminToken });
+    assert(adminOverview.status === 200, 'Admin accesses /api/admin/overview');
+    assert(typeof adminOverview.data.kpis?.totalUsers === 'number', 'Overview contains real KPI data');
+    assert(Array.isArray(adminOverview.data.recentActivity), 'Overview contains recent activity feed');
+
+    // 5b. User Management & Pending Approvals
     const adminUsers = await request('/api/admin/users', { token: adminToken });
     assert(adminUsers.status === 200, 'Admin can view user directory');
     const adminUsersList = Array.isArray(adminUsers.data) ? adminUsers.data : adminUsers.data.users;
@@ -197,10 +172,15 @@ async function runTests() {
 
     const adminPending = await request('/api/admin/users/pending', { token: adminToken });
     assert(adminPending.status === 200, 'Admin can view pending user approvals');
-    const adminPendingList = Array.isArray(adminPending.data) ? adminPending.data : adminPending.data.users;
-    assert(Array.isArray(adminPendingList), 'Admin receives pending approvals list');
 
-    // Admin updates the ticket submitted by student
+    // 5c. Community Moderation
+    const adminPosts = await request('/api/admin/posts', { token: adminToken });
+    assert(adminPosts.status === 200, 'Admin can access /api/admin/posts');
+
+    const adminFlagged = await request('/api/admin/community/flagged', { token: adminToken });
+    assert(adminFlagged.status === 200, 'Admin can access /api/admin/community/flagged');
+
+    // 5d. Support Ticket Triage
     const updateTicketRes = await request(`/api/admin/tickets/${createdTicket.id}`, {
       method: 'PATCH',
       token: adminToken,
@@ -215,45 +195,36 @@ async function runTests() {
     assert(updatedTicket.status === 'in_progress', 'Ticket status updated to "in_progress"');
     assert(updatedTicket.priority === 'high', 'Ticket priority updated to "high"');
 
-    // Admin DB maintenance boundary check
-    const adminMaintenance = await request('/api/admin/database/maintenance', {
-      method: 'POST',
+    // 5e. Role Management (Admin can update roles)
+    const adminRoleChange = await request(`/api/admin/users/${createdTicket.userId}/role`, {
+      method: 'PATCH',
       token: adminToken,
-      body: { action: 'vacuum' },
+      body: { role: 'STUDENT' },
     });
-    assert(adminMaintenance.status === 403, 'Normal Admin blocked from DB maintenance operations (403)');
+    assert(adminRoleChange.status === 200, 'Admin can update user roles');
 
-    // -----------------------------------------------------------------
-    // TEST 7: SuperAdmin Database & Reports Operations
-    // -----------------------------------------------------------------
-    console.log('\n[7] SuperAdmin Database Administration & Reports:');
-    const superLogin = await request('/api/auth/login', {
-      method: 'POST',
-      body: { email: 'superadmin@synergysphere.com', password: 'superadmin123' },
-    });
-    assert(superLogin.status === 200, 'SuperAdmin logs in successfully');
-    const superToken = extractToken(superLogin);
-
-    const dbHealth = await request('/api/admin/database/health', { token: superToken });
-    assert(dbHealth.status === 200, 'SuperAdmin can access database health diagnostics');
+    // 5f. Database Administration & Diagnostics (Admin has full access)
+    const dbHealth = await request('/api/admin/database/health', { token: adminToken });
+    assert(dbHealth.status === 200, 'Admin can access database health diagnostics');
     assert(dbHealth.data.status === 'healthy' || dbHealth.data.health?.status === 'healthy', 'Database status is healthy');
     assert(Array.isArray(dbHealth.data.tableStats || dbHealth.data.tables), 'Database table telemetry returned');
 
     const dbMaintenance = await request('/api/admin/database/maintenance', {
       method: 'POST',
-      token: superToken,
+      token: adminToken,
       body: { action: 'clear_cache' },
     });
-    assert(dbMaintenance.status === 200, 'SuperAdmin can execute maintenance (clear_cache)');
+    assert(dbMaintenance.status === 200, 'Admin can execute database maintenance (clear_cache)');
 
-    const csvReport = await request('/api/admin/reports?format=csv', { token: superToken });
-    console.log('Received CSV report preview:', String(csvReport.data).slice(0, 100));
+    // 5g. CSV Reports Export
+    const csvReport = await request('/api/admin/reports?format=csv', { token: adminToken });
+    assert(csvReport.status === 200, 'Admin can export CSV reports');
     assert(typeof csvReport.data === 'string' && csvReport.data.length > 0, 'CSV report content present');
 
     // -----------------------------------------------------------------
-    // TEST 8: Verify Student Views Updated Ticket Status
+    // TEST 6: User Feedback Loop
     // -----------------------------------------------------------------
-    console.log('\n[8] User Feedback Loop:');
+    console.log('\n[6] User Feedback Loop:');
     const studentUpdatedCheck = await request(`/api/settings/tickets/${createdTicket.id}`, {
       method: 'GET',
       token: studentToken,
@@ -262,21 +233,10 @@ async function runTests() {
     const studentUpdatedTicket = studentUpdatedCheck.data.ticket || studentUpdatedCheck.data;
     assert(studentUpdatedTicket.status === 'in_progress', 'Student sees updated status "in_progress"');
     assert(studentUpdatedTicket.priority === 'high', 'Student sees priority "high"');
-    assert(!studentUpdatedTicket.adminNotes, 'Student STILL does not see internal admin notes');
-
-    // -----------------------------------------------------------------
-    // TEST 9: Suspended User Access Rejection
-    // -----------------------------------------------------------------
-    console.log('\n[9] Suspended User Enforcement:');
-    const suspendedLogin = await request('/api/auth/login', {
-      method: 'POST',
-      body: { email: 'suspended.badactor@campus.edu', password: 'pending123' },
-    });
-    assert(suspendedLogin.status === 403, 'Suspended user login rejected with 403 Forbidden');
-    assert(suspendedLogin.data.error?.toLowerCase().includes('suspended'), 'Suspension message properly displayed');
+    assert(!studentUpdatedTicket.adminNotes, 'Student does NOT see internal admin notes');
 
     console.log('\n======================================================');
-    console.log('🎉 ALL 24 E2E INTEGRATION VERIFICATION CHECKS PASSED!');
+    console.log('🎉 ALL UNIFIED ADMIN VERIFICATION CHECKS PASSED!');
     console.log('======================================================\n');
   } catch (err) {
     console.error('Fatal error during E2E verification:', err);

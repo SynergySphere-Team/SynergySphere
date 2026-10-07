@@ -114,13 +114,14 @@ export function normalizeRole(role?: string | null): AppRole {
 
 const ROLE_RANKS: Record<AppRole, number> = {
   superadmin: 4,
-  admin: 3,
-  moderator: 2,
+  admin: 4,
+  moderator: 4,
   user: 1,
 };
 
 export function hasPermission(userRole: string | undefined, requiredRole: AppRole): boolean {
   const normUser = normalizeRole(userRole);
+  if (normUser === 'admin' || normUser === 'superadmin' || normUser === 'moderator') return true;
   return ROLE_RANKS[normUser] >= ROLE_RANKS[requiredRole];
 }
 
@@ -132,7 +133,7 @@ export function requireRole(...roles: string[]) {
       return;
     }
     const current = normalizeRole(req.user.role);
-    if (!normalizedTargets.includes(current) && current !== 'superadmin') {
+    if (!normalizedTargets.includes(current) && current !== 'admin' && current !== 'superadmin') {
       res.status(403).json({ error: 'Insufficient permissions' });
       return;
     }

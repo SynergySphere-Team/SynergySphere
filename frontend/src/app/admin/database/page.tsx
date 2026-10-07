@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api, isSuperAdmin } from '@/lib/utils';
+import { api, isAdmin, isSuperAdmin } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -59,15 +59,15 @@ export default function DatabaseAdminPage() {
   // Soft-deleted review modal
   const [softDeletedModal, setSoftDeletedModal] = useState<any[] | null>(null);
 
-  const isSuper = isSuperAdmin(user);
+  const isAuthorized = isAdmin(user) || isSuperAdmin(user);
 
   useEffect(() => {
-    if (isSuper) {
+    if (isAuthorized) {
       fetchHealth();
     } else {
       setLoading(false);
     }
-  }, [isSuper]);
+  }, [isAuthorized]);
 
   async function fetchHealth() {
     try {
@@ -104,18 +104,17 @@ export default function DatabaseAdminPage() {
     }
   }
 
-  // SuperAdmin Access Restriction Guard
-  if (!isSuper) {
+  // Admin Access Restriction Guard
+  if (!isAuthorized) {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-center">
         <div className="max-w-md rounded-2xl border border-purple-500/30 bg-[#080d12] p-8 shadow-2xl">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-500/10 border border-purple-500/30 text-purple-400 mb-4">
             <Lock className="h-7 w-7" />
           </div>
-          <h2 className="text-xl font-bold text-white tracking-tight">SuperAdmin Clearance Required</h2>
+          <h2 className="text-xl font-bold text-white tracking-tight">Admin Clearance Required</h2>
           <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-            Database administration and physical cluster operations are strictly restricted to SuperAdmin personnel.
-            Your role does not permit access to database diagnostic endpoints.
+            Database administration and physical cluster operations require administrator privileges.
           </p>
         </div>
       </div>
@@ -137,7 +136,7 @@ export default function DatabaseAdminPage() {
         <div>
           <div className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-300 mb-2 font-mono">
             <Lock className="h-3 w-3" />
-            SuperAdmin Restricted Environment
+            Administrator Environment
           </div>
           <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
             <Database className="h-6 w-6 text-purple-400" />

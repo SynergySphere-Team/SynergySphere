@@ -1,5 +1,5 @@
-// Comprehensive Test Script for Community Module & GitHub Integration
-const API_URL = 'http://localhost:4001/api';
+const PORT = process.env.PORT || 4000;
+const API_URL = process.env.API_URL || `http://localhost:${PORT}/api`;
 
 async function request(path, options = {}) {
   const url = `${API_URL}${path}`;

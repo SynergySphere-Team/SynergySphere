@@ -297,25 +297,6 @@ const updateUserRoleHandler = async (req: AuthRequest, res: Response) => {
 
     const targetCurrentRole = normalizeRole(targetUser.role);
 
-    // Authority rules:
-    // 1. Only SuperAdmin can assign SuperAdmin role
-    if (requestedRole === 'superadmin' && adminRole !== 'superadmin') {
-      res.status(403).json({ error: 'Only a SuperAdmin can promote users to SuperAdmin.' });
-      return;
-    }
-
-    // 2. Only SuperAdmin can modify a SuperAdmin's role
-    if (targetCurrentRole === 'superadmin' && adminRole !== 'superadmin') {
-      res.status(403).json({ error: 'Normal administrators cannot modify a SuperAdmin role.' });
-      return;
-    }
-
-    // 3. Admin cannot assign a role higher than themselves
-    if (!hasPermission(adminRole, requestedRole)) {
-      res.status(403).json({ error: 'You cannot assign a role with higher authority than your own.' });
-      return;
-    }
-
     // Save as normalized or conventional upper (e.g. SUPERADMIN, ADMIN, MODERATOR, STUDENT)
     const roleDbValue = requestedRole.toUpperCase() === 'USER' ? 'STUDENT' : requestedRole.toUpperCase();
 
@@ -1208,10 +1189,10 @@ router.get('/audit-logs', async (_req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 8. Database Administration & Diagnostics (SuperAdmin Only)
+// 8. Database Administration & Diagnostics (Admin Accessible)
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.get('/database/health', requireAdmin('superadmin'), async (_req, res) => {
+router.get('/database/health', requireAdmin('admin'), async (_req, res) => {
   try {
     const startTime = Date.now();
     await pool.query('SELECT 1');
@@ -1254,7 +1235,7 @@ router.get('/database/health', requireAdmin('superadmin'), async (_req, res) => 
   }
 });
 
-router.post('/database/maintenance', requireAdmin('superadmin'), async (req: AuthRequest, res) => {
+router.post('/database/maintenance', requireAdmin('admin'), async (req: AuthRequest, res) => {
   try {
     const { action } = req.body;
     const adminId = req.user!.userId;

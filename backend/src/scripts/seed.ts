@@ -229,10 +229,10 @@ async function main() {
 
     const adminPassword = await bcrypt.hash('admin123456', 12);
     await client.query(
-      `INSERT INTO "User" ("id", "firstName", "lastName", "email", "password", "role", "xp", "level")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT ("email") DO NOTHING`,
-      [newId(), 'Admin', 'User', 'admin@synergysphere.com', adminPassword, 'ADMIN', 1000, 3],
+      `INSERT INTO "User" ("id", "firstName", "lastName", "email", "password", "role", "status", "xp", "level")
+       VALUES ($1, 'Admin', 'User', 'admin@synergysphere.com', $2, 'ADMIN', 'active', 5000, 5)
+       ON CONFLICT ("email") DO UPDATE SET "password" = $2, "role" = 'ADMIN', "status" = 'active'`,
+      [newId(), adminPassword],
     );
 
     const studentPassword = await bcrypt.hash('student123', 12);
@@ -391,22 +391,9 @@ async function main() {
       [newId(), studentId],
     );
 
-    // Seed SuperAdmin
-    const superadminPassword = await bcrypt.hash('superadmin123', 12);
+    // Clean up any deprecated demo accounts so only single Admin remains
     await client.query(
-      `INSERT INTO "User" ("id", "firstName", "lastName", "email", "password", "role", "status", "xp", "level")
-       VALUES ($1, 'Super', 'Admin', 'superadmin@synergysphere.com', $2, 'SUPERADMIN', 'active', 5000, 5)
-       ON CONFLICT ("email") DO UPDATE SET "role" = 'SUPERADMIN', "status" = 'active'`,
-      [newId(), superadminPassword],
-    );
-
-    // Seed Moderator
-    const moderatorPassword = await bcrypt.hash('moderator123', 12);
-    await client.query(
-      `INSERT INTO "User" ("id", "firstName", "lastName", "email", "password", "role", "status", "xp", "level")
-       VALUES ($1, 'Sarah', 'Moderator', 'moderator@synergysphere.com', $2, 'MODERATOR', 'active', 1500, 3)
-       ON CONFLICT ("email") DO UPDATE SET "role" = 'MODERATOR', "status" = 'active'`,
-      [newId(), moderatorPassword],
+      `DELETE FROM "User" WHERE "email" IN ('superadmin@synergysphere.com', 'moderator@synergysphere.com', 'suspended.badactor@campus.edu')`
     );
 
     // Seed Pending Users for Approval workflow
@@ -418,14 +405,6 @@ async function main() {
          ($2, 'Priya', 'Naidoo', 'pending.priya@campus.edu', $3, 'STUDENT', 'pending', 'STU-2026-1043', 0, 1)
        ON CONFLICT ("email") DO NOTHING`,
       [newId(), newId(), pendingPass],
-    );
-
-    // Seed Suspended User
-    await client.query(
-      `INSERT INTO "User" ("id", "firstName", "lastName", "email", "password", "role", "status", "studentId", "rejectionReason")
-       VALUES ($1, 'Bad', 'Actor', 'suspended.badactor@campus.edu', $2, 'STUDENT', 'suspended', 'STU-2026-0999', 'Multiple community guideline violations and harassment.')
-       ON CONFLICT ("email") DO NOTHING`,
-      [newId(), pendingPass],
     );
 
     // Update studentId for student
@@ -489,9 +468,7 @@ async function main() {
 
   console.log('Seed completed!');
   console.log('Demo accounts:');
-  console.log('  SuperAdmin: superadmin@synergysphere.com / superadmin123');
-  console.log('  Admin: admin@synergysphere.com / admin123456');
-  console.log('  Moderator: moderator@synergysphere.com / moderator123');
+  console.log('  Admin (Full Access): admin@synergysphere.com / admin123456');
   console.log('  Student: student@synergysphere.com / student123');
 }
 

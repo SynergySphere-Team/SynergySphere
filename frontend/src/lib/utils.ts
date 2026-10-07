@@ -27,12 +27,13 @@ export interface User {
 }
 
 export function isSuperAdmin(user?: User | null): boolean {
-  return user?.role?.toUpperCase() === 'SUPERADMIN';
+  const r = user?.role?.toUpperCase();
+  return r === 'SUPERADMIN' || r === 'ADMIN';
 }
 
 export function isAdmin(user?: User | null): boolean {
   const r = user?.role?.toUpperCase();
-  return r === 'ADMIN' || r === 'SUPERADMIN';
+  return r === 'ADMIN' || r === 'SUPERADMIN' || r === 'MODERATOR';
 }
 
 export function isModerator(user?: User | null): boolean {
