@@ -336,33 +336,16 @@ export default function HomeScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      {/* Top Utility Nav Bar */}
-      <View style={styles.topUtilityRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open workspace menu"
-          onPress={() => setMenuOpen(true)}
-          hitSlop={8}
-          style={({ pressed }) => [
-            styles.utilityIconButton,
-            {
-              backgroundColor: isLight ? 'rgba(237, 243, 239, 0.95)' : colors.surfaceElevated,
-              borderColor: isLight ? 'rgba(145, 219, 94, 0.35)' : colors.border,
-            },
-            pressed && styles.pressedBtn,
-          ]}
-        >
-          <Ionicons name="menu" size={20} color={colors.text} />
-        </Pressable>
-
-        <View style={styles.topUtilityRight}>
+      {/* TOP BRAND & NAVIGATION BAR */}
+      <View style={styles.topHeader}>
+        <View style={styles.topHeaderLeft}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Notifications"
-            onPress={() => router.push('/notifications' as never)}
+            accessibilityLabel="Open workspace menu"
+            onPress={() => setMenuOpen(true)}
             hitSlop={8}
             style={({ pressed }) => [
-              styles.utilityIconButton,
+              styles.navIconButton,
               {
                 backgroundColor: isLight ? 'rgba(237, 243, 239, 0.95)' : colors.surfaceElevated,
                 borderColor: isLight ? 'rgba(145, 219, 94, 0.35)' : colors.border,
@@ -370,7 +353,56 @@ export default function HomeScreen() {
               pressed && styles.pressedBtn,
             ]}
           >
-            <Ionicons name="notifications-outline" size={18} color={colors.text} />
+            <Ionicons name="menu" size={22} color={colors.text} />
+          </Pressable>
+
+          <View style={styles.brandGroup}>
+            <View
+              style={[
+                styles.brandLogoWrapper,
+                {
+                  backgroundColor:
+                    theme === 'dark'
+                      ? 'rgba(16, 33, 40, 0.7)'
+                      : 'rgba(237, 243, 239, 0.85)',
+                  borderColor:
+                    theme === 'dark'
+                      ? 'rgba(145, 219, 94, 0.28)'
+                      : 'rgba(145, 219, 94, 0.45)',
+                  shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
+                },
+              ]}
+            >
+              <Image
+                source={require('../../../assets/images/wellness-logo.png')}
+                style={styles.brandLogo}
+                resizeMode="contain"
+                accessibilityIgnoresInvertColors
+              />
+            </View>
+
+            <Text style={[styles.brandTitle, { color: isLight ? '#144626' : colors.primary }]}>
+              SynergySphere
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.topHeaderRight}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            onPress={() => router.push('/notifications' as never)}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.navIconButton,
+              {
+                backgroundColor: isLight ? 'rgba(237, 243, 239, 0.95)' : colors.surfaceElevated,
+                borderColor: isLight ? 'rgba(145, 219, 94, 0.35)' : colors.border,
+              },
+              pressed && styles.pressedBtn,
+            ]}
+          >
+            <Ionicons name="notifications-outline" size={20} color={colors.text} />
             {(data?.stats?.unreadNotifications ?? 0) > 0 ? (
               <View style={[styles.unreadDot, { backgroundColor: colors.danger }]} />
             ) : null}
@@ -416,70 +448,50 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* STANDARDIZED HOME HEADER WITH PROMINENT LOGO */}
-      <View
-        style={[
-          styles.headerRow,
-          largerText && styles.headerRowLarge,
-        ]}
-      >
-        <View
+      {/* GREETING & STATUS BANNER */}
+      <View style={styles.greetingWrap}>
+        <View style={styles.kickerRow}>
+          <View
+            style={[
+              styles.kickerPill,
+              {
+                backgroundColor: isLight ? 'rgba(30, 104, 39, 0.08)' : 'rgba(145, 219, 94, 0.12)',
+                borderColor: isLight ? 'rgba(30, 104, 39, 0.22)' : 'rgba(145, 219, 94, 0.28)',
+              },
+            ]}
+          >
+            <Ionicons name="sparkles" size={11} color={primaryAccent} />
+            <Text style={[styles.kickerText, { color: primaryAccent }]}>
+              {levelTitle ? levelTitle.toUpperCase() : 'DAILY WORKSPACE'}
+            </Text>
+          </View>
+          <Text style={[styles.dateText, { color: colors.muted }]}>
+            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+          </Text>
+        </View>
+
+        <Text
+          allowFontScaling
           style={[
-            styles.brandLogoWrapper,
-            largerText && styles.brandLogoWrapperLarge,
-            {
-              backgroundColor:
-                theme === 'dark'
-                  ? 'rgba(16, 33, 40, 0.7)'
-                  : 'rgba(237, 243, 239, 0.85)',
-              borderColor:
-                theme === 'dark'
-                  ? 'rgba(145, 219, 94, 0.28)'
-                  : 'rgba(145, 219, 94, 0.45)',
-              shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
-            },
+            styles.greeting,
+            { color: colors.text },
+            largerText && { fontSize: fontSize(24), lineHeight: fontSize(28) },
           ]}
         >
-          <Image
-            source={require('../../../assets/images/wellness-logo.png')}
-            style={[
-              styles.brandLogo,
-              largerText && styles.brandLogoLarge,
-            ]}
-            resizeMode="contain"
-            accessibilityIgnoresInvertColors
-          />
-        </View>
+          {getGreeting()}, {user?.firstName ?? 'Developer'}!
+        </Text>
 
-        <View style={styles.headerText}>
-          <Text
-            allowFontScaling
-            style={[
-              styles.headerTitle,
-              {
-                color: colors.text,
-                fontSize: fontSize(24),
-              },
-            ]}
-          >
-            SynergySphere{'\n'}<Text style={{ color: primaryAccent }}>Workspace</Text>
-          </Text>
-
-          <Text
-            allowFontScaling
-            numberOfLines={2}
-            style={[
-              styles.headerSubtitle,
-              {
-                color: colors.muted,
-                fontSize: fontSize(13),
-                lineHeight: fontSize(18),
-              },
-            ]}
-          >
-            {getGreeting()}, {user?.firstName ?? 'Developer'}! · {levelTitle || 'Learn. Build. Thrive.'}
-          </Text>
-        </View>
+        <Text
+          allowFontScaling
+          numberOfLines={2}
+          style={[
+            styles.slogan,
+            { color: colors.muted },
+            largerText && { fontSize: fontSize(13), lineHeight: fontSize(18) },
+          ]}
+        >
+          Learn. Build. Thrive.{levelTitle ? ` · ${levelTitle}` : ''}
+        </Text>
       </View>
 
       {error ? <Notice>{error}</Notice> : null}
@@ -786,82 +798,65 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  topUtilityRow: {
+  topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 2,
-    marginBottom: 4,
+    paddingVertical: 4,
+    marginTop: -2,
+    marginBottom: 8,
   },
-  topUtilityRight: {
+  topHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+    flex: 1,
   },
-  utilityIconButton: {
-    width: 36,
-    height: 36,
+  brandGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    flex: 1,
+  },
+  brandLogoWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    padding: 2,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.16,
+    shadowRadius: 6,
+    elevation: 3,
+    flexShrink: 0,
+  },
+  brandLogo: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  brandTitle: {
+    fontSize: 21,
+    fontWeight: '900',
+    letterSpacing: -0.4,
+  },
+  topHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  navIconButton: {
+    width: 38,
+    height: 38,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 12,
-    minHeight: 88,
-    width: '100%',
-  },
-  headerRowLarge: {
-    alignItems: 'flex-start',
-  },
-  brandLogoWrapper: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    padding: 2,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-    elevation: 3,
-    flexShrink: 0,
-  },
-  brandLogoWrapperLarge: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-  },
-  brandLogo: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 27,
-    backgroundColor: 'transparent',
-    overflow: 'hidden',
-  },
-  brandLogoLarge: {
-    borderRadius: 31,
-  },
-  headerText: {
-    flex: 1,
-    minWidth: 0,
-    gap: 3,
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: -0.3,
-    lineHeight: 28,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    lineHeight: 18,
   },
   pressedBtn: {
     opacity: 0.75,
@@ -869,20 +864,20 @@ const styles = StyleSheet.create({
   },
   unreadDot: {
     position: 'absolute',
-    top: 5,
-    right: 5,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    top: 6,
+    right: 6,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   avatarBtn: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -891,13 +886,53 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 18,
+    borderRadius: 19,
   },
   avatarInitials: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  greetingWrap: {
+    marginTop: 4,
+    marginBottom: 14,
+    gap: 4,
+  },
+  kickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  kickerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  kickerText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  dateText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  greeting: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.4,
+    lineHeight: 28,
+  },
+  slogan: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
   },
   xpRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },
   xp: { fontSize: 32, fontWeight: '800' },
