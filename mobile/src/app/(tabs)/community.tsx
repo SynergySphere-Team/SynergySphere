@@ -11,7 +11,7 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { Screen } from '@/components/Screen';
 import { CommunityChat } from '@/components/community/CommunityChat';
-import { CommunityInitiatives } from '@/components/community/CommunityInitiatives';
+//import { CommunityInitiatives } from '@/components/community/CommunityInitiatives';
 import { CommunityGithub } from '@/components/community/CommunityGithub';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -26,10 +26,10 @@ export default function CommunityScreen() {
   } = useAccessibility();
 
   const [activeTab, setActiveTab] =
-    useState<'chat' | 'initiatives' | 'github'>('chat');
+    useState<'chat' | 'initiatives'>('initiatives');
 
   useEffect(() => {
-    if (tab === 'github' || tab === 'initiatives' || tab === 'chat') {
+    if (tab === 'initiatives' || tab === 'chat') {
       setActiveTab(tab);
     }
   }, [tab]);
@@ -218,64 +218,14 @@ export default function CommunityScreen() {
             </Text>
           </Pressable>
 
-          {/* GITHUB INTEGRATION */}
-          <Pressable
-            accessibilityRole="tab"
-            accessibilityLabel="GitHub Projects"
-            accessibilityState={{
-              selected: activeTab === 'github',
-            }}
-            onPress={() => setActiveTab('github')}
-            style={({ pressed }) => [
-              styles.topTabButton,
-              largerText && styles.topTabButtonLarge,
-              activeTab === 'github' && [
-                styles.topTabButtonActive,
-                {
-                  backgroundColor: activeBackground,
-                },
-              ],
-              pressed && styles.pressed,
-            ]}
-          >
-            <Ionicons
-              name="logo-github"
-              size={largerText ? 18 : 15}
-              color={
-                activeTab === 'github'
-                  ? activeTextColor
-                  : colors.muted
-              }
-            />
-
-            <Text
-              allowFontScaling
-              numberOfLines={largerText ? 2 : 1}
-              style={[
-                styles.topTabText,
-                {
-                  color:
-                    activeTab === 'github'
-                      ? activeTextColor
-                      : colors.text,
-                  fontWeight:
-                    activeTab === 'github'
-                      ? '800'
-                      : '600',
-                  fontSize: fontSize(12),
-                },
-              ]}
-            >
-              GitHub
-            </Text>
-          </Pressable>
+          
         </View>
       </View>
 
       {/* COMMUNITY CONTENT */}
       {activeTab === 'chat' && <CommunityChat />}
-      {activeTab === 'initiatives' && <CommunityInitiatives />}
-      {activeTab === 'github' && <CommunityGithub />}
+      {activeTab === 'initiatives' && <CommunityGithub />}
+      
     </Screen>
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -65,7 +65,24 @@ function formatCategoryLabel(category?: string | null) {
     .toLowerCase()
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
-
+function statusLabel(status?: string | null) {
+  switch (String(status ?? '').toUpperCase()) {
+    case 'APPROVED':
+      return 'Approved';
+    case 'DECLINED':
+      return 'Declined';
+    case 'INVITATION_SENT':
+      return 'GitHub invitation sent';
+    case 'ACCEPTED':
+      return 'Joined';
+    case 'COMPLETED':
+      return 'Completed';
+    case 'PENDING':
+      return 'Pending';
+    default:
+      return status || 'Submitted';
+  }
+}
 export function CommunityGithub() {
   const router = useRouter();
   const { colors, theme } = useTheme();
@@ -79,6 +96,23 @@ export function CommunityGithub() {
   const [connection, setConnection] = useState<GithubConnection | null>(null);
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const myApplications = useMemo(
+  () =>
+    projects.filter(
+      (project) =>
+        !project.isCreator &&
+        project.hasApplied,
+    ),
+  [projects],
+);
+
+const opportunities = useMemo(
+  () =>
+    projects.filter(
+      (project) => !project.isCreator,
+    ),
+  [projects],
+);
 
   const load = useCallback(async (queryText = '', cat = selectedCategory) => {
     try {
@@ -245,7 +279,7 @@ export function CommunityGithub() {
                 { backgroundColor: accentColor, borderColor: accentColor },
                 pressed && styles.pressed,
               ]}
-              onPress={() => router.push('/github-connect?returnTo=/community?tab=github' as never)}
+              onPress={() => router.push('/github-connect?returnTo=/community?tab=initiatives' as never)}
             >
               <Ionicons name="logo-github" size={largerText ? 18 : 16} color={theme === 'light' ? '#FFFFFF' : '#07180d'} />
               <Text
@@ -272,11 +306,8 @@ export function CommunityGithub() {
               pressed && styles.pressed,
             ]}
             onPress={() =>
-              router.push(
-                (connection?.connected
-                  ? '/project-wizard'
-                  : '/github-connect?returnTo=/project-wizard') as never
-              )
+              router.push
+                ('/project-wizard' as never)
             }
           >
             <Ionicons
@@ -305,7 +336,133 @@ export function CommunityGithub() {
           </Pressable>
         </View>
       </View>
+      {/* My Applications */}
+      {myApplications.length > 0 ? (
+        <View style={styles.applicationsSection}>
+          <View style={styles.applicationsHeader}>
+            <View>
+              <Text
+                style={[
+                  styles.applicationsHeading,
+                  {
+                    color: colors.text,
+                    fontSize: fontSize(18),
+                  },
+                ]}
+              >
+                My Applications
+              </Text>
 
+              <Text
+                style={[
+                  styles.applicationsSubheading,
+                  {
+                    color: colors.muted,
+                    fontSize: fontSize(12),
+                  },
+                ]}
+              >
+                Track projects you've applied to join.
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.applicationCountBadge,
+                { backgroundColor: colors.surfaceElevated },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.applicationCountText,
+                  {
+                    color: accentColor,
+                    fontSize: fontSize(11),
+                  },
+                ]}
+              >
+                {myApplications.length}
+              </Text>
+            </View>
+          </View>
+
+          {myApplications.map((project) => (
+            <Pressable
+              key={project.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Open application for ${project.title}`}
+              onPress={() =>
+                router.push({
+                  pathname: '/project-detail',
+                  params: { projectId: project.id },
+                } as never)
+              }
+              style={({ pressed }) => [
+                styles.applicationCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+                pressed && styles.pressed,
+              ]}
+            >
+              <View style={styles.applicationInfo}>
+                <Text
+                  style={[
+                    styles.applicationTitle,
+                    {
+                      color: colors.text,
+                      fontSize: fontSize(14),
+                    },
+                  ]}
+                >
+                  {project.title}
+                </Text>
+
+                <Text
+                  style={[
+                    styles.applicationMeta,
+                    {
+                      color: colors.muted,
+                      fontSize: fontSize(11),
+                    },
+                  ]}
+                >
+                  {project.organization || 'Community'}
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.applicationStatusBadge,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.applicationStatusText,
+                    {
+                      color: accentColor,
+                      fontSize: fontSize(10),
+                    },
+                  ]}
+                >
+                  {statusLabel(project.applicationStatus)}
+                </Text>
+              </View>
+
+              <Ionicons
+                name="chevron-forward"
+                size={17}
+                color={colors.muted}
+              />
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       {/* Integrated Search Bar */}
       <View style={[styles.searchBar, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
         <Ionicons name="search" size={18} color={colors.placeholderText} style={styles.searchIcon} />
@@ -365,9 +522,51 @@ export function CommunityGithub() {
         })}
       </ScrollView>
 
-      {/* Project Cards Feed */}
-      {projects.map((item) => {
-        const langColor = LANGUAGE_COLORS[item.primaryLanguage || ''] || '#7f929a';
+      {/* Featured Opportunities */}
+      <View style={styles.opportunitiesHeader}>
+        <View>
+          <Text
+            style={[
+              styles.opportunitiesHeading,
+              {
+                color: colors.text,
+                fontSize: fontSize(18),
+              },
+            ]}
+          >
+            Featured Opportunities
+          </Text>
+
+          <Text
+            style={[
+              styles.opportunitiesSubheading,
+              {
+                color: colors.muted,
+                fontSize: fontSize(12),
+              },
+            ]}
+          >
+            Discover projects looking for collaborators.
+          </Text>
+        </View>
+
+        <Text
+          style={[
+            styles.opportunitiesCount,
+            {
+              color: colors.muted,
+              fontSize: fontSize(11),
+            },
+          ]}
+        >
+          {opportunities.length}{' '}
+          {opportunities.length === 1 ? 'result' : 'results'}
+        </Text>
+      </View>
+
+      {opportunities.map((item) => {
+        const langColor =
+          LANGUAGE_COLORS[item.primaryLanguage || ''] || '#7f929a';
         const isPrivate = item.githubVisibility === 'private';
 
         return (
@@ -383,7 +582,10 @@ export function CommunityGithub() {
             }
             style={({ pressed }) => [
               styles.projectCard,
-              { backgroundColor: colors.surface, borderColor: colors.border },
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
               pressed && styles.cardPressed,
             ]}
           >
@@ -559,7 +761,7 @@ export function CommunityGithub() {
             {/* View Repo Action link */}
             <View style={styles.cardFooter}>
               <Text style={[styles.viewRepoText, { color: accentColor, fontSize: fontSize(12) }]}>
-                View repository details
+                View opportunity details
               </Text>
               <Ionicons name="chevron-forward" size={14} color={accentColor} />
             </View>
@@ -613,6 +815,79 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  applicationsSection: {
+  gap: 10,
+  marginTop: 4,
+  marginBottom: 4,
+},
+
+applicationsHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+},
+
+applicationsHeading: {
+  fontSize: 18,
+  fontWeight: '800',
+},
+
+applicationsSubheading: {
+  fontSize: 12,
+  marginTop: 2,
+},
+
+applicationCountBadge: {
+  minWidth: 28,
+  height: 28,
+  paddingHorizontal: 8,
+  borderRadius: 14,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+applicationCountText: {
+  fontSize: 11,
+  fontWeight: '800',
+},
+
+applicationCard: {
+  minHeight: 64,
+  borderWidth: 1,
+  borderRadius: 14,
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+},
+
+applicationInfo: {
+  flex: 1,
+  gap: 3,
+},
+
+applicationTitle: {
+  fontSize: 14,
+  fontWeight: '700',
+},
+
+applicationMeta: {
+  fontSize: 11,
+},
+
+applicationStatusBadge: {
+  borderWidth: 1,
+  borderRadius: 999,
+  paddingHorizontal: 9,
+  paddingVertical: 5,
+},
+
+applicationStatusText: {
+  fontSize: 10,
+  fontWeight: '800',
+},
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -754,6 +1029,29 @@ const styles = StyleSheet.create({
   },
   categoryPillText: {
     fontSize: 12,
+  },
+  opportunitiesHeader: {
+  flexDirection: 'row',
+  alignItems: 'flex-end',
+  justifyContent: 'space-between',
+  gap: 12,
+  marginTop: 6,
+  marginBottom: 2,
+},
+
+  opportunitiesHeading: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+
+  opportunitiesSubheading: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  opportunitiesCount: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   projectCard: {
     borderRadius: 18,
@@ -907,6 +1205,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
+  
   emptySub: {
     fontSize: 13,
     textAlign: 'center',
@@ -916,4 +1215,5 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.8,
   },
+  
 });
