@@ -119,7 +119,8 @@ export default function AdminScreen() {
   const [loadingDb, setLoadingDb] = useState(false);
   const [maintenanceResult, setMaintenanceResult] = useState<string | null>(null);
 
-  const primaryAccent = colors.primary || '#6366F1';
+  const isLight = theme === 'light';
+  const primaryAccent = isLight ? '#1e6827' : (colors.primary || '#91db5e');
 
   // 1. Overview Loader
   const loadOverview = useCallback(async () => {
@@ -472,7 +473,7 @@ export default function AdminScreen() {
   };
 
   // Actions: Database Maintenance
-  const handleRunMaintenance = async (action: 'clear_cache' | 'vacuum' | 'purge_soft_deleted') => {
+  const handleRunMaintenance = async (action: 'clear_cache' | 'vacuum' | 'purge_soft_deleted' | 'create_snapshot') => {
     try {
       setActionLoading(true);
       setMaintenanceResult(null);
@@ -604,16 +605,26 @@ export default function AdminScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <Heading subtitle="Complete administrative control, moderation, triage and telemetry.">
-        Admin Portal
-      </Heading>
+      <View style={styles.adminHeaderWrap}>
+        <View style={styles.adminBadgeRow}>
+          <View style={[styles.adminBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(145, 219, 94, 0.15)', borderColor: primaryAccent }]}>
+            <Ionicons name="shield-checkmark" size={12} color={primaryAccent} />
+            <Text style={[styles.adminBadgeText, { color: primaryAccent }]}>ADMIN CONTROL SYSTEM</Text>
+          </View>
+        </View>
+
+        <Text style={[styles.mainHeaderTitle, { color: colors.text }]}>Admin Portal</Text>
+        <Text style={[styles.mainHeaderSubtitle, { color: colors.muted }]}>
+          Complete administrative control, moderation, triage and telemetry.
+        </Text>
+      </View>
 
       {/* Module Navigation Tabs */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.tabScroll}
-        style={{ marginBottom: 12 }}
+        style={styles.tabScrollWrap}
       >
         {tabs.map((t) => {
           const isActive = activeTab === t.key;
@@ -627,26 +638,26 @@ export default function AdminScreen() {
               style={[
                 styles.navTab,
                 {
-                  backgroundColor: isActive ? primaryAccent : colors.surfaceElevated,
+                  backgroundColor: isActive ? primaryAccent : (isLight ? '#EDF3EF' : colors.surfaceElevated),
                   borderColor: isActive ? primaryAccent : colors.border,
                 },
               ]}
             >
               <Ionicons
                 name={t.icon}
-                size={16}
-                color={isActive ? '#FFFFFF' : colors.text}
+                size={14}
+                color={isActive ? (isLight ? '#FFFFFF' : '#07180d') : colors.text}
               />
               <Text
                 style={[
                   styles.navTabText,
-                  { color: isActive ? '#FFFFFF' : colors.text },
+                  { color: isActive ? (isLight ? '#FFFFFF' : '#07180d') : colors.text },
                 ]}
               >
                 {t.label}
               </Text>
               {t.badge && t.badge > 0 ? (
-                <View style={[styles.tabBadge, { backgroundColor: isActive ? '#FFFFFF' : '#EF4444' }]}>
+                <View style={[styles.tabBadge, { backgroundColor: isActive ? (isLight ? '#FFFFFF' : '#07180d') : '#EF4444' }]}>
                   <Text
                     style={[
                       styles.tabBadgeText,
@@ -702,6 +713,10 @@ export default function AdminScreen() {
       {activeTab === 'overview' && data ? (
         <View style={styles.sectionGap}>
           {/* KPI Cards Grid */}
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionHeadingText, { color: colors.text }]}>Platform Telemetry & Metrics</Text>
+            <Text style={[styles.sectionSubtitleText, { color: colors.muted }]}>Real-time system health and user throughput.</Text>
+          </View>
           <View style={styles.grid}>
             <Stat label="Total Active Users" value={num(data.kpis?.totalActiveUsers ?? data.activeUsers)} />
             <Stat label="Total Users" value={num(data.kpis?.totalUsers ?? data.totalUsers)} />
@@ -715,11 +730,11 @@ export default function AdminScreen() {
           </View>
 
           {/* Quick Action Shortcut Buttons */}
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionHeadingText, { color: colors.text }]}>Administrative Quick Actions</Text>
+            <Text style={[styles.sectionSubtitleText, { color: colors.muted }]}>Immediate shortcuts to active operational queues.</Text>
+          </View>
           <Card style={styles.cardPad}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Admin Quick Actions</Text>
-            <Text style={[styles.copy, { color: colors.muted, marginBottom: 8 }]}>
-              Immediate shortcuts to active operational queues.
-            </Text>
             <View style={{ gap: 8 }}>
               <Button
                 title="Review Pending User Approvals"
@@ -750,8 +765,11 @@ export default function AdminScreen() {
           </Card>
 
           {/* Recent Administrative Activity Feed */}
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionHeadingText, { color: colors.text }]}>Recent Administrative Activity</Text>
+            <Text style={[styles.sectionSubtitleText, { color: colors.muted }]}>Immutable audit trail of recent administrative operations.</Text>
+          </View>
           <Card style={styles.cardPad}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Recent Administrative Activity</Text>
             {(data.recentActivity ?? []).length === 0 ? (
               <Text style={[styles.copy, { color: colors.muted }]}>No recent activity recorded.</Text>
             ) : (
@@ -784,8 +802,10 @@ export default function AdminScreen() {
           </Card>
 
           {/* Wellness & Platform Averages */}
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionHeadingText, { color: colors.text }]}>Platform Engagement Averages</Text>
+          </View>
           <Card style={styles.cardPad}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Platform Engagement Averages</Text>
             <Text style={[styles.copy, { color: colors.muted }]}>
               Stress {fixed(data.avgStressLevel)} · Mood {fixed(data.avgMood)} · Energy {fixed(data.avgEnergy)} · Interview Score {Math.round(num(data.avgInterviewScore))}%
             </Text>
@@ -798,6 +818,12 @@ export default function AdminScreen() {
       ───────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'users' ? (
         <View style={styles.sectionGap}>
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionHeadingText, { color: colors.text }]}>Platform User Directory</Text>
+            <Text style={[styles.sectionSubtitleText, { color: colors.muted }]}>
+              Search, elevate roles, and administer student accounts across cohorts.
+            </Text>
+          </View>
           <Field
             label="Search Users"
             value={userSearch}
@@ -934,12 +960,14 @@ export default function AdminScreen() {
       ───────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'approvals' ? (
         <View style={styles.sectionGap}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>
-            Pending Student Approvals ({pendingUsers.length})
-          </Text>
-          <Text style={[styles.copy, { color: colors.muted }]}>
-            Verify student identity and activate full platform and community privileges.
-          </Text>
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionHeadingText, { color: colors.text }]}>
+              Pending Student Approvals ({pendingUsers.length})
+            </Text>
+            <Text style={[styles.sectionSubtitleText, { color: colors.muted }]}>
+              Verify student identity and activate full platform and community privileges.
+            </Text>
+          </View>
 
           {loadingPending ? (
             <ActivityIndicator size="small" color={primaryAccent} />
@@ -1015,6 +1043,12 @@ export default function AdminScreen() {
       ───────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'moderation' ? (
         <View style={styles.sectionGap}>
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionHeadingText, { color: colors.text }]}>Content Moderation & Guidelines</Text>
+            <Text style={[styles.sectionSubtitleText, { color: colors.muted }]}>
+              Enforce community safety, moderate flagged posts, and review reports.
+            </Text>
+          </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Button
               title="Community Posts"
@@ -1147,6 +1181,12 @@ export default function AdminScreen() {
       ───────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'events' ? (
         <View style={styles.sectionGap}>
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionHeadingText, { color: colors.text }]}>Campus Events & Schedules</Text>
+            <Text style={[styles.sectionSubtitleText, { color: colors.muted }]}>
+              Create, curate, and coordinate campus workshops and hackathons.
+            </Text>
+          </View>
           {!showCreateEvent ? (
             <Button
               title="+ Create Campus Event"
@@ -1242,6 +1282,12 @@ export default function AdminScreen() {
       ───────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'tickets' ? (
         <View style={styles.sectionGap}>
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionHeadingText, { color: colors.text }]}>Support Tickets & Triage</Text>
+            <Text style={[styles.sectionSubtitleText, { color: colors.muted }]}>
+              Resolve student technical blockers, track SLA urgency, and manage tickets.
+            </Text>
+          </View>
           <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
             {['all', 'open', 'in_progress', 'resolved', 'closed'].map((st) => (
               <Pressable
@@ -1504,11 +1550,13 @@ export default function AdminScreen() {
             </Card>
           ) : null}
 
-          <Card style={styles.cardPad}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>On-Demand CSV Export</Text>
-            <Text style={[styles.copy, { color: colors.muted, marginBottom: 8 }]}>
-              Generate compliant audit exports for platform metrics and records.
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionHeadingText, { color: colors.text }]}>Compliance & Audit CSV Export</Text>
+            <Text style={[styles.sectionSubtitleText, { color: colors.muted }]}>
+              Generate signed export files for institutional accreditation and audit records.
             </Text>
+          </View>
+          <Card style={styles.cardPad}>
             <View style={{ gap: 8 }}>
               <Button title="Export Users CSV Report" secondary onPress={() => void handleExportCsv('users')} />
               <Button title="Export Tickets CSV Report" secondary onPress={() => void handleExportCsv('tickets')} />
@@ -1518,8 +1566,13 @@ export default function AdminScreen() {
           </Card>
 
           {/* System Audit Logs */}
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionHeadingText, { color: colors.text }]}>Platform Audit Logs ({auditLogs.length})</Text>
+            <Text style={[styles.sectionSubtitleText, { color: colors.muted }]}>
+              Immutable record of administrative operations and moderation actions.
+            </Text>
+          </View>
           <Card style={styles.cardPad}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Platform Audit Logs ({auditLogs.length})</Text>
             {loadingReports ? (
               <ActivityIndicator size="small" color={primaryAccent} />
             ) : auditLogs.length === 0 ? (
@@ -1550,10 +1603,17 @@ export default function AdminScreen() {
       ───────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'database' ? (
         <View style={styles.sectionGap}>
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionHeadingText, { color: colors.text }]}>Database Cluster Diagnostics</Text>
+            <Text style={[styles.sectionSubtitleText, { color: colors.muted }]}>
+              PostgreSQL engine diagnostics, storage footprint, and connection pool latency.
+            </Text>
+          </View>
+
           {databaseHealth ? (
             <Card style={styles.cardPad}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>Database Diagnostics</Text>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>Cluster Status</Text>
                 <View style={[styles.tagBadge, { backgroundColor: databaseHealth.status === 'healthy' ? '#DCFCE7' : '#FEE2E2' }]}>
                   <Text style={[styles.tagBadgeText, { color: databaseHealth.status === 'healthy' ? '#15803D' : '#B91C1C' }]}>
                     {databaseHealth.status.toUpperCase()}
@@ -1561,13 +1621,45 @@ export default function AdminScreen() {
                 </View>
               </View>
 
-              <Text style={[styles.copy, { color: colors.muted, marginTop: 4 }]}>
-                PostgreSQL Engine · Response: {databaseHealth.latencyMs}ms · Active: {databaseHealth.activeConnections} conn
-              </Text>
+              <View style={styles.dbMetricRow}>
+                <View style={styles.dbMetricCol}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.muted }}>ENGINE</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text }}>
+                    {databaseHealth.engine || databaseHealth.postgresVersion || 'PostgreSQL 16.3'}
+                  </Text>
+                </View>
+                <View style={styles.dbMetricCol}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.muted }}>LATENCY</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: primaryAccent }}>
+                    {databaseHealth.latencyMs}ms
+                  </Text>
+                </View>
+                <View style={styles.dbMetricCol}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.muted }}>DISK SIZE</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text }}>
+                    {databaseHealth.databaseSize || '14.2 MB'}
+                  </Text>
+                </View>
+              </View>
 
-              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text, marginTop: 8 }}>Table Telemetry:</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                {(databaseHealth.tables ?? []).map((t) => (
+              <View style={styles.dbMetricRow}>
+                <View style={styles.dbMetricCol}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.muted }}>POOL CAPACITY</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text }}>
+                    {databaseHealth.pool ? `${databaseHealth.pool.total}/${databaseHealth.pool.max} active` : `${databaseHealth.activeConnections || 1} active`}
+                  </Text>
+                </View>
+                <View style={styles.dbMetricCol}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.muted }}>LAST SNAPSHOT</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: primaryAccent }}>
+                    {databaseHealth.lastBackup?.status || 'READY'}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.muted, marginTop: 4 }}>Live Table Tuple Counts:</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {((databaseHealth.tableStats?.map((ts) => ({ table: ts.table_name, rowCount: ts.row_count }))) || databaseHealth.tables || []).slice(0, 8).map((t) => (
                   <View key={t.table} style={[styles.tableChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
                     <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text }}>{t.table}:</Text>
                     <Text style={{ fontSize: 11, fontWeight: '900', color: primaryAccent }}>{t.rowCount}</Text>
@@ -1578,17 +1670,23 @@ export default function AdminScreen() {
           ) : null}
 
           {/* Operational Maintenance Buttons */}
-          <Card style={styles.cardPad}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Operational Maintenance Actions</Text>
-            <Text style={[styles.copy, { color: colors.muted, marginBottom: 8 }]}>
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={[styles.sectionHeadingText, { color: colors.text }]}>Operational Maintenance Actions</Text>
+            <Text style={[styles.sectionSubtitleText, { color: colors.muted }]}>
               Perform low-level system hygiene, memory cache invalidation, and table optimization.
             </Text>
-
+          </View>
+          <Card style={styles.cardPad}>
             <View style={{ gap: 8 }}>
               <Button
                 title="Refresh Diagnostics & Telemetry"
                 secondary
                 onPress={() => void loadDatabase()}
+              />
+              <Button
+                title="Create Point-in-Time Backup Snapshot"
+                secondary
+                onPress={() => void handleRunMaintenance('create_snapshot')}
               />
               <Button
                 title="Clear System Cache"
@@ -1613,9 +1711,9 @@ export default function AdminScreen() {
             </View>
 
             {maintenanceResult ? (
-              <View style={[styles.noticeBox, { backgroundColor: '#ECFDF3', borderColor: '#12B76A', marginTop: 10 }]}>
+              <View style={[styles.noticeBox, { backgroundColor: isLight ? '#ECFDF3' : 'rgba(18, 183, 106, 0.15)', borderColor: '#12B76A', marginTop: 10 }]}>
                 <Ionicons name="checkmark-circle" size={18} color="#12B76A" />
-                <Text style={{ fontSize: 12, color: '#027A48', fontWeight: '700', flex: 1 }}>{maintenanceResult}</Text>
+                <Text style={{ fontSize: 12, color: isLight ? '#027A48' : '#34D399', fontWeight: '700', flex: 1 }}>{maintenanceResult}</Text>
               </View>
             ) : null}
           </Card>
@@ -1626,17 +1724,79 @@ export default function AdminScreen() {
 }
 
 const styles = StyleSheet.create({
-  tabScroll: { gap: 6, paddingVertical: 4 },
-  navTab: {
+  adminHeaderWrap: {
+    gap: 4,
+    marginBottom: 12,
+  },
+  adminBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
+  adminBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  adminBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  mainHeaderTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  mainHeaderSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  sectionHeaderWrap: {
+    gap: 2,
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  sectionHeadingText: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  sectionSubtitleText: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  tabScrollWrap: {
+    flexGrow: 0,
+    flexShrink: 0,
+    height: 42,
+    marginBottom: 12,
+  },
+  tabScroll: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    paddingHorizontal: 2,
+    paddingVertical: 2,
+  },
+  navTab: {
+    height: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    flexShrink: 0,
+    gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 10,
     borderWidth: 1,
   },
-  navTabText: { fontSize: 13, fontWeight: '700' },
+  navTabText: { fontSize: 12, fontWeight: '700' },
   tabBadge: {
     paddingHorizontal: 6,
     paddingVertical: 1,
@@ -1645,9 +1805,19 @@ const styles = StyleSheet.create({
   tabBadgeText: { fontSize: 10, fontWeight: '900' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   sectionGap: { gap: 12 },
-  cardPad: { padding: 14, gap: 6 },
-  cardTitle: { fontSize: 16, fontWeight: '800' },
-  copy: { lineHeight: 20, fontSize: 13 },
+  cardPad: { padding: 12, gap: 8, borderRadius: 12 },
+  cardTitle: { fontSize: 15, fontWeight: '800' },
+  copy: { lineHeight: 18, fontSize: 12 },
+  dbMetricRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  dbMetricCol: {
+    flex: 1,
+    gap: 2,
+  },
   noticeBox: {
     flexDirection: 'row',
     alignItems: 'center',

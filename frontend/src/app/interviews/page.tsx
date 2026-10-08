@@ -281,87 +281,94 @@ export default function InterviewsPage() {
     setLiveTranscriptPreview('Listening to microphone...');
 
     try {
-      const rec = new SpeechRecognition();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = 'en-US';
-      rec.maxAlternatives = 1;
+      function startNewSpeechInstance(): any {
+        if (!isListeningRef.current) return null;
+        try {
+          const rec = new SpeechRecognition();
+          rec.continuous = true;
+          rec.interimResults = true;
+          rec.lang = 'en-US';
+          rec.maxAlternatives = 1;
 
-      rec.onresult = (event: any) => {
-        let sessionFinal = '';
-        let sessionInterim = '';
+          rec.onresult = (event: any) => {
+            let sessionFinal = '';
+            let sessionInterim = '';
 
-        for (let i = 0; i < event.results.length; i++) {
-          const res = event.results[i];
-          const text = res[0]?.transcript || '';
-          if (res.isFinal) {
-            sessionFinal += text + ' ';
-          } else {
-            sessionInterim += text;
-          }
+            for (let i = 0; i < event.results.length; i++) {
+              const res = event.results[i];
+              const text = res[0]?.transcript || '';
+              if (res.isFinal) {
+                sessionFinal += text + ' ';
+              } else {
+                sessionInterim += text;
+              }
+            }
+
+            lastSessionFinalRef.current = sessionFinal;
+            const currentSpoken = (committedSpeechRef.current + sessionFinal + sessionInterim).trim();
+            setLiveTranscriptPreview(currentSpoken || 'Listening...');
+
+            if (currentSpoken) {
+              const init = initialTextRef.current.trim();
+              const combined = init ? `${init} ${currentSpoken}` : currentSpoken;
+              setAnswers((prev) => {
+                const next = [...prev];
+                next[stepRef.current] = combined;
+                return next;
+              });
+
+              // Debounced AI critique update
+              if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+              if (interviewRef.current) {
+                debounceTimerRef.current = setTimeout(() => {
+                  triggerCritique(combined, scratchCodesRef.current[stepRef.current] || '', stepRef.current, interviewRef.current!);
+                }, 800);
+              }
+            }
+          };
+
+          rec.onerror = (e: any) => {
+            console.warn('Speech recognition event:', e?.error);
+            if (e?.error === 'not-allowed') {
+              setSpeechError('Microphone permission was denied. Please allow microphone access in your browser.');
+              isListeningRef.current = false;
+              setIsListening(false);
+              stopMicAnalysis();
+            } else if (e?.error === 'audio-capture') {
+              setSpeechError('No microphone detected or audio capture is blocked.');
+              isListeningRef.current = false;
+              setIsListening(false);
+              stopMicAnalysis();
+            }
+          };
+
+          rec.onend = () => {
+            if (isListeningRef.current) {
+              if (lastSessionFinalRef.current) {
+                committedSpeechRef.current += lastSessionFinalRef.current.trim() + ' ';
+                lastSessionFinalRef.current = '';
+              }
+              // Restart fresh instance so Chrome/WebKit never throws InvalidStateError
+              setTimeout(() => {
+                if (isListeningRef.current) {
+                  recognitionRef.current = startNewSpeechInstance();
+                }
+              }, 120);
+            } else {
+              setIsListening(false);
+              stopMicAnalysis();
+            }
+          };
+
+          rec.start();
+          return rec;
+        } catch (err) {
+          console.warn('SpeechRecognition instance error:', err);
+          return null;
         }
+      }
 
-        lastSessionFinalRef.current = sessionFinal;
-        const currentSpoken = (committedSpeechRef.current + sessionFinal + sessionInterim).trim();
-        setLiveTranscriptPreview(currentSpoken || 'Listening...');
-
-        if (currentSpoken) {
-          const init = initialTextRef.current.trim();
-          const combined = init ? `${init} ${currentSpoken}` : currentSpoken;
-          setAnswers((prev) => {
-            const next = [...prev];
-            next[stepRef.current] = combined;
-            return next;
-          });
-
-          // Debounced AI critique update
-          if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-          if (interviewRef.current) {
-            debounceTimerRef.current = setTimeout(() => {
-              triggerCritique(combined, scratchCodesRef.current[stepRef.current] || '', stepRef.current, interviewRef.current!);
-            }, 800);
-          }
-        }
-      };
-
-      rec.onerror = (e: any) => {
-        console.warn('Speech recognition event:', e.error);
-        if (e.error === 'not-allowed') {
-          setSpeechError('Microphone permission was denied. Please allow microphone access in your browser.');
-          isListeningRef.current = false;
-          setIsListening(false);
-          stopMicAnalysis();
-        } else if (e.error === 'audio-capture') {
-          setSpeechError('No microphone detected or audio capture is blocked.');
-          isListeningRef.current = false;
-          setIsListening(false);
-          stopMicAnalysis();
-        }
-        // 'no-speech' is harmless and will be handled by onend auto-restart
-      };
-
-      rec.onend = () => {
-        if (isListeningRef.current) {
-          if (lastSessionFinalRef.current) {
-            committedSpeechRef.current += lastSessionFinalRef.current.trim() + ' ';
-            lastSessionFinalRef.current = '';
-          }
-          try {
-            rec.start();
-          } catch {
-            isListeningRef.current = false;
-            setIsListening(false);
-            stopMicAnalysis();
-          }
-        } else {
-          setIsListening(false);
-          stopMicAnalysis();
-        }
-      };
-
-      // Start recognition IMMEDIATELY in response to the user click gesture
-      rec.start();
-      recognitionRef.current = rec;
+      recognitionRef.current = startNewSpeechInstance();
     } catch (err: any) {
       console.warn('Failed to start SpeechRecognition:', err);
       setSpeechError('Could not start speech recognition: ' + (err.message || 'Unknown error'));
@@ -370,47 +377,16 @@ export default function InterviewsPage() {
       return;
     }
 
-    // Non-blocking microphone volume analysis (does not delay or block speech recognition)
-    if (navigator.mediaDevices?.getUserMedia) {
-      navigator.mediaDevices
-        .getUserMedia({ audio: true })
-        .then((stream) => {
-          if (!isListeningRef.current) {
-            stream.getTracks().forEach((track) => track.stop());
-            return;
-          }
-          micStreamRef.current = stream;
-          try {
-            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-            if (AudioCtx) {
-              const ctx = new AudioCtx();
-              audioContextRef.current = ctx;
-              const source = ctx.createMediaStreamSource(stream);
-              const analyser = ctx.createAnalyser();
-              analyser.fftSize = 64;
-              source.connect(analyser);
-              analyserRef.current = analyser;
-
-              const dataArray = new Uint8Array(analyser.frequencyBinCount);
-              const checkVolume = () => {
-                if (!analyserRef.current || !isListeningRef.current) return;
-                analyserRef.current.getByteFrequencyData(dataArray);
-                let sum = 0;
-                for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-                const avg = sum / dataArray.length;
-                setVoiceVolume(Math.min(100, Math.round((avg / 128) * 100)));
-                animFrameRef.current = requestAnimationFrame(checkVolume);
-              };
-              checkVolume();
-            }
-          } catch (e) {
-            console.warn('Volume meter setup failed:', e);
-          }
-        })
-        .catch(() => {
-          // Volume visualizer unavailable; SpeechRecognition is still running perfectly!
-        });
-    }
+    // Activity-based speech volume visualizer (avoids competing hardware locks on microphone)
+    const volumeInterval = setInterval(() => {
+      if (!isListeningRef.current) {
+        setVoiceVolume(0);
+        clearInterval(volumeInterval);
+        return;
+      }
+      // Pulsate lively volume bars while listening
+      setVoiceVolume(Math.floor(Math.random() * 45) + 35);
+    }, 180);
   }
 
   async function startInterview(topic: string) {

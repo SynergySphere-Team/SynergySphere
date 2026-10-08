@@ -6,17 +6,25 @@ import {
   Pressable,
   Animated,
   TextInput,
+  Alert,
+  Platform,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '@/context/ThemeContext';
 
-interface VoiceWaveformInputProps {
+export interface VoiceWaveformInputProps {
   onAppendTranscription: (text: string) => void;
+  onLiveTranscription?: (text: string) => void;
+  onRecordingStart?: () => void;
+  onRecordingEnd?: () => void;
   accentColor?: string;
 }
 
 export function VoiceWaveformInput({
   onAppendTranscription,
+  onLiveTranscription,
+  onRecordingStart,
+  onRecordingEnd,
   accentColor = '#059669',
 }: VoiceWaveformInputProps) {
   const { colors, theme } = useTheme();
@@ -24,13 +32,23 @@ export function VoiceWaveformInput({
 
   const [isRecording, setIsRecording] = useState(false);
   const isRecordingRef = useRef(false);
-  useEffect(() => {
-    isRecordingRef.current = isRecording;
-  }, [isRecording]);
   const [seconds, setSeconds] = useState(0);
   const [transcription, setTranscription] = useState('');
   const [showEditor, setShowEditor] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
+
+  // Refs for persistent transcription across speech recognition pause/restart cycles
+  const committedSpeechRef = useRef<string>('');
+  const lastSessionFinalRef = useRef<string>('');
+  const speechRecRef = useRef<any>(null);
+  const restartTimerRef = useRef<any>(null);
+  const onLiveTranscriptionRef = useRef(onLiveTranscription);
+  const onAppendTranscriptionRef = useRef(onAppendTranscription);
+
+  useEffect(() => {
+    onLiveTranscriptionRef.current = onLiveTranscription;
+    onAppendTranscriptionRef.current = onAppendTranscription;
+  }, [onLiveTranscription, onAppendTranscription]);
 
   // Animated heights for 8 waveform meter bars
   const barHeights = useRef(
@@ -39,13 +57,13 @@ export function VoiceWaveformInput({
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const waveAnimRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const speechRecRef = useRef<any>(null);
   const audioContextRef = useRef<any>(null);
   const analyserRef = useRef<any>(null);
   const mediaStreamRef = useRef<any>(null);
 
   useEffect(() => {
     return () => {
+      isRecordingRef.current = false;
       cleanupAudio();
     };
   }, []);
@@ -53,6 +71,8 @@ export function VoiceWaveformInput({
   function cleanupAudio() {
     if (timerRef.current) clearInterval(timerRef.current);
     if (waveAnimRef.current) clearInterval(waveAnimRef.current);
+    if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+
     if (speechRecRef.current) {
       try {
         speechRecRef.current.stop();
@@ -80,11 +100,115 @@ export function VoiceWaveformInput({
     analyserRef.current = null;
   }
 
-  async function toggleRecord() {
-    if (isRecording) {
-      // Stop recording
+  // Create a brand new SpeechRecognition instance every time so Chrome/WebKit never errors on restart
+  function startRecognitionInstance(): any {
+    if (!isRecordingRef.current) return null;
+
+    const SpeechRecognition =
+      typeof window !== 'undefined'
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null;
+
+    if (!SpeechRecognition) {
+      setStatusMessage('Voice recognition is active. Note: Live dictation operates in supported browsers (Chrome, Edge, Safari).');
+      return null;
+    }
+
+    try {
+      const rec = new SpeechRecognition();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'en-US';
+      rec.maxAlternatives = 1;
+
+      rec.onresult = (event: any) => {
+        let sessionFinal = '';
+        let sessionInterim = '';
+
+        for (let i = 0; i < event.results.length; i++) {
+          const res = event.results[i];
+          const text = res[0]?.transcript || '';
+          if (res.isFinal) {
+            sessionFinal += text + ' ';
+          } else {
+            sessionInterim += text;
+          }
+        }
+
+        lastSessionFinalRef.current = sessionFinal;
+        const currentSpoken = (committedSpeechRef.current + sessionFinal + sessionInterim).trim();
+
+        if (currentSpoken) {
+          setTranscription(currentSpoken);
+          setStatusMessage(`Dictating: "${currentSpoken.slice(-35)}"`);
+
+          // Stream live words directly into the parent text box in real-time
+          if (onLiveTranscriptionRef.current) {
+            onLiveTranscriptionRef.current(currentSpoken);
+          }
+        }
+      };
+
+      rec.onerror = (event: any) => {
+        console.warn('SpeechRecognition error:', event?.error);
+        if (event?.error === 'not-allowed') {
+          setStatusMessage('Microphone access was denied. Please allow microphone permissions.');
+          isRecordingRef.current = false;
+          setIsRecording(false);
+          cleanupAudio();
+        } else if (event?.error === 'audio-capture') {
+          setStatusMessage('No microphone detected or audio capture is blocked.');
+          isRecordingRef.current = false;
+          setIsRecording(false);
+          cleanupAudio();
+        }
+        // 'no-speech' is harmless and will trigger onend auto-restart
+      };
+
+      rec.onend = () => {
+        if (isRecordingRef.current) {
+          // Commit accumulated words from this session before restarting
+          if (lastSessionFinalRef.current) {
+            committedSpeechRef.current += lastSessionFinalRef.current.trim() + ' ';
+            lastSessionFinalRef.current = '';
+          }
+
+          // Restart a FRESH instance so the browser does not reject rec.start() on ended instance
+          if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+          restartTimerRef.current = setTimeout(() => {
+            if (isRecordingRef.current) {
+              speechRecRef.current = startRecognitionInstance();
+            }
+          }, 120);
+        }
+      };
+
+      rec.start();
+      return rec;
+    } catch (err) {
+      console.warn('Failed to start SpeechRecognition instance:', err);
+      return null;
+    }
+  }
+
+  function toggleRecord() {
+    if (isRecordingRef.current) {
+      // ── STOP RECORDING ──
+      isRecordingRef.current = false;
       setIsRecording(false);
+
+      // Flush final recognized transcript to parent answer box
+      const finalSpoken = (committedSpeechRef.current + lastSessionFinalRef.current).trim();
+      if (finalSpoken) {
+        if (onLiveTranscriptionRef.current) {
+          onLiveTranscriptionRef.current(finalSpoken);
+        } else if (onAppendTranscriptionRef.current) {
+          onAppendTranscriptionRef.current(finalSpoken);
+        }
+      }
+
       cleanupAudio();
+      onRecordingEnd?.();
 
       // Reset bars to idle
       barHeights.forEach((b) => {
@@ -94,95 +218,53 @@ export function VoiceWaveformInput({
         }).start();
       });
 
-      setShowEditor(true);
-      setStatusMessage('');
+      setShowEditor(Boolean(finalSpoken));
+      setStatusMessage(finalSpoken ? 'Voice input captured and saved.' : '');
     } else {
-      // Start recording
-      setIsRecording(true);
-      setSeconds(0);
-      setTranscription('');
-      setShowEditor(false);
-      setStatusMessage('Listening to microphone...');
-
-      // 1. Setup AudioContext and mic input for real-time waveform if available
-      try {
-        if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          mediaStreamRef.current = stream;
-
-          const AudioContextClass =
-            (typeof window !== 'undefined' &&
-              ((window as any).AudioContext || (window as any).webkitAudioContext)) ||
-            null;
-
-          if (AudioContextClass) {
-            const ctx = new AudioContextClass();
-            audioContextRef.current = ctx;
-            const source = ctx.createMediaStreamSource(stream);
-            const analyser = ctx.createAnalyser();
-            analyser.fftSize = 32;
-            source.connect(analyser);
-            analyserRef.current = analyser;
-          }
-        }
-      } catch (err) {
-        console.warn('Microphone stream access notice:', err);
-      }
-
-      // 2. Setup Speech Recognition
+      // ── START RECORDING ──
       const SpeechRecognition =
         typeof window !== 'undefined'
           ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
           : null;
 
-      if (SpeechRecognition) {
-        try {
-          const rec = new SpeechRecognition();
-          rec.continuous = true;
-          rec.interimResults = true;
-          rec.lang = 'en-US';
-
-          rec.onresult = (event: any) => {
-            let fullText = '';
-            for (let i = 0; i < event.results.length; i++) {
-              fullText += event.results[i][0].transcript + ' ';
-            }
-            const clean = fullText.trim();
-            if (clean) {
-              setTranscription(clean);
-            }
-          };
-
-          rec.onerror = (event: any) => {
-            console.warn('SpeechRecognition error:', event);
-            if (event.error === 'not-allowed') {
-              setStatusMessage('Microphone access was denied. Please allow microphone permissions.');
-            }
-          };
-
-          rec.onend = () => {
-            if (isRecordingRef.current) {
-              try {
-                rec.start();
-              } catch {}
-            }
-          };
-
-          rec.start();
-          speechRecRef.current = rec;
-        } catch (err) {
-          console.warn('Failed to start SpeechRecognition:', err);
+      if (!SpeechRecognition) {
+        if (Platform.OS === 'web') {
+          Alert.alert(
+            'Speech Recognition',
+            'Web Speech API is not supported in this browser. Please use Google Chrome, Microsoft Edge, or Safari.',
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert(
+            'Microphone Dictation Active',
+            'Tap the answer box above and use the Microphone icon (🎙️) on your keyboard (bottom-right next to spacebar on iOS / top-right on Android) to dictate directly into the box with native voice recognition!',
+            [{ text: 'Got it' }]
+          );
         }
-      } else {
-        setStatusMessage('Listening (speak into mic)... Speech recognition operates in supported browsers.');
+        return;
       }
 
-      // 3. Seconds timer
+      isRecordingRef.current = true;
+      setIsRecording(true);
+      setSeconds(0);
+      setTranscription('');
+      setShowEditor(false);
+      setStatusMessage('Listening to microphone... Speak clearly.');
+
+      committedSpeechRef.current = '';
+      lastSessionFinalRef.current = '';
+
+      onRecordingStart?.();
+
+      // 1. Start SpeechRecognition SYNCHRONOUSLY to preserve the browser user-gesture token
+      speechRecRef.current = startRecognitionInstance();
+
+      // 2. Seconds timer
       timerRef.current = setInterval(() => {
         setSeconds((s) => s + 1);
       }, 1000);
 
-      // 4. Animate waveform bars according to real mic input if analyser is available, else audio pulse
+      // 4. Animate waveform bars according to real mic input if analyser is available, else active pulse
       waveAnimRef.current = setInterval(() => {
         let volumes: number[] = [];
         if (analyserRef.current) {
@@ -190,7 +272,7 @@ export function VoiceWaveformInput({
           analyserRef.current.getByteFrequencyData(dataArray);
           for (let i = 0; i < barHeights.length; i++) {
             const raw = dataArray[i % dataArray.length] || 0;
-            // Map 0-255 to 8-40px height
+            // Map 0-255 to 8-42px height
             volumes.push(Math.max(8, Math.min(42, Math.round((raw / 255) * 36) + 8)));
           }
         } else {
@@ -211,8 +293,8 @@ export function VoiceWaveformInput({
   function handleInsert() {
     if (transcription.trim()) {
       onAppendTranscription(transcription.trim());
-      setTranscription('');
       setShowEditor(false);
+      setStatusMessage('Inserted into answer.');
     }
   }
 
@@ -228,13 +310,13 @@ export function VoiceWaveformInput({
               ]}
             />
             <Text style={[styles.headerTitle, { color: colors.text }]}>
-              {isRecording ? `Recording (${seconds}s)...` : 'Voice Input & Audio Waveform'}
+              {isRecording ? `Dictating Live (${seconds}s)...` : 'Voice Input & Audio Waveform'}
             </Text>
           </View>
           <Text style={[styles.subText, { color: colors.muted }]}>
             {isRecording
-              ? (statusMessage || 'Recording microphone input... Speak clearly.')
-              : 'Tap to dictate your verbal answer aloud into the mic.'}
+              ? (statusMessage || 'Recording microphone input... Streaming words to answer box.')
+              : 'Tap to dictate your answer aloud — words stream directly into your answer.'}
           </Text>
         </View>
 
@@ -273,8 +355,18 @@ export function VoiceWaveformInput({
         ))}
       </View>
 
-      {/* Transcription Editor */}
-      {showEditor && (
+      {/* Real-time Spoken Text Preview or Editor */}
+      {isRecording && transcription ? (
+        <View style={[styles.liveTranscriptPill, { backgroundColor: isLight ? '#eefbf3' : 'rgba(16, 185, 129, 0.12)', borderColor: accentColor }]}>
+          <Ionicons name="mic" size={13} color={accentColor} />
+          <Text style={[styles.liveTranscriptText, { color: colors.text }]} numberOfLines={2}>
+            {transcription}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Transcription Editor after stopping */}
+      {showEditor && !isRecording && (
         <View style={styles.transcriptionBox}>
           <Text style={[styles.transcriptionLabel, { color: colors.muted }]}>
             RECORDED MIC TRANSCRIPTION:
@@ -283,7 +375,7 @@ export function VoiceWaveformInput({
             value={transcription}
             onChangeText={setTranscription}
             multiline
-            placeholder="Your spoken words will appear here. Edit or add text before inserting..."
+            placeholder="Your spoken words appear here. Edit or add text before inserting..."
             placeholderTextColor={colors.muted}
             style={[
               styles.transcriptInput,
@@ -299,7 +391,7 @@ export function VoiceWaveformInput({
               onPress={() => setShowEditor(false)}
               style={[styles.actionBtn, { borderColor: colors.border }]}
             >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.muted }}>Discard</Text>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.muted }}>Dismiss</Text>
             </Pressable>
 
             <Pressable
@@ -308,7 +400,7 @@ export function VoiceWaveformInput({
             >
               <Ionicons name="checkmark" size={14} color="#ffffff" />
               <Text style={{ fontSize: 12, fontWeight: '800', color: '#ffffff' }}>
-                Insert into Answer
+                Re-Insert into Answer
               </Text>
             </Pressable>
           </View>
@@ -372,6 +464,20 @@ const styles = StyleSheet.create({
   waveBar: {
     width: 5,
     borderRadius: 3,
+  },
+  liveTranscriptPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  liveTranscriptText: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
   },
   transcriptionBox: {
     gap: 6,

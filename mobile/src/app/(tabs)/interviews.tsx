@@ -322,6 +322,20 @@ export default function InterviewsScreen() {
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const speechRecognitionRef = useRef<any>(null);
   const recordedSpeechRef = useRef<string>('');
+  const stepRef = useRef(step);
+  useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
+  const answersRef = useRef(answers);
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+  const answerInputRef = useRef<any>(null);
+  const initialAnswerBeforeRecordRef = useRef<string>('');
+  const committedSpeechRef = useRef<string>('');
+  const lastSessionFinalRef = useRef<string>('');
+  const [voiceBannerMessage, setVoiceBannerMessage] = useState<string | null>(null);
+  const restartVoiceTimerRef = useRef<any>(null);
 
   // Timer states (timestamp based)
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -533,6 +547,21 @@ export default function InterviewsScreen() {
     saveInterviewDraft(nextState);
   }
 
+  const initialAnswerBeforeVoiceRef = useRef<string>('');
+
+  function handleRealisticVoiceStart() {
+    if (!realisticSession) return;
+    const stageIdx = realisticSession.currentStageIndex;
+    initialAnswerBeforeVoiceRef.current = realisticSession.answers[stageIdx] || '';
+  }
+
+  function handleRealisticVoiceLive(streamedSpokenText: string) {
+    if (!realisticSession) return;
+    const base = initialAnswerBeforeVoiceRef.current.trim();
+    const combined = base ? `${base} ${streamedSpokenText}` : streamedSpokenText;
+    handleRealisticAnswerChange(combined);
+  }
+
   function handleRealisticVoiceAppend(text: string) {
     if (!realisticSession) return;
     const stageIdx = realisticSession.currentStageIndex;
@@ -651,88 +680,160 @@ export default function InterviewsScreen() {
   // Real voice recording & speech transcription
   const toggleRecording = () => {
     if (isRecordingRef.current) {
+      // ── STOP RECORDING ──
       isRecordingRef.current = false;
       setIsRecording(false);
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      if (restartVoiceTimerRef.current) {
+        clearTimeout(restartVoiceTimerRef.current);
+        restartVoiceTimerRef.current = null;
+      }
       if (speechRecognitionRef.current) {
         try {
           speechRecognitionRef.current.stop();
-        } catch {
-          // ignore
-        }
+        } catch {}
         speechRecognitionRef.current = null;
       }
-      triggerCritique(answers[step] || '', step);
-      recordedSpeechRef.current = '';
-    } else {
-      isRecordingRef.current = true;
-      setIsRecording(true);
-      setRecordingSeconds(0);
-      recordedSpeechRef.current = '';
-
-      const SpeechRecognition =
-        typeof window !== 'undefined'
-          ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-          : null;
-
-      if (SpeechRecognition) {
-        try {
-          const baseAnswer = answers[step] || '';
-          let committed = '';
-          let lastFinal = '';
-          const rec = new SpeechRecognition();
-          rec.continuous = true;
-          rec.interimResults = true;
-          rec.lang = 'en-US';
-          rec.onresult = (e: any) => {
-            let sessionFinal = '';
-            let sessionInterim = '';
-            for (let i = 0; i < e.results.length; i++) {
-              const res = e.results[i];
-              const t = res[0]?.transcript || '';
-              if (res.isFinal) {
-                sessionFinal += t + ' ';
-              } else {
-                sessionInterim += t;
-              }
-            }
-            lastFinal = sessionFinal;
-            const clean = (committed + sessionFinal + sessionInterim).trim();
-            if (clean) {
-              recordedSpeechRef.current = clean;
-              const liveAnswer = baseAnswer ? `${baseAnswer} ${clean}` : clean;
-              setAnswers((prev) => {
-                const next = [...prev];
-                next[step] = liveAnswer;
-                return next;
-              });
-            }
-          };
-          rec.onerror = (e: any) => {
-            console.warn('SpeechRecognition error:', e);
-          };
-          rec.onend = () => {
-            if (isRecordingRef.current) {
-              if (lastFinal) {
-                committed += lastFinal.trim() + ' ';
-                lastFinal = '';
-              }
-              try {
-                rec.start();
-              } catch {}
-            }
-          };
-          rec.start();
-          speechRecognitionRef.current = rec;
-        } catch (err) {
-          console.warn('Could not start speech recognition:', err);
-        }
+      const finalSpoken = (committedSpeechRef.current + lastSessionFinalRef.current).trim();
+      if (finalSpoken) {
+        const base = initialAnswerBeforeRecordRef.current.trim();
+        const combined = base ? `${base} ${finalSpoken}` : finalSpoken;
+        setAnswers((prev) => {
+          const next = [...prev];
+          next[stepRef.current] = combined;
+          return next;
+        });
+        triggerCritique(combined, stepRef.current);
+        setVoiceBannerMessage('Voice transcription saved.');
+        setTimeout(() => setVoiceBannerMessage(null), 3500);
+      } else {
+        triggerCritique(answersRef.current[stepRef.current] || '', stepRef.current);
       }
-
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingSeconds((s) => s + 1);
-      }, 1000);
+      recordedSpeechRef.current = '';
+      return;
     }
+
+    // ── START RECORDING ──
+    const SpeechRecognition =
+      typeof window !== 'undefined'
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null;
+
+    if (!SpeechRecognition) {
+      // Platform does not support Web Speech API (e.g. native iOS/Android in Expo Go)
+      answerInputRef.current?.focus();
+      setTimeout(() => {
+        interviewScrollRef.current?.scrollToEnd({ animated: true });
+      }, 150);
+      if (Platform.OS === 'web') {
+        Alert.alert(
+          'Speech Recognition',
+          'Web Speech API is not supported in this browser. Please use Google Chrome, Microsoft Edge, or Safari.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Microphone Dictation Active',
+          'Your answer box is focused! Tap the Microphone icon (🎙️) on your keyboard (bottom-right next to spacebar on iOS / top-right on Android) to dictate directly into the box with native voice recognition.',
+          [{ text: 'Start Dictating' }]
+        );
+      }
+      return;
+    }
+
+    // Web Speech API is supported
+    isRecordingRef.current = true;
+    setIsRecording(true);
+    setRecordingSeconds(0);
+    recordedSpeechRef.current = '';
+    initialAnswerBeforeRecordRef.current = answersRef.current[stepRef.current] || '';
+    committedSpeechRef.current = '';
+    lastSessionFinalRef.current = '';
+    setVoiceBannerMessage('Listening to microphone... Speak clearly.');
+
+    function startNewSpeechInstance(): any {
+      if (!isRecordingRef.current) return null;
+      try {
+        const rec = new SpeechRecognition();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = 'en-US';
+        rec.maxAlternatives = 1;
+
+        rec.onresult = (e: any) => {
+          let sessionFinal = '';
+          let sessionInterim = '';
+          for (let i = 0; i < e.results.length; i++) {
+            const res = e.results[i];
+            const t = res[0]?.transcript || '';
+            if (res.isFinal) {
+              sessionFinal += t + ' ';
+            } else {
+              sessionInterim += t;
+            }
+          }
+          lastSessionFinalRef.current = sessionFinal;
+          const currentSpoken = (committedSpeechRef.current + sessionFinal + sessionInterim).trim();
+          if (currentSpoken) {
+            recordedSpeechRef.current = currentSpoken;
+            const base = initialAnswerBeforeRecordRef.current.trim();
+            const liveAnswer = base ? `${base} ${currentSpoken}` : currentSpoken;
+            setAnswers((prev) => {
+              const next = [...prev];
+              next[stepRef.current] = liveAnswer;
+              return next;
+            });
+            setVoiceBannerMessage(`Dictating: "${currentSpoken.slice(-35)}"`);
+          }
+        };
+
+        rec.onerror = (e: any) => {
+          console.warn('SpeechRecognition error:', e?.error);
+          if (e?.error === 'not-allowed') {
+            setVoiceBannerMessage('Microphone access denied. Please allow microphone in browser settings.');
+            isRecordingRef.current = false;
+            setIsRecording(false);
+            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+          } else if (e?.error === 'audio-capture') {
+            setVoiceBannerMessage('No microphone detected or audio capture is blocked.');
+            isRecordingRef.current = false;
+            setIsRecording(false);
+            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+          }
+        };
+
+        rec.onend = () => {
+          if (isRecordingRef.current) {
+            if (lastSessionFinalRef.current) {
+              committedSpeechRef.current += lastSessionFinalRef.current.trim() + ' ';
+              lastSessionFinalRef.current = '';
+            }
+            // Auto-restart with a FRESH instance so Chrome/Safari never throws InvalidStateError
+            if (restartVoiceTimerRef.current) clearTimeout(restartVoiceTimerRef.current);
+            restartVoiceTimerRef.current = setTimeout(() => {
+              if (isRecordingRef.current) {
+                speechRecognitionRef.current = startNewSpeechInstance();
+              }
+            }, 100);
+          }
+        };
+
+        rec.start();
+        return rec;
+      } catch (err) {
+        console.warn('Could not start speech recognition instance:', err);
+        return null;
+      }
+    }
+
+    speechRecognitionRef.current = startNewSpeechInstance();
+
+    recordingTimerRef.current = setInterval(() => {
+      setRecordingSeconds((s) => s + 1);
+    }, 1000);
   };
 
   // Debounced live rubric critique
@@ -1296,7 +1397,7 @@ export default function InterviewsScreen() {
               activeTab === 'setup' && [styles.segmentBtnActive, { backgroundColor: colors.surface, borderColor: primaryAccent }],
             ]}
           >
-            <Ionicons name="rocket" size={14} color={activeTab === 'setup' ? primaryAccent : colors.muted} />
+            <Ionicons name="play-circle" size={14} color={activeTab === 'setup' ? primaryAccent : colors.muted} />
             <Text
               numberOfLines={1}
               ellipsizeMode="tail"
@@ -1726,7 +1827,7 @@ export default function InterviewsScreen() {
 
               <View style={{ marginTop: 12, gap: 8 }}>
                 <Button
-                  title="Launch 4-Stage FAANG Simulation (Recommended) 🚀"
+                  title="Launch 4-Stage FAANG Simulation (Recommended)"
                   onPress={() => startRealisticInterview(false)}
                 />
 
@@ -2076,6 +2177,8 @@ export default function InterviewsScreen() {
 
               {/* Speech-to-Text Voice Waveform Input */}
               <VoiceWaveformInput
+                onRecordingStart={handleRealisticVoiceStart}
+                onLiveTranscription={handleRealisticVoiceLive}
                 onAppendTranscription={handleRealisticVoiceAppend}
                 accentColor={primaryAccent}
               />
@@ -2225,6 +2328,7 @@ export default function InterviewsScreen() {
 
             {/* Answer Input */}
             <TextInput
+              ref={answerInputRef}
               value={answers[step] || ''}
               onChangeText={(txt) => {
                 const nextAnswers = [...answers];
@@ -2243,6 +2347,16 @@ export default function InterviewsScreen() {
               placeholderTextColor={colors.muted}
               style={[styles.answerInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.text }]}
             />
+
+            {/* Live voice transcription feedback banner */}
+            {voiceBannerMessage ? (
+              <View style={[styles.voiceStatusBanner, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)', borderColor: primaryAccent }]}>
+                <Ionicons name="mic" size={14} color={primaryAccent} />
+                <Text style={[styles.voiceStatusText, { color: colors.text }]} numberOfLines={2}>
+                  {voiceBannerMessage}
+                </Text>
+              </View>
+            ) : null}
 
             {/* Voice & Hints Controls */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -3130,5 +3244,20 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  voiceStatusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  voiceStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
   },
 });

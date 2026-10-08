@@ -323,12 +323,7 @@ export default function TabsLayout() {
             }}
           />
 
-          <Tabs.Screen
-            name="analytics"
-            options={{
-              href: null,
-            }}
-          />
+
 
           <Tabs.Screen
             name="project-chat"

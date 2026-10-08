@@ -492,9 +492,11 @@ export default function PortfolioScreen() {
 
         {/* ── 2. Featured Projects Section ─────────────────────────────────── */}
         <View style={styles.sectionHeaderRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={styles.sectionTitleWrap}>
             <Ionicons name="briefcase" size={18} color={primaryAccent} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Featured Projects</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
+              Featured Projects
+            </Text>
           </View>
           <Text style={[styles.countBadge, { color: colors.muted }]}>{items.length} projects</Text>
         </View>
@@ -572,9 +574,11 @@ export default function PortfolioScreen() {
 
         {/* ── 3. AI Career Development Studio Grid ─────────────────────────── */}
         <View style={styles.sectionHeaderRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={styles.sectionTitleWrap}>
             <Ionicons name="sparkles" size={18} color={primaryAccent} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Career Tools</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
+              Career Tools
+            </Text>
           </View>
           <Pressable
             onPress={() => setActiveCareerTool('resume')}
@@ -641,9 +645,11 @@ export default function PortfolioScreen() {
 
         {/* ── 4. Technical Skills Section ─────────────────────────────────── */}
         <View style={styles.sectionHeaderRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={styles.sectionTitleWrap}>
             <Ionicons name="code-slash" size={18} color={primaryAccent} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Learning Hub Verified Skills</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
+              Learning Hub Verified Skills
+            </Text>
           </View>
           <Pressable
             onPress={() => setShowSkillModal(true)}
@@ -922,15 +928,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    width: '100%',
     gap: 8,
     marginTop: 6,
+  },
+  sectionTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginRight: 6,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '800',
-    flex: 1,
-    minWidth: 0,
-    paddingRight: 4,
+    flexShrink: 1,
   },
   countBadge: {
     fontSize: 12,
@@ -1057,6 +1070,7 @@ projectActionBtn: {
   addSkillBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -1098,18 +1112,19 @@ projectActionBtn: {
     borderRadius: 999,
   },
   openStudioButton: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 5,
-  paddingHorizontal: 10,
-  paddingVertical: 7,
-  borderRadius: 10,
-  borderWidth: 1,
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
 
-openStudioText: {
-  fontSize: 10,
-  fontWeight: '800',
-  letterSpacing: 0.5,
-},
+  openStudioText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
 });

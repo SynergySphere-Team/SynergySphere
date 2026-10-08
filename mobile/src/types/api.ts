@@ -314,12 +314,32 @@ export interface AdminEvent {
 
 export interface AdminDatabaseHealth {
   status: 'healthy' | 'degraded';
-  postgresVersion: string;
+  postgresVersion?: string;
+  engine?: string;
   latencyMs: number;
-  activeConnections: number;
-  tables: {
+  activeConnections?: number;
+  databaseSize?: string;
+  pool?: {
+    total: number;
+    idle: number;
+    waiting: number;
+    max: number;
+  };
+  lastBackup?: {
+    timestamp: string;
+    status: string;
+    type: string;
+    adminName: string;
+    description: string;
+  };
+  softDeletedCount?: number;
+  tables?: {
     table: string;
     rowCount: number;
+  }[];
+  tableStats?: {
+    table_name: string;
+    row_count: number;
   }[];
 }
 
