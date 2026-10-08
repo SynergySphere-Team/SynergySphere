@@ -18,16 +18,31 @@ export interface ChatTurn {
   content: string;
 }
 
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 function refreshEnv(): void {
   try {
-    dotenv.config({ override: true });
+    dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
+  } catch {
+    // ignore
+  }
+  try {
+    dotenv.config({ path: path.resolve(process.cwd(), 'backend/.env'), override: true });
+  } catch {
+    // ignore
+  }
+  try {
+    const currentDir = path.dirname(fileURLToPath(import.meta.url));
+    dotenv.config({ path: path.resolve(currentDir, '../../../.env'), override: true });
+    dotenv.config({ path: path.resolve(currentDir, '../../.env'), override: true });
   } catch {
     // ignore
   }
 }
 
 function getAiTimeout(): number {
-  return Number(process.env.AI_TIMEOUT_MS || process.env.OPENAI_TIMEOUT_MS) || 25000;
+  return Number(process.env.AI_TIMEOUT_MS || process.env.OPENAI_TIMEOUT_MS) || 35000;
 }
 
 /* ─────────────────────────── main export ─────────────────────────── */
@@ -82,17 +97,13 @@ async function callGemini(
 ): Promise<string> {
   const models = [
     process.env.GEMINI_MODEL,
-    'gemini-3.8-flash',
     'gemini-3.5-flash-lite',
     'gemini-3.5-flash',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-3.7-flash',
-    'gemini-3.6-flash',
-    'gemini-3.1-flash-lite',
+    'gemini-2.5-flash-lite',
     'gemini-flash-lite-latest',
     'gemini-flash-latest',
+    'gemini-3.8-flash',
+    'gemini-3.1-flash-lite',
   ].filter((model, index, all): model is string => Boolean(model) && all.indexOf(model) === index);
 
   let lastError = '';
@@ -103,10 +114,11 @@ async function callGemini(
       continue;
     }
     lastError = result.error;
-    // If not a retryable error (like bad API key / 400), don't keep trying models
-    if (!/404|not found|NOT_FOUND|503|UNAVAILABLE|429|RESOURCE_EXHAUSTED/i.test(result.error)) {
+    // If explicitly bad/unauthorized API key, don't keep trying models
+    if (/API_KEY_INVALID|API key not valid/i.test(result.error)) {
       throw new Error(result.error);
     }
+    // Otherwise (model not found / deprecated / 404 / 503 / 429), try next fallback model
   }
   throw new Error(lastError || 'Gemini request failed');
 }
@@ -160,12 +172,14 @@ async function callGeminiModel(
     const data = await response.json() as {
       candidates?: Array<{
         finishReason?: string;
-        content?: { parts?: Array<{ text?: string }> };
+        content?: { parts?: Array<{ text?: string; thought?: boolean }> };
       }>;
     };
 
     const parts = data.candidates?.[0]?.content?.parts || [];
-    const text = parts
+    // Ignore internal thought parts (Gemini 2.5/3.8 thinking models)
+    const contentParts = parts.filter((part) => !part.thought);
+    const text = (contentParts.length > 0 ? contentParts : parts)
       .map((part) => (typeof part.text === 'string' ? part.text : ''))
       .join('')
       .trim();

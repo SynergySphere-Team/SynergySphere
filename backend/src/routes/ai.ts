@@ -71,52 +71,57 @@ const chatSchema = z.object({
   message: z.string().min(1).max(4000),
   context: z.string().max(12000).optional(),
   lessonId: z.string().min(1).max(255).optional(),
+  challengeId: z.string().min(1).max(255).optional(),
   uploadId: z.string().min(1).max(255).optional(),
   history: z.array(chatTurnSchema).max(20).optional(),
 });
 
 router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => {
-  const { message, context, lessonId, uploadId } = req.body;
+  const { message, context, lessonId, challengeId, uploadId } = req.body;
   const history: ChatTurn[] = Array.isArray(req.body.history) ? req.body.history.slice(-20) : [];
 
   const bundle = await buildGroundingBundle({
     userId: req.user!.userId,
     message,
     lessonId,
+    challengeId,
     uploadId,
   });
 
   const ref = bundle.reference;
   const groundedLabel = ref.lessonTitle
     ? `${ref.subjectName ?? ''} › ${ref.moduleName ?? ''} › ${ref.lessonTitle}`
-    : ref.uploadFileName
-      ? `study pack "${ref.uploadFileName}"`
-      : null;
+    : ref.challengeTitle
+      ? `Learning Hub Coding Challenge: "${ref.challengeTitle}" (${ref.subjectName ?? ''})`
+      : ref.uploadFileName
+        ? `study pack "${ref.uploadFileName}"`
+        : null;
 
-  const isExplicitLesson = Boolean(lessonId || uploadId);
+  const isExplicitItem = Boolean(lessonId || challengeId || uploadId);
   const systemPrompt = [
-    'You are SynergySphere AI Workspace, an expert, supportive, and highly capable software engineering assistant and tutor.',
+    'You are SynergySphere AI Workspace, an expert, supportive, and highly capable software engineering assistant and tutor grounded in the LectureToLife Learning Hub (Programming Academy & Coding Challenges).',
     'Your goal is to provide deep, practical, accurate, and educational answers: explain programming concepts clearly, debug errors with root-cause analysis, provide optimized and idiomatic code snippets, and answer technical questions thoroughly.',
     '',
-    bundle.hasContext && isExplicitLesson
+    bundle.hasContext && isExplicitItem
       ? [
-          'CURRENT STUDY LESSON / STUDY PACK CONTEXT:',
+          'CURRENT STUDY LESSON / CHALLENGE / PACK CONTEXT:',
           bundle.contextBlock,
           '',
           'GUIDELINES:',
-          `- The student is currently studying "${groundedLabel}". Align your explanation and terminology with this curriculum level.`,
+          `- The student is currently studying or working on "${groundedLabel}". Align your explanation and terminology with this context.`,
           '- Directly, specifically, and thoroughly answer the student\'s question or resolve their code issue.',
-          '- Provide clear explanations, modern best practices, and fresh tailored code examples. Never dump lesson notes verbatim.',
+          '- If working on a coding challenge, guide the student with algorithmic intuition, edge cases, and hints without dumping the complete solution immediately unless they explicitly request it.',
+          '- Provide clear explanations, modern best practices, and fresh tailored code examples.',
         ].join('\n')
       : bundle.hasContext
         ? [
-            'REFERENCE CURRICULUM CONTEXT (Optional background info from LectureToLife):',
+            'REFERENCE LEARNING HUB CONTEXT (Curriculum / Challenges from SynergySphere):',
             bundle.contextBlock,
             '',
             'GUIDELINES:',
             '- Directly and thoroughly answer the student\'s question using your full programming expertise and clear code examples.',
             '- Focus 100% on solving and explaining the user\'s specific question, code, or debug request.',
-            '- You may naturally connect to the reference curriculum if relevant, but do not restrict yourself to it.',
+            '- You may naturally connect to the reference Learning Hub material if relevant, citing lessons or challenges.',
           ].join('\n')
         : [
             'GUIDELINES:',
@@ -156,7 +161,7 @@ router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => 
       newId(),
       req.user!.userId,
       message,
-      JSON.stringify({ lessonId, uploadId }),
+      JSON.stringify({ lessonId, challengeId, uploadId }),
       newId(),
       response,
       JSON.stringify({ grounding: bundle.source }),
@@ -171,6 +176,8 @@ router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => 
       lessonTitle: ref.lessonTitle ?? null,
       subjectName: ref.subjectName ?? null,
       moduleName: ref.moduleName ?? null,
+      challengeId: ref.challengeId ?? null,
+      challengeTitle: ref.challengeTitle ?? null,
     },
   });
 });

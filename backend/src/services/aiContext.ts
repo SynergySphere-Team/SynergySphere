@@ -15,18 +15,22 @@ import {
 } from '../data/w3schoolsCurriculumData.js';
 import type { FlatLessonEntry } from '../data/curriculumAliases.js';
 import { findLessonEntry, getAllFlatLessons } from '../data/curriculumCatalog.js';
+import { searchLearningHub, parseLearningHubQuery, type LearningHubMatch } from './learningHubSearch.js';
+import { LEARNING_HUB_CHALLENGES, type LearningHubChallenge } from '../data/learningHubChallenges.js';
 
-export { getAllFlatLessons };
+export { getAllFlatLessons, searchLearningHub, LEARNING_HUB_CHALLENGES };
 
 export const GROUNDING_CHAR_LIMIT = 8000;
 
-export type GroundingSource = 'lesson' | 'upload' | 'search' | 'none';
+export type GroundingSource = 'lesson' | 'challenge' | 'upload' | 'search' | 'none';
 
 export interface GroundingReference {
   lessonId?: string;
   lessonTitle?: string;
   subjectName?: string;
   moduleName?: string;
+  challengeId?: string;
+  challengeTitle?: string;
   uploadId?: string;
   uploadFileName?: string;
 }
@@ -37,6 +41,16 @@ export interface RecentUploadRef {
   summary: string | null;
   createdAt: Date | string;
   [key: string]: unknown;
+}
+
+export interface GroundedChallenge {
+  id: string;
+  title: string;
+  language: string;
+  difficulty: string;
+  description: string;
+  starterCode?: string;
+  xpReward: number;
 }
 
 export interface GroundedLesson {
@@ -72,9 +86,11 @@ export interface GroundingBundle {
   reference: GroundingReference;
   /** Structured matched lesson, used for no-API-key synthesis. */
   lesson?: GroundedLesson;
+  /** Structured matched coding challenge, used for no-API-key synthesis. */
+  challenge?: GroundedChallenge;
   /** Structured matched study pack, used for no-API-key synthesis. */
   upload?: GroundedUpload;
-  /** First code example of the matched lesson, used to prefill the web editor. */
+  /** First code example or starter code of the matched item, used to prefill the web editor. */
   starterCode?: string;
   starterLanguage?: string;
   recentUploads: RecentUploadRef[];
@@ -306,65 +322,22 @@ function uploadBlock(upload: GroundedUpload): string {
   return parts.join('\n\n');
 }
 
-/* ─────────────────────────── search (reuses /curriculum/search matching) ─────────────────────────── */
+/* ─────────────────────────── challenge grounding ─────────────────────────── */
 
-/** Stopwords that must never drive lesson matching from a chat question. */
-const SEARCH_STOPWORDS = new Set([
-  'a', 'an', 'the', 'and', 'or', 'but', 'if', 'then', 'else', 'when', 'what', 'whats', 'how',
-  'why', 'who', 'which', 'where', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'do',
-  'does', 'did', 'can', 'could', 'should', 'would', 'will', 'shall', 'may', 'might', 'must',
-  'i', 'me', 'my', 'we', 'our', 'you', 'your', 'it', 'its', 'this', 'that', 'these', 'those',
-  'there', 'here', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'from', 'by', 'as', 'about',
-  'into', 'over', 'not', 'no', 'yes', 'so', 'than', 'too', 'very', 'just', 'some', 'any',
-  'explain', 'please', 'help', 'tell', 'show', 'give', 'make', 'get', 'use', 'using', 'code',
-  'example', 'lesson', 'difference', 'between', 'understand', 'meaning', 'means', 'work',
-  'works', 'working', 'write', 'writing', 'simple', 'short', 'detail', 'details',
-]);
-
-/**
- * Lesson search for grounding, mirroring GET /curriculum/search matching
- * (title, overview, subject, keyConcepts, syntax) with light scoring so a
- * chat question picks the most on-topic lesson, not just any word overlap.
- */
-function searchLessons(q: string, limit = 3): FlatLessonEntry[] {
-  const query = q.trim().toLowerCase();
-  if (!query) return [];
-
-  const words = query
-    .split(/[^a-z0-9]+/)
-    .filter((w) => w.length >= 2 && !SEARCH_STOPWORDS.has(w));
-  if (words.length === 0) return [];
-
-  const scored = getAllFlatLessons()
-    .map((entry) => {
-      const title = entry.lesson.title.toLowerCase();
-      const overview = entry.lesson.overview.toLowerCase();
-      const subject = entry.subjectName.toLowerCase();
-      const module = entry.moduleName.toLowerCase();
-      const concepts = (entry.lesson.content.keyConcepts ?? [])
-        .map((c) => `${c.title} ${c.definition}`.toLowerCase());
-      const syntax = (entry.lesson.content.syntax ?? []).map((s) => s.toLowerCase());
-
-      let score = 0;
-      for (const w of words) {
-        if (title === w) score += 50;
-        else if (title.includes(w)) score += 30;
-        if (subject === w) score += 20;
-        else if (subject.includes(w)) score += 8;
-        if (module.includes(w)) score += 5;
-        if (overview.includes(w)) score += 6;
-        if (concepts.some((c) => c.includes(w))) score += 15;
-        if (syntax.some((s) => s.includes(w))) score += 12;
-      }
-      // Exact phrase hit in the title is the strongest signal.
-      if (title.includes(query)) score += 30;
-
-      return { entry, score };
-    })
-    .filter((r) => r.score > 0);
-
-  scored.sort((a, b) => b.score - a.score || a.entry.lesson.sortOrder - b.entry.lesson.sortOrder);
-  return scored.slice(0, limit).map((r) => r.entry);
+function challengeBlock(challenge: LearningHubChallenge): string {
+  const parts: string[] = [
+    `LEARNING HUB CODING CHALLENGE: ${challenge.title}`,
+    `TRACK / LANGUAGE: ${challenge.language || 'Multi-language'}`,
+    `DIFFICULTY: ${challenge.difficulty} (XP Reward: ${challenge.xpReward})`,
+    `DESCRIPTION: ${challenge.description}`,
+  ];
+  if (challenge.starterCode) {
+    parts.push(`STARTER CODE:\n\`\`\`${challenge.language || 'code'}\n${challenge.starterCode}\n\`\`\``);
+  }
+  parts.push(
+    'TUTOR OBJECTIVE: Guide the student through solving this challenge step-by-step. Explain the algorithmic pattern, edge cases, and test requirements. Help with debugging without simply providing the entire solution upfront unless asked.',
+  );
+  return parts.join('\n\n');
 }
 
 /* ─────────────────────────── public entry point ─────────────────────────── */
@@ -373,6 +346,7 @@ export async function buildGroundingBundle(options: {
   userId: string;
   message: string;
   lessonId?: string;
+  challengeId?: string;
   uploadId?: string;
 }): Promise<GroundingBundle> {
   const { userId, message } = options;
@@ -396,13 +370,41 @@ export async function buildGroundingBundle(options: {
     contextBlock: string;
     reference: GroundingReference;
     lesson?: GroundedLesson;
+    challenge?: GroundedChallenge;
     upload?: GroundedUpload;
     starterCode?: string;
     starterLanguage?: string;
   } = { source: 'none', contextBlock: '', reference: {} };
 
-  // 1. Explicit lesson pin — same lesson GET /curriculum/lessons/:lessonId returns.
-  if (options.lessonId) {
+  // 1. Explicit challenge pin — from Learning Hub Coding Challenges
+  if (options.challengeId) {
+    const matchedChallenge = LEARNING_HUB_CHALLENGES.find((c) => c.id === options.challengeId);
+    if (matchedChallenge) {
+      bundle = {
+        source: 'challenge',
+        contextBlock: challengeBlock(matchedChallenge),
+        reference: {
+          challengeId: matchedChallenge.id,
+          challengeTitle: matchedChallenge.title,
+          subjectName: matchedChallenge.language || 'Coding Challenge',
+        },
+        challenge: {
+          id: matchedChallenge.id,
+          title: matchedChallenge.title,
+          language: matchedChallenge.language || 'code',
+          difficulty: matchedChallenge.difficulty,
+          description: matchedChallenge.description,
+          starterCode: matchedChallenge.starterCode || undefined,
+          xpReward: matchedChallenge.xpReward,
+        },
+        starterCode: matchedChallenge.starterCode || undefined,
+        starterLanguage: matchedChallenge.language || 'code',
+      };
+    }
+  }
+
+  // 2. Explicit lesson pin — same lesson GET /curriculum/lessons/:lessonId returns.
+  if (bundle.source === 'none' && options.lessonId) {
     const entry = findLessonById(options.lessonId);
     if (entry) {
       bundle = {
@@ -421,7 +423,7 @@ export async function buildGroundingBundle(options: {
     }
   }
 
-  // 2. Explicit study pack — that user's LectureUpload.
+  // 3. Explicit study pack — that user's LectureUpload.
   if (bundle.source === 'none' && options.uploadId) {
     const upload = await loadUpload(options.uploadId, userId);
     if (upload) {
@@ -437,30 +439,52 @@ export async function buildGroundingBundle(options: {
     }
   }
 
-  // 3. Free-text question → reuse the /curriculum/search matching across the academy.
+  // 4. Free-text search using high-accuracy word recognition across Learning Hub
   if (bundle.source === 'none') {
-    const matches = searchLessons(message);
+    const matches = searchLearningHub(message, 3);
     if (matches.length > 0) {
       const best = matches[0];
-      bundle = {
-        source: 'search',
-        contextBlock:
-          lessonListBlock(matches) +
-          '\n\n' +
-          lessonBlock(best) +
-          (matches.length > 1
-            ? `\n\nAlso briefly connect to: ${matches.slice(1).map((m) => `"${m.lesson.title}"`).join(', ')}.`
-            : ''),
-        reference: {
-          lessonId: best.lesson.id,
-          lessonTitle: best.lesson.title,
-          subjectName: best.subjectName,
-          moduleName: best.moduleName,
-        },
-        lesson: toGroundedLesson(best),
-        starterCode: best.lesson.content.examples?.[0]?.code,
-        starterLanguage: best.lesson.content.examples?.[0]?.language || best.subjectId,
-      };
+      if (best.type === 'challenge' && best.rawChallenge) {
+        bundle = {
+          source: 'challenge',
+          contextBlock: challengeBlock(best.rawChallenge),
+          reference: {
+            challengeId: best.id,
+            challengeTitle: best.title,
+            subjectName: best.subjectName,
+          },
+          challenge: {
+            id: best.id,
+            title: best.title,
+            language: best.subjectName,
+            difficulty: best.difficulty,
+            description: best.overview,
+            starterCode: best.starterCode,
+            xpReward: best.rawChallenge.xpReward,
+          },
+          starterCode: best.starterCode,
+          starterLanguage: best.starterLanguage,
+        };
+      } else if (best.rawLesson) {
+        const lessonEntries = matches
+          .map((m) => m.rawLesson)
+          .filter((l): l is FlatLessonEntry => Boolean(l));
+        bundle = {
+          source: 'search',
+          contextBlock:
+            (lessonEntries.length > 1 ? lessonListBlock(lessonEntries) + '\n\n' : '') +
+            lessonBlock(best.rawLesson),
+          reference: {
+            lessonId: best.id,
+            lessonTitle: best.title,
+            subjectName: best.subjectName,
+            moduleName: best.moduleName,
+          },
+          lesson: toGroundedLesson(best.rawLesson),
+          starterCode: best.starterCode,
+          starterLanguage: best.starterLanguage,
+        };
+      }
     }
   }
 
@@ -477,6 +501,7 @@ export async function buildGroundingBundle(options: {
     contextBlock,
     reference: bundle.reference,
     lesson: bundle.lesson,
+    challenge: bundle.challenge,
     upload: bundle.upload,
     starterCode: bundle.starterCode,
     starterLanguage: bundle.starterLanguage,
@@ -513,10 +538,7 @@ const GENERAL_GLOSSARY: Record<string, string> = {
 };
 
 function messageTokens(message: string): string[] {
-  return message
-    .toLowerCase()
-    .split(/[^a-z0-9/]+/)
-    .filter((w) => w.length >= 2 && !SEARCH_STOPWORDS.has(w));
+  return parseLearningHubQuery(message).tokens;
 }
 
 function questionRelatesToLesson(message: string, lesson: GroundedLesson): boolean {
@@ -659,9 +681,61 @@ function synthesizeUploadAnswer(message: string, upload: GroundedUpload): string
   return lines.join('\n');
 }
 
+function synthesizeChallengeAnswer(message: string, challenge: GroundedChallenge): string {
+  const lines: string[] = [];
+  lines.push(`Based on Learning Hub Challenge: "${challenge.title}" (${challenge.language || 'Code'} • ${challenge.difficulty})`);
+  lines.push('');
+  lines.push(`**Objective:** ${challenge.description}`);
+  lines.push('');
+  lines.push('### Problem Breakdown & Algorithm Approach:');
+
+  const lower = challenge.title.toLowerCase();
+  if (lower.includes('fizzbuzz')) {
+    lines.push('1. Loop from 1 up to `n`.');
+    lines.push('2. **Order of conditions matters:** check `n % 15 === 0` (or both 3 and 5) first!');
+    lines.push('3. Check multiples of 3 (`n % 3 === 0`) for "Fizz".');
+    lines.push('4. Check multiples of 5 (`n % 5 === 0`) for "Buzz".');
+    lines.push('5. Otherwise, return the number itself.');
+  } else if (lower.includes('two sum')) {
+    lines.push('1. **Brute force:** O(n²) checks every pair with two nested loops.');
+    lines.push('2. **Optimal O(n) solution:** Use a Map/dictionary to store numbers and their indices.');
+    lines.push('3. For each number `x`, check if `target - x` is already in your map.');
+    lines.push('4. If found, return `[map.get(target - x), currentIndex]`.');
+  } else if (lower.includes('binary search')) {
+    lines.push('1. Maintain two pointers: `left = 0` and `right = arr.length - 1`.');
+    lines.push('2. While `left <= right`, compute `mid = Math.floor((left + right) / 2)`.');
+    lines.push('3. If `arr[mid] === target`, return `mid`.');
+    lines.push('4. If `arr[mid] < target`, move `left = mid + 1`.');
+    lines.push('5. If `arr[mid] > target`, move `right = mid - 1`.');
+    lines.push('6. Return `-1` if not found.');
+  } else if (lower.includes('hello world')) {
+    lines.push('1. Define the required function `greet()`.');
+    lines.push('2. Return the exact greeting string: `"Hello, SynergySphere!"`.');
+  } else if (lower.includes('sum array')) {
+    lines.push('1. Iterate through the array using a loop or `.reduce((sum, x) => sum + x, 0)`.');
+    lines.push('2. Ensure an empty array returns `0`.');
+  } else {
+    lines.push('1. Clarify expected inputs, outputs, and edge cases (e.g. empty lists, negative inputs).');
+    lines.push('2. Break down the core logic into discrete steps before writing code.');
+    lines.push('3. Consider time and space complexity: choose data structures that avoid unnecessary passes.');
+  }
+
+  if (challenge.starterCode) {
+    lines.push('');
+    lines.push('**Starter Code:**');
+    lines.push('```' + (challenge.language || ''));
+    lines.push(challenge.starterCode);
+    lines.push('```');
+  }
+
+  lines.push('');
+  lines.push(`💡 Ready to write and test your code? Open **Learning Hub → Coding Challenges** to run live tests and earn ${challenge.xpReward} XP!`);
+  return lines.join('\n');
+}
+
 /**
  * Offline fallback for grounded questions. Synthesizes the answer from the
- * matched lesson / study pack (explanation, key concepts, example) instead of
+ * matched lesson / challenge / study pack (explanation, key concepts, example) instead of
  * returning canned copy. Only a question with NO matched context gets the
  * "add GEMINI_API_KEY" notice.
  */
@@ -683,28 +757,32 @@ export function buildGroundedFallback(
   const code = isAskingAboutSnippet(message) ? extractCode(message, codeContext) : null;
   if (code) {
     const walkthrough = synthesizeCodeExplanation(message, code);
-    if (!bundle.lesson && !bundle.upload) return walkthrough;
+    if (!bundle.lesson && !bundle.challenge && !bundle.upload) return walkthrough;
     const grounded = bundle.lesson
       ? synthesizeLessonAnswer(message, bundle.lesson)
-      : bundle.upload
-        ? synthesizeUploadAnswer(message, bundle.upload)
-        : '';
+      : bundle.challenge
+        ? synthesizeChallengeAnswer(message, bundle.challenge)
+        : bundle.upload
+          ? synthesizeUploadAnswer(message, bundle.upload)
+          : '';
     return `${walkthrough}\n\n---\nHow this connects to LectureToLife:\n${grounded}`.slice(0, 4000);
   }
 
   if (!bundle.hasContext) {
     return (
-      "I'm SynergySphere AI running in demo mode, and I couldn't match your question to a LectureToLife lesson or one of your study packs.\n\n" +
-      'Try naming a topic from the Programming Academy (e.g. "Explain SQL JOINs" or "How does a for loop work?") or ask from inside a lesson.\n\n' +
+      "I'm SynergySphere AI running in demo mode, and I couldn't match your question to a LectureToLife lesson, a coding challenge, or one of your study packs.\n\n" +
+      'Try naming a topic from the Programming Academy (e.g. "Explain SQL JOINs" or "How does a for loop work in Python?") or ask about a challenge (e.g. "How to solve FizzBuzz?").\n\n' +
       '⚡ For full AI answers, add GEMINI_API_KEY to backend/.env (free at aistudio.google.com).'
     );
   }
 
   const body = bundle.lesson
     ? synthesizeLessonAnswer(message, bundle.lesson)
-    : bundle.upload
-      ? synthesizeUploadAnswer(message, bundle.upload)
-      : bundle.contextBlock;
+    : bundle.challenge
+      ? synthesizeChallengeAnswer(message, bundle.challenge)
+      : bundle.upload
+        ? synthesizeUploadAnswer(message, bundle.upload)
+        : bundle.contextBlock;
 
   const parts: string[] = [body];
   if (historySummary) {

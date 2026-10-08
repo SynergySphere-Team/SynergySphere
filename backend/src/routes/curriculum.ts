@@ -10,6 +10,7 @@ import {
 import { W3SchoolsSyncEngine } from '../services/w3schoolsSyncEngine.js';
 import { getCanonicalLessonId, getAliasesForLesson } from '../data/curriculumAliases.js';
 import { findLessonEntry, getAllFlatLessons, invalidateLessonCatalog } from '../data/curriculumCatalog.js';
+import { searchLearningHub } from '../services/learningHubSearch.js';
 
 const router = Router();
 
@@ -256,27 +257,75 @@ router.post('/lessons/:lessonId/progress', async (req: AuthRequest, res) => {
   });
 });
 
-// 5. GET /api/curriculum/search - search lessons across technologies
-router.get('/search', async (req: AuthRequest, res) => {
-  const q = String(req.query.q || '').trim().toLowerCase();
+// 5. GET /api/curriculum/learning-hub-search - unified high-accuracy search across lessons & challenges
+router.get('/learning-hub-search', async (req: AuthRequest, res) => {
+  const q = String(req.query.q || '').trim();
   if (!q) {
-    res.json({ results: [] });
+    res.json({ query: '', total: 0, results: [] });
     return;
   }
 
   const completedSet = await getUserCompletions(req.user?.userId);
-  const allEntries = getAllFlatLessons();
+  const matches = searchLearningHub(q, 20);
 
-  const results = allEntries
+  const results = matches.map((m) => ({
+    type: m.type,
+    id: m.id,
+    title: m.title,
+    subjectName: m.subjectName,
+    moduleName: m.moduleName,
+    difficulty: m.difficulty,
+    overview: m.overview,
+    starterCode: m.starterCode,
+    starterLanguage: m.starterLanguage,
+    completed: m.type === 'lesson' ? completedSet.has(m.id) : false,
+    score: m.score,
+    matchReasons: m.matchReasons,
+  }));
+
+  res.json({ query: q, total: results.length, results });
+});
+
+// 6. GET /api/curriculum/search - search lessons across technologies
+router.get('/search', async (req: AuthRequest, res) => {
+  const q = String(req.query.q || '').trim();
+  if (!q) {
+    res.json({ query: '', total: 0, results: [] });
+    return;
+  }
+
+  const completedSet = await getUserCompletions(req.user?.userId);
+  const matches = searchLearningHub(q, 20);
+  const lessonMatches = matches.filter((m) => m.type === 'lesson');
+
+  if (lessonMatches.length > 0) {
+    res.json({
+      query: q,
+      total: lessonMatches.length,
+      results: lessonMatches.map((m) => ({
+        id: m.id,
+        title: m.title,
+        overview: m.overview,
+        difficulty: m.difficulty,
+        subjectId: m.rawLesson?.subjectId || m.subjectName.toLowerCase(),
+        subjectName: m.subjectName,
+        moduleId: m.rawLesson?.moduleId || '',
+        moduleName: m.moduleName || '',
+        completed: completedSet.has(m.id),
+        snippet: m.overview,
+      })),
+    });
+    return;
+  }
+
+  const allEntries = getAllFlatLessons();
+  const lowerQ = q.toLowerCase();
+  const fallbackResults = allEntries
     .filter((entry) => {
-      const matchTitle = entry.lesson.title.toLowerCase().includes(q);
-      const matchOverview = entry.lesson.overview.toLowerCase().includes(q);
-      const matchSubject = entry.subjectName.toLowerCase().includes(q);
-      const matchConcepts = entry.lesson.content.keyConcepts?.some((c) =>
-        c.title.toLowerCase().includes(q) || c.definition.toLowerCase().includes(q),
-      );
-      const matchSyntax = entry.lesson.content.syntax?.some((s) => s.toLowerCase().includes(q));
-      return matchTitle || matchOverview || matchSubject || matchConcepts || matchSyntax;
+      const matchTitle = entry.lesson.title.toLowerCase().includes(lowerQ);
+      const matchOverview = entry.lesson.overview.toLowerCase().includes(lowerQ);
+      const matchSubject = entry.subjectName.toLowerCase().includes(lowerQ);
+      return matchTitle || matchOverview || matchSubject;
     })
     .map((entry) => ({
       id: entry.lesson.id,
@@ -292,7 +341,7 @@ router.get('/search', async (req: AuthRequest, res) => {
     }))
     .slice(0, 20);
 
-  res.json({ query: q, total: results.length, results });
+  res.json({ query: q, total: fallbackResults.length, results: fallbackResults });
 });
 
 // 6. POST /api/curriculum/sync - run dynamic scan, update lessons, flag changes

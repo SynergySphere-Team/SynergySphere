@@ -55,6 +55,27 @@ async function main() {
     `title=${joins.reference.lessonTitle ?? 'none'}`,
   );
 
+  const pythonLoop = await buildGroundingBundle({ userId: 'offline-test-user', message: 'how does a for loop work in python?' });
+  check(
+    'Python for-loop question matches Python track specifically',
+    pythonLoop.source === 'search' && pythonLoop.reference.subjectName === 'Python',
+    `title=${pythonLoop.reference.lessonTitle ?? 'none'} subject=${pythonLoop.reference.subjectName ?? 'none'}`,
+  );
+
+  const fizzbuzz = await buildGroundingBundle({ userId: 'offline-test-user', message: 'how do I solve the fizzbuzz challenge?' });
+  check(
+    'Challenge question matches Learning Hub Coding Challenge',
+    fizzbuzz.source === 'challenge' && fizzbuzz.reference.challengeTitle === 'FizzBuzz',
+    `source=${fizzbuzz.source} challenge=${fizzbuzz.reference.challengeTitle ?? 'none'}`,
+  );
+
+  const typoTest = await buildGroundingBundle({ userId: 'offline-test-user', message: 'pyton loop' });
+  check(
+    'Typo query ("pyton") recognizes Python language track',
+    typoTest.source === 'search' && typoTest.reference.subjectName === 'Python',
+    `subject=${typoTest.reference.subjectName ?? 'none'}`,
+  );
+
   // 3. No false grounding: canned API-key copy ONLY when nothing matched.
   const outside = await buildGroundingBundle({ userId: 'offline-test-user', message: 'Who wrote Hamlet?' });
   const outsideAnswer = buildGroundedFallback('Who wrote Hamlet?', outside);

@@ -16,12 +16,15 @@ import {
   Code2,
   FileCode2,
   Loader2,
+  Search,
   Send,
   Sparkles,
   TestTube,
   Trash2,
+  Trophy,
   User,
   Wand2,
+  X,
   Zap,
 } from 'lucide-react';
 
@@ -34,16 +37,19 @@ interface Message {
   lessonTitle?: string;
   subjectName?: string;
   moduleName?: string;
+  challengeTitle?: string;
 }
 
 interface ChatResponse {
   response: string;
   grounding?: {
-    source: 'lesson' | 'upload' | 'search' | 'none';
+    source: 'lesson' | 'challenge' | 'upload' | 'search' | 'none';
     lessonId: string | null;
     lessonTitle: string | null;
     subjectName: string | null;
     moduleName: string | null;
+    challengeId?: string | null;
+    challengeTitle?: string | null;
   };
 }
 
@@ -55,6 +61,29 @@ interface LessonPreview {
   difficulty?: string;
   firstExampleCode?: string;
   firstExampleLanguage?: string;
+}
+
+interface ChallengePreview {
+  id: string;
+  title: string;
+  language: string;
+  difficulty: string;
+  overview: string;
+  starterCode?: string;
+}
+
+export interface LearningHubSearchResultItem {
+  type: 'lesson' | 'challenge';
+  id: string;
+  title: string;
+  subjectName: string;
+  moduleName?: string;
+  difficulty: string;
+  overview: string;
+  starterCode?: string;
+  starterLanguage?: string;
+  matchReasons?: string[];
+  score: number;
 }
 
 /* ─────────────────────────── quick action definitions ─────────────────────────── */
@@ -84,6 +113,15 @@ const quickActions = [
     prompt: (code: string) =>
       `Generate comprehensive unit tests for this code. Include edge cases:\n\n\`\`\`\n${code}\n\`\`\``,
   },
+];
+
+const quickPills = [
+  'Python Loops',
+  'SQL JOIN',
+  'FizzBuzz',
+  'Binary Search',
+  'React Hooks',
+  'Two Sum',
 ];
 
 /* ─────────────────────────── AI analysis (local) ─────────────────────────── */
@@ -163,12 +201,13 @@ function AIAssistantInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const lessonParam = searchParams.get('lesson') || '';
+  const challengeParam = searchParams.get('challenge') || '';
 
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
       content:
-        "👋 Hi! I'm your SynergySphere AI Workspace assistant, grounded in the LectureToLife Programming Academy and your own study packs. Ask about the lesson you're studying, paste code, or use the quick actions!",
+        "👋 Hi! I'm your SynergySphere AI Workspace assistant, grounded in the Learning Hub (1,000+ programming lessons & 60 interactive coding challenges). Search for any topic or challenge above, ask questions, or paste code for instant analysis!",
       timestamp: new Date(),
     },
   ]);
@@ -179,9 +218,54 @@ function AIAssistantInner() {
   const [analysis, setAnalysis] = useState<AnalysisResult[] | null>(null);
   const [recentPrompts, setRecentPrompts] = useState<string[]>([]);
   const [lesson, setLesson] = useState<LessonPreview | null>(null);
+  const [challenge, setChallenge] = useState<ChallengePreview | null>(null);
+
+  // Search & Grounding states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<LearningHubSearchResultItem[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Fetch lesson details when ?lesson=<id> is present (used for chip + editor prefill).
+  // Close search popover on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setSearchOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Debounced search for Learning Hub content (lessons & challenges)
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed || trimmed.length < 2) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api<{ results: LearningHubSearchResultItem[] }>(
+          `/curriculum/learning-hub-search?q=${encodeURIComponent(trimmed)}`
+        );
+        setSearchResults(res?.results || []);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 220);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Fetch lesson details when ?lesson=<id> is present
   useEffect(() => {
     if (!lessonParam) {
       setLesson(null);
@@ -208,7 +292,6 @@ function AIAssistantInner() {
           firstExampleCode: detail.content?.examples?.[0]?.code,
           firstExampleLanguage: detail.content?.examples?.[0]?.language,
         });
-        // Prefill the editor with the lesson's first example, not a generic starter.
         const exampleCode = detail.content?.examples?.[0]?.code;
         if (exampleCode) {
           setCodeContext((prev) => prev || exampleCode);
@@ -223,6 +306,36 @@ function AIAssistantInner() {
     };
   }, [lessonParam]);
 
+  // Fetch challenge details when ?challenge=<id> is present
+  useEffect(() => {
+    if (!challengeParam) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api<{ results: LearningHubSearchResultItem[] }>(
+          `/curriculum/learning-hub-search?q=${encodeURIComponent(challengeParam)}`
+        );
+        if (cancelled) return;
+        const found =
+          res.results?.find(
+            (r) =>
+              r.type === 'challenge' &&
+              (r.id.toLowerCase() === challengeParam.toLowerCase() ||
+                r.title.toLowerCase() === challengeParam.toLowerCase())
+          ) || res.results?.find((r) => r.type === 'challenge');
+
+        if (found) {
+          selectLearningHubItem(found);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [challengeParam]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -231,6 +344,83 @@ function AIAssistantInner() {
   useEffect(() => {
     setAnalysis(analyzeCodeLocally(codeContext));
   }, [codeContext]);
+
+  const selectLearningHubItem = (item: LearningHubSearchResultItem) => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    if (item.type === 'challenge') {
+      setLesson(null);
+      setChallenge({
+        id: item.id,
+        title: item.title,
+        language: item.starterLanguage || item.subjectName,
+        difficulty: item.difficulty,
+        overview: item.overview,
+        starterCode: item.starterCode,
+      });
+      if (item.starterCode) {
+        setCodeContext(item.starterCode);
+        setCodeEditedByUser(false);
+      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `🎯 **Coding Challenge Pinned: ${item.title}** (${item.starterLanguage || item.subjectName} • ${item.difficulty})\n\n> ${item.overview}\n\nI've loaded the challenge starter code into the editor. How would you like to proceed? You can ask for algorithmic intuition, edge case breakdowns, or write code and click **Explain**, **Debug**, or **Generate Tests**!`,
+          timestamp: new Date(),
+          challengeTitle: item.title,
+        },
+      ]);
+    } else {
+      setChallenge(null);
+      setLesson({
+        id: item.id,
+        title: item.title,
+        subjectName: item.subjectName,
+        moduleName: item.moduleName,
+        difficulty: item.difficulty,
+        firstExampleCode: item.starterCode,
+        firstExampleLanguage: item.starterLanguage,
+      });
+      if (item.starterCode) {
+        setCodeContext(item.starterCode);
+        setCodeEditedByUser(false);
+      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `📖 **Lesson Pinned: ${item.title}** (${item.subjectName}${item.moduleName ? ` › ${item.moduleName}` : ''})\n\n> ${item.overview}\n\nI'm ready to answer any questions grounded in this lesson!`,
+          timestamp: new Date(),
+          lessonTitle: item.title,
+          subjectName: item.subjectName,
+          moduleName: item.moduleName,
+        },
+      ]);
+    }
+  };
+
+  const handlePillClick = async (pill: string) => {
+    setSearchQuery(pill);
+    setSearchOpen(true);
+    setSearchLoading(true);
+    try {
+      const res = await api<{ results: LearningHubSearchResultItem[] }>(
+        `/curriculum/learning-hub-search?q=${encodeURIComponent(pill)}`
+      );
+      setSearchResults(res?.results || []);
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const unpinGrounding = () => {
+    setLesson(null);
+    setChallenge(null);
+    router.replace('/ai-assistant');
+  };
 
   const historyFromMessages = useCallback(
     (msgs: Message[]): Array<{ role: 'user' | 'assistant'; content: string }> => {
@@ -266,8 +456,9 @@ function AIAssistantInner() {
         body: JSON.stringify({
           message: text.trim(),
           context: contextToSend,
-          // Pin the grounded lesson on every request so follow-ups stay in-lesson.
+          // Pin the grounded lesson or challenge on every request so follow-ups stay in context.
           ...(lesson ? { lessonId: lesson.id } : {}),
+          ...(challenge ? { challengeId: challenge.id } : {}),
           history: historyFromMessages(baseMessages).slice(-20),
         }),
       });
@@ -280,6 +471,7 @@ function AIAssistantInner() {
           lessonTitle: res.grounding?.lessonTitle || undefined,
           subjectName: res.grounding?.subjectName || undefined,
           moduleName: res.grounding?.moduleName || undefined,
+          challengeTitle: res.grounding?.challengeTitle || undefined,
         },
       ]);
     } catch {
@@ -346,7 +538,9 @@ function AIAssistantInner() {
         role: 'assistant',
         content: lesson
           ? `Chat cleared! Ask me anything about "${lesson.title}" — I'll stay grounded in that lesson.`
-          : 'Chat cleared! Ask about any LectureToLife lesson or paste code and I can help.',
+          : challenge
+            ? `Chat cleared! Ready to work on the "${challenge.title}" challenge. Ask for hints, algorithmic intuition, or code review!`
+            : 'Chat cleared! Ask about any Learning Hub lesson or challenge, paste code, or use search above to ground the workspace.',
         timestamp: new Date(),
       },
     ];
@@ -366,12 +560,14 @@ function AIAssistantInner() {
             AI Workspace
           </p>
           <h1 className="text-2xl font-bold text-white md:text-3xl">
-            {lesson ? 'Lesson Assistant' : 'Coding Assistant'}
+            {lesson ? 'Lesson Assistant' : challenge ? 'Challenge Assistant' : 'Coding Assistant'}
           </h1>
           <p className="text-sm text-muted-foreground">
             {lesson
               ? `Grounded in LectureToLife Programming Academy — ${lesson.subjectName ?? ''}${lesson.moduleName ? ` › ${lesson.moduleName}` : ''}`
-              : 'Grounded in LectureToLife Programming Academy and your study packs.'}
+              : challenge
+                ? `Grounded in Coding Challenge — ${challenge.title} (${challenge.language} • ${challenge.difficulty})`
+                : 'Grounded in Learning Hub (1,000+ programming lessons & 60 interactive challenges).'}
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={clearChat} className="gap-2">
@@ -380,22 +576,192 @@ function AIAssistantInner() {
         </Button>
       </div>
 
-      {/* Grounded lesson chip */}
-      {lesson && (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-primary/25 bg-primary/[0.07] px-4 py-3">
-          <BookOpen className="h-4 w-4 text-primary" />
-          <span className="text-xs font-semibold text-primary">Grounded in</span>
-          <span className="text-xs text-white">
-            {lesson.subjectName ? `${lesson.subjectName} › ` : ''}
-            {lesson.moduleName ? `${lesson.moduleName} › ` : ''}
-            {lesson.title}
+      {/* Search & Grounding Bar */}
+      <div ref={searchContainerRef} className="relative mb-4 space-y-2">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setSearchOpen(true);
+            }}
+            onFocus={() => {
+              if (searchResults.length > 0 || searchQuery.trim().length >= 2) setSearchOpen(true);
+            }}
+            placeholder="Search 1,000+ lessons & 60 challenges (e.g., Python loops, SQL JOIN, FizzBuzz, Binary Search)..."
+            className="pl-10 pr-9 bg-secondary/30 border-white/[0.09] focus:bg-secondary/50 text-sm h-10"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setSearchResults([]);
+                setSearchOpen(false);
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white"
+              title="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Quick Topic / Challenge Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+          <span className="text-[11px] font-medium text-muted-foreground shrink-0 flex items-center gap-1">
+            <Sparkles className="h-3 w-3 text-primary" /> Quick Ground:
           </span>
-          <button
-            onClick={() => router.push('/learning-hub')}
-            className="ml-auto text-[11px] text-muted-foreground underline-offset-2 hover:text-white hover:underline"
-          >
-            Open lesson
-          </button>
+          {quickPills.map((pill) => (
+            <button
+              key={pill}
+              type="button"
+              onClick={() => handlePillClick(pill)}
+              className="inline-flex items-center rounded-full border border-white/[0.08] bg-secondary/35 px-2.5 py-0.5 text-[11px] text-muted-foreground hover:border-primary/40 hover:bg-primary/[0.08] hover:text-white transition shrink-0"
+            >
+              {pill}
+            </button>
+          ))}
+        </div>
+
+        {/* Search Results Dropdown */}
+        {searchOpen && (searchLoading || searchResults.length > 0) && (
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-96 overflow-y-auto rounded-xl border border-white/[0.12] bg-[#0c141a]/95 p-2 shadow-2xl backdrop-blur-md space-y-1">
+            {searchLoading && (
+              <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                Searching Learning Hub curriculum & challenges…
+              </div>
+            )}
+            {!searchLoading && searchResults.length === 0 && (
+              <div className="py-4 text-center text-xs text-muted-foreground">
+                No matching lessons or challenges found for &ldquo;{searchQuery}&rdquo;.
+              </div>
+            )}
+            {!searchLoading &&
+              searchResults.map((item) => (
+                <button
+                  key={`${item.type}-${item.id}`}
+                  onClick={() => selectLearningHubItem(item)}
+                  className="flex w-full items-start gap-3 rounded-lg p-2.5 text-left transition hover:bg-white/[0.05] border border-transparent hover:border-white/[0.08] group"
+                >
+                  <div
+                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
+                      item.type === 'challenge'
+                        ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                        : 'bg-primary/15 text-primary border border-primary/30'
+                    }`}
+                  >
+                    {item.type === 'challenge' ? (
+                      <Trophy className="h-3.5 w-3.5" />
+                    ) : (
+                      <BookOpen className="h-3.5 w-3.5" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-xs text-white group-hover:text-primary transition line-clamp-1">
+                        {item.title}
+                      </span>
+                      <span
+                        className={`rounded px-1.5 py-0.2 text-[10px] font-semibold uppercase tracking-wider ${
+                          item.type === 'challenge'
+                            ? 'bg-amber-400/10 text-amber-300'
+                            : 'bg-primary/10 text-primary'
+                        }`}
+                      >
+                        {item.type === 'challenge' ? 'Challenge' : 'Lesson'}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground/70">
+                        {item.subjectName}
+                        {item.moduleName ? ` › ${item.moduleName}` : ''}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                      {item.overview}
+                    </p>
+                    {item.matchReasons && item.matchReasons.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {item.matchReasons.slice(0, 3).map((r, ri) => (
+                          <span
+                            key={ri}
+                            className="text-[9px] text-primary/80 bg-primary/[0.08] px-1.5 py-0.2 rounded"
+                          >
+                            ✓ {r}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-medium text-muted-foreground group-hover:text-white shrink-0 self-center">
+                    Select →
+                  </span>
+                </button>
+              ))}
+          </div>
+        )}
+      </div>
+
+      {/* Grounded context chip */}
+      {(lesson || challenge) && (
+        <div className="mb-4 flex flex-wrap items-center gap-2.5 rounded-xl border border-primary/25 bg-primary/[0.07] px-4 py-3">
+          {lesson ? (
+            <>
+              <BookOpen className="h-4 w-4 text-primary shrink-0" />
+              <span className="text-xs font-semibold text-primary">Grounded Lesson:</span>
+              <span className="text-xs text-white">
+                {lesson.subjectName ? `${lesson.subjectName} › ` : ''}
+                {lesson.moduleName ? `${lesson.moduleName} › ` : ''}
+                {lesson.title}
+              </span>
+              {lesson.difficulty && (
+                <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-white/[0.08] text-muted-foreground">
+                  {lesson.difficulty}
+                </span>
+              )}
+              <div className="ml-auto flex items-center gap-3">
+                <button
+                  onClick={() => router.push('/learning-hub')}
+                  className="text-[11px] text-muted-foreground underline-offset-2 hover:text-white hover:underline"
+                >
+                  Open in Learning Hub
+                </button>
+                <button
+                  onClick={unpinGrounding}
+                  className="flex items-center gap-1 text-[11px] font-medium text-red-400 hover:text-red-300 transition"
+                  title="Unpin lesson"
+                >
+                  <X className="h-3 w-3" /> Unpin
+                </button>
+              </div>
+            </>
+          ) : challenge ? (
+            <>
+              <Trophy className="h-4 w-4 text-amber-400 shrink-0" />
+              <span className="text-xs font-semibold text-amber-400">Grounded Challenge:</span>
+              <span className="text-xs text-white">
+                {challenge.title} ({challenge.language})
+              </span>
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-300">
+                {challenge.difficulty}
+              </span>
+              <div className="ml-auto flex items-center gap-3">
+                <button
+                  onClick={() => router.push('/learning-hub')}
+                  className="text-[11px] text-muted-foreground underline-offset-2 hover:text-white hover:underline"
+                >
+                  Challenges Hub
+                </button>
+                <button
+                  onClick={unpinGrounding}
+                  className="flex items-center gap-1 text-[11px] font-medium text-red-400 hover:text-red-300 transition"
+                  title="Unpin challenge"
+                >
+                  <X className="h-3 w-3" /> Unpin
+                </button>
+              </div>
+            </>
+          ) : null}
         </div>
       )}
 
@@ -441,9 +807,9 @@ function AIAssistantInner() {
                         <p className="whitespace-pre-wrap">{msg.content}</p>
                       )}
                     </div>
-                    {msg.role === 'assistant' && msg.lessonTitle && (
+                    {msg.role === 'assistant' && (msg.lessonTitle || msg.challengeTitle) && (
                       <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                        Based on: {msg.lessonTitle}
+                        {msg.lessonTitle ? `Based on: ${msg.lessonTitle}` : `Challenge: ${msg.challengeTitle}`}
                       </span>
                     )}
                     <span className="text-[10px] text-muted-foreground/50">{formatTime(msg.timestamp)}</span>
@@ -476,7 +842,11 @@ function AIAssistantInner() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage(input)}
                 placeholder={
-                  lesson ? `Ask about ${lesson.title}…` : 'Ask about code, concepts, errors…'
+                  lesson
+                    ? `Ask about ${lesson.title}…`
+                    : challenge
+                      ? `Ask for hints on ${challenge.title}…`
+                      : 'Ask about code, concepts, errors, or search above…'
                 }
                 disabled={loading}
               />
@@ -496,8 +866,10 @@ function AIAssistantInner() {
             </CardTitle>
             <span className="rounded-lg border border-white/[0.08] bg-secondary/50 px-2 py-1 text-xs text-muted-foreground">
               {lesson?.firstExampleLanguage
-                ? `${lesson.firstExampleLanguage} example from the lesson`
-                : 'Java / JS / Python'}
+                ? `${lesson.firstExampleLanguage} example from lesson`
+                : challenge?.language
+                  ? `${challenge.language} challenge starter`
+                  : 'Java / JS / Python'}
             </span>
           </CardHeader>
           <CardContent>
@@ -533,7 +905,9 @@ function AIAssistantInner() {
             <p className="mt-2 text-[11px] text-muted-foreground/60">
               {lesson?.firstExampleCode
                 ? 'Pre-filled with the first example from this lesson — edit it or paste your own code.'
-                : 'Paste code above and click a button, or type a question in the chat.'}
+                : challenge?.starterCode
+                  ? 'Pre-filled with challenge starter code — edit it or ask for algorithmic hints!'
+                  : 'Paste code above and click a button, or type a question in the chat.'}
             </p>
           </CardContent>
         </Card>

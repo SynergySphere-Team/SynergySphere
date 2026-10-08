@@ -1,4 +1,16 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+dotenv.config();
+try {
+  dotenv.config({ path: path.resolve(process.cwd(), 'backend/.env'), override: false });
+  dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: false });
+  const _currDir = path.dirname(fileURLToPath(import.meta.url));
+  dotenv.config({ path: path.resolve(_currDir, '../../.env'), override: false });
+} catch {
+  // ignore
+}
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
