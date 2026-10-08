@@ -30,6 +30,7 @@ export default function AdminAnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAnalytics();
@@ -37,11 +38,13 @@ export default function AdminAnalyticsPage() {
 
   async function fetchAnalytics() {
     try {
+      setError(null);
       setRefreshing(true);
       const res = await api<AnalyticsData>('/admin/analytics');
       setData(res);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load analytics:', err);
+      setError(err?.message || 'Failed to retrieve platform analytics telemetry.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -89,6 +92,23 @@ export default function AdminAnalyticsPage() {
           Refresh Metrics
         </Button>
       </div>
+
+      {error ? (
+        <div className="flex items-center justify-between p-4 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-xs">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={fetchAnalytics}
+            className="h-7 text-xs text-red-300 hover:text-white hover:bg-red-500/20"
+          >
+            Retry
+          </Button>
+        </div>
+      ) : null}
 
       {/* ─── Top Stats Row ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

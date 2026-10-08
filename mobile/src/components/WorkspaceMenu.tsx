@@ -24,6 +24,7 @@ const destinations: {
   { title: 'Portfolio', href: '/portfolio', icon: 'briefcase' },
   { title: 'Mock Interviews', href: '/interviews', icon: 'chatbubbles' },
   { title: 'Leaderboard', href: '/leaderboard', icon: 'trophy' },
+  { title: 'Analytics', href: '/analytics', icon: 'bar-chart' },
 ];
 
 export function WorkspaceMenu({

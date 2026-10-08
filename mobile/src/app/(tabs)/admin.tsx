@@ -146,6 +146,7 @@ export default function AdminScreen() {
       console.warn('Load users failed:', e);
     } finally {
       setLoadingUsers(false);
+      setLoaded(true);
     }
   }, [userSearch, userStatusFilter]);
 
@@ -159,6 +160,7 @@ export default function AdminScreen() {
       console.warn('Load pending failed:', e);
     } finally {
       setLoadingPending(false);
+      setLoaded(true);
     }
   }, []);
 
@@ -172,6 +174,7 @@ export default function AdminScreen() {
       console.warn('Load posts failed:', e);
     } finally {
       setLoadingPosts(false);
+      setLoaded(true);
     }
   }, []);
 
@@ -184,6 +187,7 @@ export default function AdminScreen() {
       console.warn('Load complaints failed:', e);
     } finally {
       setLoadingComplaints(false);
+      setLoaded(true);
     }
   }, []);
 
@@ -197,6 +201,7 @@ export default function AdminScreen() {
       console.warn('Load events failed:', e);
     } finally {
       setLoadingEvents(false);
+      setLoaded(true);
     }
   }, []);
 
@@ -212,6 +217,7 @@ export default function AdminScreen() {
       console.warn('Load tickets failed:', e);
     } finally {
       setLoadingTickets(false);
+      setLoaded(true);
     }
   }, [ticketStatusFilter]);
 
@@ -229,6 +235,7 @@ export default function AdminScreen() {
       console.warn('Load reports failed:', e);
     } finally {
       setLoadingReports(false);
+      setLoaded(true);
     }
   }, []);
 
@@ -242,6 +249,7 @@ export default function AdminScreen() {
       console.warn('Load db health failed:', e);
     } finally {
       setLoadingDb(false);
+      setLoaded(true);
     }
   }, []);
 
@@ -251,16 +259,22 @@ export default function AdminScreen() {
       setLoaded(true);
       return;
     }
-    if (activeTab === 'overview') void loadOverview();
-    else if (activeTab === 'users') void loadUsers();
-    else if (activeTab === 'approvals') void loadPending();
-    else if (activeTab === 'moderation') {
-      void loadPosts();
-      void loadComplaints();
-    } else if (activeTab === 'events') void loadEvents();
-    else if (activeTab === 'tickets') void loadTickets();
-    else if (activeTab === 'reports') void loadReports();
-    else if (activeTab === 'database') void loadDatabase();
+    const runTabLoader = async () => {
+      try {
+        if (activeTab === 'overview') await loadOverview();
+        else if (activeTab === 'users') await loadUsers();
+        else if (activeTab === 'approvals') await loadPending();
+        else if (activeTab === 'moderation') {
+          await Promise.allSettled([loadPosts(), loadComplaints()]);
+        } else if (activeTab === 'events') await loadEvents();
+        else if (activeTab === 'tickets') await loadTickets();
+        else if (activeTab === 'reports') await loadReports();
+        else if (activeTab === 'database') await loadDatabase();
+      } finally {
+        setLoaded(true);
+      }
+    };
+    void runTabLoader();
   }, [
     user?.role,
     activeTab,
@@ -277,16 +291,20 @@ export default function AdminScreen() {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    if (activeTab === 'overview') await loadOverview();
-    else if (activeTab === 'users') await loadUsers();
-    else if (activeTab === 'approvals') await loadPending();
-    else if (activeTab === 'moderation') {
-      await Promise.allSettled([loadPosts(), loadComplaints()]);
-    } else if (activeTab === 'events') await loadEvents();
-    else if (activeTab === 'tickets') await loadTickets();
-    else if (activeTab === 'reports') await loadReports();
-    else if (activeTab === 'database') await loadDatabase();
-    setRefreshing(false);
+    try {
+      if (activeTab === 'overview') await loadOverview();
+      else if (activeTab === 'users') await loadUsers();
+      else if (activeTab === 'approvals') await loadPending();
+      else if (activeTab === 'moderation') {
+        await Promise.allSettled([loadPosts(), loadComplaints()]);
+      } else if (activeTab === 'events') await loadEvents();
+      else if (activeTab === 'tickets') await loadTickets();
+      else if (activeTab === 'reports') await loadReports();
+      else if (activeTab === 'database') await loadDatabase();
+    } finally {
+      setRefreshing(false);
+      setLoaded(true);
+    }
   }, [
     activeTab,
     loadOverview,
@@ -1346,15 +1364,24 @@ export default function AdminScreen() {
       ───────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'reports' ? (
         <View style={styles.sectionGap}>
-          {/* Telemetry Overview KPIs */}
-          <View style={styles.grid}>
-            <Stat
-              label="Mean Resolution"
-              value={`${analyticsData?.avgResolutionHours || 0} hrs`}
-            />
-            <Stat
-              label="New Users (14d)"
-              value={(analyticsData?.dailyRegistrations || []).reduce(
+          {loadingReports && !analyticsData ? (
+            <Card style={[styles.cardPad, { alignItems: 'center', paddingVertical: 32 }]}>
+              <ActivityIndicator size="large" color={primaryAccent} />
+              <Text style={[styles.copy, { color: colors.muted, marginTop: 12 }]}>
+                Aggregating platform analytics...
+              </Text>
+            </Card>
+          ) : (
+            <>
+              {/* Telemetry Overview KPIs */}
+              <View style={styles.grid}>
+                <Stat
+                  label="Mean Resolution"
+                  value={`${analyticsData?.avgResolutionHours || 0} hrs`}
+                />
+                <Stat
+                  label="New Users (14d)"
+                  value={(analyticsData?.dailyRegistrations || []).reduce(
                 (acc: number, d: any) => acc + (d.newUsers || 0),
                 0
               )}
@@ -1513,6 +1540,8 @@ export default function AdminScreen() {
               ))
             )}
           </Card>
+          </>
+        )}
         </View>
       ) : null}
 

@@ -13,6 +13,7 @@ const destinations = [
   ['Portfolio', 'Build your career project showcase.', '/portfolio'],
   ['Mock Interviews', 'Practice technical interview questions.', '/interviews'],
   ['Leaderboard', 'See the SynergySphere rankings.', '/leaderboard'],
+  ['Analytics', 'Platform metrics, learning telemetry and system vitality.', '/analytics'],
 ] as const;
 
 export default function MoreScreen() {

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, authStorage, ApiError } from '@/services/api';
+import { api, authStorage, ApiError, onboardingStorage } from '@/services/api';
 import { registerCommunityPushNotifications } from '@/services/notifications';
 import { github } from '@/services/github';
 import type { AuthResponse, User } from '@/types/api';
@@ -26,7 +26,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login: async (email, password) => establishSession(await api.post<AuthResponse>('/auth/login', { email, password })),
     register: async (data) => establishSession(await api.post<AuthResponse>('/auth/register', data)),
     updateProfile: async (data) => setUser(await api.patch<User>('/auth/me', data)),
-    logout: async () => { try { await api.post('/auth/logout'); } finally { await Promise.all([authStorage.clearToken(), github.clearLocalToken()]); setUser(null); } },
+    logout: async () => {
+      try {
+        await api.post('/auth/logout');
+      } finally {
+        await Promise.all([
+          authStorage.clearToken(),
+          github.clearLocalToken(),
+          onboardingStorage.reset(),
+        ]);
+        setUser(null);
+      }
+    },
   }), [user, loading, refresh]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

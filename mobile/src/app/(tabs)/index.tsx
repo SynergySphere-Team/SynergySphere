@@ -324,13 +324,14 @@ export default function HomeScreen() {
     { title: 'Portfolio Evidence', description: 'Verified credentials & public share link.', route: '/portfolio', icon: 'briefcase' },
     { title: 'Tasks & Productivity', description: 'Weekly deadlines & focus timer.', route: '/tasks', icon: 'checkbox' },
     { title: 'Settings & Security', description: 'Profile, notifications, theme & account.', route: '/settings', icon: 'settings' },
+    { title: 'Analytics', description: 'Review platform-wide learning, velocity & telemetry metrics.', route: '/analytics', icon: 'bar-chart' },
   ];
   if (user?.role === 'ADMIN') {
     workspaces.push({
-      title: 'Analytics',
-      description: 'Review platform-wide learning and wellness metrics.',
-      route: '/admin?tab=analytics',
-      icon: 'bar-chart',
+      title: 'Admin Portal',
+      description: 'System approvals, moderation, database health & reports.',
+      route: '/admin',
+      icon: 'shield-checkmark',
     });
   }
 
