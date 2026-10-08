@@ -133,8 +133,37 @@ export interface WellnessInsights {
   }>;
 }
 
-export interface Challenge { id: string; title: string; difficulty: string; description: string; language: string | null; starterCode?: string | null; xpReward: number; }
-export interface LearningResource { id: string; title: string; topic: string; level: string; minutes: number; xpReward: number; source: string; url: string; outcome: string; question: string; options: string[]; answer: number; completed: boolean; }
+export interface Challenge {
+  id: string;
+  title: string;
+  difficulty: string;
+  description: string;
+  language: string | null;
+  starterCode?: string | null;
+  hint?: string;
+  approach?: string;
+  timeComplexity?: string;
+  spaceComplexity?: string;
+  xpReward: number;
+}
+
+export interface LearningResource {
+  id: string;
+  title: string;
+  topic: string;
+  level: string;
+  minutes: number;
+  xpReward: number;
+  source: string;
+  url: string;
+  outcome: string;
+  notes?: string;
+  question: string;
+  options: string[];
+  answer: number;
+  explanation?: string;
+  completed: boolean;
+}
 
 export interface Project {
   id: string; title: string; category: string; location: string | null; organization: string;

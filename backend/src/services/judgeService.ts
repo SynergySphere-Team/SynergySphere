@@ -99,6 +99,89 @@ const CHALLENGE_TESTS: Record<string, { fn: string; cases: TestCase[] }> = {
       { label: 'Hidden: isPalindrome("A man, a plan, a canal: Panama")', args: ['A man, a plan, a canal: Panama'], expected: true, hidden: true },
     ],
   },
+  'Reverse a String': {
+    fn: 'reverseString',
+    cases: [
+      { label: 'reverseString("hello")', args: ['hello'], expected: 'olleh' },
+      { label: 'reverseString("Geeks")', args: ['Geeks'], expected: 'skeeG' },
+      { label: 'Hidden: reverseString("")', args: [''], expected: '', hidden: true },
+    ],
+  },
+  'Reverse a String in Python': {
+    fn: 'reverse_string',
+    cases: [
+      { label: 'reverse_string("hello")', args: ['hello'], expected: 'olleh' },
+    ],
+  },
+  'Palindrome String': {
+    fn: 'isPalindrome',
+    cases: [
+      { label: 'isPalindrome("racecar")', args: ['racecar'], expected: true },
+      { label: 'isPalindrome("abc")', args: ['abc'], expected: false },
+    ],
+  },
+  'Sum of Array Elements': {
+    fn: 'sumArray',
+    cases: [
+      { label: 'sumArray([1, 2, 3])', args: [[1, 2, 3]], expected: 6 },
+      { label: 'sumArray([10, 20, 30])', args: [[10, 20, 30]], expected: 60 },
+      { label: 'Hidden: sumArray([])', args: [[]], expected: 0, hidden: true },
+    ],
+  },
+  'Sum of Elements in List': {
+    fn: 'sum_list',
+    cases: [
+      { label: 'sum_list([1, 2, 3])', args: [[1, 2, 3]], expected: 6 },
+    ],
+  },
+  'Two Sum (Hash Map Optimal)': {
+    fn: 'twoSum',
+    cases: [
+      { label: 'twoSum([2, 7, 11, 15], 9)', args: [[2, 7, 11, 15], 9], expected: [0, 1] },
+      { label: 'twoSum([3, 2, 4], 6)', args: [[3, 2, 4], 6], expected: [1, 2] },
+      { label: 'Hidden: twoSum([3, 3], 6)', args: [[3, 3], 6], expected: [0, 1], hidden: true },
+    ],
+  },
+  'Two Sum with HashMap': {
+    fn: 'twoSum',
+    cases: [
+      { label: 'twoSum([2, 7, 11, 15], 9)', args: [[2, 7, 11, 15], 9], expected: [0, 1] },
+    ],
+  },
+  'Find Missing Number in Array': {
+    fn: 'findMissingNumber',
+    cases: [
+      { label: 'findMissingNumber([1, 2, 4, 5], 5)', args: [[1, 2, 4, 5], 5], expected: 3 },
+      { label: 'findMissingNumber([2, 3, 1, 5], 5)', args: [[2, 3, 1, 5], 5], expected: 4 },
+      { label: 'Hidden: findMissingNumber([1, 2, 3], 4)', args: [[1, 2, 3], 4], expected: 4, hidden: true },
+    ],
+  },
+  'Factorial of a Number': {
+    fn: 'factorial',
+    cases: [
+      { label: 'factorial(5)', args: [5], expected: 120 },
+      { label: 'factorial(0)', args: [0], expected: 1 },
+      { label: 'Hidden: factorial(7)', args: [7], expected: 5040, hidden: true },
+    ],
+  },
+  'Check for Prime Number': {
+    fn: 'isPrime',
+    cases: [
+      { label: 'isPrime(7)', args: [7], expected: true },
+      { label: 'isPrime(4)', args: [4], expected: false },
+      { label: 'isPrime(1)', args: [1], expected: false },
+      { label: 'Hidden: isPrime(29)', args: [29], expected: true, hidden: true },
+    ],
+  },
+  'Valid Parentheses (Stack)': {
+    fn: 'isValid',
+    cases: [
+      { label: 'isValid("()")', args: ['()'], expected: true },
+      { label: 'isValid("()[]{}")', args: ['()[]{}'], expected: true },
+      { label: 'isValid("(]")', args: ['(]'], expected: false },
+      { label: 'Hidden: isValid("([{}])")', args: ['([{}])'], expected: true, hidden: true },
+    ],
+  },
 };
 
 /**
@@ -217,53 +300,107 @@ export async function judgeJavaScript(
  * Creates an isolated transient database schema or transaction with dummy tables,
  * runs the student's SQL query, and checks output rows.
  */
-export async function judgeSql(queryText: string, _challengeTitle?: string): Promise<JudgeResult> {
+export async function judgeSql(queryText: string, challengeTitle?: string): Promise<JudgeResult> {
   const client = await pool.connect();
   const testResults: TestResult[] = [];
   try {
     await client.query('BEGIN');
 
-    // Create a temporary sandbox table
+    // Create a temporary sandbox tables
     await client.query(`
       CREATE TEMP TABLE IF NOT EXISTS temp_students (
         id SERIAL PRIMARY KEY,
         name VARCHAR(100),
         gpa NUMERIC(3, 2)
       ) ON COMMIT DROP;
-    `);
 
-    await client.query(`
       INSERT INTO temp_students (name, gpa) VALUES
       ('Alice Walker', 3.90),
       ('Bob Mokoena', 3.20),
       ('Chidi Anagonye', 3.85),
-      ('David Naidoo', 2.90)
+      ('David Naidoo', 2.90);
+
+      CREATE TEMP TABLE IF NOT EXISTS temp_users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100),
+        country VARCHAR(50),
+        status VARCHAR(20)
+      ) ON COMMIT DROP;
+
+      INSERT INTO temp_users (name, country, status) VALUES
+      ('U1', 'USA', 'active'), ('U2', 'USA', 'active'), ('U3', 'USA', 'active'),
+      ('U4', 'USA', 'active'), ('U5', 'USA', 'active'), ('U6', 'USA', 'active'),
+      ('U7', 'UK', 'active'), ('U8', 'UK', 'active'), ('U9', 'UK', 'active'),
+      ('U10', 'UK', 'active'), ('U11', 'UK', 'active'), ('U12', 'UK', 'active'),
+      ('U13', 'Canada', 'active'), ('U14', 'Canada', 'active'),
+      ('U15', 'USA', 'inactive'), ('U16', 'UK', 'inactive');
+
+      CREATE TEMP TABLE IF NOT EXISTS temp_employees (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100),
+        department VARCHAR(50),
+        salary NUMERIC(10, 2)
+      ) ON COMMIT DROP;
+
+      INSERT INTO temp_employees (name, department, salary) VALUES
+      ('John Doe', 'Engineering', 95000),
+      ('Jane Smith', 'Engineering', 85000),
+      ('Bob Johnson', 'HR', 45000),
+      ('Alice Brown', 'Sales', 60000);
     `);
 
-    // Replace table names in query to target temp_students
-    const sanitizedQuery = queryText.replace(/\bstudents\b/gi, 'temp_students');
-    const res = await client.query(sanitizedQuery);
+    // Replace table names in query to target temp tables
+    const sanitizedQuery = queryText
+      .replace(/\bstudents\b/gi, 'temp_students')
+      .replace(/\busers\b/gi, 'temp_users')
+      .replace(/\bemployees\b/gi, 'temp_employees');
 
+    const res = await client.query(sanitizedQuery);
     await client.query('ROLLBACK');
 
-    const names = res.rows.map((r: any) => r.name).sort();
-    const expected = ['Alice Walker', 'Chidi Anagonye'].sort();
-    const passed = JSON.stringify(names) === JSON.stringify(expected);
+    const lowerQuery = queryText.toLowerCase();
+    const title = (challengeTitle || '').toLowerCase();
 
-    testResults.push({
-      label: 'Returns students with GPA > 3.5',
-      passed,
-      expected,
-      got: names,
-    });
+    if (title.includes('active') || lowerQuery.includes('country')) {
+      const countries = res.rows.map((r: any) => r.country).sort();
+      const expected = ['UK', 'USA'].sort();
+      const passed = JSON.stringify(countries) === JSON.stringify(expected);
 
-    testResults.push({
-      label: 'Excludes students with GPA <= 3.5 (Naidoo, Mokoena)',
-      passed: !names.includes('David Naidoo') && !names.includes('Bob Mokoena'),
-      expected: true,
-      got: !names.includes('David Naidoo') && !names.includes('Bob Mokoena'),
-      hidden: true,
-    });
+      testResults.push({
+        label: 'Groups active users by country with count > 5 (UK, USA)',
+        passed,
+        expected,
+        got: countries,
+      });
+
+      testResults.push({
+        label: 'Filters out inactive users and countries <= 5 (Canada)',
+        passed: !countries.includes('Canada'),
+        expected: true,
+        got: !countries.includes('Canada'),
+        hidden: true,
+      });
+    } else {
+      // Default students check
+      const names = res.rows.map((r: any) => r.name).sort();
+      const expected = ['Alice Walker', 'Chidi Anagonye'].sort();
+      const passed = JSON.stringify(names) === JSON.stringify(expected);
+
+      testResults.push({
+        label: 'Returns students with GPA > 3.5',
+        passed,
+        expected,
+        got: names,
+      });
+
+      testResults.push({
+        label: 'Excludes students with GPA <= 3.5 (Naidoo, Mokoena)',
+        passed: !names.includes('David Naidoo') && !names.includes('Bob Mokoena'),
+        expected: true,
+        got: !names.includes('David Naidoo') && !names.includes('Bob Mokoena'),
+        hidden: true,
+      });
+    }
 
     return {
       passed: testResults.every((r) => r.passed),
