@@ -386,6 +386,14 @@ export default function SettingsScreen() {
 
   } = useTheme();
 
+  const {
+
+    eyeComfort,
+
+    setEyeComfort,
+
+  } = useAccessibility();
+
   const [
 
     expanded,
@@ -791,6 +799,142 @@ export default function SettingsScreen() {
         text: err?.message || 'Error opening photo library.',
       });
     }
+  }
+
+  async function takePhoto() {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        setMessage({
+          type: 'error',
+          text: 'Camera access is needed to capture a profile photo.',
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        let base64Data = asset.base64;
+        if (!base64Data && asset.uri) {
+          try {
+            const FileSystem = await import('expo-file-system/legacy');
+            base64Data = await FileSystem.readAsStringAsync(asset.uri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+          } catch (e) {
+            console.warn('Fallback base64 read failed:', e);
+          }
+        }
+
+        if (base64Data) {
+          const dataUri = `data:image/jpeg;base64,${base64Data}`;
+          setPhoto(dataUri);
+          setMessage({
+            type: 'success',
+            text: 'Profile photo captured. Updating profile...',
+          });
+
+          try {
+            setSaving(true);
+            await updateProfile({
+              firstName: firstName.trim() || user?.firstName || 'User',
+              lastName: lastName.trim() || user?.lastName || '',
+              profilePicture: dataUri,
+            });
+            await api.patch('/auth/settings', {
+              profilePicture: dataUri,
+            });
+            setMessage({
+              type: 'success',
+              text: 'Profile picture updated successfully!',
+            });
+          } catch (err: any) {
+            setMessage({
+              type: 'error',
+              text: err?.message || 'Picture captured, but failed to save to server.',
+            });
+          } finally {
+            setSaving(false);
+          }
+        } else {
+          setMessage({
+            type: 'error',
+            text: 'Could not process captured image. Please try again.',
+          });
+        }
+      }
+    } catch (err: any) {
+      setMessage({
+        type: 'error',
+        text: err?.message || 'Error opening camera.',
+      });
+    }
+  }
+
+  async function removePhoto() {
+    try {
+      setSaving(true);
+      setPhoto(null);
+      await updateProfile({
+        firstName: firstName.trim() || user?.firstName || 'User',
+        lastName: lastName.trim() || user?.lastName || '',
+        profilePicture: null,
+      });
+      await api.patch('/auth/settings', {
+        profilePicture: null,
+      });
+      setMessage({
+        type: 'success',
+        text: 'Profile photo removed. Restored default initials placeholder.',
+      });
+    } catch (err: any) {
+      setMessage({
+        type: 'error',
+        text: err?.message || 'Could not remove profile picture.',
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function promptPhotoOptions() {
+    if (Platform.OS === 'web') {
+      void choosePhoto();
+      return;
+    }
+
+    const options: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [
+      {
+        text: 'Take Photo',
+        onPress: () => void takePhoto(),
+      },
+      {
+        text: 'Choose from Library',
+        onPress: () => void choosePhoto(),
+      },
+    ];
+
+    if (photo) {
+      options.push({
+        text: 'Remove Photo',
+        style: 'destructive',
+        onPress: () => void removePhoto(),
+      });
+    }
+
+    options.push({
+      text: 'Cancel',
+      style: 'cancel',
+    });
+
+    Alert.alert('Profile Picture', 'Select an option to update your avatar:', options);
   }
 
   async function saveSettings() {
@@ -1309,14 +1453,29 @@ function confirmDeleteAccount() {
 
     'SynergySphere User';
 
+  const userInitials =
+    user?.firstName && user?.lastName
+      ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+      : user?.firstName && user.firstName.length >= 2
+      ? user.firstName.slice(0, 2).toUpperCase()
+      : user?.firstName
+      ? user.firstName[0].toUpperCase()
+      : 'SS';
+
   return (
 
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
 
-      <Heading subtitle="Manage your account, preferences, privacy and security.">
-
+      <Heading
+        subtitle="Manage your account, preferences, privacy and security."
+        rightAction={
+          <View style={[styles.headerStatusBadge, { backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)' }]}>
+            <Ionicons name="shield-checkmark" size={12} color={primaryAccent} />
+            <Text style={[styles.headerStatusBadgeText, { color: primaryAccent }]}>Synced</Text>
+          </View>
+        }
+      >
         Settings
-
       </Heading>
 
       {message ? (
@@ -1344,189 +1503,130 @@ function confirmDeleteAccount() {
       ) : null}
 
       <View
-
         style={[
-
           styles.profileSummary,
-
           {
-
-            backgroundColor:
-
-              colors.surface,
-
-            borderColor:
-
-              colors.border,
-
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
           },
-
         ]}
-
       >
-
-        <Pressable
-
-          accessibilityRole="button"
-
-          accessibilityLabel="Change profile photo"
-
-          onPress={
-
-            choosePhoto
-
-          }
-
-          style={[
-
-            styles.summaryAvatar,
-
-            {
-
-              backgroundColor:
-
-                colors.surfaceElevated,
-
-              borderColor:
-
-                colors.border,
-
-            },
-
-          ]}
-
-        >
-
-          {photo ? (
-
-            <Image
-
-              source={{
-
-                uri: photo,
-
-              }}
-
-              style={
-
-                styles.avatarImage
-
-              }
-
-            />
-
-          ) : (
-
-            <Ionicons
-
-              name="person"
-
-              size={30}
-
-              color={
-
-                primaryAccent
-
-              }
-
-            />
-
-          )}
-
-        </Pressable>
-
-        <View
-
-          style={
-
-            styles.summaryCopy
-
-          }
-
-        >
-
-          <Text
-
+        <View style={styles.avatarWrapper}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Change profile photo"
+            onPress={promptPhotoOptions}
             style={[
-
-              styles.summaryName,
-
+              styles.summaryAvatar,
               {
-
-                color:
-
-                  colors.text,
-
+                backgroundColor: isLight ? '#0B2314' : '#0F3D24',
+                borderColor: isLight ? '#1e6827' : colors.primary,
               },
-
             ]}
-
           >
-
-            {fullName}
-
-          </Text>
-
-          <Text
-
-            style={[
-
-              styles.summaryEmail,
-
-              {
-
-                color:
-
-                  colors.muted,
-
-              },
-
-            ]}
-
-          >
-
-            {user?.email ||
-
-              'No email available'}
-
-          </Text>
-
-          <Text
-
-            style={[
-
-              styles.summaryRole,
-
-              {
-
-                color:
-
-                  primaryAccent,
-
-              },
-
-            ]}
-
-          >
-
-            {String(
-
-              user?.role ||
-
-                'USER',
-
-            ).replaceAll(
-
-              '\_',
-
-              ' ',
-
+            {photo ? (
+              <Image
+                source={{
+                  uri: photo,
+                }}
+                style={styles.avatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.avatarInitialsText}>
+                {userInitials}
+              </Text>
             )}
-
-          </Text>
-
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit photo"
+            onPress={promptPhotoOptions}
+            style={[
+              styles.cameraBadge,
+              {
+                backgroundColor: primaryAccent,
+                borderColor: colors.surface,
+              },
+            ]}
+          >
+            <Ionicons name="camera" size={11} color="#ffffff" />
+          </Pressable>
         </View>
 
+        <View style={styles.summaryCopy}>
+          <Text
+            style={[
+              styles.summaryName,
+              {
+                color: colors.text,
+              },
+            ]}
+            numberOfLines={1}
+          >
+            {fullName}
+          </Text>
+
+          <Text
+            style={[
+              styles.summaryEmail,
+              {
+                color: colors.muted,
+              },
+            ]}
+            numberOfLines={1}
+          >
+            {user?.email || 'No email available'}
+          </Text>
+
+          <View style={styles.summaryBadgeRow}>
+            <View style={[styles.rolePill, { backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)' }]}>
+              <Text style={[styles.rolePillText, { color: primaryAccent }]}>
+                {String(user?.role || 'USER').replaceAll('_', ' ')}
+              </Text>
+            </View>
+          </View>
+
+          {/* Explicit Photo Controls */}
+          <View style={styles.photoActionsRow}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={promptPhotoOptions}
+              style={[
+                styles.photoActionButton,
+                {
+                  borderColor: isLight ? '#CBD5E1' : colors.border,
+                  backgroundColor: colors.surfaceElevated,
+                },
+              ]}
+            >
+              <Ionicons name="camera-outline" size={12} color={primaryAccent} />
+              <Text style={[styles.photoActionText, { color: colors.text }]}>
+                {photo ? 'Change Photo' : 'Upload Photo'}
+              </Text>
+            </Pressable>
+
+            {photo ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={removePhoto}
+                style={[
+                  styles.photoActionButton,
+                  styles.removePhotoButton,
+                  {
+                    borderColor: 'rgba(239,68,68,0.25)',
+                    backgroundColor: isLight ? '#fef2f2' : 'rgba(239,68,68,0.1)',
+                  },
+                ]}
+              >
+                <Ionicons name="trash-outline" size={12} color="#ef4444" />
+                <Text style={[styles.photoActionText, { color: '#ef4444' }]}>
+                  Remove
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
       </View>
 
       <Text
@@ -2475,6 +2575,60 @@ function confirmDeleteAccount() {
 
               />
 
+            </View>
+
+            <View
+              style={[
+                styles.switchRow,
+                {
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTopWidth: 1,
+                  borderTopColor: colors.border,
+                },
+              ]}
+            >
+              <View style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="eye-outline" size={16} color={primaryAccent} />
+                  <Text
+                    style={[
+                      styles.switchLabel,
+                      {
+                        color: colors.text,
+                      },
+                    ]}
+                  >
+                    Eye Comfort
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.description,
+                    {
+                      color: colors.muted,
+                      marginTop: 2,
+                    },
+                  ]}
+                >
+                  Warm-tinted, reduced-strain palette designed for prolonged coding sessions.
+                </Text>
+              </View>
+
+              <Switch
+                value={eyeComfort}
+                onValueChange={setEyeComfort}
+                style={{ flexShrink: 0 }}
+                trackColor={{
+                  false: colors.border,
+                  true: primaryAccent,
+                }}
+                thumbColor={
+                  eyeComfort
+                    ? '#ffffff'
+                    : colors.surface
+                }
+              />
             </View>
 
           </View>
@@ -4031,6 +4185,21 @@ const styles =
 
   StyleSheet.create({
 
+    headerStatusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      marginRight: 4,
+    },
+
+    headerStatusBadgeText: {
+      fontSize: 11,
+      fontWeight: '800',
+    },
+
     profileSummary: {
 
       borderWidth: 1,
@@ -4041,21 +4210,26 @@ const styles =
 
       flexDirection: 'row',
 
-      alignItems: 'center',
+      alignItems: 'flex-start',
 
-      gap: 12,
+      gap: 14,
 
+    },
+
+    avatarWrapper: {
+      position: 'relative',
+      alignSelf: 'flex-start',
     },
 
     summaryAvatar: {
 
-      width: 62,
+      width: 64,
 
-      height: 62,
+      height: 64,
 
-      borderRadius: 31,
+      borderRadius: 32,
 
-      borderWidth: 1,
+      borderWidth: 1.5,
 
       alignItems: 'center',
 
@@ -4063,6 +4237,24 @@ const styles =
 
       overflow: 'hidden',
 
+    },
+
+    avatarInitialsText: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: '#ffffff',
+    },
+
+    cameraBadge: {
+      position: 'absolute',
+      bottom: -2,
+      right: -2,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 2,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
 
     avatarImage: {
@@ -4095,6 +4287,52 @@ const styles =
 
       lineHeight: 17,
 
+    },
+
+    summaryBadgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 2,
+    },
+
+    rolePill: {
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 10,
+      alignSelf: 'flex-start',
+    },
+
+    rolePillText: {
+      fontSize: 10.5,
+      fontWeight: '800',
+      textTransform: 'capitalize',
+    },
+
+    photoActionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 8,
+      flexWrap: 'wrap',
+    },
+
+    photoActionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+      borderRadius: 6,
+      borderWidth: 1,
+    },
+
+    photoActionText: {
+      fontSize: 11,
+      fontWeight: '700',
+    },
+
+    removePhotoButton: {
+      paddingHorizontal: 8,
     },
 
     summaryRole: {
@@ -4158,6 +4396,8 @@ const styles =
     settingCopy: {
 
       flex: 1,
+
+      minWidth: 0,
 
       gap: 2,
 

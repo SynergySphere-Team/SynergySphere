@@ -9,6 +9,7 @@ import {
   Platform,
   Image,
   Vibration,
+  TextInput,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
@@ -27,6 +28,7 @@ import {
   ENERGY_ANCHORS,
   SLEEP_PRESETS,
   WATER_PRESETS,
+  WATER_STEP,
   WELLNESS_MILESTONES,
   GRATITUDE_PROMPT_PRESETS,
   generateDynamicTaskDeconstruction,
@@ -46,6 +48,9 @@ export default function WellnessScreen() {
   // Navigation tab: 'checkin' | 'trends'
   const [activeTab, setActiveTab] = useState<ActiveTab>('checkin');
 
+  // Multi-step Check-in Navigation: 1: Mind & Focus | 2: Physical & Rest | 3: Reflection
+  const [checkInStep, setCheckInStep] = useState<1 | 2 | 3>(1);
+
   // Check-In Form State
   const [moduleId, setModuleId] = useState('PRODUCTIVITY');
   const [taskTitle, setTaskTitle] = useState('');
@@ -54,10 +59,15 @@ export default function WellnessScreen() {
   const [mood, setMood] = useState(6);
   const [energy, setEnergy] = useState(6);
   const [sleepHours, setSleepHours] = useState(7.5);
-  const [waterGlasses, setWaterGlasses] = useState(6);
+  const [sleepInputText, setSleepInputText] = useState('7.5');
+  const [waterLitres, setWaterLitres] = useState(2.0);
+  const [waterInputText, setWaterInputText] = useState('2.0');
   const [selectedTags, setSelectedTags] = useState<string[]>(['#flow-state']);
   const [gratitudeWin, setGratitudeWin] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Accordion state for past logged sessions
+  const [isSessionListExpanded, setIsSessionListExpanded] = useState(false);
 
   // Status & Data
   const [entries, setEntries] = useState<WellnessEntry[]>([]);
@@ -183,6 +193,45 @@ export default function WellnessScreen() {
     );
   };
 
+  // Two-way numeric data binding for sleep and water inputs
+  const updateSleep = (val: number) => {
+    const rounded = Math.round(val * 10) / 10;
+    const clamped = Math.min(14, Math.max(0, rounded));
+    setSleepHours(clamped);
+    setSleepInputText(clamped.toString());
+  };
+
+  const handleSleepTextChange = (text: string) => {
+    setSleepInputText(text);
+    const parsed = parseFloat(text);
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 24) {
+      setSleepHours(Math.round(parsed * 10) / 10);
+    }
+  };
+
+  const handleSleepBlur = () => {
+    setSleepInputText(sleepHours.toString());
+  };
+
+  const updateWater = (val: number) => {
+    const rounded = Math.round(val * 100) / 100;
+    const clamped = Math.min(15, Math.max(0, rounded));
+    setWaterLitres(clamped);
+    setWaterInputText(clamped.toString());
+  };
+
+  const handleWaterTextChange = (text: string) => {
+    setWaterInputText(text);
+    const parsed = parseFloat(text);
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 20) {
+      setWaterLitres(Math.round(parsed * 100) / 100);
+    }
+  };
+
+  const handleWaterBlur = () => {
+    setWaterInputText(waterLitres.toString());
+  };
+
   // Save check-in
   async function save() {
     try {
@@ -196,7 +245,7 @@ export default function WellnessScreen() {
         energyLevel: energy,
         moduleId,
         sleepHours,
-        waterIntake: waterGlasses,
+        waterIntake: waterLitres,
         tags: selectedTags,
         ...(taskTitle.trim()
           ? {
@@ -212,6 +261,7 @@ export default function WellnessScreen() {
       setGratitudeWin('');
       setTaskTitle('');
       setMarkTaskDone(false);
+      setCheckInStep(1);
 
       const xpEarned = res?.xpAwarded ?? (markTaskDone ? 25 : 15);
       const streak = res?.streak ?? (insights?.streak?.current ? insights.streak.current + 1 : 1);
@@ -238,7 +288,7 @@ export default function WellnessScreen() {
         notes: `Quick Win: ${win}`,
         gratitude: win,
         sleepHours,
-        waterIntake: waterGlasses,
+        waterIntake: waterLitres,
         tags: selectedTags,
       });
       setSavedMessage(`Win logged! +15 XP awarded.`);
@@ -394,6 +444,175 @@ export default function WellnessScreen() {
 
   const isHighStrain = stress > 6 || energy < 5;
 
+  const renderSessionCardBody = (session: ClusteredSession, isMulti: boolean) => {
+    const isExpanded = !!expandedClusterIds[session.id];
+    const isHighStrainSession = session.netStrain >= 1.5;
+    const isFlowSession = session.netStrain <= -1.0;
+
+    return (
+      <View style={{ width: '100%' }}>
+        <View style={styles.sessionHeaderRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
+            <Ionicons
+              name={isMulti ? 'layers' : 'time-outline'}
+              size={15}
+              color={colors.primary}
+              style={{ flexShrink: 0 }}
+            />
+            <Text style={[styles.sessionTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>
+              {isMulti ? `Session Summary (${session.entryCount} Check-ins)` : 'Single Check-in'}
+            </Text>
+          </View>
+          <Text style={[styles.sessionTime, { color: colors.muted, flexShrink: 0 }]}>
+            {new Date(session.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {isMulti ? ` – ${new Date(session.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+          </Text>
+        </View>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 }}>
+          <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>
+            Module: {session.primaryModuleId.replace('_', ' ')}
+          </Text>
+          <View
+            style={[
+              styles.strainPill,
+              {
+                backgroundColor: isHighStrainSession
+                  ? 'rgba(244,114,182,0.15)'
+                  : isFlowSession
+                  ? 'rgba(34,197,94,0.15)'
+                  : 'rgba(255,255,255,0.08)',
+              },
+            ]}
+          >
+            <Text
+              style={{
+                fontSize: 10,
+                fontWeight: '700',
+                color: isHighStrainSession ? '#f472b6' : isFlowSession ? '#22c55e' : colors.muted,
+              }}
+            >
+              Strain: {session.netStrain > 0 ? `+${session.netStrain}` : session.netStrain}
+            </Text>
+          </View>
+        </View>
+
+        {/* Averages Row */}
+        <View style={styles.entryMetricsRow}>
+          <Text style={[styles.entryPill, { color: '#f472b6', backgroundColor: 'rgba(244,114,182,0.1)' }]}>
+            {isMulti ? 'Avg Stress' : 'Stress'}: {session.avgStress}
+          </Text>
+          <Text style={[styles.entryPill, { color: '#c084fc', backgroundColor: 'rgba(192,132,252,0.1)' }]}>
+            {isMulti ? 'Avg Mood' : 'Mood'}: {session.avgMood}
+          </Text>
+          <Text style={[styles.entryPill, { color: '#2dd4bf', backgroundColor: 'rgba(45,212,191,0.1)' }]}>
+            {isMulti ? 'Avg Energy' : 'Energy'}: {session.avgEnergy}
+          </Text>
+          {session.sleepHours != null ? (
+            <Text style={[styles.entryPill, { color: colors.muted, backgroundColor: 'rgba(255,255,255,0.06)' }]}>
+              🌙 {session.sleepHours}h
+            </Text>
+          ) : null}
+          {session.waterIntake != null ? (
+            <Text style={[styles.entryPill, { color: colors.muted, backgroundColor: 'rgba(255,255,255,0.06)' }]}>
+              💧 {session.waterIntake}L
+            </Text>
+          ) : null}
+        </View>
+
+        {/* Tasks in this session */}
+        {session.taskTitles.length > 0 ? (
+          <View style={{ marginTop: 6 }}>
+            {session.taskTitles.map((t, idx) => (
+              <Text key={idx} style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                ✓ {t}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Cumulative Tags */}
+        {session.allTags.length > 0 ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+            {session.allTags.map((t) => (
+              <Text key={t} style={{ fontSize: 10, color: colors.muted, fontStyle: 'italic' }}>
+                {t}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Wins */}
+        {session.gratitudeWins.length > 0 ? (
+          <View style={{ marginTop: 4 }}>
+            {session.gratitudeWins.map((w, idx) => (
+              <Text key={idx} style={{ fontSize: 11, color: '#f59e0b' }}>
+                ✨ Win: {w}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Notes */}
+        {session.notes.length > 0 ? (
+          <View style={{ marginTop: 4 }}>
+            {session.notes.map((n, idx) => (
+              <Text key={idx} style={[styles.summary, { color: colors.muted }]}>
+                &ldquo;{n}&rdquo;
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Multi-entry Expandable micro-events */}
+        {isMulti ? (
+          <View style={{ marginTop: 8 }}>
+            <Pressable
+              onPress={() =>
+                setExpandedClusterIds((prev) => ({
+                  ...prev,
+                  [session.id]: !prev[session.id],
+                }))
+              }
+              style={styles.microEventsToggle}
+            >
+              <Text style={[styles.microEventsToggleText, { color: colors.primary }]}>
+                {isExpanded ? 'Hide raw micro-events' : `Inspect ${session.entryCount} raw micro-logs`}
+              </Text>
+              <Ionicons
+                name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                size={14}
+                color={colors.primary}
+              />
+            </Pressable>
+
+            {isExpanded ? (
+              <View style={styles.clusterSubEntries}>
+                {session.entries.map((micro, mIdx) => (
+                  <View key={micro.id || mIdx} style={styles.clusterMicroRow}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 11, color: colors.muted, fontWeight: '700' }}>
+                        #{mIdx + 1} · {new Date(micro.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: colors.text }}>
+                        S:<Text style={{ color: '#f472b6' }}>{micro.stressLevel}</Text> · M:<Text style={{ color: '#c084fc' }}>{micro.mood}</Text> · E:<Text style={{ color: '#2dd4bf' }}>{micro.energyLevel}</Text>
+                      </Text>
+                    </View>
+                    {micro.notes ? (
+                      <Text style={{ fontSize: 10, color: colors.muted, fontStyle: 'italic', marginTop: 2 }}>
+                        {micro.notes}
+                      </Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
   return (
     <Screen
       refreshing={refreshing}
@@ -526,6 +745,9 @@ export default function WellnessScreen() {
       </View>
 
       {/* Gamification Streak & Milestone Banner */}
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        Resilience &amp; Daily Streak
+      </Text>
       <Card>
         <View style={styles.streakHeader}>
           <View style={styles.streakCountBox}>
@@ -612,418 +834,652 @@ export default function WellnessScreen() {
       {activeTab === 'checkin' ? (
         <>
           {/* Main Daily Check-In Form */}
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Daily Check-In
+          </Text>
           <Card>
-            <View style={styles.cardHeaderRow}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Daily Check-In</Text>
-              <View style={[styles.statusPill, { backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)' }]}>
-                <Text style={[styles.statusPillText, { color: isLight ? '#1e6827' : colors.primary }]}>Today</Text>
+            {/* Step Progress Bar & Discrete Step Buttons */}
+            <View style={styles.stepIndicatorContainer}>
+              <View style={styles.stepHeaderRow}>
+                <Text style={[styles.stepTitleText, { color: colors.text }]}>
+                  {checkInStep === 1
+                    ? 'Step 1: Mind & Focus'
+                    : checkInStep === 2
+                    ? 'Step 2: Physical Metrics & Sleep'
+                    : 'Step 3: Reflection & Debrief'}
+                </Text>
+                <View style={[styles.statusPill, { backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)' }]}>
+                  <Text style={[styles.statusPillText, { color: isLight ? '#1e6827' : colors.primary }]}>
+                    Step {checkInStep} of 3
+                  </Text>
+                </View>
               </View>
-            </View>
 
-            {/* Module Picker */}
-            <Text style={[styles.sectionSubtitle, { color: colors.muted }]}>Linked Module</Text>
-            <View style={styles.moduleGrid}>
-              {WELLNESS_MODULES.map((m) => {
-                const isSelected = moduleId === m.id;
-                return (
-                  <Pressable
-                    key={m.id}
-                    onPress={() => setModuleId(m.id)}
-                    style={[
-                      styles.moduleButton,
-                      {
-                        borderColor: isSelected ? m.color : 'rgba(255,255,255,0.1)',
-                        backgroundColor: isSelected ? 'rgba(255,255,255,0.1)' : 'transparent',
-                      },
-                    ]}
-                  >
-                    <View style={[styles.moduleDot, { backgroundColor: m.color }]} />
-                    <Text
+              {/* Progress Bar Track */}
+              <View style={[styles.stepProgressBarTrack, { backgroundColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.1)' }]}>
+                <View
+                  style={[
+                    styles.stepProgressBarFill,
+                    {
+                      width: checkInStep === 1 ? '33.3%' : checkInStep === 2 ? '66.6%' : '100%',
+                      backgroundColor: isLight ? '#00875A' : colors.primary,
+                    },
+                  ]}
+                />
+              </View>
+
+              {/* Discrete Step Tabs / Dots */}
+              <View style={styles.stepDotsRow}>
+                {[
+                  { step: 1 as const, label: 'Mind & Focus' },
+                  { step: 2 as const, label: 'Physical & Rest' },
+                  { step: 3 as const, label: 'Reflection' },
+                ].map((s) => {
+                  const active = checkInStep === s.step;
+                  const completed = checkInStep > s.step;
+                  return (
+                    <Pressable
+                      key={s.step}
+                      onPress={() => {
+                        setCheckInStep(s.step);
+                        try { Vibration.vibrate(15); } catch {}
+                      }}
                       style={[
-                        styles.moduleButtonText,
-                        { color: isSelected ? colors.text : colors.muted, fontWeight: isSelected ? '700' : '500' },
+                        styles.stepDotBtn,
+                        active && {
+                          backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)',
+                          borderColor: colors.primary,
+                        },
+                        completed && {
+                          backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.06)',
+                          borderColor: isLight ? '#CBD5E1' : 'rgba(255,255,255,0.15)',
+                        },
+                        !active && !completed && {
+                          borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)',
+                        },
                       ]}
                     >
-                      {m.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            {/* Task Input */}
-            <Field
-              label="Active Task or Blocker"
-              value={taskTitle}
-              onChangeText={setTaskTitle}
-              placeholder="e.g. Debugging Spring Security, LeetCode Binary Search..."
-            />
-
-            {taskTitle.trim().length > 0 ? (
-              <Pressable
-                onPress={() => setMarkTaskDone(!markTaskDone)}
-                style={styles.checkboxRow}
-              >
-                <Ionicons
-                  name={markTaskDone ? 'checkbox' : 'square-outline'}
-                  size={18}
-                  color={markTaskDone ? colors.primary : colors.muted}
-                  style={{ flexShrink: 0 }}
-                />
-                <Text style={[styles.checkboxText, { color: colors.text }]}>
-                  Mark task as completed (DONE) (+10 XP)
-                </Text>
-              </Pressable>
-            ) : null}
-
-            {/* Rating Controls: Step 1 Labeled 1-10 Scale with Dynamic Semantic Anchors & Haptics */}
-            <View style={styles.ratingSection}>
-              {/* Stress 1-10 Scale */}
-              {(() => {
-                const anchor = STRESS_ANCHORS[stress] || STRESS_ANCHORS[5];
-                return (
-                  <View style={styles.scaleContainer}>
-                    <View style={styles.scaleLabelRow}>
-                      <Text style={[styles.ratingLabel, { color: colors.text }]}>
-                        Stress Level: <Text style={{ color: '#f472b6', fontWeight: '800' }}>{stress}/10</Text>
-                      </Text>
-                      <View style={[styles.scaleValueBadge, { backgroundColor: `${anchor.color}20`, borderColor: anchor.color }]}>
-                        <Text style={[styles.scaleValueBadgeText, { color: anchor.color }]}>
-                          {anchor.label}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.scaleButtonsRow}>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
-                        const isSelected = stress === val;
-                        return (
-                          <Pressable
-                            key={val}
-                            onPress={() => setRatingWithHaptic(setStress, val)}
-                            style={[
-                              styles.scaleBtn,
-                              isSelected
-                                ? { backgroundColor: '#f472b6', borderColor: '#f472b6' }
-                                : { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.scaleBtnText,
-                                { color: isSelected ? '#ffffff' : colors.text },
-                              ]}
-                            >
-                              {val}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-
-                    {/* Semantic Anchor Description */}
-                    <View style={[styles.anchorCard, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)' }]}>
-                      <View style={[styles.anchorDot, { backgroundColor: anchor.color }]} />
-                      <Text style={[styles.anchorDescText, { color: colors.muted }]}>
-                        {anchor.desc}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })()}
-
-              {/* Mood 1-10 Scale */}
-              {(() => {
-                const anchor = MOOD_ANCHORS[mood] || MOOD_ANCHORS[6];
-                return (
-                  <View style={styles.scaleContainer}>
-                    <View style={styles.scaleLabelRow}>
-                      <Text style={[styles.ratingLabel, { color: colors.text }]}>
-                        Mood / Outlook: <Text style={{ color: '#c084fc', fontWeight: '800' }}>{mood}/10</Text>
-                      </Text>
-                      <View style={[styles.scaleValueBadge, { backgroundColor: `${anchor.color}20`, borderColor: anchor.color }]}>
-                        <Text style={[styles.scaleValueBadgeText, { color: anchor.color }]}>
-                          {anchor.label}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.scaleButtonsRow}>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
-                        const isSelected = mood === val;
-                        return (
-                          <Pressable
-                            key={val}
-                            onPress={() => setRatingWithHaptic(setMood, val)}
-                            style={[
-                              styles.scaleBtn,
-                              isSelected
-                                ? { backgroundColor: '#c084fc', borderColor: '#c084fc' }
-                                : { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.scaleBtnText,
-                                { color: isSelected ? '#ffffff' : colors.text },
-                              ]}
-                            >
-                              {val}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-
-                    <View style={[styles.anchorCard, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)' }]}>
-                      <View style={[styles.anchorDot, { backgroundColor: anchor.color }]} />
-                      <Text style={[styles.anchorDescText, { color: colors.muted }]}>
-                        {anchor.desc}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })()}
-
-              {/* Energy 1-10 Scale */}
-              {(() => {
-                const anchor = ENERGY_ANCHORS[energy] || ENERGY_ANCHORS[6];
-                return (
-                  <View style={styles.scaleContainer}>
-                    <View style={styles.scaleLabelRow}>
-                      <Text style={[styles.ratingLabel, { color: colors.text }]}>
-                        Energy / Vitality: <Text style={{ color: '#2dd4bf', fontWeight: '800' }}>{energy}/10</Text>
-                      </Text>
-                      <View style={[styles.scaleValueBadge, { backgroundColor: `${anchor.color}20`, borderColor: anchor.color }]}>
-                        <Text style={[styles.scaleValueBadgeText, { color: anchor.color }]}>
-                          {anchor.label}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.scaleButtonsRow}>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
-                        const isSelected = energy === val;
-                        return (
-                          <Pressable
-                            key={val}
-                            onPress={() => setRatingWithHaptic(setEnergy, val)}
-                            style={[
-                              styles.scaleBtn,
-                              isSelected
-                                ? { backgroundColor: '#2dd4bf', borderColor: '#2dd4bf' }
-                                : { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.scaleBtnText,
-                                { color: isSelected ? '#042f2e' : colors.text },
-                              ]}
-                            >
-                              {val}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-
-                    <View style={[styles.anchorCard, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)' }]}>
-                      <View style={[styles.anchorDot, { backgroundColor: anchor.color }]} />
-                      <Text style={[styles.anchorDescText, { color: colors.muted }]}>
-                        {anchor.desc}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })()}
-            </View>
-
-            {/* Micro-Trackers: Sleep & Water with One-Tap Presets */}
-            <View style={styles.microTrackersRow}>
-              {/* Sleep Tracker */}
-              <View style={[styles.microCard, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.04)', borderColor: colors.border }]}>
-                <View style={styles.microHeader}>
-                  <Ionicons name="moon" size={13} color="#c084fc" />
-                  <Text style={[styles.microTitle, { color: colors.text }]}>Sleep: {sleepHours}h</Text>
-                  <Text style={{ fontSize: 9, color: colors.muted, marginLeft: 'auto' }}>
-                    {sleepHours < 6 ? 'Deprived' : sleepHours < 7.5 ? 'Moderate' : 'Optimal'}
-                  </Text>
-                </View>
-
-                {/* Presets Row */}
-                <View style={styles.quickPresetRow}>
-                  {SLEEP_PRESETS.map((hrs) => {
-                    const active = sleepHours === hrs;
-                    return (
-                      <Pressable
-                        key={hrs}
-                        onPress={() => {
-                          setSleepHours(hrs);
-                          try { Vibration.vibrate(15); } catch {}
-                        }}
+                      <View
                         style={[
-                          styles.presetChip,
-                          active && { backgroundColor: isLight ? '#e9d5ff' : 'rgba(192,132,252,0.25)', borderColor: '#c084fc' },
+                          styles.stepDotCircle,
+                          {
+                            backgroundColor: active
+                              ? (isLight ? '#00875A' : colors.primary)
+                              : completed
+                              ? '#22c55e'
+                              : isLight ? '#CBD5E1' : 'rgba(255,255,255,0.2)',
+                          },
                         ]}
                       >
-                        <Text style={[styles.presetChipText, { color: active ? (isLight ? '#7e22ce' : '#e9d5ff') : colors.muted }]}>
-                          {hrs}h
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                {/* Stepper Row */}
-                <View style={styles.stepperRow}>
-                  <Pressable
-                    onPress={() => setSleepHours((s) => Math.max(3, Number((s - 0.5).toFixed(1))))}
-                    style={styles.stepBtn}
-                  >
-                    <Ionicons name="remove" size={14} color={colors.text} />
-                  </Pressable>
-                  <Text style={[styles.stepperValue, { color: '#c084fc' }]}>{sleepHours} hrs</Text>
-                  <Pressable
-                    onPress={() => setSleepHours((s) => Math.min(14, Number((s + 0.5).toFixed(1))))}
-                    style={styles.stepBtn}
-                  >
-                    <Ionicons name="add" size={14} color={colors.text} />
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Water Tracker */}
-              <View style={[styles.microCard, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.04)', borderColor: colors.border }]}>
-                <View style={styles.microHeader}>
-                  <Ionicons name="water" size={13} color="#2dd4bf" />
-                  <Text style={[styles.microTitle, { color: colors.text }]}>Water: {waterGlasses}💧</Text>
-                  <Text style={{ fontSize: 9, color: colors.muted, marginLeft: 'auto' }}>
-                    {waterGlasses < 4 ? 'Low' : waterGlasses < 8 ? 'Moderate' : 'Hydrated'}
-                  </Text>
-                </View>
-
-                {/* Presets Row */}
-                <View style={styles.quickPresetRow}>
-                  {WATER_PRESETS.map((gls) => {
-                    const active = waterGlasses === gls;
-                    return (
-                      <Pressable
-                        key={gls}
-                        onPress={() => {
-                          setWaterGlasses(gls);
-                          try { Vibration.vibrate(15); } catch {}
-                        }}
+                        {completed ? (
+                          <Ionicons name="checkmark" size={10} color="#ffffff" />
+                        ) : (
+                          <Text style={styles.stepDotNumber}>{s.step}</Text>
+                        )}
+                      </View>
+                      <Text
+                        numberOfLines={1}
                         style={[
-                          styles.presetChip,
-                          active && { backgroundColor: isLight ? '#ccfbf1' : 'rgba(45,212,191,0.25)', borderColor: '#2dd4bf' },
+                          styles.stepDotLabel,
+                          {
+                            color: active ? colors.text : colors.muted,
+                            fontWeight: active ? '800' : '500',
+                          },
                         ]}
                       >
-                        <Text style={[styles.presetChipText, { color: active ? (isLight ? '#0f766e' : '#99f6e4') : colors.muted }]}>
-                          {gls}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                  <Pressable
-                    onPress={() => {
-                      setWaterGlasses((w) => Math.min(20, w + 1));
-                      try { Vibration.vibrate(15); } catch {}
-                    }}
-                    style={styles.boosterChip}
-                  >
-                    <Text style={styles.boosterChipText}>+1💧</Text>
-                  </Pressable>
-                </View>
-
-                {/* Stepper Row */}
-                <View style={styles.stepperRow}>
-                  <Pressable
-                    onPress={() => setWaterGlasses((w) => Math.max(0, w - 1))}
-                    style={styles.stepBtn}
-                  >
-                    <Ionicons name="remove" size={14} color={colors.text} />
-                  </Pressable>
-                  <Text style={[styles.stepperValue, { color: '#2dd4bf' }]}>{waterGlasses} gls</Text>
-                  <Pressable
-                    onPress={() => setWaterGlasses((w) => Math.min(20, w + 1))}
-                    style={styles.stepBtn}
-                  >
-                    <Ionicons name="add" size={14} color={colors.text} />
-                  </Pressable>
-                </View>
+                        {s.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
 
-            {/* Categorized Focus & Mood Keywords */}
-            <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 12 }]}>
-              Focus &amp; Mood Tags
-            </Text>
-            <View style={{ gap: 8, marginBottom: 8 }}>
-              {MOOD_TAG_CATEGORIES.map((cat) => (
-                <View key={cat.category} style={styles.tagCategoryBlock}>
-                  <View style={styles.tagCategoryHeader}>
-                    <Ionicons name={cat.icon as any} size={11} color={cat.color} />
-                    <Text style={[styles.tagCategoryTitle, { color: cat.color }]}>{cat.category}</Text>
-                  </View>
-                  <View style={styles.categoryPillWrap}>
-                    {cat.tags.map((tag) => {
-                      const active = selectedTags.includes(tag);
-                      return (
-                        <Pressable
-                          key={tag}
-                          onPress={() => {
-                            toggleTag(tag);
-                            try { Vibration.vibrate(15); } catch {}
-                          }}
+            {/* STEP 1: MIND & FOCUS */}
+            {checkInStep === 1 ? (
+              <View style={{ gap: 4 }}>
+                {/* Module Picker */}
+                <Text style={[styles.sectionSubtitle, { color: colors.muted }]}>Linked Module</Text>
+                <View style={styles.moduleGrid}>
+                  {WELLNESS_MODULES.map((m) => {
+                    const isSelected = moduleId === m.id;
+                    return (
+                      <Pressable
+                        key={m.id}
+                        onPress={() => setModuleId(m.id)}
+                        style={[
+                          styles.moduleButton,
+                          {
+                            borderColor: isSelected ? m.color : 'rgba(255,255,255,0.1)',
+                            backgroundColor: isSelected ? 'rgba(255,255,255,0.1)' : 'transparent',
+                          },
+                        ]}
+                      >
+                        <View style={[styles.moduleDot, { backgroundColor: m.color }]} />
+                        <Text
                           style={[
-                            styles.categoryTagPill,
-                            active && {
-                              backgroundColor: `${cat.color}25`,
-                              borderColor: cat.color,
-                            },
-                            !active && { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
+                            styles.moduleButtonText,
+                            { color: isSelected ? colors.text : colors.muted, fontWeight: isSelected ? '700' : '500' },
                           ]}
                         >
-                          {active ? (
-                            <Ionicons name="checkmark" size={11} color={cat.color} style={{ marginRight: 2 }} />
-                          ) : null}
-                          <Text
+                          {m.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                {/* Task Input */}
+                <Field
+                  label="Active Task or Blocker"
+                  value={taskTitle}
+                  onChangeText={setTaskTitle}
+                  placeholder="e.g. Debugging Spring Security, LeetCode Binary Search..."
+                />
+
+                {taskTitle.trim().length > 0 ? (
+                  <Pressable
+                    onPress={() => setMarkTaskDone(!markTaskDone)}
+                    style={styles.checkboxRow}
+                  >
+                    <Ionicons
+                      name={markTaskDone ? 'checkbox' : 'square-outline'}
+                      size={18}
+                      color={markTaskDone ? colors.primary : colors.muted}
+                      style={{ flexShrink: 0 }}
+                    />
+                    <Text style={[styles.checkboxText, { color: colors.text }]}>
+                      Mark task as completed (DONE) (+10 XP)
+                    </Text>
+                  </Pressable>
+                ) : null}
+
+                {/* Rating Controls: Step 1 Labeled 1-10 Scale with Dynamic Semantic Anchors & Haptics */}
+                <View style={styles.ratingSection}>
+                  {/* Stress 1-10 Scale */}
+                  {(() => {
+                    const anchor = STRESS_ANCHORS[stress] || STRESS_ANCHORS[5];
+                    return (
+                      <View style={styles.scaleContainer}>
+                        <View style={styles.scaleLabelRow}>
+                          <Text style={[styles.ratingLabel, { color: colors.text }]}>
+                            Stress Level: <Text style={{ color: '#f472b6', fontWeight: '800' }}>{stress}/10</Text>
+                          </Text>
+                          <View style={[styles.scaleValueBadge, { backgroundColor: `${anchor.color}20`, borderColor: anchor.color }]}>
+                            <Text style={[styles.scaleValueBadgeText, { color: anchor.color }]}>
+                              {anchor.label}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.scaleButtonsRow}>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
+                            const isSelected = stress === val;
+                            return (
+                              <Pressable
+                                key={val}
+                                onPress={() => setRatingWithHaptic(setStress, val)}
+                                style={[
+                                  styles.scaleBtn,
+                                  isSelected
+                                    ? { backgroundColor: '#f472b6', borderColor: '#f472b6' }
+                                    : { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.scaleBtnText,
+                                    { color: isSelected ? '#ffffff' : colors.text },
+                                  ]}
+                                >
+                                  {val}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+
+                        {/* Semantic Anchor Description */}
+                        <View style={[styles.anchorCard, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)' }]}>
+                          <View style={[styles.anchorDot, { backgroundColor: anchor.color }]} />
+                          <Text style={[styles.anchorDescText, { color: colors.muted }]}>
+                            {anchor.desc}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })()}
+
+                  {/* Mood 1-10 Scale */}
+                  {(() => {
+                    const anchor = MOOD_ANCHORS[mood] || MOOD_ANCHORS[6];
+                    return (
+                      <View style={styles.scaleContainer}>
+                        <View style={styles.scaleLabelRow}>
+                          <Text style={[styles.ratingLabel, { color: colors.text }]}>
+                            Mood / Outlook: <Text style={{ color: '#c084fc', fontWeight: '800' }}>{mood}/10</Text>
+                          </Text>
+                          <View style={[styles.scaleValueBadge, { backgroundColor: `${anchor.color}20`, borderColor: anchor.color }]}>
+                            <Text style={[styles.scaleValueBadgeText, { color: anchor.color }]}>
+                              {anchor.label}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.scaleButtonsRow}>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
+                            const isSelected = mood === val;
+                            return (
+                              <Pressable
+                                key={val}
+                                onPress={() => setRatingWithHaptic(setMood, val)}
+                                style={[
+                                  styles.scaleBtn,
+                                  isSelected
+                                    ? { backgroundColor: '#c084fc', borderColor: '#c084fc' }
+                                    : { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.scaleBtnText,
+                                    { color: isSelected ? '#ffffff' : colors.text },
+                                  ]}
+                                >
+                                  {val}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+
+                        <View style={[styles.anchorCard, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)' }]}>
+                          <View style={[styles.anchorDot, { backgroundColor: anchor.color }]} />
+                          <Text style={[styles.anchorDescText, { color: colors.muted }]}>
+                            {anchor.desc}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })()}
+
+                  {/* Energy 1-10 Scale */}
+                  {(() => {
+                    const anchor = ENERGY_ANCHORS[energy] || ENERGY_ANCHORS[6];
+                    return (
+                      <View style={styles.scaleContainer}>
+                        <View style={styles.scaleLabelRow}>
+                          <Text style={[styles.ratingLabel, { color: colors.text }]}>
+                            Energy / Vitality: <Text style={{ color: '#2dd4bf', fontWeight: '800' }}>{energy}/10</Text>
+                          </Text>
+                          <View style={[styles.scaleValueBadge, { backgroundColor: `${anchor.color}20`, borderColor: anchor.color }]}>
+                            <Text style={[styles.scaleValueBadgeText, { color: anchor.color }]}>
+                              {anchor.label}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.scaleButtonsRow}>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
+                            const isSelected = energy === val;
+                            return (
+                              <Pressable
+                                key={val}
+                                onPress={() => setRatingWithHaptic(setEnergy, val)}
+                                style={[
+                                  styles.scaleBtn,
+                                  isSelected
+                                    ? { backgroundColor: '#2dd4bf', borderColor: '#2dd4bf' }
+                                    : { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.scaleBtnText,
+                                    { color: isSelected ? '#042f2e' : colors.text },
+                                  ]}
+                                >
+                                  {val}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+
+                        <View style={[styles.anchorCard, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)' }]}>
+                          <View style={[styles.anchorDot, { backgroundColor: anchor.color }]} />
+                          <Text style={[styles.anchorDescText, { color: colors.muted }]}>
+                            {anchor.desc}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })()}
+                </View>
+
+                {/* Step 1 Navigation */}
+                <View style={styles.stepNavigationRow}>
+                  <Button
+                    title="Next: Physical Metrics & Sleep →"
+                    onPress={() => {
+                      setCheckInStep(2);
+                      try { Vibration.vibrate(15); } catch {}
+                    }}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              </View>
+            ) : null}
+
+            {/* STEP 2: PHYSICAL METRICS & SLEEP */}
+            {checkInStep === 2 ? (
+              <View style={{ gap: 6 }}>
+                {/* Micro-Trackers: Sleep & Water with Two-Way Keyboard Input & Steppers */}
+                <View style={styles.microTrackersRow}>
+                  {/* Sleep Tracker */}
+                  <View style={[styles.microCard, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.04)', borderColor: colors.border }]}>
+                    <View style={styles.microHeader}>
+                      <Ionicons name="moon" size={13} color="#c084fc" />
+                      <Text style={[styles.microTitle, { color: colors.text }]}>Sleep: {sleepHours}h</Text>
+                      <Text style={{ fontSize: 9, color: colors.muted, marginLeft: 'auto' }}>
+                        {sleepHours < 6 ? 'Deprived' : sleepHours < 7.5 ? 'Moderate' : 'Optimal'}
+                      </Text>
+                    </View>
+
+                    {/* Presets Row */}
+                    <View style={styles.quickPresetRow}>
+                      {SLEEP_PRESETS.map((hrs) => {
+                        const active = sleepHours === hrs;
+                        return (
+                          <Pressable
+                            key={hrs}
+                            onPress={() => {
+                              updateSleep(hrs);
+                              try { Vibration.vibrate(15); } catch {}
+                            }}
                             style={[
-                              styles.categoryTagPillText,
-                              {
-                                color: active ? (isLight ? cat.color : '#ffffff') : colors.muted,
-                                fontWeight: active ? '700' : '500',
-                              },
+                              styles.presetChip,
+                              active && { backgroundColor: isLight ? '#e9d5ff' : 'rgba(192,132,252,0.25)', borderColor: '#c084fc' },
                             ]}
                           >
-                            {tag}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
+                            <Text style={[styles.presetChipText, { color: active ? (isLight ? '#7e22ce' : '#e9d5ff') : colors.muted }]}>
+                              {hrs}h
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+
+                    {/* Stepper & Direct Editable Numeric Input */}
+                    <View style={styles.stepperRow}>
+                      <Pressable
+                        onPress={() => updateSleep(sleepHours - 0.5)}
+                        style={styles.stepBtn}
+                      >
+                        <Ionicons name="remove" size={14} color={colors.text} />
+                      </Pressable>
+                      <View style={[styles.metricInputBox, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' }]}>
+                        <TextInput
+                          keyboardType="decimal-pad"
+                          value={sleepInputText}
+                          onChangeText={handleSleepTextChange}
+                          onBlur={handleSleepBlur}
+                          style={[styles.metricTextInput, { color: '#c084fc' }]}
+                          selectTextOnFocus
+                        />
+                        <Text style={[styles.metricUnitLabel, { color: '#c084fc' }]}>hrs</Text>
+                      </View>
+                      <Pressable
+                        onPress={() => updateSleep(sleepHours + 0.5)}
+                        style={styles.stepBtn}
+                      >
+                        <Ionicons name="add" size={14} color={colors.text} />
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  {/* Water Tracker (Litres - L) */}
+                  <View style={[styles.microCard, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.04)', borderColor: colors.border }]}>
+                    <View style={styles.microHeader}>
+                      <Ionicons name="water" size={13} color="#2dd4bf" />
+                      <Text style={[styles.microTitle, { color: colors.text }]}>Water: {waterLitres.toFixed(1)}L💧</Text>
+                      <Text style={{ fontSize: 9, color: colors.muted, marginLeft: 'auto' }}>
+                        {waterLitres < 1.5 ? 'Low' : waterLitres < 2.5 ? 'Good' : 'Hydrated'}
+                      </Text>
+                    </View>
+
+                    {/* Presets Row */}
+                    <View style={styles.quickPresetRow}>
+                      {WATER_PRESETS.map((litres) => {
+                        const active = Math.abs(waterLitres - litres) < 0.05;
+                        return (
+                          <Pressable
+                            key={litres}
+                            onPress={() => {
+                              updateWater(litres);
+                              try { Vibration.vibrate(15); } catch {}
+                            }}
+                            style={[
+                              styles.presetChip,
+                              active && { backgroundColor: isLight ? '#ccfbf1' : 'rgba(45,212,191,0.25)', borderColor: '#2dd4bf' },
+                            ]}
+                          >
+                            <Text style={[styles.presetChipText, { color: active ? (isLight ? '#0f766e' : '#99f6e4') : colors.muted }]}>
+                              {litres.toFixed(1)}L
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                      <Pressable
+                        onPress={() => {
+                          updateWater(waterLitres + WATER_STEP);
+                          try { Vibration.vibrate(15); } catch {}
+                        }}
+                        style={styles.boosterChip}
+                      >
+                        <Text style={styles.boosterChipText}>+0.25L</Text>
+                      </Pressable>
+                    </View>
+
+                    {/* Stepper & Direct Editable Numeric Input */}
+                    <View style={styles.stepperRow}>
+                      <Pressable
+                        onPress={() => updateWater(waterLitres - WATER_STEP)}
+                        style={styles.stepBtn}
+                      >
+                        <Ionicons name="remove" size={14} color={colors.text} />
+                      </Pressable>
+                      <View style={[styles.metricInputBox, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' }]}>
+                        <TextInput
+                          keyboardType="decimal-pad"
+                          value={waterInputText}
+                          onChangeText={handleWaterTextChange}
+                          onBlur={handleWaterBlur}
+                          style={[styles.metricTextInput, { color: '#2dd4bf' }]}
+                          selectTextOnFocus
+                        />
+                        <Text style={[styles.metricUnitLabel, { color: '#2dd4bf' }]}>L</Text>
+                      </View>
+                      <Pressable
+                        onPress={() => updateWater(waterLitres + WATER_STEP)}
+                        style={styles.stepBtn}
+                      >
+                        <Ionicons name="add" size={14} color={colors.text} />
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
-              ))}
-            </View>
 
-            {/* Notes */}
-            <Field
-              label="Session Notes"
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              placeholder="What went well or what challenges did you face today?"
-            />
+                {/* Categorized Focus & Mood Keywords */}
+                <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 12 }]}>
+                  Focus &amp; Mood Tags
+                </Text>
+                <View style={{ gap: 8, marginBottom: 8 }}>
+                  {MOOD_TAG_CATEGORIES.map((cat) => (
+                    <View key={cat.category} style={styles.tagCategoryBlock}>
+                      <View style={styles.tagCategoryHeader}>
+                        <Ionicons name={cat.icon as any} size={11} color={cat.color} />
+                        <Text style={[styles.tagCategoryTitle, { color: cat.color }]}>{cat.category}</Text>
+                      </View>
+                      <View style={styles.categoryPillWrap}>
+                        {cat.tags.map((tag) => {
+                          const active = selectedTags.includes(tag);
+                          return (
+                            <Pressable
+                              key={tag}
+                              onPress={() => {
+                                toggleTag(tag);
+                                try { Vibration.vibrate(15); } catch {}
+                              }}
+                              style={[
+                                styles.categoryTagPill,
+                                active && {
+                                  backgroundColor: `${cat.color}25`,
+                                  borderColor: cat.color,
+                                },
+                                !active && { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
+                              ]}
+                            >
+                              {active ? (
+                                <Ionicons name="checkmark" size={11} color={cat.color} style={{ marginRight: 2 }} />
+                              ) : null}
+                              <Text
+                                style={[
+                                  styles.categoryTagPillText,
+                                  {
+                                    color: active ? (isLight ? cat.color : '#ffffff') : colors.muted,
+                                    fontWeight: active ? '700' : '500',
+                                  },
+                                ]}
+                              >
+                                {tag}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ))}
+                </View>
 
-            <Button
-              title={saving ? 'Logging...' : 'Log Wellness Check-in (+15 XP)'}
-              disabled={saving}
-              onPress={save}
-            />
+                {/* Step 2 Navigation */}
+                <View style={styles.stepNavigationRow}>
+                  <Button
+                    title="← Back to Mind"
+                    secondary
+                    onPress={() => {
+                      setCheckInStep(1);
+                      try { Vibration.vibrate(15); } catch {}
+                    }}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    title="Next: Reflection →"
+                    onPress={() => {
+                      setCheckInStep(3);
+                      try { Vibration.vibrate(15); } catch {}
+                    }}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              </View>
+            ) : null}
+
+            {/* STEP 3: REFLECTION */}
+            {checkInStep === 3 ? (
+              <View style={{ gap: 8 }}>
+                {/* Gratitude Win */}
+                <Text style={[styles.sectionSubtitle, { color: colors.muted }]}>
+                  Micro-Win or Gratitude
+                </Text>
+                <View style={styles.gratitudePillWrap}>
+                  {GRATITUDE_PROMPT_PRESETS.map((preset, i) => {
+                    const isSelected = gratitudeWin === preset;
+                    return (
+                      <Pressable
+                        key={i}
+                        onPress={() => {
+                          setGratitudeWin(isSelected ? '' : preset);
+                          try { Vibration.vibrate(15); } catch {}
+                        }}
+                        style={[
+                          styles.gratitudePill,
+                          {
+                            borderColor: isSelected ? colors.primary : colors.border,
+                            backgroundColor: isSelected ? (isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)') : 'transparent',
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.gratitudePillText, { color: isSelected ? (isLight ? '#1e6827' : colors.primary) : colors.text }]}>
+                          {preset}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Field
+                  label="Custom Micro-Win"
+                  value={gratitudeWin}
+                  onChangeText={setGratitudeWin}
+                  placeholder="e.g. Shipped clean refactor without regressions..."
+                />
+
+                {/* Notes */}
+                <Field
+                  label="Session Notes & Blockers"
+                  value={notes}
+                  onChangeText={setNotes}
+                  multiline
+                  placeholder="What went well or what challenges did you face today?"
+                />
+
+                {/* Real-time Summary Card Before Submission */}
+                <View style={[styles.checkInPreviewCard, { backgroundColor: isLight ? '#f8faf9' : 'rgba(255,255,255,0.03)', borderColor: colors.border }]}>
+                  <Text style={[styles.previewCardTitle, { color: colors.text }]}>Check-In Summary</Text>
+                  <View style={styles.previewMetricsRow}>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>
+                      Stress: <Text style={{ color: '#f472b6', fontWeight: '800' }}>{stress}/10</Text> · Mood: <Text style={{ color: '#c084fc', fontWeight: '800' }}>{mood}/10</Text> · Energy: <Text style={{ color: '#2dd4bf', fontWeight: '800' }}>{energy}/10</Text>
+                    </Text>
+                  </View>
+                  <View style={styles.previewMetricsRow}>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>
+                      Sleep: <Text style={{ color: colors.text, fontWeight: '700' }}>{sleepHours} hrs</Text> · Water: <Text style={{ color: colors.text, fontWeight: '700' }}>{waterLitres.toFixed(1)} L</Text> · Module: <Text style={{ color: colors.primary, fontWeight: '700' }}>{moduleId}</Text>
+                    </Text>
+                  </View>
+                  {selectedTags.length > 0 ? (
+                    <Text style={{ fontSize: 10, color: colors.muted, fontStyle: 'italic', marginTop: 2 }}>
+                      {selectedTags.join('  ')}
+                    </Text>
+                  ) : null}
+                </View>
+
+                {/* Step 3 Navigation */}
+                <View style={styles.stepNavigationRow}>
+                  <Button
+                    title="← Back to Physical"
+                    secondary
+                    onPress={() => {
+                      setCheckInStep(2);
+                      try { Vibration.vibrate(15); } catch {}
+                    }}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    title={saving ? 'Logging...' : 'Log Check-in (+15 XP) ✓'}
+                    disabled={saving}
+                    onPress={save}
+                    style={{ flex: 2 }}
+                  />
+                </View>
+              </View>
+            ) : null}
           </Card>
 
           {/* AI Burnout Risk Meter: Active Actionable Tool & 1-Tap Interventions */}
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Burnout Risk Assessment
+          </Text>
           <Card>
             <View style={styles.burnoutHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
@@ -1033,7 +1489,7 @@ export default function WellnessScreen() {
                   color={burnoutRisk.color}
                   style={{ flexShrink: 0 }}
                 />
-                <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Burnout Risk Assessment</Text>
+                <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Cognitive Strain Monitor</Text>
               </View>
               <View
                 style={[
@@ -1144,96 +1600,104 @@ export default function WellnessScreen() {
 
           {/* AI Task & Workflow Optimizer (Appears when task is specified) */}
           {taskDeconstruction ? (
-            <Card>
-              <View style={styles.optimizerHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
-                  <Ionicons name="sparkles" size={18} color="#06b6d4" style={{ flexShrink: 0 }} />
-                  <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Workflow Optimizer</Text>
-                </View>
-                {isHighStrain ? (
-                  <View style={[styles.strainBadge, { backgroundColor: 'rgba(244,114,182,0.2)', flexShrink: 0 }]}>
-                    <Text style={{ color: '#f472b6', fontSize: 10, fontWeight: '700' }}>High Strain</Text>
+            <>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                AI Workflow Optimizer
+              </Text>
+              <Card>
+                <View style={styles.optimizerHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
+                    <Ionicons name="sparkles" size={18} color="#06b6d4" style={{ flexShrink: 0 }} />
+                    <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Focus Decomposition</Text>
                   </View>
-                ) : null}
-              </View>
-
-              <Text style={[styles.optimizerAdvice, { color: colors.text }]}>
-                {taskDeconstruction.actionableAdvice}
-              </Text>
-
-              {/* Subtasks */}
-              <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 10 }]}>
-                Actionable Focus Slices
-              </Text>
-              {taskDeconstruction.subtasks.map((sub, i) => {
-                const done = !!completedSubtasks[sub.id];
-                return (
-                  <Pressable
-                    key={sub.id}
-                    onPress={() => setCompletedSubtasks((prev) => ({ ...prev, [sub.id]: !prev[sub.id] }))}
-                    style={[
-                      styles.subtaskItem,
-                      {
-                        backgroundColor: done
-                          ? isLight ? '#f1f5f3' : 'rgba(34,197,94,0.08)'
-                          : isLight ? '#ffffff' : 'rgba(255,255,255,0.04)',
-                        borderColor: done ? '#22c55e' : colors.border,
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={done ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={16}
-                      color={done ? '#22c55e' : colors.muted}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[
-                          styles.subtaskTitle,
-                          {
-                            color: done ? colors.muted : colors.text,
-                            textDecorationLine: done ? 'line-through' : 'none',
-                          },
-                        ]}
-                      >
-                        {i + 1}. {sub.title} ({sub.durationMinutes}m)
-                      </Text>
-                      <Text style={[styles.subtaskRationale, { color: colors.muted }]}>
-                        {sub.rationale}
-                      </Text>
+                  {isHighStrain ? (
+                    <View style={[styles.strainBadge, { backgroundColor: 'rgba(244,114,182,0.2)', flexShrink: 0 }]}>
+                      <Text style={{ color: '#f472b6', fontSize: 10, fontWeight: '700' }}>High Strain</Text>
                     </View>
-                  </Pressable>
-                );
-              })}
+                  ) : null}
+                </View>
 
-              {/* Curated External Resources */}
-              {taskDeconstruction.curatedResources.length > 0 ? (
-                <>
-                  <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 12 }]}>
-                    Curated Resources
-                  </Text>
-                  {taskDeconstruction.curatedResources.map((res) => (
-                    <TouchableOpacity
-                      key={res.id}
-                      onPress={() => openExternalResource(res.url)}
-                      style={[styles.resourceCard, { borderColor: colors.border }]}
+                <Text style={[styles.optimizerAdvice, { color: colors.text }]}>
+                  {taskDeconstruction.actionableAdvice}
+                </Text>
+
+                {/* Subtasks */}
+                <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 10 }]}>
+                  Actionable Focus Slices
+                </Text>
+                {taskDeconstruction.subtasks.map((sub, i) => {
+                  const done = !!completedSubtasks[sub.id];
+                  return (
+                    <Pressable
+                      key={sub.id}
+                      onPress={() => setCompletedSubtasks((prev) => ({ ...prev, [sub.id]: !prev[sub.id] }))}
+                      style={[
+                        styles.subtaskItem,
+                        {
+                          backgroundColor: done
+                            ? isLight ? '#f1f5f3' : 'rgba(34,197,94,0.08)'
+                            : isLight ? '#ffffff' : 'rgba(255,255,255,0.04)',
+                          borderColor: done ? '#22c55e' : colors.border,
+                        },
+                      ]}
                     >
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={styles.resourceBadge}>{res.badge}</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Text style={{ fontSize: 11, color: '#06b6d4', fontWeight: '700' }}>Open ↗</Text>
-                        </View>
+                      <Ionicons
+                        name={done ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={16}
+                        color={done ? '#22c55e' : colors.muted}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.subtaskTitle,
+                            {
+                              color: done ? colors.muted : colors.text,
+                              textDecorationLine: done ? 'line-through' : 'none',
+                            },
+                          ]}
+                        >
+                          {i + 1}. {sub.title} ({sub.durationMinutes}m)
+                        </Text>
+                        <Text style={[styles.subtaskRationale, { color: colors.muted }]}>
+                          {sub.rationale}
+                        </Text>
                       </View>
-                      <Text style={[styles.resourceTitle, { color: colors.text }]}>{res.title}</Text>
-                      <Text style={[styles.resourceDesc, { color: colors.muted }]}>{res.description}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </>
-              ) : null}
-            </Card>
+                    </Pressable>
+                  );
+                })}
+
+                {/* Curated External Resources */}
+                {taskDeconstruction.curatedResources.length > 0 ? (
+                  <>
+                    <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 12 }]}>
+                      Curated Resources
+                    </Text>
+                    {taskDeconstruction.curatedResources.map((res) => (
+                      <TouchableOpacity
+                        key={res.id}
+                        onPress={() => openExternalResource(res.url)}
+                        style={[styles.resourceCard, { borderColor: colors.border }]}
+                      >
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={styles.resourceBadge}>{res.badge}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Text style={{ fontSize: 11, color: '#06b6d4', fontWeight: '700' }}>Open ↗</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.resourceTitle, { color: colors.text }]}>{res.title}</Text>
+                        <Text style={[styles.resourceDesc, { color: colors.muted }]}>{res.description}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </>
+                ) : null}
+              </Card>
+            </>
           ) : null}
 
           {/* Quick Resets Collapsible Card */}
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Quick Resets &amp; Micro-Tools
+          </Text>
           <Card>
             <Pressable
               onPress={() => setResetSectionOpen(!resetSectionOpen)}
@@ -1241,7 +1705,9 @@ export default function WellnessScreen() {
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
                 <Ionicons name="leaf" size={18} color="#f472b6" style={{ flexShrink: 0 }} />
-                <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Quick Resets</Text>
+                <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>
+                  {activeResetTool === 'breathing' ? '4-7-8 Breathing Guide' : activeResetTool === 'pomodoro' ? '5-Min Decompression' : 'Gratitude Win Anchoring'}
+                </Text>
               </View>
               <Ionicons
                 name={resetSectionOpen ? 'chevron-up' : 'chevron-down'}
@@ -1382,9 +1848,12 @@ export default function WellnessScreen() {
         /* TAB 2: TRENDS & CORRELATION HEATMAP */
         <>
           {/* Time Range Filter */}
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Timeframe &amp; Averages
+          </Text>
           <Card>
             <View style={styles.timeRangeBar}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Timeframe</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>Range Filter</Text>
               <View style={styles.timeRangeButtons}>
                 {(['7D', '30D', 'SEMESTER'] as TimeRange[]).map((tr) => (
                   <Pressable
@@ -1437,10 +1906,13 @@ export default function WellnessScreen() {
           </Card>
 
           {/* Visual Trend Bars with Step 3 Baseline Equilibrium Line & Interactive Touch Tooltip */}
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Wellness Trajectory ({filteredEntries.length} entries)
+          </Text>
           <Card>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, width: '100%' }}>
-              <Text style={[styles.cardTitle, { color: colors.text, flex: 1, minWidth: 0 }]} numberOfLines={1}>
-                Wellness Trajectory ({filteredEntries.length} entries)
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, width: '100%', marginBottom: 4 }}>
+              <Text style={[styles.sectionSubtitle, { color: colors.muted, marginBottom: 0 }]}>
+                Stress / Mood / Energy Dynamics
               </Text>
               <View style={[styles.trendLegend, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.1)' }]}>
                 <View style={[styles.legendDot, { backgroundColor: '#f472b6' }]} />
@@ -1579,10 +2051,13 @@ export default function WellnessScreen() {
           </Card>
 
           {/* Academic vs. Wellness Correlation Heatmap: Step 3 Filter Active & Collapse Inactive */}
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Academic vs. Wellness Heatmap
+          </Text>
           <Card>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, width: '100%' }}>
-              <Text style={[styles.cardTitle, { color: colors.text, flex: 1, minWidth: 0 }]} numberOfLines={1}>
-                Academic vs. Wellness Heatmap
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, width: '100%', marginBottom: 4 }}>
+              <Text style={[styles.sectionSubtitle, { color: colors.muted, marginBottom: 0 }]}>
+                Strain By Subject / Module
               </Text>
               <View style={[styles.heatBadge, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.08)' }]}>
                 <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>
@@ -1703,189 +2178,103 @@ export default function WellnessScreen() {
         </>
       )}
 
-      {/* STEP 2: RECENT CHECK-IN HISTORY AS COHESIVE SESSION SUMMARIES */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 6, gap: 8, width: '100%' }}>
-        <Text style={[styles.historyHeader, { color: colors.text, flex: 1, minWidth: 0 }]} numberOfLines={1}>
-          Session Activity Stream ({clusteredSessions.length})
+      {/* RECENT CHECK-IN HISTORY AS ACCORDION & LATEST SESSION SUMMARY */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, marginBottom: 6, gap: 8, width: '100%' }}>
+        <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 0, marginBottom: 0, flex: 1, minWidth: 0 }]} numberOfLines={1}>
+          Recent Activity Logs ({clusteredSessions.length})
         </Text>
         <View style={[styles.clusteringBadge, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.08)' }]}>
           <Text style={{ fontSize: 10, fontWeight: '700', color: colors.muted }}>
-            45m Window Clustered
+            45m Clustered
           </Text>
         </View>
       </View>
 
-      {clusteredSessions.slice(0, 6).map((session) => {
-        const isMulti = session.entryCount > 1;
-        const isExpanded = !!expandedClusterIds[session.id];
-        const isHighStrain = session.netStrain >= 1.5;
-        const isFlow = session.netStrain <= -1.0;
-
-        return (
-          <Card key={session.id}>
-            <View style={styles.sessionHeaderRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
-                <Ionicons
-                  name={isMulti ? 'layers' : 'time-outline'}
-                  size={15}
-                  color={colors.primary}
-                  style={{ flexShrink: 0 }}
-                />
-                <Text style={[styles.sessionTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>
-                  {isMulti ? `Session Summary (${session.entryCount} Check-ins)` : 'Single Check-in'}
+      {clusteredSessions.length === 0 ? (
+        <Card>
+          <View style={{ alignItems: 'center', paddingVertical: 18, gap: 6 }}>
+            <Ionicons name="calendar-outline" size={32} color={colors.muted} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>No Logged Sessions Yet</Text>
+            <Text style={{ fontSize: 11, color: colors.muted, textAlign: 'center' }}>
+              Complete your first check-in above to track your strain, mood, and focus momentum.
+            </Text>
+          </View>
+        </Card>
+      ) : (
+        <>
+          {/* Latest Session Card (Always visible summary) */}
+          <Card>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <View style={[styles.latestSessionBadge, { backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)' }]}>
+                <Ionicons name="sparkles" size={11} color={isLight ? '#1e6827' : colors.primary} />
+                <Text style={[styles.latestSessionBadgeText, { color: isLight ? '#1e6827' : colors.primary }]}>
+                  Latest Session
                 </Text>
               </View>
-              <Text style={[styles.sessionTime, { color: colors.muted, flexShrink: 0 }]}>
-                {new Date(session.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                {isMulti ? ` – ${new Date(session.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+              <Text style={{ fontSize: 10, color: colors.muted }}>
+                {new Date(clusteredSessions[0].startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
               </Text>
             </View>
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 }}>
-              <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>
-                Module: {session.primaryModuleId.replace('_', ' ')}
-              </Text>
-              <View
-                style={[
-                  styles.strainPill,
-                  {
-                    backgroundColor: isHighStrain
-                      ? 'rgba(244,114,182,0.15)'
-                      : isFlow
-                      ? 'rgba(34,197,94,0.15)'
-                      : 'rgba(255,255,255,0.08)',
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    fontSize: 10,
-                    fontWeight: '700',
-                    color: isHighStrain ? '#f472b6' : isFlow ? '#22c55e' : colors.muted,
-                  }}
-                >
-                  Strain: {session.netStrain > 0 ? `+${session.netStrain}` : session.netStrain}
-                </Text>
-              </View>
-            </View>
-
-            {/* Averages Row */}
-            <View style={styles.entryMetricsRow}>
-              <Text style={[styles.entryPill, { color: '#f472b6', backgroundColor: 'rgba(244,114,182,0.1)' }]}>
-                {isMulti ? 'Avg Stress' : 'Stress'}: {session.avgStress}
-              </Text>
-              <Text style={[styles.entryPill, { color: '#c084fc', backgroundColor: 'rgba(192,132,252,0.1)' }]}>
-                {isMulti ? 'Avg Mood' : 'Mood'}: {session.avgMood}
-              </Text>
-              <Text style={[styles.entryPill, { color: '#2dd4bf', backgroundColor: 'rgba(45,212,191,0.1)' }]}>
-                {isMulti ? 'Avg Energy' : 'Energy'}: {session.avgEnergy}
-              </Text>
-              {session.sleepHours != null ? (
-                <Text style={[styles.entryPill, { color: colors.muted, backgroundColor: 'rgba(255,255,255,0.06)' }]}>
-                  🌙 {session.sleepHours}h
-                </Text>
-              ) : null}
-              {session.waterIntake != null ? (
-                <Text style={[styles.entryPill, { color: colors.muted, backgroundColor: 'rgba(255,255,255,0.06)' }]}>
-                  💧 {session.waterIntake}
-                </Text>
-              ) : null}
-            </View>
-
-            {/* Tasks in this session */}
-            {session.taskTitles.length > 0 ? (
-              <View style={{ marginTop: 6 }}>
-                {session.taskTitles.map((t, idx) => (
-                  <Text key={idx} style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
-                    ✓ {t}
-                  </Text>
-                ))}
-              </View>
-            ) : null}
-
-            {/* Cumulative Tags */}
-            {session.allTags.length > 0 ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-                {session.allTags.map((t) => (
-                  <Text key={t} style={{ fontSize: 10, color: colors.muted, fontStyle: 'italic' }}>
-                    {t}
-                  </Text>
-                ))}
-              </View>
-            ) : null}
-
-            {/* Wins */}
-            {session.gratitudeWins.length > 0 ? (
-              <View style={{ marginTop: 4 }}>
-                {session.gratitudeWins.map((w, idx) => (
-                  <Text key={idx} style={{ fontSize: 11, color: '#f59e0b' }}>
-                    ✨ Win: {w}
-                  </Text>
-                ))}
-              </View>
-            ) : null}
-
-            {/* Notes */}
-            {session.notes.length > 0 ? (
-              <View style={{ marginTop: 4 }}>
-                {session.notes.map((n, idx) => (
-                  <Text key={idx} style={[styles.summary, { color: colors.muted }]}>
-                    &ldquo;{n}&rdquo;
-                  </Text>
-                ))}
-              </View>
-            ) : null}
-
-            {/* Multi-entry Expandable micro-events */}
-            {isMulti ? (
-              <View style={{ marginTop: 8 }}>
-                <Pressable
-                  onPress={() =>
-                    setExpandedClusterIds((prev) => ({
-                      ...prev,
-                      [session.id]: !prev[session.id],
-                    }))
-                  }
-                  style={styles.microEventsToggle}
-                >
-                  <Text style={[styles.microEventsToggleText, { color: colors.primary }]}>
-                    {isExpanded ? 'Hide raw micro-events' : `Inspect ${session.entryCount} raw micro-logs`}
-                  </Text>
-                  <Ionicons
-                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                    size={14}
-                    color={colors.primary}
-                  />
-                </Pressable>
-
-                {isExpanded ? (
-                  <View style={styles.clusterSubEntries}>
-                    {session.entries.map((micro, mIdx) => (
-                      <View key={micro.id || mIdx} style={styles.clusterMicroRow}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 11, color: colors.muted, fontWeight: '700' }}>
-                            #{mIdx + 1} · {new Date(micro.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </Text>
-                          <Text style={{ fontSize: 11, color: colors.text }}>
-                            S:<Text style={{ color: '#f472b6' }}>{micro.stressLevel}</Text> · M:<Text style={{ color: '#c084fc' }}>{micro.mood}</Text> · E:<Text style={{ color: '#2dd4bf' }}>{micro.energyLevel}</Text>
-                          </Text>
-                        </View>
-                        {micro.notes ? (
-                          <Text style={{ fontSize: 10, color: colors.muted, fontStyle: 'italic', marginTop: 2 }}>
-                            {micro.notes}
-                          </Text>
-                        ) : null}
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            ) : null}
+            {renderSessionCardBody(clusteredSessions[0], clusteredSessions[0].entryCount > 1)}
           </Card>
-        );
-      })}
 
-      {/* STEP 5: DEVELOPER INTEGRATIONS & AUTOMATED ZERO-FRICTION HOOKS */}
+          {/* Expandable Accordion for Previous Sessions */}
+          {clusteredSessions.length > 1 ? (
+            <Card>
+              <Pressable
+                onPress={() => setIsSessionListExpanded(!isSessionListExpanded)}
+                style={styles.accordionHeaderRow}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                  <Ionicons name="archive-outline" size={18} color={colors.primary} />
+                  <Text style={[styles.accordionTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>
+                    {isSessionListExpanded ? 'Collapse Past Sessions' : `View Logged Sessions (${clusteredSessions.length - 1} earlier)`}
+                  </Text>
+                  <View style={[styles.accordionCountPill, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.08)' }]}>
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>
+                      +{clusteredSessions.length - 1}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name={isSessionListExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={18}
+                  color={colors.muted}
+                />
+              </Pressable>
+
+              {isSessionListExpanded ? (
+                <View style={{ marginTop: 12, gap: 12 }}>
+                  {clusteredSessions.slice(1, 10).map((session) => (
+                    <View
+                      key={session.id}
+                      style={[
+                        styles.pastSessionSubCard,
+                        {
+                          borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)',
+                          backgroundColor: isLight ? '#f8faf9' : 'rgba(255,255,255,0.02)',
+                        },
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.muted }}>
+                          {new Date(session.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                        </Text>
+                      </View>
+                      {renderSessionCardBody(session, session.entryCount > 1)}
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </Card>
+          ) : null}
+        </>
+      )}
+
+      {/* DEVELOPER INTEGRATIONS & AUTOMATED ZERO-FRICTION HOOKS */}
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        Developer Integrations
+      </Text>
       <Card>
         <Pressable
           onPress={() => setDevHooksOpen(!devHooksOpen)}
@@ -1894,7 +2283,7 @@ export default function WellnessScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
             <Ionicons name="git-branch" size={18} color="#3b82f6" style={{ flexShrink: 0 }} />
             <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>
-              Developer Integrations
+              Automated Telemetry &amp; Git Hooks
             </Text>
           </View>
           <Ionicons
@@ -1967,6 +2356,149 @@ export default function WellnessScreen() {
 }
 
 const styles = StyleSheet.create({
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  stepIndicatorContainer: {
+    marginBottom: 14,
+    width: '100%',
+  },
+  stepHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    width: '100%',
+  },
+  stepTitleText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  stepProgressBarTrack: {
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+    width: '100%',
+    marginBottom: 10,
+  },
+  stepProgressBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  stepDotsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    width: '100%',
+  },
+  stepDotBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 0,
+  },
+  stepDotCircle: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  stepDotNumber: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  stepDotLabel: {
+    fontSize: 10.5,
+    flexShrink: 1,
+  },
+  stepNavigationRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    width: '100%',
+  },
+  metricInputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    gap: 2,
+  },
+  metricTextInput: {
+    fontSize: 12,
+    fontWeight: '800',
+    minWidth: 32,
+    textAlign: 'center',
+    paddingVertical: 0,
+  },
+  metricUnitLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  checkInPreviewCard: {
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 4,
+    gap: 3,
+  },
+  previewCardTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  previewMetricsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  accordionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  accordionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  accordionCountPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 12,
+    flexShrink: 0,
+  },
+  latestSessionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  latestSessionBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  pastSessionSubCard: {
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
   tabBar: {
     flexDirection: 'row',
     borderRadius: 12,

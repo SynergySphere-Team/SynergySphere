@@ -1397,8 +1397,8 @@ export default function InterviewsScreen() {
               <Card key={item.id}>
                 <View style={{ gap: 8 }}>
                   <View style={styles.cardHeaderRow}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1, minWidth: 0, paddingRight: 6 }}>
-                      <Ionicons name="sparkles" size={15} color={primaryAccent} style={{ flexShrink: 0 }} />
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 7, flex: 1, minWidth: 0, paddingRight: 8 }}>
+                      <Ionicons name="sparkles" size={15} color={primaryAccent} style={{ flexShrink: 0, marginTop: 2 }} />
                       <Text style={[styles.cardTitleText, { color: colors.text }]}>{item.topic}</Text>
                     </View>
                     <View
@@ -1411,7 +1411,7 @@ export default function InterviewsScreen() {
                         },
                       ]}
                     >
-                      <Text style={[styles.levelBadgeText, { color: primaryAccent }]}>
+                      <Text numberOfLines={1} style={[styles.levelBadgeText, { color: primaryAccent }]}>
                         {item.status === 'Developing' ? 'Needs Practice' : item.status}
                       </Text>
                     </View>
@@ -1723,12 +1723,12 @@ export default function InterviewsScreen() {
             <Card key={tr.id}>
               <View style={{ gap: 8 }}>
                 <View style={styles.cardHeaderRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, paddingRight: 6 }}>
-                    <Ionicons name="code-slash" size={18} color={primaryAccent} style={{ flexShrink: 0 }} />
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, flex: 1, minWidth: 0, paddingRight: 8 }}>
+                    <Ionicons name="code-slash" size={18} color={primaryAccent} style={{ flexShrink: 0, marginTop: 2 }} />
                     <Text style={[styles.cardTitleText, { fontSize: 16, color: colors.text }]}>{tr.name}</Text>
                   </View>
                   <View style={[styles.tagBadge, { backgroundColor: `${primaryAccent}15`, flexShrink: 0, alignSelf: 'flex-start' }]}>
-                    <Text style={[styles.tagText, { color: primaryAccent }]}>{tr.category.toUpperCase()}</Text>
+                    <Text numberOfLines={1} style={[styles.tagText, { color: primaryAccent }]}>{tr.category.toUpperCase()}</Text>
                   </View>
                 </View>
 
@@ -2862,7 +2862,7 @@ const styles = StyleSheet.create({
   streakBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   focusBox: { padding: 10, borderRadius: 8, borderWidth: 1, gap: 4, marginVertical: 6 },
   levelBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, flexShrink: 0, alignSelf: 'flex-start' },
-  levelBadgeText: { fontSize: 11, fontWeight: '800' },
+  levelBadgeText: { fontSize: 11, fontWeight: '800', flexShrink: 0 },
   practiseNowBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },

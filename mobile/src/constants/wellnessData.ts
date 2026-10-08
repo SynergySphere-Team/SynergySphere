@@ -253,7 +253,8 @@ export const ENERGY_ANCHORS: Record<number, { label: string; desc: string; color
 };
 
 export const SLEEP_PRESETS = [5, 6, 7, 7.5, 8, 9];
-export const WATER_PRESETS = [4, 6, 8, 10];
+export const WATER_PRESETS = [1.0, 1.5, 2.0, 2.5, 3.0];
+export const WATER_STEP = 0.25;
 
 export const WELLNESS_MILESTONES = [
   {

@@ -13,12 +13,15 @@ import * as SecureStore from 'expo-secure-store';
 export type AccessibilityPreferences = {
   largerText: boolean;
   highContrast: boolean;
+  eyeComfort?: boolean;
   reduceMotion: boolean;
 };
 
 type AccessibilityContextValue = AccessibilityPreferences & {
+  eyeComfort: boolean;
   setLargerText(value: boolean): Promise<void>;
   setHighContrast(value: boolean): Promise<void>;
+  setEyeComfort(value: boolean): Promise<void>;
   setReduceMotion(value: boolean): Promise<void>;
   fontSize(size: number): number;
 };
@@ -26,6 +29,7 @@ type AccessibilityContextValue = AccessibilityPreferences & {
 const DEFAULT_PREFERENCES: AccessibilityPreferences = {
   largerText: false,
   highContrast: false,
+  eyeComfort: false,
   reduceMotion: false,
 };
 
@@ -49,10 +53,11 @@ async function readPreferences(): Promise<AccessibilityPreferences> {
     if (!raw) return DEFAULT_PREFERENCES;
 
     const parsed = JSON.parse(raw) as Partial<AccessibilityPreferences>;
-
+    const isComfort = Boolean(parsed.eyeComfort ?? parsed.highContrast);
     return {
       largerText: Boolean(parsed.largerText),
-      highContrast: Boolean(parsed.highContrast),
+      highContrast: isComfort,
+      eyeComfort: isComfort,
       reduceMotion: Boolean(parsed.reduceMotion),
     };
   } catch {
@@ -87,20 +92,19 @@ export function AccessibilityProvider({
     void readPreferences().then(setPreferences);
   }, []);
 
-  const updatePreference = useCallback(
-    async (
-      key: keyof AccessibilityPreferences,
-      enabled: boolean,
-    ) => {
-      const next = {
-        ...preferences,
-        [key]: enabled,
-      };
-
-      setPreferences(next);
+  const updatePreferences = useCallback(
+    async (patch: Partial<AccessibilityPreferences>) => {
+      let nextState: AccessibilityPreferences = DEFAULT_PREFERENCES;
+      setPreferences((prev) => {
+        nextState = {
+          ...prev,
+          ...patch,
+        };
+        return nextState;
+      });
 
       try {
-        await savePreferences(next);
+        await savePreferences(nextState);
       } catch (error) {
         console.error(
           'Unable to save accessibility preferences:',
@@ -108,18 +112,22 @@ export function AccessibilityProvider({
         );
       }
     },
-    [preferences],
+    [],
   );
 
   const value = useMemo<AccessibilityContextValue>(
     () => ({
       ...preferences,
+      eyeComfort: Boolean(preferences.eyeComfort ?? preferences.highContrast),
+      highContrast: Boolean(preferences.highContrast ?? preferences.eyeComfort),
       setLargerText: (enabled) =>
-        updatePreference('largerText', enabled),
+        updatePreferences({ largerText: enabled }),
       setHighContrast: (enabled) =>
-        updatePreference('highContrast', enabled),
+        updatePreferences({ highContrast: enabled, eyeComfort: enabled }),
+      setEyeComfort: (enabled) =>
+        updatePreferences({ eyeComfort: enabled, highContrast: enabled }),
       setReduceMotion: (enabled) =>
-        updatePreference('reduceMotion', enabled),
+        updatePreferences({ reduceMotion: enabled }),
 
       // 30% increase keeps layouts readable without making controls overflow.
       fontSize: (size) =>
@@ -127,7 +135,7 @@ export function AccessibilityProvider({
           ? Math.round(size * 1.3)
           : size,
     }),
-    [preferences, updatePreference],
+    [preferences, updatePreferences],
   );
 
   return (

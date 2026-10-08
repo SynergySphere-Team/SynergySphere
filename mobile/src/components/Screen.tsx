@@ -437,10 +437,6 @@ export function Screen({
     </SafeAreaView>
   );
 
-  if (!canPerformBack) {
-    return screenView;
-  }
-
   return (
     <GestureDetector gesture={composedSwipeGesture}>
       <Animated.View style={[{ flex: 1 }, animatedScreenStyle]}>

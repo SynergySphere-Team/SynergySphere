@@ -22,9 +22,11 @@ export default function AccessibilitySettingsScreen() {
 
   const {
     largerText,
+    eyeComfort,
     highContrast,
     reduceMotion,
     setLargerText,
+    setEyeComfort,
     setHighContrast,
     setReduceMotion,
     fontSize,
@@ -96,7 +98,7 @@ export default function AccessibilitySettingsScreen() {
   return (
     <Screen onBack={goBackToSettings}>
       <View style={styles.page}>
-        <Heading subtitle="Adjust text, contrast and motion preferences.">
+        <Heading subtitle="Adjust text, eye comfort and motion preferences.">
           Accessibility
         </Heading>
 
@@ -111,7 +113,7 @@ export default function AccessibilitySettingsScreen() {
             },
           ]}
         >
-          VISION
+          VISION & COMFORT
         </Text>
 
         <View
@@ -149,12 +151,12 @@ export default function AccessibilitySettingsScreen() {
           />
 
           <PreferenceRow
-            icon="contrast-outline"
-            title="High Contrast"
-            description="Increase visual contrast between text and interface elements."
-            value={highContrast}
+            icon="eye-outline"
+            title="Eye Comfort"
+            description="Warm tint and optimized contrast to reduce visual fatigue during long coding sessions."
+            value={eyeComfort}
             onValueChange={(value) =>
-              void setHighContrast(value)
+              void setEyeComfort(value)
             }
             colors={colors}
             accent={accent}
