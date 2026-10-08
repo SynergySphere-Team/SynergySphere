@@ -138,73 +138,77 @@ export default function AdminReportsPage() {
       </div>
 
       {/* ─── Table View ──────────────────────────────────────────────────────── */}
-      <Card className="border-white/[0.08] bg-[#071118]/90 overflow-hidden shadow-xl">
-        <CardHeader className="pb-3 border-b border-white/[0.06] flex flex-row items-center justify-between">
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-base font-bold text-white flex items-center gap-2">
-              <Icon className="h-4 w-4 text-emerald-400" />
-              {currentMeta.title} ({data.length} records)
-            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Icon className="h-4 w-4 text-primary" />
+              <h2 className="text-sm sm:text-base font-bold text-white">
+                {currentMeta.title} ({data.length} records)
+              </h2>
+            </div>
             <p className="text-xs text-muted-foreground mt-0.5">{currentMeta.desc}</p>
           </div>
           <Button
             variant="outline"
             size="sm"
             onClick={handleExportCsv}
-            className="h-7 text-xs border-white/[0.1] hover:bg-white/[0.05] gap-1"
+            className="h-8 text-xs border-white/[0.1] bg-black/40 hover:bg-white/[0.05] gap-1.5 self-start sm:self-auto shrink-0"
           >
-            <Download className="h-3 w-3" />
+            <Download className="h-3.5 w-3.5 text-primary" />
             Download CSV
           </Button>
-        </CardHeader>
+        </div>
 
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex h-64 items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
-            </div>
-          ) : data.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground">
-              No data records available for this report type.
-            </div>
-          ) : (
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead className="sticky top-0 bg-[#060c10] z-10">
-                  <tr className="border-b border-white/[0.08] text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {columns.map((col) => (
-                      <th key={col} className="py-3 px-4 whitespace-nowrap">
-                        {col.replace(/([A-Z])/g, ' $1').trim()}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.06]">
-                  {data.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-white/[0.02] transition">
-                      {columns.map((col) => {
-                        const val = row[col];
-                        const displayVal =
-                          val == null
-                            ? '—'
-                            : typeof val === 'object'
-                            ? JSON.stringify(val)
-                            : String(val);
-
-                        return (
-                          <td key={col} className="py-2.5 px-4 whitespace-nowrap font-mono text-[11px] text-white/90">
-                            {displayVal}
-                          </td>
-                        );
-                      })}
+        <Card className="border-white/[0.08] bg-[#071015]/85 overflow-hidden shadow-lg">
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="flex h-64 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : data.length === 0 ? (
+              <div className="p-12 text-center text-xs text-muted-foreground font-mono">
+                No data records available for this report type.
+              </div>
+            ) : (
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="sticky top-0 bg-[#060c10] z-10">
+                    <tr className="border-b border-white/[0.08] text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {columns.map((col) => (
+                        <th key={col} className="py-2.5 px-4 whitespace-nowrap">
+                          {col.replace(/([A-Z])/g, ' $1').trim()}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.06]">
+                    {data.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-white/[0.02] transition">
+                        {columns.map((col) => {
+                          const val = row[col];
+                          const displayVal =
+                            val == null
+                              ? '—'
+                              : typeof val === 'object'
+                              ? JSON.stringify(val)
+                              : String(val);
+
+                          return (
+                            <td key={col} className="py-2.5 px-4 whitespace-nowrap font-mono text-[11px] text-white/90">
+                              {displayVal}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

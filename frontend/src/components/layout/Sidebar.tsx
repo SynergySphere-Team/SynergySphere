@@ -80,10 +80,6 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-const adminItems = [
-  { href: '/admin', label: 'Analytics', icon: BarChart3 },
-];
-
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();

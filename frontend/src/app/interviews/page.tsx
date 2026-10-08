@@ -20,6 +20,8 @@ import {
   Zap,
   ArrowRight,
   Layers,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 
 interface Question {
@@ -175,6 +177,239 @@ export default function InterviewsPage() {
       debounceTimerRef.current = setTimeout(() => {
         triggerCritique(answers[step] || '', val, step, interview);
       }, 800);
+    }
+  }
+
+  const stepRef = useRef(step);
+  useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
+
+  const answersRef = useRef(answers);
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  const interviewRef = useRef(interview);
+  useEffect(() => {
+    interviewRef.current = interview;
+  }, [interview]);
+
+  const scratchCodesRef = useRef(scratchCodes);
+  useEffect(() => {
+    scratchCodesRef.current = scratchCodes;
+  }, [scratchCodes]);
+
+  const [isListening, setIsListening] = useState(false);
+  const [voiceVolume, setVoiceVolume] = useState(0);
+  const [liveTranscriptPreview, setLiveTranscriptPreview] = useState('');
+  const [speechError, setSpeechError] = useState<string | null>(null);
+
+  const recognitionRef = useRef<any>(null);
+  const isListeningRef = useRef<boolean>(false);
+  const initialTextRef = useRef<string>('');
+  const committedSpeechRef = useRef<string>('');
+  const lastSessionFinalRef = useRef<string>('');
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+
+  function stopMicAnalysis() {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    setVoiceVolume(0);
+  }
+
+  useEffect(() => {
+    return () => {
+      isListeningRef.current = false;
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      stopMicAnalysis();
+    };
+  }, []);
+
+  function toggleSpeechRecognition() {
+    if (isListeningRef.current) {
+      // User clicked stop
+      isListeningRef.current = false;
+      setIsListening(false);
+      setLiveTranscriptPreview('');
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+        recognitionRef.current = null;
+      }
+      stopMicAnalysis();
+      return;
+    }
+
+    setSpeechError(null);
+    const SpeechRecognition =
+      typeof window !== 'undefined'
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null;
+
+    if (!SpeechRecognition) {
+      setSpeechError('Web Speech API is not supported in this browser. Please use Google Chrome, Microsoft Edge, or Safari.');
+      return;
+    }
+
+    // Capture starting state
+    const currentStep = stepRef.current;
+    initialTextRef.current = answersRef.current[currentStep] || '';
+    committedSpeechRef.current = '';
+    lastSessionFinalRef.current = '';
+    isListeningRef.current = true;
+    setIsListening(true);
+    setLiveTranscriptPreview('Listening to microphone...');
+
+    try {
+      const rec = new SpeechRecognition();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'en-US';
+      rec.maxAlternatives = 1;
+
+      rec.onresult = (event: any) => {
+        let sessionFinal = '';
+        let sessionInterim = '';
+
+        for (let i = 0; i < event.results.length; i++) {
+          const res = event.results[i];
+          const text = res[0]?.transcript || '';
+          if (res.isFinal) {
+            sessionFinal += text + ' ';
+          } else {
+            sessionInterim += text;
+          }
+        }
+
+        lastSessionFinalRef.current = sessionFinal;
+        const currentSpoken = (committedSpeechRef.current + sessionFinal + sessionInterim).trim();
+        setLiveTranscriptPreview(currentSpoken || 'Listening...');
+
+        if (currentSpoken) {
+          const init = initialTextRef.current.trim();
+          const combined = init ? `${init} ${currentSpoken}` : currentSpoken;
+          setAnswers((prev) => {
+            const next = [...prev];
+            next[stepRef.current] = combined;
+            return next;
+          });
+
+          // Debounced AI critique update
+          if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+          if (interviewRef.current) {
+            debounceTimerRef.current = setTimeout(() => {
+              triggerCritique(combined, scratchCodesRef.current[stepRef.current] || '', stepRef.current, interviewRef.current!);
+            }, 800);
+          }
+        }
+      };
+
+      rec.onerror = (e: any) => {
+        console.warn('Speech recognition event:', e.error);
+        if (e.error === 'not-allowed') {
+          setSpeechError('Microphone permission was denied. Please allow microphone access in your browser.');
+          isListeningRef.current = false;
+          setIsListening(false);
+          stopMicAnalysis();
+        } else if (e.error === 'audio-capture') {
+          setSpeechError('No microphone detected or audio capture is blocked.');
+          isListeningRef.current = false;
+          setIsListening(false);
+          stopMicAnalysis();
+        }
+        // 'no-speech' is harmless and will be handled by onend auto-restart
+      };
+
+      rec.onend = () => {
+        if (isListeningRef.current) {
+          if (lastSessionFinalRef.current) {
+            committedSpeechRef.current += lastSessionFinalRef.current.trim() + ' ';
+            lastSessionFinalRef.current = '';
+          }
+          try {
+            rec.start();
+          } catch {
+            isListeningRef.current = false;
+            setIsListening(false);
+            stopMicAnalysis();
+          }
+        } else {
+          setIsListening(false);
+          stopMicAnalysis();
+        }
+      };
+
+      // Start recognition IMMEDIATELY in response to the user click gesture
+      rec.start();
+      recognitionRef.current = rec;
+    } catch (err: any) {
+      console.warn('Failed to start SpeechRecognition:', err);
+      setSpeechError('Could not start speech recognition: ' + (err.message || 'Unknown error'));
+      isListeningRef.current = false;
+      setIsListening(false);
+      return;
+    }
+
+    // Non-blocking microphone volume analysis (does not delay or block speech recognition)
+    if (navigator.mediaDevices?.getUserMedia) {
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => {
+          if (!isListeningRef.current) {
+            stream.getTracks().forEach((track) => track.stop());
+            return;
+          }
+          micStreamRef.current = stream;
+          try {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            if (AudioCtx) {
+              const ctx = new AudioCtx();
+              audioContextRef.current = ctx;
+              const source = ctx.createMediaStreamSource(stream);
+              const analyser = ctx.createAnalyser();
+              analyser.fftSize = 64;
+              source.connect(analyser);
+              analyserRef.current = analyser;
+
+              const dataArray = new Uint8Array(analyser.frequencyBinCount);
+              const checkVolume = () => {
+                if (!analyserRef.current || !isListeningRef.current) return;
+                analyserRef.current.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+                const avg = sum / dataArray.length;
+                setVoiceVolume(Math.min(100, Math.round((avg / 128) * 100)));
+                animFrameRef.current = requestAnimationFrame(checkVolume);
+              };
+              checkVolume();
+            }
+          } catch (e) {
+            console.warn('Volume meter setup failed:', e);
+          }
+        })
+        .catch(() => {
+          // Volume visualizer unavailable; SpeechRecognition is still running perfectly!
+        });
     }
   }
 
@@ -499,31 +734,92 @@ export default function InterviewsPage() {
                   </div>
 
                   {/* Tabs: Verbal Answer vs Scratch Code */}
-                  <div className="flex border-b border-white/[0.08]">
-                    <button
-                      onClick={() => setActiveTab('answer')}
-                      className={`flex items-center gap-1.5 border-b-2 px-4 py-2 text-xs font-bold transition ${
-                        activeTab === 'answer'
-                          ? 'border-primary text-primary'
-                          : 'border-transparent text-muted-foreground hover:text-white'
-                      }`}
-                    >
-                      <MessageCircle className="h-3.5 w-3.5" />
-                      Verbal Response / Reasoning
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('code')}
-                      className={`flex items-center gap-1.5 border-b-2 px-4 py-2 text-xs font-bold transition ${
-                        activeTab === 'code'
-                          ? 'border-primary text-primary'
-                          : 'border-transparent text-muted-foreground hover:text-white'
-                      }`}
-                    >
-                      <Code2 className="h-3.5 w-3.5" />
-                      Interactive Code Scratchpad
-                      {scratchCodes[step]?.trim() && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-                    </button>
+                  <div className="flex items-center justify-between border-b border-white/[0.08]">
+                    <div className="flex">
+                      <button
+                        onClick={() => setActiveTab('answer')}
+                        className={`flex items-center gap-1.5 border-b-2 px-4 py-2 text-xs font-bold transition ${
+                          activeTab === 'answer'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-muted-foreground hover:text-white'
+                        }`}
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Verbal Response / Reasoning
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('code')}
+                        className={`flex items-center gap-1.5 border-b-2 px-4 py-2 text-xs font-bold transition ${
+                          activeTab === 'code'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-muted-foreground hover:text-white'
+                        }`}
+                      >
+                        <Code2 className="h-3.5 w-3.5" />
+                        Interactive Code Scratchpad
+                        {scratchCodes[step]?.trim() && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                      </button>
+                    </div>
+
+                    {activeTab === 'answer' && (
+                      <div className="flex items-center gap-2">
+                        {isListening && (
+                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/20">
+                            <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
+                            <div className="flex items-end gap-0.5 h-3.5">
+                              {[0.3, 0.7, 1, 0.6, 0.4].map((ratio, idx) => {
+                                const h = Math.max(3, Math.min(14, Math.round((voiceVolume / 100) * 14 * ratio + 3)));
+                                return (
+                                  <span
+                                    key={idx}
+                                    className="w-1 bg-rose-400 rounded-full transition-all duration-75"
+                                    style={{ height: `${h}px` }}
+                                  />
+                                );
+                              })}
+                            </div>
+                            <span className="text-[10px] font-mono text-rose-300 ml-1">Live Mic</span>
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={toggleSpeechRecognition}
+                          className={`mr-2 flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                            isListening
+                              ? 'border-rose-500 bg-rose-500/20 text-rose-300 shadow-md shadow-rose-500/20'
+                              : 'border-white/10 bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white'
+                          }`}
+                        >
+                          {isListening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                          <span>{isListening ? 'Done Speaking (Stop)' : 'Voice Input (Mic)'}</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
+
+                  {speechError && (
+                    <div className="mx-4 mt-3 flex items-center justify-between rounded-lg border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-300">
+                      <span>{speechError}</span>
+                      <button
+                        onClick={() => setSpeechError(null)}
+                        className="text-rose-400 hover:text-white ml-2 text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+
+                  {isListening && (
+                    <div className="mx-4 mt-3 flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+                      <Mic className="h-3.5 w-3.5 shrink-0 text-emerald-400 animate-pulse" />
+                      <div className="min-w-0 flex-1">
+                        <span className="font-semibold text-emerald-400">Transcribing live: </span>
+                        <span className="italic text-white font-mono">
+                          {liveTranscriptPreview || 'Listening for speech…'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Input Fields */}
                   {activeTab === 'answer' ? (
@@ -531,7 +827,7 @@ export default function InterviewsPage() {
                       <textarea
                         value={answers[step] || ''}
                         onChange={(e) => handleAnswerChange(e.target.value)}
-                        placeholder="State your approach, trade-offs, internal mechanics, and time/space complexity..."
+                        placeholder="Speak into your microphone or type your explanation, architectural trade-offs, internal mechanics, and time/space complexity..."
                         className="h-36 w-full resize-none rounded-xl border border-white/[0.08] bg-black/35 p-3.5 text-sm leading-relaxed text-white outline-none transition focus:border-primary/40 focus:ring-1 focus:ring-primary/40"
                       />
                       <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">

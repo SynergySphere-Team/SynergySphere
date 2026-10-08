@@ -14,6 +14,8 @@ import {
   Layers3,
   Lightbulb,
   Upload,
+  Download,
+  Trash2,
 } from 'lucide-react';
 
 interface Flashcard {
@@ -63,6 +65,7 @@ export default function LectureToLifePage() {
   const [selected, setSelected] = useState<LectureUpload | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('Summary');
   const [loading, setLoading] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number | null>>({});
@@ -81,6 +84,54 @@ export default function LectureToLifePage() {
       setError('Could not load saved lecture packs from the backend.');
     }
   }, []);
+
+  async function clearAllSessions() {
+    if (!confirm('Are you sure you want to clear all saved lecture sessions? This cannot be undone.')) return;
+    setClearing(true);
+    setError('');
+    try {
+      await api('/ai/lecture-to-life', { method: 'DELETE' });
+      setUploads([]);
+      setSelected(null);
+    } catch {
+      setError('Could not clear saved sessions.');
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  async function deleteSession(id: string, e?: React.MouseEvent) {
+    if (e) e.stopPropagation();
+    setError('');
+    try {
+      await api(`/ai/lecture-to-life/${id}`, { method: 'DELETE' });
+      setUploads((prev) => {
+        const remaining = prev.filter((item) => item.id !== id);
+        if (selected?.id === id) {
+          setSelected(remaining[0] || null);
+        }
+        return remaining;
+      });
+    } catch {
+      setError('Could not delete this session.');
+    }
+  }
+
+  function downloadSummary() {
+    if (!selected?.summary) return;
+    const dateStr = new Date(selected.createdAt).toLocaleString();
+    const markdownContent = `# ${selected.fileName || 'Lecture'} - Study Summary\n\n**Generated:** ${dateStr}\n**Format:** ${selected.fileType.toUpperCase()}\n\n---\n\n${selected.summary}\n`;
+    const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeTitle = (selected.fileName || 'Lecture_Summary').replace(/[^a-zA-Z0-9_-]/g, '_');
+    link.download = `${safeTitle}_Summary.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
 
   useEffect(() => {
     loadUploads();
@@ -213,90 +264,144 @@ export default function LectureToLifePage() {
             <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
           )}
 
-          <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Upload className="h-4 w-4 text-primary" />
-                  Upload Lecture Content
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <input
-                  value={fileName}
-                  onChange={(e) => setFileName(e.target.value)}
-                  placeholder="Lecture title..."
-                  className="flex h-10 w-full rounded-lg border border-white/[0.08] bg-black/20 px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                />
-                <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="Paste lecture notes or upload a PDF/DOCX file — content will appear here..."
-                  className="h-52 w-full resize-none rounded-lg border border-white/[0.08] bg-black/20 p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-primary/30"
-                />
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pptx,.docx,.pdf,.txt,.md,.csv"
-                  className="hidden"
-                  onChange={onFileChange}
-                />
-                <div
-                  ref={dropRef}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={onDrop}
-                  className="rounded-lg border border-dashed border-primary/25 bg-primary/5 p-8 text-center"
-                >
-                  <FileText className="mx-auto mb-3 h-8 w-8 text-primary" />
-                  <p className="text-sm font-semibold text-white">Drag and drop lecture files here</p>
-                  <p className="mt-1 text-xs text-muted-foreground">PPTX, DOCX, PDF, TXT, and MD supported</p>
-                  <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} disabled={extracting}>
-                      {extracting ? 'Reading file...' : 'Choose File'}
-                    </Button>
-                    <Button onClick={convert} disabled={loading || extracting || content.trim().length < 20}>
-                      {loading ? 'Generating...' : 'Generate Study Pack'}
-                    </Button>
+          <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+            {/* Upload Section */}
+            <div>
+              <div className="mb-2.5 flex items-center gap-2">
+                <Upload className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-white">Upload Lecture Content</h2>
+              </div>
+              <Card>
+                <CardContent className="space-y-4 pt-6">
+                  <input
+                    value={fileName}
+                    onChange={(e) => setFileName(e.target.value)}
+                    placeholder="Lecture title..."
+                    className="flex h-10 w-full rounded-lg border border-white/[0.08] bg-black/20 px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                  <textarea
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    placeholder="Paste lecture notes or upload a PDF/DOCX file — content will appear here..."
+                    className="h-52 w-full resize-none rounded-lg border border-white/[0.08] bg-black/20 p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pptx,.docx,.pdf,.txt,.md,.csv"
+                    className="hidden"
+                    onChange={onFileChange}
+                  />
+                  <div
+                    ref={dropRef}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={onDrop}
+                    className="rounded-lg border border-dashed border-primary/25 bg-primary/5 p-8 text-center"
+                  >
+                    <FileText className="mx-auto mb-3 h-8 w-8 text-primary" />
+                    <p className="text-sm font-semibold text-white">Drag and drop lecture files here</p>
+                    <p className="mt-1 text-xs text-muted-foreground">PPTX, DOCX, PDF, TXT, and MD supported</p>
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} disabled={extracting}>
+                        {extracting ? 'Reading file...' : 'Choose File'}
+                      </Button>
+                      <Button onClick={convert} disabled={loading || extracting || content.trim().length < 20}>
+                        {loading ? 'Generating...' : 'Generate Study Pack'}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+            {/* Saved Sessions Section */}
+            <div>
+              <div className="mb-2.5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
                   <BookOpen className="h-4 w-4 text-primary" />
-                  Recent Uploads
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {uploads.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No lecture packs yet. Upload your first slides above.</p>
-                ) : (
-                  uploads.map((upload) => (
-                    <button
-                      key={upload.id}
-                      onClick={() => setSelected(upload)}
-                      className={`flex w-full items-center justify-between rounded-lg border p-3 text-left transition ${
-                        selected?.id === upload.id ? 'border-primary/35 bg-primary/10' : 'border-white/[0.07] bg-secondary/40'
-                      }`}
-                    >
-                      <div>
-                        <p className="text-sm font-semibold text-white">{upload.fileName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {upload.fileType.toUpperCase()} · {new Date(upload.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <span className="text-primary">→</span>
-                    </button>
-                  ))
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-white">Saved Sessions</h2>
+                  {uploads.length > 0 && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                      {uploads.length}
+                    </span>
+                  )}
+                </div>
+                {uploads.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllSessions}
+                    disabled={clearing}
+                    className="h-7 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    {clearing ? 'Clearing...' : 'Clear Saved Sessions'}
+                  </Button>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+              <Card>
+                <CardContent className="space-y-3 pt-6">
+                  {uploads.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No lecture packs yet. Upload your first slides above.</p>
+                  ) : (
+                    uploads.map((upload) => (
+                      <div
+                        key={upload.id}
+                        onClick={() => setSelected(upload)}
+                        className={`group flex w-full cursor-pointer items-center justify-between rounded-lg border p-3 text-left transition ${
+                          selected?.id === upload.id
+                            ? 'border-primary/35 bg-primary/10'
+                            : 'border-white/[0.07] bg-secondary/40 hover:border-white/[0.15]'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-white">{upload.fileName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {upload.fileType.toUpperCase()} · {new Date(upload.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => deleteSession(upload.id, e)}
+                            className="rounded p-1 text-muted-foreground opacity-60 transition hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                            title="Delete session"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="text-primary text-sm">→</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           {selected && (
-            <div className="mt-4">
+            <div className="mt-6">
+              {/* Heading Outside the Card */}
+              <div className="mb-2.5 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Layers3 className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-white">
+                    Study Pack: {selected.fileName}
+                  </h2>
+                </div>
+                {selected.summary && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadSummary}
+                    className="h-8 gap-1.5 border-primary/30 text-xs text-primary hover:bg-primary/10"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download Summary (.md)
+                  </Button>
+                )}
+              </div>
+
               <Card>
                 <CardHeader>
                   <div className="flex flex-wrap gap-2">
@@ -318,13 +423,34 @@ export default function LectureToLifePage() {
                 <CardContent>
                   {activeTab === 'Summary' && (
                     <div>
-                      <h2 className="mb-3 text-base font-semibold text-white">Summary — {selected.fileName}</h2>
-                      <p className="text-sm leading-7 text-muted-foreground">
+                      <div className="mb-3 flex items-center justify-between">
+                        <h3 className="text-base font-semibold text-white">Summary — {selected.fileName}</h3>
+                        {selected.summary && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={downloadSummary}
+                            className="h-7 gap-1 text-xs"
+                          >
+                            <Download className="h-3 w-3" />
+                            Download Summary
+                          </Button>
+                        )}
+                      </div>
+                      <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
                         {selected.summary || 'No summary generated yet.'}
                       </p>
-                      <Button variant="secondary" size="sm" className="mt-5" onClick={regenerate} disabled={loading}>
-                        {loading ? 'Regenerating...' : 'Regenerate Materials'}
-                      </Button>
+                      <div className="mt-5 flex flex-wrap items-center gap-2">
+                        <Button variant="secondary" size="sm" onClick={regenerate} disabled={loading}>
+                          {loading ? 'Regenerating...' : 'Regenerate Materials'}
+                        </Button>
+                        {selected.summary && (
+                          <Button variant="outline" size="sm" onClick={downloadSummary} className="gap-1.5 text-xs">
+                            <Download className="h-3.5 w-3.5" />
+                            Download Summary
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   )}
 

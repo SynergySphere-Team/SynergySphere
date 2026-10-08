@@ -516,6 +516,17 @@ export default function PortfolioPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               Level {user?.level ?? 1} · {user?.xp ?? 0} XP · Verified skills computed directly from Learning Hub progress
             </p>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {effectiveSkills.slice(0, 6).map(([sName, sLevel]) => (
+                <span
+                  key={sName}
+                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary shadow-sm"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {sName} · {sLevel}%
+                </span>
+              ))}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button

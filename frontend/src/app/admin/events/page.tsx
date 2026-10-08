@@ -262,7 +262,18 @@ export default function AdminEventsPage() {
       )}
 
       {/* ─── Events Table ────────────────────────────────────────────────────── */}
-      <Card className="border-white/[0.08] bg-[#071118]/90 overflow-hidden shadow-xl">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-primary" />
+            <h2 className="text-sm sm:text-base font-bold text-white">
+              Scheduled Platform Workshops & Events ({events.length})
+            </h2>
+          </div>
+          <span className="text-[11px] text-muted-foreground font-mono">Engineering calendar</span>
+        </div>
+
+        <Card className="border-white/[0.08] bg-[#071015]/85 overflow-hidden shadow-lg">
         {loading ? (
           <div className="flex h-64 items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
@@ -370,6 +381,7 @@ export default function AdminEventsPage() {
           </div>
         )}
       </Card>
+      </div>
 
       {/* ─── Modal 1: Create or Edit Event ───────────────────────────────────── */}
       {(createModalOpen || editingEvent) && (

@@ -186,15 +186,19 @@ export default function FlaggedContentPage() {
       )}
 
       {/* ─── Reported User Misconduct / Complaints Queue ──────────────────────── */}
-      <Card className="border-white/[0.08] bg-[#071118]/90 overflow-hidden shadow-xl">
-        <CardHeader className="pb-3 border-b border-white/[0.06] flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-orange-400" />
-            Reported Violations Awaiting Moderator Review ({complaintsQueue.length})
-          </CardTitle>
+            <h2 className="text-sm sm:text-base font-bold text-white">
+              Reported Violations Awaiting Moderator Review ({complaintsQueue.length})
+            </h2>
+          </div>
           <span className="text-[11px] text-muted-foreground font-mono">Context Review Required</span>
-        </CardHeader>
-        <CardContent className="p-0">
+        </div>
+
+        <Card className="border-white/[0.08] bg-[#071015]/85 overflow-hidden shadow-lg">
+          <CardContent className="p-0">
           {loading ? (
             <div className="flex h-36 items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-rose-400" />
@@ -263,17 +267,22 @@ export default function FlaggedContentPage() {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* ─── High Flag Count Forum Posts ─────────────────────────────────────── */}
-      <Card className="border-white/[0.08] bg-[#071118]/90 overflow-hidden shadow-xl">
-        <CardHeader className="pb-3 border-b border-white/[0.06] flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-rose-400" />
-            Flagged Forum Threads ({flaggedPosts.length})
-          </CardTitle>
+            <h2 className="text-sm sm:text-base font-bold text-white">
+              Flagged Forum Threads ({flaggedPosts.length})
+            </h2>
+          </div>
           <span className="text-[11px] text-muted-foreground font-mono">Flag Threshold Exceeded</span>
-        </CardHeader>
-        <CardContent className="p-0">
+        </div>
+
+        <Card className="border-white/[0.08] bg-[#071015]/85 overflow-hidden shadow-lg">
+          <CardContent className="p-0">
           {flaggedPosts.length === 0 ? (
             <div className="p-8 text-center text-xs text-muted-foreground">
               No community posts have active flags.
@@ -331,6 +340,7 @@ export default function FlaggedContentPage() {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* ─── Inspection Modal ────────────────────────────────────────────────── */}
       {activeItem && (

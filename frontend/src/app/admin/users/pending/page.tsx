@@ -174,16 +174,19 @@ export default function PendingApprovalsPage() {
       )}
 
       {/* ─── Pending Users List ──────────────────────────────────────────────── */}
-      <Card className="border-white/[0.08] bg-[#071118]/90 overflow-hidden shadow-xl">
-        <CardHeader className="pb-3 border-b border-white/[0.06] flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-            <Clock className="h-4 w-4 text-amber-400" />
-            Awaiting Verification ({pendingUsers.length})
-          </CardTitle>
-          <span className="text-xs text-muted-foreground font-mono">Requires Admin Approval</span>
-        </CardHeader>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary" />
+            <h2 className="text-sm sm:text-base font-bold text-white">
+              Awaiting Verification ({pendingUsers.length})
+            </h2>
+          </div>
+          <span className="text-[11px] text-muted-foreground font-mono">Requires Admin Approval</span>
+        </div>
 
-        <CardContent className="p-0">
+        <Card className="border-white/[0.08] bg-[#071015]/85 overflow-hidden shadow-lg">
+          <CardContent className="p-0">
           {loading ? (
             <div className="flex h-48 items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
@@ -265,6 +268,7 @@ export default function PendingApprovalsPage() {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* ─── Modal: Reject Application Dialog ────────────────────────────────── */}
       {rejectUser && (

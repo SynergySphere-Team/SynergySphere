@@ -190,18 +190,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ];
 
   return (
-    <div className="min-h-screen bg-[#03070a] text-foreground">
+    <div
+      className="relative min-h-screen text-foreground overflow-x-hidden"
+      style={{
+        background: `
+          linear-gradient(135deg, rgba(126, 211, 83, 0.08), transparent 28%),
+          linear-gradient(225deg, rgba(43, 168, 105, 0.08), transparent 30%),
+          linear-gradient(180deg, #020506 0%, #071015 48%, #030608 100%)
+        `,
+      }}
+    >
+      <div className="fixed inset-0 dashboard-grid opacity-50 pointer-events-none z-0" />
       {/* ─── Admin Sidebar ───────────────────────────────────────────────────── */}
-      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col md:flex border-r border-white/[0.08] bg-[#050a0e]/95 backdrop-blur-xl">
+      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col md:flex border-r border-white/[0.08] bg-[#050a0e]/90 backdrop-blur-xl">
         {/* Brand & Portal Badge */}
         <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3.5">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-400 font-bold text-xs shrink-0 shadow-md shadow-amber-500/10">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/30 bg-primary/10 text-primary font-bold text-xs shrink-0 shadow-md shadow-primary/20">
               <ShieldCheck className="h-4 w-4" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-xs font-bold text-white tracking-tight">SynergySphere</h1>
-              <p className="text-[10px] uppercase tracking-wider text-amber-400/90 font-mono font-semibold">
+              <p className="text-[10px] uppercase tracking-wider text-primary font-mono font-semibold">
                 Admin Portal
               </p>
             </div>
@@ -240,12 +250,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       href={item.href}
                       className={`group flex items-center justify-between rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
                         isActive
-                          ? 'border-amber-500/30 bg-amber-500/[0.12] text-amber-300 font-semibold shadow-inner shadow-amber-500/10'
+                          ? 'border-primary/40 bg-primary/[0.12] text-primary font-semibold shadow-inner shadow-primary/10'
                           : 'border-transparent text-muted-foreground hover:border-white/[0.06] hover:bg-white/[0.04] hover:text-white'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 truncate">
-                        <Icon className={`h-4 w-4 shrink-0 transition-colors ${isActive ? 'text-amber-400' : 'text-muted-foreground group-hover:text-amber-400'}`} />
+                        <Icon className={`h-4 w-4 shrink-0 transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'}`} />
                         <span className="truncate">{item.label}</span>
                       </div>
                       {item.badge !== undefined && (
@@ -296,9 +306,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* ─── Main Content Wrapper ────────────────────────────────────────────── */}
-      <div className="min-h-screen md:ml-64">
+      <div className="relative z-10 min-h-screen md:ml-64">
         {/* Top Header */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/[0.08] bg-[#04080b]/85 px-3 sm:px-6 backdrop-blur-xl gap-2">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/[0.08] bg-[#030608]/85 px-3 sm:px-6 backdrop-blur-xl gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             {/* Mobile Sidebar Hamburger Toggle */}
             <button
@@ -311,12 +321,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </button>
 
             <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
-              <ShieldCheck className="h-4 w-4 text-amber-400 shrink-0" />
+              <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
               <span className="font-semibold text-white truncate max-w-[110px] sm:max-w-none">
                 Admin Console
               </span>
               <span className="hidden sm:inline text-white/20">/</span>
-              <span className="hidden sm:inline capitalize text-amber-400/90 font-mono text-[11px] truncate">
+              <span className="hidden sm:inline capitalize text-primary font-mono text-[11px] truncate">
                 {pathname.replace('/admin', '').replace('/', ' → ') || 'Dashboard'}
               </span>
             </div>

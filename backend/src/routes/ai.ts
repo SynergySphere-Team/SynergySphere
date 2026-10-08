@@ -667,4 +667,24 @@ router.get('/lecture-to-life', async (req: AuthRequest, res) => {
   res.json(uploads);
 });
 
+router.delete('/lecture-to-life', async (req: AuthRequest, res) => {
+  await query('DELETE FROM "LectureUpload" WHERE "userId" = $1', [req.user!.userId]);
+  res.json({ message: 'All saved lecture sessions cleared.' });
+});
+
+router.delete('/lecture-to-life/:id', async (req: AuthRequest, res) => {
+  const deleted = await queryOne<{ id: string }>(
+    `DELETE FROM "LectureUpload"
+     WHERE "id" = $1 AND "userId" = $2
+     RETURNING "id"`,
+    [paramId(req), req.user!.userId],
+  );
+  if (!deleted) {
+    res.status(404).json({ error: 'Session not found' });
+    return;
+  }
+  res.json({ message: 'Lecture session deleted.', id: deleted.id });
+});
+
 export default router;
+

@@ -312,10 +312,16 @@ export default function InterviewsScreen() {
   const [hintsUsedCount, setHintsUsedCount] = useState(0);
   const [hintLoading, setHintLoading] = useState(false);
 
-  // Voice recording mock / speech-to-text
+  // Voice recording & live speech-to-text
   const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false);
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const speechRecognitionRef = useRef<any>(null);
+  const recordedSpeechRef = useRef<string>('');
 
   // Timer states (timestamp based)
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -642,21 +648,87 @@ export default function InterviewsScreen() {
     };
   }, [activeInterview, startTime]);
 
-  // Voice recording mock / speech transcription
+  // Real voice recording & speech transcription
   const toggleRecording = () => {
-    if (isRecording) {
+    if (isRecordingRef.current) {
+      isRecordingRef.current = false;
       setIsRecording(false);
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-      const transcriptAppend = ` [Spoken response]: In production environments, I emphasize defensive programming, modular interfaces, and deterministic error handling with telemetry logging.`;
-      const currentAnswer = answers[step] || '';
-      const updated = currentAnswer + transcriptAppend;
-      const nextAnswers = [...answers];
-      nextAnswers[step] = updated;
-      setAnswers(nextAnswers);
-      triggerCritique(updated, step);
+      if (speechRecognitionRef.current) {
+        try {
+          speechRecognitionRef.current.stop();
+        } catch {
+          // ignore
+        }
+        speechRecognitionRef.current = null;
+      }
+      triggerCritique(answers[step] || '', step);
+      recordedSpeechRef.current = '';
     } else {
+      isRecordingRef.current = true;
       setIsRecording(true);
       setRecordingSeconds(0);
+      recordedSpeechRef.current = '';
+
+      const SpeechRecognition =
+        typeof window !== 'undefined'
+          ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+          : null;
+
+      if (SpeechRecognition) {
+        try {
+          const baseAnswer = answers[step] || '';
+          let committed = '';
+          let lastFinal = '';
+          const rec = new SpeechRecognition();
+          rec.continuous = true;
+          rec.interimResults = true;
+          rec.lang = 'en-US';
+          rec.onresult = (e: any) => {
+            let sessionFinal = '';
+            let sessionInterim = '';
+            for (let i = 0; i < e.results.length; i++) {
+              const res = e.results[i];
+              const t = res[0]?.transcript || '';
+              if (res.isFinal) {
+                sessionFinal += t + ' ';
+              } else {
+                sessionInterim += t;
+              }
+            }
+            lastFinal = sessionFinal;
+            const clean = (committed + sessionFinal + sessionInterim).trim();
+            if (clean) {
+              recordedSpeechRef.current = clean;
+              const liveAnswer = baseAnswer ? `${baseAnswer} ${clean}` : clean;
+              setAnswers((prev) => {
+                const next = [...prev];
+                next[step] = liveAnswer;
+                return next;
+              });
+            }
+          };
+          rec.onerror = (e: any) => {
+            console.warn('SpeechRecognition error:', e);
+          };
+          rec.onend = () => {
+            if (isRecordingRef.current) {
+              if (lastFinal) {
+                committed += lastFinal.trim() + ' ';
+                lastFinal = '';
+              }
+              try {
+                rec.start();
+              } catch {}
+            }
+          };
+          rec.start();
+          speechRecognitionRef.current = rec;
+        } catch (err) {
+          console.warn('Could not start speech recognition:', err);
+        }
+      }
+
       recordingTimerRef.current = setInterval(() => {
         setRecordingSeconds((s) => s + 1);
       }, 1000);
@@ -2183,7 +2255,7 @@ export default function InterviewsScreen() {
               >
                 <Ionicons name={isRecording ? 'stop-circle' : 'mic-outline'} size={15} color={isRecording ? '#fff' : colors.text} />
                 <Text style={[styles.voiceBtnText, { color: isRecording ? '#fff' : colors.text }]}>
-                  {isRecording ? `Recording (${recordingSeconds}s)...` : 'Simulate Voice'}
+                  {isRecording ? `Recording (${recordingSeconds}s)...` : 'Voice Input (Mic)'}
                 </Text>
               </Pressable>
 

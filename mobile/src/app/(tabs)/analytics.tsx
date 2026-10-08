@@ -55,6 +55,14 @@ export default function AnalyticsScreen() {
   const isLight = theme === 'light';
   const primaryAccent = isLight ? '#1e6827' : colors.primary;
 
+  useEffect(() => {
+    if (user?.role === 'ADMIN') {
+      router.replace('/admin?tab=reports' as never);
+    } else {
+      router.replace('/' as never);
+    }
+  }, [user?.role, router]);
+
   const loadData = useCallback(async () => {
     try {
       setError('');

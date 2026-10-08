@@ -15,13 +15,6 @@ interface VoiceWaveformInputProps {
   accentColor?: string;
 }
 
-const SAMPLE_SPEECH_SNIPPETS = [
-  'In production environments, I emphasize defensive programming, modular interfaces, and deterministic error handling with OpenTelemetry tracing.',
-  'To maintain high throughput, I utilize in-memory token bucket counters within Redis to isolate noisy neighbors and enforce tiered rate limits.',
-  'When faced with high write contention, we partitioned the database horizontally and introduced idempotent messaging queues to decouple processing.',
-  'I chose a prefix sum hash map approach because it provides strict O(N) time complexity in a single linear pass over the data array.',
-];
-
 export function VoiceWaveformInput({
   onAppendTranscription,
   accentColor = '#059669',
@@ -30,31 +23,68 @@ export function VoiceWaveformInput({
   const isLight = theme === 'light';
 
   const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false);
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
   const [seconds, setSeconds] = useState(0);
   const [transcription, setTranscription] = useState('');
   const [showEditor, setShowEditor] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
 
   // Animated heights for 8 waveform meter bars
   const barHeights = useRef(
-    new Array(8).fill(0).map(() => new Animated.Value(12))
+    new Array(8).fill(0).map(() => new Animated.Value(10))
   ).current;
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const waveAnimRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const speechRecRef = useRef<any>(null);
+  const audioContextRef = useRef<any>(null);
+  const analyserRef = useRef<any>(null);
+  const mediaStreamRef = useRef<any>(null);
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (waveAnimRef.current) clearInterval(waveAnimRef.current);
+      cleanupAudio();
     };
   }, []);
 
-  function toggleRecord() {
+  function cleanupAudio() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (waveAnimRef.current) clearInterval(waveAnimRef.current);
+    if (speechRecRef.current) {
+      try {
+        speechRecRef.current.stop();
+      } catch {
+        // ignore
+      }
+      speechRecRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      try {
+        mediaStreamRef.current.getTracks?.().forEach((t: any) => t.stop());
+      } catch {
+        // ignore
+      }
+      mediaStreamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close?.();
+      } catch {
+        // ignore
+      }
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+  }
+
+  async function toggleRecord() {
     if (isRecording) {
       // Stop recording
       setIsRecording(false);
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (waveAnimRef.current) clearInterval(waveAnimRef.current);
+      cleanupAudio();
 
       // Reset bars to idle
       barHeights.forEach((b) => {
@@ -64,33 +94,117 @@ export function VoiceWaveformInput({
         }).start();
       });
 
-      // Generate realistic simulated transcription snippet
-      const randomSnippet =
-        SAMPLE_SPEECH_SNIPPETS[Math.floor(Math.random() * SAMPLE_SPEECH_SNIPPETS.length)];
-      setTranscription(randomSnippet);
       setShowEditor(true);
+      setStatusMessage('');
     } else {
       // Start recording
       setIsRecording(true);
       setSeconds(0);
       setTranscription('');
       setShowEditor(false);
+      setStatusMessage('Listening to microphone...');
 
+      // 1. Setup AudioContext and mic input for real-time waveform if available
+      try {
+        if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaStreamRef.current = stream;
+
+          const AudioContextClass =
+            (typeof window !== 'undefined' &&
+              ((window as any).AudioContext || (window as any).webkitAudioContext)) ||
+            null;
+
+          if (AudioContextClass) {
+            const ctx = new AudioContextClass();
+            audioContextRef.current = ctx;
+            const source = ctx.createMediaStreamSource(stream);
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 32;
+            source.connect(analyser);
+            analyserRef.current = analyser;
+          }
+        }
+      } catch (err) {
+        console.warn('Microphone stream access notice:', err);
+      }
+
+      // 2. Setup Speech Recognition
+      const SpeechRecognition =
+        typeof window !== 'undefined'
+          ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+          : null;
+
+      if (SpeechRecognition) {
+        try {
+          const rec = new SpeechRecognition();
+          rec.continuous = true;
+          rec.interimResults = true;
+          rec.lang = 'en-US';
+
+          rec.onresult = (event: any) => {
+            let fullText = '';
+            for (let i = 0; i < event.results.length; i++) {
+              fullText += event.results[i][0].transcript + ' ';
+            }
+            const clean = fullText.trim();
+            if (clean) {
+              setTranscription(clean);
+            }
+          };
+
+          rec.onerror = (event: any) => {
+            console.warn('SpeechRecognition error:', event);
+            if (event.error === 'not-allowed') {
+              setStatusMessage('Microphone access was denied. Please allow microphone permissions.');
+            }
+          };
+
+          rec.onend = () => {
+            if (isRecordingRef.current) {
+              try {
+                rec.start();
+              } catch {}
+            }
+          };
+
+          rec.start();
+          speechRecRef.current = rec;
+        } catch (err) {
+          console.warn('Failed to start SpeechRecognition:', err);
+        }
+      } else {
+        setStatusMessage('Listening (speak into mic)... Speech recognition operates in supported browsers.');
+      }
+
+      // 3. Seconds timer
       timerRef.current = setInterval(() => {
         setSeconds((s) => s + 1);
       }, 1000);
 
-      // Animate waveform bars periodically
+      // 4. Animate waveform bars according to real mic input if analyser is available, else audio pulse
       waveAnimRef.current = setInterval(() => {
-        barHeights.forEach((b) => {
-          const targetHeight = Math.floor(Math.random() * 32) + 8;
+        let volumes: number[] = [];
+        if (analyserRef.current) {
+          const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+          analyserRef.current.getByteFrequencyData(dataArray);
+          for (let i = 0; i < barHeights.length; i++) {
+            const raw = dataArray[i % dataArray.length] || 0;
+            // Map 0-255 to 8-40px height
+            volumes.push(Math.max(8, Math.min(42, Math.round((raw / 255) * 36) + 8)));
+          }
+        } else {
+          volumes = barHeights.map(() => Math.floor(Math.random() * 26) + 8);
+        }
+
+        barHeights.forEach((b, idx) => {
           Animated.timing(b, {
-            toValue: targetHeight,
-            duration: 140,
+            toValue: volumes[idx] || 10,
+            duration: 100,
             useNativeDriver: false,
           }).start();
         });
-      }, 150);
+      }, 110);
     }
   }
 
@@ -119,8 +233,8 @@ export function VoiceWaveformInput({
           </View>
           <Text style={[styles.subText, { color: colors.muted }]}>
             {isRecording
-              ? 'Speaking response... Speak naturally to test verbal delivery.'
-              : 'Tap to dictate your response aloud as in a real interview.'}
+              ? (statusMessage || 'Recording microphone input... Speak clearly.')
+              : 'Tap to dictate your verbal answer aloud into the mic.'}
           </Text>
         </View>
 
@@ -163,13 +277,13 @@ export function VoiceWaveformInput({
       {showEditor && (
         <View style={styles.transcriptionBox}>
           <Text style={[styles.transcriptionLabel, { color: colors.muted }]}>
-            TRANSCRIPTION (EDITABLE):
+            RECORDED MIC TRANSCRIPTION:
           </Text>
           <TextInput
             value={transcription}
             onChangeText={setTranscription}
             multiline
-            placeholder="Edit your speech-to-text response..."
+            placeholder="Your spoken words will appear here. Edit or add text before inserting..."
             placeholderTextColor={colors.muted}
             style={[
               styles.transcriptInput,

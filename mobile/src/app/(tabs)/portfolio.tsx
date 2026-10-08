@@ -427,6 +427,11 @@ export default function PortfolioScreen() {
                 <View style={[styles.levelBadge, { backgroundColor: isLight ? '#E8F5E9' : colors.surfaceElevated }]}>
                   <Text style={[styles.levelBadgeText, { color: isLight ? '#1e6827' : colors.text }]}>{user?.xp ?? 285} XP</Text>
                 </View>
+                {effectiveSkills.slice(0, 3).map(([sName]) => (
+                  <View key={sName} style={[styles.levelBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', borderWidth: 1, borderColor: primaryAccent }]}>
+                    <Text style={[styles.levelBadgeText, { color: primaryAccent }]}>✓ {sName}</Text>
+                  </View>
+                ))}
               </View>
             </View>
           </View>
@@ -747,7 +752,7 @@ export default function PortfolioScreen() {
 const styles = StyleSheet.create({
   container: {
     gap: 16,
-    paddingBottom: 40,
+    paddingBottom: 130,
   },
   headerRow: {
     flexDirection: 'row',
@@ -807,11 +812,15 @@ const styles = StyleSheet.create({
   },
   quickActionRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
   },
   headerActionBtn: {
+    flex: 1,
+    minWidth: 135,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 9,
@@ -861,6 +870,7 @@ const styles = StyleSheet.create({
   },
   badgeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 6,
     marginTop: 4,
   },
@@ -989,8 +999,8 @@ projectActionBtn: {
     gap: 12,
   },
   careerToolCard: {
-    width: '48%',
-    flexGrow: 1,
+    minWidth: '45%',
+    flex: 1,
     padding: 14,
     borderRadius: 16,
     borderWidth: 1.5,
@@ -998,6 +1008,7 @@ projectActionBtn: {
   },
   toolCardTop: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 6,

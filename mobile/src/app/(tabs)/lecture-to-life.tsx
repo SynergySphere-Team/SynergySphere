@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Screen, Loading, Notice } from '@/components/Screen';
-import { Button, Card, Field, Heading } from '@/components/ui';
+import { Button, Card, Field } from '@/components/ui';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
@@ -32,6 +41,7 @@ export default function LectureToLifeScreen() {
   const [content, setContent] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [selectedDocName, setSelectedDocName] = useState<string | null>(null);
   const [selectedDocType, setSelectedDocType] = useState<string | null>(null);
@@ -52,6 +62,86 @@ export default function LectureToLifeScreen() {
       setLoaded(true);
     }
   }, []);
+
+  async function clearAllPacks() {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && !window.confirm('Are you sure you want to clear all saved study packs? This cannot be undone.')) {
+        return;
+      }
+      doClearAllPacks();
+    } else {
+      Alert.alert(
+        'Clear Saved Study Packs',
+        'Are you sure you want to delete all saved study sessions? This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Clear All', style: 'destructive', onPress: doClearAllPacks },
+        ]
+      );
+    }
+  }
+
+  async function doClearAllPacks() {
+    setClearing(true);
+    setError('');
+    try {
+      await api.delete('/ai/lecture-to-life');
+      setUploads([]);
+      setSelected(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not clear saved study materials.');
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  async function deletePack(id: string) {
+    setError('');
+    try {
+      await api.delete(`/ai/lecture-to-life/${id}`);
+      setUploads((current) => {
+        const remaining = current.filter((item) => item.id !== id);
+        if (selected?.id === id) {
+          setSelected(remaining[0] || null);
+        }
+        return remaining;
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not delete study pack.');
+    }
+  }
+
+  async function handleDownloadSummary() {
+    if (!selected?.summary) return;
+    const dateStr = new Date(selected.createdAt).toLocaleDateString();
+    const textToShare = `# ${selected.fileName} - Study Summary\n\nGenerated: ${dateStr}\n\n${selected.summary}`;
+
+    if (Platform.OS === 'web') {
+      try {
+        const blob = new Blob([textToShare], { type: 'text/markdown;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const safeTitle = (selected.fileName || 'Lecture_Summary').replace(/[^a-zA-Z0-9_-]/g, '_');
+        link.download = `${safeTitle}_Summary.md`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch {
+        setError('Failed to download summary.');
+      }
+    } else {
+      try {
+        await Share.share({
+          title: `${selected.fileName} - Summary`,
+          message: textToShare,
+        });
+      } catch {
+        setError('Could not share or download summary.');
+      }
+    }
+  }
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -234,7 +324,13 @@ export default function LectureToLifeScreen() {
 
       {error ? <Notice tone="error">{error}</Notice> : null}
 
-      {/* Upload and Input Card */}
+      {/* Upload and Input Section */}
+      <View style={styles.sectionHeaderRow}>
+        <View style={styles.sectionTitleWithIcon}>
+          <Ionicons name="cloud-upload-outline" size={18} color={brandGreen} />
+          <Text style={[styles.sectionHeading, { color: colors.text }]}>Upload Lecture Content</Text>
+        </View>
+      </View>
       <Card>
         {/* Document Upload Button */}
         <Pressable
@@ -256,7 +352,7 @@ export default function LectureToLifeScreen() {
               <ActivityIndicator color={brandGreen} size="small" />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.uploadBtnTitle, { color: colors.text }]}>Extracting document content…</Text>
-                <Text style={[styles.uploadBtnSub, { color: colors.muted }]}>Reading slides &amp; text</Text>
+                <Text style={[styles.uploadBtnSub, { color: colors.muted }]}>Reading slides & text</Text>
               </View>
             </View>
           ) : (
@@ -311,200 +407,285 @@ export default function LectureToLifeScreen() {
 
       {/* Saved Lectures Selector */}
       {uploads.length ? (
-        <Card>
-          <Text style={[styles.title, { color: colors.text }]}>Saved study packs</Text>
-          <View style={styles.savedPacksContainer}>
-            {uploads.map((item) => (
-              <Button
-                key={item.id}
-                title={item.fileName}
-                secondary={selected?.id !== item.id}
-                onPress={() => chooseLecture(item)}
-              />
-            ))}
+        <>
+          <View style={styles.sectionHeaderRowBetween}>
+            <View style={styles.sectionTitleWithIcon}>
+              <Ionicons name="library-outline" size={18} color={brandGreen} />
+              <Text style={[styles.sectionHeading, { color: colors.text }]}>Saved Study Packs ({uploads.length})</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Clear all saved study packs"
+              onPress={clearAllPacks}
+              disabled={clearing}
+              style={({ pressed }) => [
+                styles.clearAllBtn,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Ionicons name="trash-outline" size={14} color={colors.danger || '#ef4444'} />
+              <Text style={[styles.clearAllBtnText, { color: colors.danger || '#ef4444' }]}>
+                {clearing ? 'Clearing…' : 'Clear Saved'}
+              </Text>
+            </Pressable>
           </View>
-        </Card>
+          <Card>
+            <View style={styles.savedPacksContainer}>
+              {uploads.map((item) => (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.savedPackItemRow,
+                    {
+                      backgroundColor: selected?.id === item.id ? (isLight ? '#E8F5E9' : colors.primaryDark) : colors.surfaceElevated,
+                      borderColor: selected?.id === item.id ? brandGreen : colors.border,
+                    },
+                  ]}
+                >
+                  <Pressable
+                    style={styles.savedPackSelectPressable}
+                    onPress={() => chooseLecture(item)}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.savedPackTitle,
+                        { color: colors.text, fontWeight: selected?.id === item.id ? '700' : '500' },
+                      ]}
+                    >
+                      {item.fileName}
+                    </Text>
+                    <Text style={[styles.savedPackDate, { color: colors.muted }]}>
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => deletePack(item.id)}
+                    style={styles.deletePackBtn}
+                    accessibilityLabel={`Delete ${item.fileName}`}
+                  >
+                    <Ionicons name="trash-outline" size={16} color={colors.muted} />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          </Card>
+        </>
       ) : null}
 
       {/* Selected Lecture Study Materials */}
       {selected ? (
         <>
-          {/* Summary Card */}
-          <Card>
-            <View style={styles.cardHeaderRow}>
+          {/* Summary Heading Outside Card */}
+          <View style={styles.sectionHeaderRowBetween}>
+            <View style={styles.sectionTitleWithIcon}>
               <Ionicons name="reader-outline" size={18} color={brandGreen} />
-              <Text style={[styles.title, { color: colors.text }]}>Summary</Text>
+              <Text style={[styles.sectionHeading, { color: colors.text }]}>Summary — {selected.fileName}</Text>
             </View>
+            {selected.summary ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Download summary"
+                onPress={handleDownloadSummary}
+                style={({ pressed }) => [
+                  styles.downloadSummaryBtn,
+                  { borderColor: brandGreen, backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)' },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons name="download-outline" size={15} color={brandGreen} />
+                <Text style={[styles.downloadSummaryBtnText, { color: brandGreen }]}>Download</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <Card>
             <Text style={[styles.copy, { color: colors.muted }]}>{selected.summary}</Text>
           </Card>
 
-          {/* Flashcards Card */}
+          {/* Flashcards Heading Outside Card */}
           {flashcards.length ? (
-            <Card>
-              <View style={styles.cardHeaderRow}>
-                <Ionicons name="card-outline" size={18} color={brandGreen} />
-                <Text style={[styles.title, { color: colors.text }]}>Flashcards ({flashcards.length})</Text>
+            <>
+              <View style={styles.sectionHeaderRow}>
+                <View style={styles.sectionTitleWithIcon}>
+                  <Ionicons name="card-outline" size={18} color={brandGreen} />
+                  <Text style={[styles.sectionHeading, { color: colors.text }]}>Flashcards ({flashcards.length})</Text>
+                </View>
               </View>
-              <Text style={[styles.help, { color: colors.muted }]}>Tap a card to reveal its answer.</Text>
-              {flashcards.map((card, index) => {
-                const isFlipped = flipped === index;
-                return (
-                  <Pressable
-                    key={index}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Flip flashcard ${index + 1}`}
-                    onPress={() => setFlipped(isFlipped ? null : index)}
-                    style={({ pressed }) => [
-                      styles.flashcard,
-                      {
-                        backgroundColor: isFlipped ? (isLight ? '#E2F5DA' : colors.primaryDark) : colors.surfaceElevated,
-                        borderColor: isFlipped ? brandGreen : colors.border,
-                      },
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text style={[styles.flashcardLabel, { color: brandGreen }]}>
-                      {isFlipped ? 'ANSWER' : `CARD ${index + 1}`}
-                    </Text>
-                    <Text style={[styles.flashcardText, { color: colors.text }]}>
-                      {isFlipped ? card.back : card.front}
-                    </Text>
-                    <Text style={[styles.flashcardHint, { color: colors.muted }]}>
-                      {isFlipped ? 'Tap to see the question' : 'Tap to reveal answer'}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </Card>
+              <Card>
+                <Text style={[styles.help, { color: colors.muted }]}>Tap a card to reveal its answer.</Text>
+                {flashcards.map((card, index) => {
+                  const isFlipped = flipped === index;
+                  return (
+                    <Pressable
+                      key={index}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Flip flashcard ${index + 1}`}
+                      onPress={() => setFlipped(isFlipped ? null : index)}
+                      style={({ pressed }) => [
+                        styles.flashcard,
+                        {
+                          backgroundColor: isFlipped ? (isLight ? '#E2F5DA' : colors.primaryDark) : colors.surfaceElevated,
+                          borderColor: isFlipped ? brandGreen : colors.border,
+                        },
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={[styles.flashcardLabel, { color: brandGreen }]}>
+                        {isFlipped ? 'ANSWER' : `CARD ${index + 1}`}
+                      </Text>
+                      <Text style={[styles.flashcardText, { color: colors.text }]}>
+                        {isFlipped ? card.back : card.front}
+                      </Text>
+                      <Text style={[styles.flashcardHint, { color: colors.muted }]}>
+                        {isFlipped ? 'Tap to see the question' : 'Tap to reveal answer'}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </Card>
+            </>
           ) : null}
 
-          {/* Graded Quiz Card */}
+          {/* Graded Quiz Heading Outside Card */}
           {quiz.length ? (
-            <Card>
-              <View style={styles.cardHeaderRow}>
-                <Ionicons name="help-circle-outline" size={18} color={brandGreen} />
-                <Text style={[styles.title, { color: colors.text }]}>Graded Quiz ({quiz.length} Questions)</Text>
+            <>
+              <View style={styles.sectionHeaderRow}>
+                <View style={styles.sectionTitleWithIcon}>
+                  <Ionicons name="help-circle-outline" size={18} color={brandGreen} />
+                  <Text style={[styles.sectionHeading, { color: colors.text }]}>Graded Quiz ({quiz.length} Questions)</Text>
+                </View>
               </View>
-              <Text style={[styles.help, { color: colors.muted }]}>
-                Choose one answer for each question, then submit to check your work.
-              </Text>
-              {quiz.map((item, questionIndex) => (
-                <View key={questionIndex} style={styles.question}>
-                  <Text style={[styles.questionText, { color: colors.text }]}>
-                    {questionIndex + 1}. {item.question}
-                  </Text>
-                  {item.options.map((option, optionIndex) => {
-                    const chosen = answers[questionIndex] === optionIndex;
-                    const isCorrect = item.answer === optionIndex;
-                    return (
-                      <Pressable
-                        key={optionIndex}
-                        disabled={quizSubmitted}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected: chosen, disabled: quizSubmitted }}
-                        onPress={() => setAnswers((current) => ({ ...current, [questionIndex]: optionIndex }))}
-                        style={({ pressed }) => [
-                          styles.option,
-                          {
-                            backgroundColor: colors.surfaceElevated,
-                            borderColor: colors.border,
-                          },
-                          chosen && {
-                            borderColor: brandGreen,
-                            backgroundColor: isLight ? '#E8F5E9' : colors.primaryDark,
-                          },
-                          quizSubmitted &&
-                            isCorrect && {
+              <Card>
+                <Text style={[styles.help, { color: colors.muted }]}>
+                  Choose one answer for each question, then submit to check your work.
+                </Text>
+                {quiz.map((item, questionIndex) => (
+                  <View key={questionIndex} style={styles.question}>
+                    <Text style={[styles.questionText, { color: colors.text }]}>
+                      {questionIndex + 1}. {item.question}
+                    </Text>
+                    {item.options.map((option, optionIndex) => {
+                      const chosen = answers[questionIndex] === optionIndex;
+                      const isCorrect = item.answer === optionIndex;
+                      return (
+                        <Pressable
+                          key={optionIndex}
+                          disabled={quizSubmitted}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: chosen, disabled: quizSubmitted }}
+                          onPress={() => setAnswers((current) => ({ ...current, [questionIndex]: optionIndex }))}
+                          style={({ pressed }) => [
+                            styles.option,
+                            {
+                              backgroundColor: colors.surfaceElevated,
+                              borderColor: colors.border,
+                            },
+                            chosen && {
                               borderColor: brandGreen,
-                              backgroundColor: isLight ? '#E2F5DA' : colors.primaryDark,
+                              backgroundColor: isLight ? '#E8F5E9' : colors.primaryDark,
                             },
-                          quizSubmitted &&
-                            chosen &&
-                            !isCorrect && {
-                              borderColor: colors.danger,
-                              backgroundColor: isLight ? '#FDE8E8' : '#421d24',
-                            },
-                          pressed && !quizSubmitted && styles.pressed,
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.radio,
-                            { borderColor: colors.muted },
-                            chosen && { borderColor: brandGreen },
+                            quizSubmitted &&
+                              isCorrect && {
+                                borderColor: brandGreen,
+                                backgroundColor: isLight ? '#E2F5DA' : colors.primaryDark,
+                              },
+                            quizSubmitted &&
+                              chosen &&
+                              !isCorrect && {
+                                borderColor: colors.danger,
+                                backgroundColor: isLight ? '#FDE8E8' : '#421d24',
+                              },
+                            pressed && !quizSubmitted && styles.pressed,
                           ]}
                         >
-                          {chosen ? <View style={[styles.radioDot, { backgroundColor: brandGreen }]} /> : null}
-                        </View>
-                        <Text
-                          style={[
-                            styles.optionText,
-                            { color: colors.text },
-                            quizSubmitted && isCorrect && { color: brandGreen, fontWeight: '700' },
-                          ]}
-                        >
-                          {option}
-                        </Text>
-                        {quizSubmitted && (isCorrect || chosen) ? (
-                          <Text
+                          <View
                             style={[
-                              styles.result,
-                              { color: isCorrect ? brandGreen : colors.danger },
+                              styles.radio,
+                              { borderColor: colors.muted },
+                              chosen && { borderColor: brandGreen },
                             ]}
                           >
-                            {isCorrect ? 'Correct' : 'Incorrect'}
+                            {chosen ? <View style={[styles.radioDot, { backgroundColor: brandGreen }]} /> : null}
+                          </View>
+                          <Text
+                            style={[
+                              styles.optionText,
+                              { color: colors.text },
+                              quizSubmitted && isCorrect && { color: brandGreen, fontWeight: '700' },
+                            ]}
+                          >
+                            {option}
                           </Text>
-                        ) : null}
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ))}
-              <Button
-                title={quizSubmitted ? `Score: ${score}/${quiz.length} · Try again` : 'Submit quiz'}
-                onPress={() => (quizSubmitted ? (setAnswers({}), setQuizSubmitted(false)) : setQuizSubmitted(true))}
-                disabled={!quizSubmitted && Object.keys(answers).length !== quiz.length}
-              />
-            </Card>
+                          {quizSubmitted && (isCorrect || chosen) ? (
+                            <Text
+                              style={[
+                                styles.result,
+                                { color: isCorrect ? brandGreen : colors.danger },
+                              ]}
+                            >
+                              {isCorrect ? 'Correct' : 'Incorrect'}
+                            </Text>
+                          ) : null}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ))}
+                <Button
+                  title={quizSubmitted ? `Score: ${score}/${quiz.length} · Try again` : 'Submit quiz'}
+                  onPress={() => (quizSubmitted ? (setAnswers({}), setQuizSubmitted(false)) : setQuizSubmitted(true))}
+                  disabled={!quizSubmitted && Object.keys(answers).length !== quiz.length}
+                />
+              </Card>
+            </>
           ) : null}
 
-          {/* Mini Projects Card */}
+          {/* Mini Projects Heading Outside Card */}
           {projects.length ? (
-            <Card>
-              <View style={styles.cardHeaderRow}>
-                <Ionicons name="construct-outline" size={18} color={brandGreen} />
-                <Text style={[styles.title, { color: colors.text }]}>Mini Projects</Text>
-              </View>
-              {projects.map((item, index) => (
-                <View key={index} style={styles.projectItem}>
-                  <Text style={[styles.projectTitle, { color: colors.text }]}>• {item.title}</Text>
-                  <Text style={[styles.copy, { color: colors.muted }]}>{item.description}</Text>
+            <>
+              <View style={styles.sectionHeaderRow}>
+                <View style={styles.sectionTitleWithIcon}>
+                  <Ionicons name="construct-outline" size={18} color={brandGreen} />
+                  <Text style={[styles.sectionHeading, { color: colors.text }]}>Mini Projects ({projects.length})</Text>
                 </View>
-              ))}
-            </Card>
+              </View>
+              <Card>
+                {projects.map((item, index) => (
+                  <View key={index} style={styles.projectItem}>
+                    <Text style={[styles.projectTitle, { color: colors.text }]}>• {item.title}</Text>
+                    <Text style={[styles.copy, { color: colors.muted }]}>{item.description}</Text>
+                  </View>
+                ))}
+              </Card>
+            </>
           ) : null}
 
-          {/* Coding Exercises Card */}
+          {/* Coding Exercises Heading Outside Card */}
           {exercises.length ? (
-            <Card>
-              <View style={styles.cardHeaderRow}>
-                <Ionicons name="code-working-outline" size={18} color={brandGreen} />
-                <Text style={[styles.title, { color: colors.text }]}>Coding Exercises</Text>
-              </View>
-              {exercises.map((item, index) => (
-                <View key={index} style={styles.exerciseItem}>
-                  <Text style={[styles.projectTitle, { color: colors.text }]}>
-                    {index + 1}. {item.title}
-                  </Text>
-                  <Text style={[styles.copy, { color: colors.muted }]}>{item.description}</Text>
-                  {item.hint ? (
-                    <Text style={[styles.exerciseHint, { color: brandGreen }]}>
-                      💡 Hint: {item.hint}
-                    </Text>
-                  ) : null}
+            <>
+              <View style={styles.sectionHeaderRow}>
+                <View style={styles.sectionTitleWithIcon}>
+                  <Ionicons name="code-working-outline" size={18} color={brandGreen} />
+                  <Text style={[styles.sectionHeading, { color: colors.text }]}>Coding Exercises ({exercises.length})</Text>
                 </View>
-              ))}
-            </Card>
+              </View>
+              <Card>
+                {exercises.map((item, index) => (
+                  <View key={index} style={styles.exerciseItem}>
+                    <Text style={[styles.projectTitle, { color: colors.text }]}>
+                      {index + 1}. {item.title}
+                    </Text>
+                    <Text style={[styles.copy, { color: colors.muted }]}>{item.description}</Text>
+                    {item.hint ? (
+                      <Text style={[styles.exerciseHint, { color: brandGreen }]}>
+                        💡 Hint: {item.hint}
+                      </Text>
+                    ) : null}
+                  </View>
+                ))}
+              </Card>
+            </>
           ) : null}
         </>
       ) : null}
@@ -577,7 +758,83 @@ const styles = StyleSheet.create({
   radioDot: { width: 8, height: 8, borderRadius: 4 },
   optionText: { flex: 1, fontSize: 13, lineHeight: 18 },
   result: { fontSize: 12, fontWeight: '800' },
-  savedPacksContainer: { gap: 8, marginTop: 8 },
+  savedPacksContainer: { gap: 8, marginTop: 4 },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 18,
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  sectionHeaderRowBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 18,
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  sectionTitleWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  sectionHeading: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  clearAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+  },
+  clearAllBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  downloadSummaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  downloadSummaryBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  savedPackItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  savedPackSelectPressable: {
+    flex: 1,
+    gap: 2,
+  },
+  savedPackTitle: {
+    fontSize: 14,
+  },
+  savedPackDate: {
+    fontSize: 11,
+  },
+  deletePackBtn: {
+    padding: 6,
+    borderRadius: 6,
+  },
   projectItem: { marginTop: 8, gap: 4 },
   projectTitle: { fontSize: 14, fontWeight: '700' },
   exerciseItem: { marginTop: 10, gap: 4 },

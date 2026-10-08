@@ -195,7 +195,7 @@ export default function AdminPostsPage() {
       )}
 
       {/* ─── Search & Filters Bar ────────────────────────────────────────────── */}
-      <Card className="border-white/[0.08] bg-[#071118]/80 p-4">
+      <Card className="border-white/[0.08] bg-[#071015]/85 p-3.5 shadow-md">
         <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -211,7 +211,7 @@ export default function AdminPostsPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-9 rounded-lg border border-white/[0.08] bg-black/40 px-3 text-xs text-foreground focus:outline-none focus:border-cyan-500/40"
+              className="h-9 rounded-lg border border-white/[0.08] bg-black/40 px-3 text-xs text-foreground focus:outline-none focus:border-primary/40"
             >
               <option value="all">All Statuses</option>
               <option value="visible">Visible Only</option>
@@ -222,7 +222,7 @@ export default function AdminPostsPage() {
             <select
               value={flagFilter}
               onChange={(e) => setFlagFilter(e.target.value)}
-              className="h-9 rounded-lg border border-white/[0.08] bg-black/40 px-3 text-xs text-foreground focus:outline-none focus:border-cyan-500/40"
+              className="h-9 rounded-lg border border-white/[0.08] bg-black/40 px-3 text-xs text-foreground focus:outline-none focus:border-primary/40"
             >
               <option value="all">All Content</option>
               <option value="flagged">Flagged / Reported</option>
@@ -237,19 +237,29 @@ export default function AdminPostsPage() {
 
       {/* ─── Posts Feed List ─────────────────────────────────────────────────── */}
       <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-primary" />
+            <h2 className="text-sm sm:text-base font-bold text-white">
+              Community Discussion Threads ({posts.length})
+            </h2>
+          </div>
+          <span className="text-[11px] text-muted-foreground font-mono">Forum moderation queue</span>
+        </div>
+
         {loading ? (
-          <div className="flex h-64 items-center justify-center rounded-xl border border-white/[0.08] bg-[#071118]/60">
-            <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+          <div className="flex h-64 items-center justify-center rounded-xl border border-white/[0.08] bg-[#071015]/60">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : posts.length === 0 ? (
-          <Card className="border-white/[0.08] bg-[#071118]/60 p-12 text-center text-xs text-muted-foreground">
+          <Card className="border-white/[0.08] bg-[#071015]/60 p-12 text-center text-xs text-muted-foreground font-mono">
             No community posts match your criteria.
           </Card>
         ) : (
           posts.map((post) => (
             <Card
               key={post.id}
-              className={`border-white/[0.08] bg-[#071118]/90 transition-all hover:border-cyan-500/30 ${
+              className={`border-white/[0.08] bg-[#071015]/85 transition-all hover:border-primary/30 shadow-md ${
                 post.isDeleted
                   ? 'opacity-60 bg-rose-950/10 border-rose-500/20'
                   : post.isHidden

@@ -235,151 +235,165 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* ─── KPI Cards Grid ──────────────────────────────────────────────────── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {kpiCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Link key={card.title} href={card.href} className="group block">
-              <Card className="h-full border-white/[0.08] bg-[#071118]/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-500/40 hover:bg-[#09151e] shadow-lg relative overflow-hidden">
-                {card.highlight && (
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
-                )}
-                <CardHeader className="pb-2 pt-4 px-4 flex flex-row items-center justify-between space-y-0">
-                  <span className="text-xs font-medium text-muted-foreground group-hover:text-white transition-colors">
-                    {card.title}
-                  </span>
-                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg border ${card.bgColor} ${card.color}`}>
-                    <Icon className="h-4 w-4" />
-                  </div>
-                </CardHeader>
-                <CardContent className="px-4 pb-4 space-y-2">
-                  <div className="text-2xl sm:text-3xl font-black text-white tracking-tight font-mono">
-                    {card.value}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground/80 line-clamp-1">{card.subtext}</p>
-                  <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between text-[11px] font-medium text-amber-400/90 group-hover:text-amber-300">
-                    <span>{card.actionText}</span>
-                    <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
+      {/* ─── KPI Cards Section ──────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-bold text-white tracking-tight">Platform Telemetry & Metrics</h2>
+          </div>
+          <span className="text-[11px] text-muted-foreground font-mono">Live cluster counts</span>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {kpiCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Link key={card.title} href={card.href} className="group block">
+                <Card className="h-full border-white/[0.08] bg-[#071015]/85 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-[#09151e] shadow-md relative overflow-hidden">
+                  {card.highlight && (
+                    <div className="absolute top-0 right-0 w-12 h-12 bg-primary/10 rounded-full blur-lg pointer-events-none" />
+                  )}
+                  <CardContent className="p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-muted-foreground group-hover:text-white transition-colors truncate">
+                        {card.title}
+                      </span>
+                      <div className={`flex h-7 w-7 items-center justify-center rounded-md border shrink-0 ${card.bgColor} ${card.color}`}>
+                        <Icon className="h-3.5 w-3.5" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xl sm:text-2xl font-bold text-white tracking-tight font-mono">
+                        {card.value}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground/80 line-clamp-1 mt-0.5">{card.subtext}</p>
+                    </div>
+                    <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-semibold text-primary group-hover:text-emerald-300">
+                      <span>{card.actionText}</span>
+                      <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       {/* ─── Quick Actions Panel ─────────────────────────────────────────────── */}
-      <Card className="border-white/[0.08] bg-[#071118]/90 shadow-xl">
-        <CardHeader className="pb-3 border-b border-white/[0.06]">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-amber-400" />
-              Administrative Quick Actions
-            </CardTitle>
-            <span className="text-xs text-muted-foreground">High-frequency workflows</span>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h2 className="text-sm sm:text-base font-bold text-white">Administrative Quick Actions</h2>
           </div>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <Link href="/admin/users/pending">
-              <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.08] bg-black/40 p-3.5 text-center transition hover:border-amber-500/40 hover:bg-amber-500/[0.06] group cursor-pointer">
-                <UserCheck className="h-5 w-5 text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-semibold text-white">Approve Users</span>
-                <span className="text-[10px] text-muted-foreground mt-0.5">{kpis.pendingApprovals} pending</span>
-              </div>
-            </Link>
+          <span className="text-[11px] text-muted-foreground font-mono">High-frequency workflows</span>
+        </div>
 
-            <Link href="/admin/tickets">
-              <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.08] bg-black/40 p-3.5 text-center transition hover:border-primary/40 hover:bg-primary/[0.06] group cursor-pointer">
-                <LifeBuoy className="h-5 w-5 text-primary mb-2 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-semibold text-white">Support Tickets</span>
-                <span className="text-[10px] text-muted-foreground mt-0.5">{kpis.openTickets} open</span>
-              </div>
-            </Link>
+        <Card className="border-white/[0.08] bg-[#071015]/85 shadow-lg">
+          <CardContent className="p-3.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+              <Link href="/admin/users/pending">
+                <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.08] bg-black/40 p-3 text-center transition hover:border-primary/40 hover:bg-primary/[0.06] group cursor-pointer">
+                  <UserCheck className="h-4 w-4 text-primary mb-1.5 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-semibold text-white">Approve Users</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">{kpis.pendingApprovals} pending</span>
+                </div>
+              </Link>
 
-            <Link href="/admin/complaints">
-              <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.08] bg-black/40 p-3.5 text-center transition hover:border-orange-500/40 hover:bg-orange-500/[0.06] group cursor-pointer">
-                <AlertTriangle className="h-5 w-5 text-orange-400 mb-2 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-semibold text-white">Review Complaints</span>
-                <span className="text-[10px] text-muted-foreground mt-0.5">{kpis.unreviewedComplaints} awaiting</span>
-              </div>
-            </Link>
+              <Link href="/admin/tickets">
+                <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.08] bg-black/40 p-3 text-center transition hover:border-blue-500/40 hover:bg-blue-500/[0.06] group cursor-pointer">
+                  <LifeBuoy className="h-4 w-4 text-blue-400 mb-1.5 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-semibold text-white">Support Tickets</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">{kpis.openTickets} open</span>
+                </div>
+              </Link>
 
-            <Link href="/admin/community/flagged">
-              <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.08] bg-black/40 p-3.5 text-center transition hover:border-rose-500/40 hover:bg-rose-500/[0.06] group cursor-pointer">
-                <MessageSquare className="h-5 w-5 text-rose-400 mb-2 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-semibold text-white">Review Flagged</span>
-                <span className="text-[10px] text-muted-foreground mt-0.5">Content queue</span>
-              </div>
-            </Link>
+              <Link href="/admin/complaints">
+                <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.08] bg-black/40 p-3 text-center transition hover:border-orange-500/40 hover:bg-orange-500/[0.06] group cursor-pointer">
+                  <AlertTriangle className="h-4 w-4 text-orange-400 mb-1.5 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-semibold text-white">Review Complaints</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">{kpis.unreviewedComplaints} awaiting</span>
+                </div>
+              </Link>
 
-            <Link href="/admin/events">
-              <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.08] bg-black/40 p-3.5 text-center transition hover:border-purple-500/40 hover:bg-purple-500/[0.06] group cursor-pointer">
-                <Calendar className="h-5 w-5 text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-semibold text-white">Manage Events</span>
-                <span className="text-[10px] text-muted-foreground mt-0.5">{kpis.scheduledEventsWeek} this week</span>
-              </div>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+              <Link href="/admin/community/flagged">
+                <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.08] bg-black/40 p-3 text-center transition hover:border-rose-500/40 hover:bg-rose-500/[0.06] group cursor-pointer">
+                  <MessageSquare className="h-4 w-4 text-rose-400 mb-1.5 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-semibold text-white">Review Flagged</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">Content queue</span>
+                </div>
+              </Link>
+
+              <Link href="/admin/events">
+                <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.08] bg-black/40 p-3 text-center transition hover:border-purple-500/40 hover:bg-purple-500/[0.06] group cursor-pointer">
+                  <Calendar className="h-4 w-4 text-purple-400 mb-1.5 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-semibold text-white">Manage Events</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">{kpis.scheduledEventsWeek} this week</span>
+                </div>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* ─── Recent Administrative Activity Feed ───────────────────────────────── */}
-      <Card className="border-white/[0.08] bg-[#071118]/90 shadow-xl">
-        <CardHeader className="pb-3 border-b border-white/[0.06]">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-bold text-white flex items-center gap-2">
-                <Activity className="h-4 w-4 text-emerald-400" />
-                Recent Administrative Activity
-              </CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Real-time chronological audit trail of administrative events and moderation decisions.
-              </p>
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              <h2 className="text-sm sm:text-base font-bold text-white">Recent Administrative Activity</h2>
             </div>
-            <Link href="/admin/reports">
-              <Button variant="outline" size="sm" className="h-8 text-xs border-white/[0.1] hover:bg-white/[0.05]">
-                Full Audit Trail
-              </Button>
-            </Link>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Real-time chronological audit trail of administrative events and moderation decisions.
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className="pt-4">
-          {!data?.recentActivity || data.recentActivity.length === 0 ? (
-            <div className="py-8 text-center text-xs text-muted-foreground">
-              No recent administrative actions recorded.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {data.recentActivity.map((act) => (
-                <div
-                  key={act.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-white/[0.06] bg-black/30 p-3 transition hover:border-white/[0.1] hover:bg-black/50"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span
-                      className={`rounded border px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider shrink-0 ${getActionBadge(
-                        act.action,
-                      )}`}
-                    >
-                      {act.action.replace('_', ' ')}
-                    </span>
-                    <p className="text-xs text-white truncate font-medium">
-                      {act.description}
-                    </p>
-                  </div>
+          <Link href="/admin/reports">
+            <Button variant="outline" size="sm" className="h-8 text-xs border-white/[0.1] bg-black/30 hover:bg-white/[0.05]">
+              Full Audit Trail
+            </Button>
+          </Link>
+        </div>
 
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground shrink-0 sm:self-center self-end font-mono">
-                    <Clock className="h-3 w-3 text-muted-foreground/60" />
-                    <span>{formatTimeAgo(act.createdAt)}</span>
+        <Card className="border-white/[0.08] bg-[#071015]/85 shadow-lg">
+          <CardContent className="p-3.5">
+            {!data?.recentActivity || data.recentActivity.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground font-mono">
+                No recent administrative actions recorded.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {data.recentActivity.map((act) => (
+                  <div
+                    key={act.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-black/30 p-2.5 transition hover:border-white/[0.1] hover:bg-black/50"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className={`rounded border px-1.5 py-0.5 text-[9px] font-mono font-semibold uppercase tracking-wider shrink-0 ${getActionBadge(
+                          act.action,
+                        )}`}
+                      >
+                        {act.action.replace(/_/g, ' ')}
+                      </span>
+                      <p className="text-xs text-white truncate font-medium">
+                        {act.description}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0 sm:self-center self-end font-mono">
+                      <Clock className="h-3 w-3 text-muted-foreground/60" />
+                      <span>{formatTimeAgo(act.createdAt)}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

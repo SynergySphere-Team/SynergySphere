@@ -250,7 +250,7 @@ export default function UsersManagementPage() {
       </div>
 
       {/* ─── Search & Filters Bar ────────────────────────────────────────────── */}
-      <Card className="border-white/[0.08] bg-[#071118]/80 p-4">
+      <Card className="border-white/[0.08] bg-[#071015]/85 p-3.5 shadow-md">
         <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -266,7 +266,7 @@ export default function UsersManagementPage() {
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="h-9 rounded-lg border border-white/[0.08] bg-black/40 px-3 text-xs text-foreground focus:outline-none focus:border-amber-500/40"
+              className="h-9 rounded-lg border border-white/[0.08] bg-black/40 px-3 text-xs text-foreground focus:outline-none focus:border-primary/40"
             >
               <option value="all">All Roles</option>
               <option value="superadmin">SuperAdmin</option>
@@ -278,7 +278,7 @@ export default function UsersManagementPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-9 rounded-lg border border-white/[0.08] bg-black/40 px-3 text-xs text-foreground focus:outline-none focus:border-amber-500/40"
+              className="h-9 rounded-lg border border-white/[0.08] bg-black/40 px-3 text-xs text-foreground focus:outline-none focus:border-primary/40"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
@@ -295,7 +295,18 @@ export default function UsersManagementPage() {
       </Card>
 
       {/* ─── Users Table ─────────────────────────────────────────────────────── */}
-      <Card className="border-white/[0.08] bg-[#071118]/90 overflow-hidden shadow-xl">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            <h2 className="text-sm sm:text-base font-bold text-white">
+              Registered User Accounts ({users.length})
+            </h2>
+          </div>
+          <span className="text-[11px] text-muted-foreground font-mono">Platform directory</span>
+        </div>
+
+        <Card className="border-white/[0.08] bg-[#071015]/85 overflow-hidden shadow-lg">
         {loading ? (
           <div className="flex h-64 items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
@@ -461,6 +472,7 @@ export default function UsersManagementPage() {
           </div>
         )}
       </Card>
+      </div>
 
       {/* ─── Modal 1: Edit Role Modal ────────────────────────────────────────── */}
       {roleModalUser && (
