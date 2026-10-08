@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LogBox, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-
+import NotificationPopup from '@/components/NotificationPopup';
 import { AuthProvider } from '@/context/AuthContext';
 import {
   AccessibilityProvider,
@@ -105,7 +105,10 @@ function AppLayout() {
           name="community/[id]"
           options={{ headerShown: false }}
         />
+
       </Stack>
+        
+        <NotificationPopup />
     </AuthProvider>
   );
 }

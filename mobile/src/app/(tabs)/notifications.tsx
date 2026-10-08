@@ -5,6 +5,7 @@ import {
 } from 'react';
 
 import {
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -328,9 +329,22 @@ export default function NotificationsScreen() {
       refreshing={refreshing}
       onRefresh={handleRefresh}
     >
-      <Heading subtitle="Project, Community, comment, like and system updates.">
-        Notifications
-      </Heading>
+      <View style={styles.topRow}>
+        <BackButton />
+
+        <Image
+          source={require('../../../assets/images/notifications-logo.png')}
+          style={styles.headerLogo}
+          resizeMode="contain"
+          accessibilityLabel="Notifications logo"
+        />
+
+        <View style={styles.headingWrap}>
+          <Heading subtitle="Project, Community, comment, like and system updates.">
+            Notifications
+          </Heading>
+        </View>
+      </View>
 
       {error ? (
         <Notice>
@@ -746,5 +760,10 @@ const styles =
 
     pressed: {
       opacity: 0.68,
+    },
+    headerLogo: {
+      width: 48,
+      height: 48,
+      borderRadius: 12,
     },
   });

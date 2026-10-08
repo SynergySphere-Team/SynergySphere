@@ -154,7 +154,33 @@ router.post('/', validateBody(wellnessSchema), async (req: AuthRequest, res) => 
       nullable(req.body.gratitude),
     ],
   );
+    // Notify the user about their first daily wellness check-in.
+  if (entry && isFirstToday) {
+    const isMilestone = [3, 7, 14].includes(streak);
 
+    const notificationTitle = isMilestone
+      ? `${streak}-Day Wellness Streak! `
+      : 'Wellness Check-In Completed';
+
+    const notificationMessage = isMilestone
+      ? `You've maintained your wellness check-in streak for ${streak} days. Keep it going!`
+      : 'Your daily wellness check-in is complete. Thank you for taking time for yourself!';
+
+    await queryOne(
+      `INSERT INTO "Notification"
+       ("id", "userId", "title", "message", "type", "link")
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING "id"`,
+      [
+        newId(),
+        userId,
+        notificationTitle,
+        notificationMessage,
+        'wellness',
+        '/wellness',
+      ],
+    );
+  }
   res.status(201).json({
     ...entry,
     xpAwarded: baseCheckinXp + streakBonusXp + taskXpAwarded,

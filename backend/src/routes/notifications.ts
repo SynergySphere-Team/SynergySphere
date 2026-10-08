@@ -36,7 +36,7 @@ router.get('/', async (req: AuthRequest, res) => {
        "createdAt"
      FROM "Notification"
      WHERE "userId" = $1
-     ORDER BY COALESCE("read", FALSE) ASC, "createdAt" DESC
+     ORDER BY "createdAt" DESC
      LIMIT $2`,
     [req.user!.userId, take],
   );
