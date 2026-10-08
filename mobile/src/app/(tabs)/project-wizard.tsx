@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen, Notice, BackButton } from '@/components/Screen';
 import { Field, Heading } from '@/components/ui';
@@ -99,7 +99,27 @@ export default function ProjectWizardScreen() {
         category: customCategory.trim() ? customCategory.trim() : form.category,
       };
       const result = await api.post<{ project: { id: string } }>('/github/projects', payload);
-      router.replace({ pathname: '/project-detail', params: { projectId: result.project.id } } as never);
+      // Reset the wizard for the next project
+      setStep(0);
+      setForm({ ...initial });
+      setCustomCategory('');
+      setError('');
+
+      Alert.alert(
+        'Project Created!',
+        'Community project created successfully.',
+        [
+          {
+            text: 'View Project',
+            onPress: () =>
+              router.replace({
+                pathname: '/project-detail',
+                params: { projectId: result.project.id },
+              } as never),
+          },
+        ],
+        { cancelable: false }
+      );
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Could not create the GitHub repository.';
       setError(message);
@@ -121,10 +141,8 @@ export default function ProjectWizardScreen() {
   const handleWizardBack = () => {
     if (step > 0) {
       setStep(step - 1);
-    } else if (router.canGoBack()) {
-      router.back();
     } else {
-      router.replace('/(tabs)/community' as never);
+      router.replace('/community?tab=initiatives' as never);
     }
   };
 

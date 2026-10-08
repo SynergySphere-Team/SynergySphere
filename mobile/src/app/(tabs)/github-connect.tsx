@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  Alert,
   ActivityIndicator,
   AppState,
   type AppStateStatus,
@@ -67,7 +68,19 @@ export default function GithubConnectScreen() {
       if (result.status === 'connected') {
         setStatus('connected');
         clearTimer();
-        timer.current = setTimeout(navigateBackOrToReturn, 700);
+
+        Alert.alert(
+          'GitHub Connected ✓',
+          'Your GitHub account was connected successfully.',
+          [
+            {
+              text: 'Continue',
+              onPress: navigateBackOrToReturn,
+            },
+          ],
+          { cancelable: false }
+        );
+
         return;
       }
 

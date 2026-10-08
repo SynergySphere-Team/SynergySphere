@@ -5,7 +5,6 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams } from 'expo-router';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card, Field, TaskCard, type TaskCardAction } from '@/components/ui';
-import { MyWorkView } from './my-work';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useAccessibility } from '@/context/AccessibilityContext';
@@ -104,19 +103,6 @@ export default function TasksScreen() {
   const { colors, theme } = useTheme();
   const { fontSize, largerText } = useAccessibility();
   const { user, refresh: refreshAuth } = useAuth();
-  const { tab } = useLocalSearchParams<{ tab?: string }>();
-  const [activeModule, setActiveModule] = useState<'productivity' | 'my-work'>(
-    tab === 'my-work' ? 'my-work' : 'productivity'
-  );
-
-  useEffect(() => {
-    if (tab === 'my-work') {
-      setActiveModule('my-work');
-    } else if (tab === 'productivity') {
-      setActiveModule('productivity');
-    }
-  }, [tab]);
-
   const [tasks, setTasks] = useState<Task[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -291,11 +277,9 @@ export default function TasksScreen() {
   async function startTimer() {
     setError('');
     setSuccess('');
-
     const targetSeconds = timeLeft > 0 ? timeLeft : selectedMinutes * 60;
     const targetEndTime = Date.now() + targetSeconds * 1000;
     endTimeRef.current = targetEndTime;
-
     // Schedule notification for when the timer expires
     const notifId = await scheduleFocusCompletionNotification(targetSeconds, selectedMinutes);
     if (notifId) {
@@ -485,83 +469,7 @@ export default function TasksScreen() {
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {success ? <Notice tone="success">{success}</Notice> : null}
-
-      {/* Top Navigation Tabs */}
-      <View style={[styles.tabBar, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setActiveModule('productivity')}
-          style={[
-            styles.tabButton,
-            activeModule === 'productivity' && {
-              backgroundColor: colors.surface,
-              borderColor: brandGreen,
-              borderWidth: 1,
-            },
-          ]}
-        >
-          <Ionicons
-            name="checkbox-outline"
-            size={14}
-            color={activeModule === 'productivity' ? brandGreen : colors.muted}
-            style={{ flexShrink: 0 }}
-          />
-          <Text
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.8}
-            style={[
-              styles.tabText,
-              {
-                color: activeModule === 'productivity' ? colors.text : colors.muted,
-                fontWeight: activeModule === 'productivity' ? '800' : '600',
-              },
-            ]}
-          >
-            Tasks &amp; Focus
-          </Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setActiveModule('my-work')}
-          style={[
-            styles.tabButton,
-            activeModule === 'my-work' && {
-              backgroundColor: colors.surface,
-              borderColor: brandGreen,
-              borderWidth: 1,
-            },
-          ]}
-        >
-          <Ionicons
-            name="git-pull-request-outline"
-            size={14}
-            color={activeModule === 'my-work' ? brandGreen : colors.muted}
-            style={{ flexShrink: 0 }}
-          />
-          <Text
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.8}
-            style={[
-              styles.tabText,
-              {
-                color: activeModule === 'my-work' ? colors.text : colors.muted,
-                fontWeight: activeModule === 'my-work' ? '800' : '600',
-              },
-            ]}
-          >
-            My Work
-          </Text>
-        </Pressable>
-      </View>
-
-      {activeModule === 'my-work' ? (
-        <MyWorkView showBackButton={false} wrapInScreen={false} />
-      ) : (
-        <>
-          {/* Focus Timer Card */}
+      {/* Focus Timer Card */}
       <Card>
         <View style={styles.cardHeader}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>Focus Timer</Text>
@@ -925,8 +833,6 @@ export default function TasksScreen() {
           </View>
         )}
         </Card>
-        </>
-      )}
     </Screen>
   );
 }

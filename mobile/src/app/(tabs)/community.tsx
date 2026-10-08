@@ -8,11 +8,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
-
 import { Screen } from '@/components/Screen';
 import { CommunityChat } from '@/components/community/CommunityChat';
 //import { CommunityInitiatives } from '@/components/community/CommunityInitiatives';
 import { CommunityGithub } from '@/components/community/CommunityGithub';
+import { MyWorkView } from './my-work';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -27,6 +27,8 @@ export default function CommunityScreen() {
 
   const [activeTab, setActiveTab] =
     useState<'chat' | 'initiatives'>('initiatives');
+  const [initiativesTab, setInitiativesTab] =
+    useState<'discover' | 'my-work'>('discover');
 
   useEffect(() => {
     if (tab === 'initiatives' || tab === 'chat') {
@@ -218,14 +220,66 @@ export default function CommunityScreen() {
             </Text>
           </Pressable>
 
-          
+
         </View>
       </View>
 
       {/* COMMUNITY CONTENT */}
       {activeTab === 'chat' && <CommunityChat />}
-      {activeTab === 'initiatives' && <CommunityGithub />}
-      
+
+      {activeTab === 'initiatives' && (
+        <>
+          {/* INITIATIVES SUB-TABS */}
+          <View
+            style={{
+              flexDirection: 'row',
+              backgroundColor: colors.surface,
+              borderRadius: 14,
+              padding: 5,
+              marginVertical: 16,
+              gap: 8,
+            }}
+          >
+            {(['discover', 'my-work'] as const).map((item) => (
+              <Pressable
+                key={item}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: initiativesTab === item }}
+                onPress={() => setInitiativesTab(item)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center',
+                  backgroundColor:
+                    initiativesTab === item
+                      ? activeBackground
+                      : 'transparent',
+                }}
+              >
+                <Text
+                  style={{
+                    color:
+                      initiativesTab === item
+                        ? activeTextColor
+                        : colors.text,
+                    fontWeight: '700',
+                  }}
+                >
+                  {item === 'discover' ? 'Discover' : 'My Work'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* INITIATIVES CONTENT */}
+          {initiativesTab === 'discover' ? (
+            <CommunityGithub />
+          ) : (
+            <MyWorkView showBackButton={false} wrapInScreen={false} />
+          )}
+        </>
+      )}
     </Screen>
   );
 }

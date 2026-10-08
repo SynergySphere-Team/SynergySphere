@@ -2243,9 +2243,23 @@ function confirmDeleteAccount() {
 
                 githubConnection?.connected
 
-                  ? disconnectGithub
-
-                  : () =>
+                  ?() =>
+                    Alert.alert(
+                      'Disconnect GitHub?',
+                      'Are you sure you want to disconnect your GitHub account from SynergySphere?',
+                      [
+                        {
+                          text: 'Cancel',
+                          style: 'cancel',
+                        },
+                        {
+                          text: 'Disconnect',
+                          style: 'destructive',
+                          onPress: disconnectGithub,
+                        },
+                      ]
+                    )
+                : () =>
 
                       router.push(
 

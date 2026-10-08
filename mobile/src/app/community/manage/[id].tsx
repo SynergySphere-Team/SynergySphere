@@ -758,6 +758,11 @@ export default function ManageProjectScreen() {
       setSuccess(
         'Project changes saved successfully.'
       );
+      Alert.alert(
+        'Project Updated ✓',
+        'Project updated successfully.',
+        [{ text: 'OK' }]
+      );
     } catch (e) {
       setError(
         e instanceof Error
@@ -894,6 +899,13 @@ export default function ManageProjectScreen() {
           ? 'Project reactivated successfully.'
           : 'Project deactivated successfully.'
       );
+      Alert.alert(
+        isActive ? 'Project Reactivated ✓' : 'Project Deactivated',
+        isActive
+          ? 'Project reactivated successfully.'
+          : 'Project deactivated successfully.',
+        [{ text: 'OK' }]
+      );
     } catch (e) {
       setError(
         e instanceof Error
@@ -942,7 +954,61 @@ export default function ManageProjectScreen() {
       ]
     );
   }
+function handleDeleteProject() {
+  if (!project) {
+    Alert.alert(
+      'Error',
+      'Project information is unavailable.'
+    );
+    return;
+  }
 
+  const deleteProjectId = project.id;
+
+  Alert.alert(
+    'Delete Project?',
+    'Are you sure you want to permanently delete this project? Its applications, messages, and activity will also be deleted. Your GitHub repository will not be deleted.',
+    [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Delete Project',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setError('');
+
+            await api.delete(`/projects/${deleteProjectId}`);
+
+            Alert.alert(
+              'Project Deleted ✓',
+              'Project deleted successfully.',
+              [
+                {
+                  text: 'Back to Initiatives',
+                  onPress: () =>
+                    router.replace(
+                      '/community?tab=initiatives' as never
+                    ),
+                },
+              ],
+              { cancelable: false }
+            );
+          } catch (err) {
+            Alert.alert(
+              'Deletion Failed',
+              err instanceof Error
+                ? err.message
+                : 'Unable to delete the project. Please try again.'
+            );
+          }
+        },
+      },
+    ]
+  );
+}
   async function openUrl(
     url: string
   ) {
@@ -1849,6 +1915,12 @@ export default function ManageProjectScreen() {
             changingStatus ||
             linkingGithub
           }
+        />
+        <Button
+          title="Delete Project"
+          secondary
+          onPress={handleDeleteProject}
+          disabled={saving || changingStatus || linkingGithub}
         />
       </Card>
     </Screen>

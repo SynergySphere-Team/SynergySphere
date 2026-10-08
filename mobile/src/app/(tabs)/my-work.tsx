@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
+  ActivityIndicator,
   Image,
   Linking,
   Pressable,
@@ -65,6 +66,7 @@ export function MyWorkView({
   const [data, setData] = useState<Work | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [search, setSearch] = useState('');
 
@@ -72,12 +74,21 @@ export function MyWorkView({
     try {
       setError('');
       setLoading(true);
+      setRefreshing(true);
       const res = await api.get<Work>('/github/my-work');
+      console.log('MY WORK DATA REFRESHED', {
+        issues: res.issues?.length,
+        repositories: res.repositories?.length,
+        pullRequests: Array.isArray(res.pullRequests)
+          ? res.pullRequests.length
+          : res.pullRequests?.items?.length,
+      });
       setData(res);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load GitHub work.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -178,10 +189,15 @@ export function MyWorkView({
             rightAction={
               <Pressable
                 style={[styles.refreshIconButton, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}
-                onPress={load}
-                accessibilityLabel="Refresh GitHub data"
+                onPress={() => {
+                  void load();
+                }}
               >
-                <Ionicons name="reload" size={18} color={colors.primary} />
+                {refreshing ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="reload" size={18} color={colors.primary} />
+                )}
               </Pressable>
             }
           >
@@ -760,8 +776,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   refreshIconButton: {
-    width: 38,
-    height: 38,
+    width: 60,
+    height: 60,
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',

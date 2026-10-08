@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card, Heading } from '@/components/ui';
 import { api } from '@/services/api';
@@ -41,18 +41,55 @@ export default function JoinRequestsScreen() {
     return () => clearTimeout(timeout);
   }, [load]);
 
-  async function review(id: string, status: 'APPROVED' | 'DECLINED') {
-    setBusy(id);
-    try {
-      await api.patch(`/projects/${projectId}/applications/${id}`, { status });
-      await load();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not update the request.');
-    } finally {
-      setBusy('');
-    }
-  }
+  function review(id: string, status: 'APPROVED' | 'DECLINED') {
+    const isApprove = status === 'APPROVED';
 
+    Alert.alert(
+      isApprove ? 'Approve Request' : 'Decline Request',
+      isApprove
+        ? 'Are you sure you want to approve this join request?'
+        : 'Are you sure you want to decline this join request?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: isApprove ? 'Approve' : 'Decline',
+          style: isApprove ? 'default' : 'destructive',
+          onPress: async () => {
+            setBusy(id);
+            setError('');
+
+            try {
+              await api.patch(
+                `/projects/${projectId}/applications/${id}`,
+                { status }
+              );
+
+              await load();
+
+              Alert.alert(
+                isApprove ? 'Request Approved ✓' : 'Request Declined',
+                isApprove
+                  ? 'The join request was approved successfully.'
+                  : 'The join request was declined successfully.',
+                [{ text: 'OK' }]
+              );
+            } catch (cause) {
+              setError(
+                cause instanceof Error
+                  ? cause.message
+                  : 'Could not update the request.'
+              );
+            } finally {
+              setBusy('');
+            }
+          },
+        },
+      ]
+    );
+  }
   if (!loaded) return <Loading />;
 
   return (

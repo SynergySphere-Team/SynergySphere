@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen, Loading, Notice, BackButton } from '@/components/Screen';
 import { Button, Heading } from '@/components/ui';
@@ -116,7 +116,12 @@ export default function ProjectDetailScreen() {
     try {
       await api.post(`/projects/${project.id}/join-requests`, {});
       await load();
-    } catch (cause) {
+      Alert.alert(
+      'Application Submitted!',
+      'Your application was submitted successfully.',
+      [{ text: 'OK' }]
+    );
+        } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Could not send join request.';
       setError(message);
       if (/connect github/i.test(message)) {

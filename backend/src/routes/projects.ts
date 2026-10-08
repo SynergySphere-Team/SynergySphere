@@ -1154,6 +1154,44 @@ router.patch('/:id', authenticate, validateBody(updateProjectSchema), async (req
 
   res.json(updatedProject);
 });
+router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
+  const projectId = paramId(req);
+
+  const project = await queryOne<{
+    id: string;
+    creatorId: string | null;
+  }>(
+    `SELECT "id", "creatorId"
+     FROM "Project"
+     WHERE "id" = $1`,
+    [projectId],
+  );
+
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  const isOwner = project.creatorId === req.user!.userId;
+  const isAdmin = req.user!.role === 'ADMIN';
+
+  if (!isOwner && !isAdmin) {
+    res.status(403).json({
+      error: 'Only the project owner or an admin can delete this project.',
+    });
+    return;
+  }
+
+  await query(
+    `DELETE FROM "Project"
+     WHERE "id" = $1`,
+    [projectId],
+  );
+
+  res.status(200).json({
+    message: 'Project deleted successfully.',
+  });
+});
 
 router.post('/', authenticate, validateBody(projectSchema), async (req: AuthRequest, res) => {
   if (req.user!.role !== 'ORGANIZATION' && req.user!.role !== 'ADMIN' && req.user!.role !== 'STUDENT') {
