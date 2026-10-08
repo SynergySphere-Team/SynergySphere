@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { LogBox } from 'react-native';
+import { LogBox, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -58,7 +58,10 @@ function AppLayout() {
           gestureDirection: 'horizontal',
           animation: reduceMotion
             ? 'none'
-            : 'slide_from_right',
+            : Platform.OS === 'ios'
+              ? 'default'
+              : 'slide_from_right',
+          animationDuration: 240,
         }}
       >
         <Stack.Screen
@@ -68,6 +71,11 @@ function AppLayout() {
 
         <Stack.Screen
           name="(auth)"
+          options={{ headerShown: false }}
+        />
+
+        <Stack.Screen
+          name="onboarding"
           options={{ headerShown: false }}
         />
 

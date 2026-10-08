@@ -5,6 +5,7 @@ import { Screen, Notice } from '@/components/Screen';
 import { Button, Field } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import { onboardingStorage } from '@/services/api';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -19,21 +20,57 @@ export default function RegisterScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   async function submit() {
-    setError('');
+    if (submitting) return;
+
+    const trimmedFirst = firstName.trim();
+    const trimmedLast = lastName.trim();
+    const trimmedEmail = email.trim();
+
+    if (!trimmedFirst) {
+      setError('Please enter your first name.');
+      return;
+    }
+    if (!trimmedLast) {
+      setError('Please enter your last name.');
+      return;
+    }
+    if (!trimmedEmail) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter a password.');
+      return;
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
+    if (!confirmPassword) {
+      setError('Please re-enter your password to confirm.');
+      return;
+    }
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
       return;
     }
+
+    setError('');
     setSubmitting(true);
     try {
       await register({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email.trim(),
+        firstName: trimmedFirst,
+        lastName: trimmedLast,
+        email: trimmedEmail,
         password,
         confirmPassword,
       });
-      router.replace('/(tabs)');
+      await onboardingStorage.reset();
+      router.replace('/(auth)/onboarding');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to create the account.');
     } finally {
@@ -59,21 +96,46 @@ export default function RegisterScreen() {
       </View>
       <View style={styles.form}>
         {error ? <Notice>{error}</Notice> : null}
-        <Field label="First name" value={firstName} onChangeText={setFirstName} autoComplete="given-name" placeholder="First name" />
-        <Field label="Last name" value={lastName} onChangeText={setLastName} autoComplete="family-name" placeholder="Last name" />
+        <Field
+          label="First name"
+          value={firstName}
+          onChangeText={(text) => {
+            setFirstName(text);
+            if (error) setError('');
+          }}
+          autoComplete="given-name"
+          placeholder="First name"
+        />
+        <Field
+          label="Last name"
+          value={lastName}
+          onChangeText={(text) => {
+            setLastName(text);
+            if (error) setError('');
+          }}
+          autoComplete="family-name"
+          placeholder="Last name"
+        />
         <Field
           label="Email"
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(text) => {
+            setEmail(text);
+            if (error) setError('');
+          }}
           keyboardType="email-address"
           autoCapitalize="none"
+          autoCorrect={false}
           autoComplete="email"
           placeholder="you@example.com"
         />
         <Field
           label="Password"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(text) => {
+            setPassword(text);
+            if (error) setError('');
+          }}
           secureTextEntry
           autoComplete="new-password"
           placeholder="At least 8 characters"
@@ -81,14 +143,17 @@ export default function RegisterScreen() {
         <Field
           label="Confirm password"
           value={confirmPassword}
-          onChangeText={setConfirmPassword}
+          onChangeText={(text) => {
+            setConfirmPassword(text);
+            if (error) setError('');
+          }}
           secureTextEntry
           autoComplete="new-password"
           placeholder="Re-enter your password"
         />
         <Button
           title={submitting ? 'Creating account…' : 'Create account'}
-          disabled={submitting || !firstName || !lastName || !email || password.length < 8 || !confirmPassword}
+          disabled={submitting}
           onPress={submit}
         />
         <Pressable onPress={() => router.push('/(auth)/login')}>
@@ -105,6 +170,6 @@ const styles = StyleSheet.create({
   logoImage: { width: '100%', height: '100%' },
   brand: { fontSize: 24, fontWeight: '800' },
   title: { fontSize: 28, fontWeight: '800', textAlign: 'center' },
-  form: { marginTop: 24, gap: 14 },
+  form: { marginTop: 24, gap: 14, paddingBottom: 40 },
   link: { textAlign: 'center', marginTop: 6, fontWeight: '700', fontSize: 14 },
 });

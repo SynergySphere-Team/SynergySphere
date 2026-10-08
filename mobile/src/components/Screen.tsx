@@ -24,11 +24,11 @@ import Animated, {
   runOnJS,
   interpolate,
   Extrapolation,
+  Easing,
 } from 'react-native-reanimated';
 import { usePathname, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { useAccessibility } from '@/context/AccessibilityContext';
-import { triggerLightHaptic } from '@/services/nativePolish';
 import { BackButton } from '@/components/BackButton';
 
 export { BackButton };
@@ -183,9 +183,10 @@ export function Screen({
     pathname === '/notifications' ||
     pathname === '/(tabs)/notifications' ||
     pathname === '/profile' ||
-    pathname === '/(tabs)/profile' ||
     pathname === '/login' ||
-    pathname === '/(auth)/login';
+    pathname === '/(auth)/login' ||
+    pathname === '/onboarding' ||
+    pathname === '/(auth)/onboarding';
 
   const shouldShowBack = showBackButton !== undefined ? showBackButton : !isMainTabRoot;
   const canPerformBack = !disableSwipeBack && swipeBack && (!isMainTabRoot || router.canGoBack());
@@ -200,7 +201,6 @@ export function Screen({
         return true;
       }
       if (canPerformBack) {
-        triggerLightHaptic();
         handleBack();
         return true;
       }
@@ -212,13 +212,13 @@ export function Screen({
   }, [disableSwipeBack, canPerformBack, handleBack]);
 
   const finishGestureBack = useCallback(() => {
-    triggerLightHaptic();
     handleBack();
-    // Reset shared values after navigation transition completes
-    setTimeout(() => {
+    // Maintain transition state during navigation pop, then smoothly reset
+    const timer = setTimeout(() => {
       translateX.value = 0;
       opacity.value = 1;
-    }, 200);
+    }, 450);
+    return () => clearTimeout(timer);
   }, [handleBack, translateX, opacity]);
 
   const edgeWidth = Math.max(20, Math.min(swipeBackEdgeWidth, 50));
@@ -227,8 +227,8 @@ export function Screen({
   const leftEdgeGesture = Gesture.Pan()
     .enabled(canPerformBack)
     .hitSlop({ left: 0, width: edgeWidth })
-    .activeOffsetX(12)
-    .failOffsetY([-22, 22])
+    .activeOffsetX(10)
+    .failOffsetY([-20, 20])
     .cancelsTouchesInView(false)
     .onUpdate((event) => {
       if (!canPerformBack) return;
@@ -237,21 +237,38 @@ export function Screen({
         opacity.value = interpolate(
           event.translationX,
           [0, screenWidth],
-          [1, 0.72],
+          [1, 0.9],
           Extrapolation.CLAMP
         );
       }
     })
     .onEnd((event) => {
       if (!canPerformBack) return;
-      if (event.translationX > 70 || event.velocityX > 350) {
-        translateX.value = withTiming(screenWidth, { duration: 160 }, () => {
-          runOnJS(finishGestureBack)();
+      if (event.translationX > 75 || (event.translationX > 25 && event.velocityX > 300)) {
+        translateX.value = withTiming(
+          screenWidth,
+          {
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+          },
+          () => {
+            runOnJS(finishGestureBack)();
+          }
+        );
+        opacity.value = withTiming(0.85, {
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
         });
-        opacity.value = withTiming(0.4, { duration: 160 });
       } else {
-        translateX.value = withSpring(0, { damping: 22, stiffness: 240 });
-        opacity.value = withTiming(1, { duration: 140 });
+        translateX.value = withSpring(0, {
+          damping: 26,
+          stiffness: 260,
+          mass: 0.8,
+        });
+        opacity.value = withTiming(1, {
+          duration: 180,
+          easing: Easing.out(Easing.quad),
+        });
       }
     });
 
@@ -259,8 +276,8 @@ export function Screen({
   const rightEdgeGesture = Gesture.Pan()
     .enabled(canPerformBack && allowBothEdges)
     .hitSlop({ right: 0, width: edgeWidth })
-    .activeOffsetX(-12)
-    .failOffsetY([-22, 22])
+    .activeOffsetX(-10)
+    .failOffsetY([-20, 20])
     .cancelsTouchesInView(false)
     .onUpdate((event) => {
       if (!canPerformBack) return;
@@ -269,21 +286,38 @@ export function Screen({
         opacity.value = interpolate(
           Math.abs(event.translationX),
           [0, screenWidth],
-          [1, 0.72],
+          [1, 0.9],
           Extrapolation.CLAMP
         );
       }
     })
     .onEnd((event) => {
       if (!canPerformBack) return;
-      if (event.translationX < -70 || event.velocityX < -350) {
-        translateX.value = withTiming(-screenWidth, { duration: 160 }, () => {
-          runOnJS(finishGestureBack)();
+      if (event.translationX < -75 || (event.translationX < -25 && event.velocityX < -300)) {
+        translateX.value = withTiming(
+          -screenWidth,
+          {
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+          },
+          () => {
+            runOnJS(finishGestureBack)();
+          }
+        );
+        opacity.value = withTiming(0.85, {
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
         });
-        opacity.value = withTiming(0.4, { duration: 160 });
       } else {
-        translateX.value = withSpring(0, { damping: 22, stiffness: 240 });
-        opacity.value = withTiming(1, { duration: 140 });
+        translateX.value = withSpring(0, {
+          damping: 26,
+          stiffness: 260,
+          mass: 0.8,
+        });
+        opacity.value = withTiming(1, {
+          duration: 180,
+          easing: Easing.out(Easing.quad),
+        });
       }
     });
 
@@ -343,10 +377,16 @@ export function Screen({
     <ScrollView
       ref={activeScrollRef}
       style={styles.scroller}
-      contentContainerStyle={[styles.scroll, contentContainerStyle]}
+      contentContainerStyle={[
+        styles.scroll,
+        contentContainerStyle,
+        keyboardAvoiding && keyboardHeight > 0
+          ? { paddingBottom: Math.max(keyboardHeight + 36, 100) }
+          : { paddingBottom: 36 },
+      ]}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
-      automaticallyAdjustKeyboardInsets={!keyboardAvoiding}
+      automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
       nestedScrollEnabled
       showsVerticalScrollIndicator={false}
       refreshControl={refreshComponent}
@@ -360,7 +400,7 @@ export function Screen({
   const body = keyboardAvoiding ? (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + keyboardOffset : keyboardOffset}
     >
       {innerContent}

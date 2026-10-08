@@ -185,8 +185,44 @@ export const api = {
   health: () => request<{ status: string; service: string }>('/health'),
 };
 
+const ONBOARDING_KEY = 'synergysphere.onboarding-completed';
+let webOnboardingCompleted = false;
+
 export const authStorage = {
   getToken,
   setToken: (token: string) => Platform.OS === 'web' ? Promise.resolve(webToken = token) : SecureStore.setItemAsync(TOKEN_KEY, token),
   clearToken: () => Platform.OS === 'web' ? Promise.resolve(webToken = null) : SecureStore.deleteItemAsync(TOKEN_KEY),
+};
+
+export const onboardingStorage = {
+  isCompleted: async (): Promise<boolean> => {
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') {
+        return localStorage.getItem(ONBOARDING_KEY) === 'true';
+      }
+      return webOnboardingCompleted;
+    }
+    const val = await SecureStore.getItemAsync(ONBOARDING_KEY);
+    return val === 'true';
+  },
+  setCompleted: async (): Promise<void> => {
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(ONBOARDING_KEY, 'true');
+      }
+      webOnboardingCompleted = true;
+      return;
+    }
+    await SecureStore.setItemAsync(ONBOARDING_KEY, 'true');
+  },
+  reset: async (): Promise<void> => {
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(ONBOARDING_KEY);
+      }
+      webOnboardingCompleted = false;
+      return;
+    }
+    await SecureStore.deleteItemAsync(ONBOARDING_KEY);
+  },
 };
