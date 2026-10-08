@@ -2681,8 +2681,6 @@ export default function CodingScreen() {
                   </Pressable>
                 </View>
               ))}
-
-              <View style={{ height: 20 }} />
             </ScrollView>
           </View>
         </View>

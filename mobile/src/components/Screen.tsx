@@ -75,6 +75,7 @@ export function Screen({
   scrollViewRef,
 }: ScreenProps) {
   const { colors, theme } = useTheme();
+  const { largerText } = useAccessibility();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
@@ -330,7 +331,17 @@ export function Screen({
     opacity: opacity.value,
   }));
 
-  const bottomInsetPadding = Math.max(insets.bottom + 115, 145);
+  // Floating bottom navigation has a height of ~70px (78px with larger text)
+  // and sits at Math.max(insets.bottom, 12).
+  // Content bottom padding should only clear the floating bottom navigation bar
+  // (~80px to 96px / pb-24 on standard viewports, or insets.bottom + 76px on notched viewports)
+  // plus safe area insets without leaving an excessive blank void.
+  const hasBottomNav = !pathname.includes('/(auth)');
+  const bottomInsetPadding = hasBottomNav
+    ? insets.bottom > 0
+      ? insets.bottom + (largerText ? 84 : 76)
+      : (largerText ? 96 : 88)
+    : Math.max(insets.bottom + 16, 24);
 
   const renderTopNav = (shouldShowBack || headerRight) ? (
     <View style={styles.topNavRow}>
@@ -408,6 +419,9 @@ export function Screen({
       automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
       nestedScrollEnabled
       showsVerticalScrollIndicator={false}
+      bounces={true}
+      alwaysBounceVertical={false}
+      overScrollMode="never"
       refreshControl={refreshComponent}
     >
       {contentForScroll}
@@ -521,6 +535,11 @@ const styles = StyleSheet.create({
   },
   scroller: {
     flex: 1,
+    ...Platform.select({
+      web: {
+        overscrollBehavior: 'contain',
+      } as any,
+    }),
   },
   scroll: {
     flexGrow: 1,
@@ -531,6 +550,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 16,
     paddingTop: 12,
   },
