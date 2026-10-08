@@ -26,6 +26,8 @@ import {
   Loader2,
   Bell,
   ExternalLink,
+  Menu,
+  X,
 } from 'lucide-react';
 
 interface NavItem {
@@ -50,6 +52,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [openTicketsCount, setOpenTicketsCount] = useState<number>(0);
+  const [mobileOpen, setMobileOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -291,30 +298,95 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* ─── Main Content Wrapper ────────────────────────────────────────────── */}
       <div className="min-h-screen md:ml-64">
         {/* Top Header */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/[0.08] bg-[#04080b]/85 px-4 sm:px-6 backdrop-blur-xl">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <ShieldCheck className="h-4 w-4 text-amber-400" />
-              <span className="font-semibold text-white">SynergySphere Central Console</span>
-              <span className="text-white/20">/</span>
-              <span className="capitalize text-amber-400/90 font-mono text-[11px]">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/[0.08] bg-[#04080b]/85 px-3 sm:px-6 backdrop-blur-xl gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {/* Mobile Sidebar Hamburger Toggle */}
+            <button
+              type="button"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label="Toggle mobile admin menu"
+              className="flex md:hidden h-8 w-8 items-center justify-center rounded-lg border border-white/[0.1] bg-black/40 text-white hover:bg-white/[0.05]"
+            >
+              {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
+
+            <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+              <ShieldCheck className="h-4 w-4 text-amber-400 shrink-0" />
+              <span className="font-semibold text-white truncate max-w-[110px] sm:max-w-none">
+                Admin Console
+              </span>
+              <span className="hidden sm:inline text-white/20">/</span>
+              <span className="hidden sm:inline capitalize text-amber-400/90 font-mono text-[11px] truncate">
                 {pathname.replace('/admin', '').replace('/', ' → ') || 'Dashboard'}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
             <span className={`hidden sm:inline-flex rounded-full border px-2.5 py-0.5 text-xs font-mono font-medium ${roleBadgeColor}`}>
               Clearance: {roleName}
             </span>
             <Link href="/dashboard">
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs border-white/[0.1] hover:bg-white/[0.05]">
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs border-white/[0.1] hover:bg-white/[0.05] px-2.5 sm:px-3">
                 <ArrowLeft className="h-3 w-3" />
-                <span className="hidden sm:inline">User Application</span>
+                <span className="hidden sm:inline">User App</span>
               </Button>
             </Link>
           </div>
         </header>
+
+        {/* Mobile Navigation Drawer */}
+        {mobileOpen && (
+          <div className="md:hidden border-b border-white/[0.08] bg-[#050a0e]/95 p-4 space-y-4 backdrop-blur-xl animate-in fade-in duration-200">
+            <nav className="space-y-4">
+              {navSections.map((section) => {
+                const visibleItems = section.items.filter((item) => {
+                  if (item.superAdminOnly && !isSuperAdmin(user)) return false;
+                  if (item.adminOnly && !isAdmin(user)) return false;
+                  return true;
+                });
+                if (visibleItems.length === 0) return null;
+
+                return (
+                  <div key={section.title} className="space-y-1">
+                    <p className="px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                      {section.title}
+                    </p>
+                    {visibleItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive =
+                        pathname === item.href ||
+                        (item.href !== '/admin' && pathname.startsWith(item.href));
+
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setMobileOpen(false)}
+                          className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition ${
+                            isActive
+                              ? 'border border-amber-500/30 bg-amber-500/[0.12] text-amber-300 font-semibold'
+                              : 'text-muted-foreground hover:bg-white/[0.04] hover:text-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 truncate">
+                            <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-amber-400' : 'text-muted-foreground'}`} />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                          {item.badge !== undefined && (
+                            <span className={`rounded border px-1.5 py-0.2 text-[10px] font-mono font-semibold ${item.badgeColor || 'bg-white/10 text-white'}`}>
+                              {item.badge}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </nav>
+          </div>
+        )}
 
         {/* Content Children */}
         <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">{children}</main>

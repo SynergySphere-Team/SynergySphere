@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -49,8 +50,21 @@ function fixed(value: unknown, digits = 1): string {
 export default function AdminScreen() {
   const { user } = useAuth();
   const { colors, theme } = useTheme();
+  const params = useLocalSearchParams<{ tab?: string }>();
 
-  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
+    if (params.tab === 'analytics' || params.tab === 'reports') return 'reports';
+    if (params.tab) return params.tab as AdminTab;
+    return 'overview';
+  });
+
+  useEffect(() => {
+    if (params.tab === 'analytics' || params.tab === 'reports') {
+      setActiveTab('reports');
+    } else if (params.tab) {
+      setActiveTab(params.tab as AdminTab);
+    }
+  }, [params.tab]);
   const [data, setData] = useState<AdminOverview | null>(null);
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
@@ -566,7 +580,7 @@ export default function AdminScreen() {
       icon: 'receipt-outline',
       badge: data?.kpis?.openTickets || 0,
     },
-    { key: 'reports', label: 'Reports', icon: 'bar-chart-outline' },
+    { key: 'reports', label: 'Analytics', icon: 'bar-chart-outline' },
     { key: 'database', label: 'Database', icon: 'server-outline' },
   ];
 
@@ -1332,6 +1346,137 @@ export default function AdminScreen() {
       ───────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'reports' ? (
         <View style={styles.sectionGap}>
+          {/* Telemetry Overview KPIs */}
+          <View style={styles.grid}>
+            <Stat
+              label="Mean Resolution"
+              value={`${analyticsData?.avgResolutionHours || 0} hrs`}
+            />
+            <Stat
+              label="New Users (14d)"
+              value={(analyticsData?.dailyRegistrations || []).reduce(
+                (acc: number, d: any) => acc + (d.newUsers || 0),
+                0
+              )}
+            />
+            <Stat
+              label="Workshop Seats"
+              value={(analyticsData?.eventStats || []).reduce(
+                (acc: number, ev: any) => acc + (ev.totalCapacity || 0),
+                0
+              )}
+            />
+          </View>
+
+          {/* User Registration Trend */}
+          {analyticsData?.dailyRegistrations && analyticsData.dailyRegistrations.length > 0 ? (
+            <Card style={styles.cardPad}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="trending-up" size={18} color="#10B981" />
+                <Text style={[styles.cardTitle, { color: colors.text }]}>User Registration Volume (Trend)</Text>
+              </View>
+              <Text style={[styles.copy, { color: colors.muted, marginBottom: 8 }]}>
+                Daily incoming signups across the past 14 days.
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+              >
+                {analyticsData.dailyRegistrations.map((d: any) => (
+                  <View
+                    key={d.date}
+                    style={[
+                      styles.trendCard,
+                      { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                    ]}
+                  >
+                    <Text style={{ fontSize: 16, fontWeight: '900', color: primaryAccent }}>
+                      +{d.newUsers}
+                    </Text>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: colors.muted }}>
+                      {d.date.slice(5)}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </Card>
+          ) : null}
+
+          {/* Support Tickets by Category */}
+          {analyticsData?.ticketCategoryBreakdown && analyticsData.ticketCategoryBreakdown.length > 0 ? (
+            <Card style={styles.cardPad}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="help-buoy-outline" size={18} color={primaryAccent} />
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Support Requests by Category</Text>
+              </View>
+              <View style={{ gap: 8, marginTop: 4 }}>
+                {analyticsData.ticketCategoryBreakdown.map((c: any) => {
+                  const maxCount = Math.max(
+                    ...analyticsData.ticketCategoryBreakdown.map((x: any) => x.count || 1),
+                    1
+                  );
+                  const pct = Math.min(100, Math.round(((c.count || 0) / maxCount) * 100));
+                  return (
+                    <View key={c.category} style={{ gap: 4 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>{c.category}</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '800', color: primaryAccent }}>
+                          {c.count} tickets
+                        </Text>
+                      </View>
+                      <View
+                        style={{
+                          height: 6,
+                          borderRadius: 3,
+                          backgroundColor: colors.surfaceElevated,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <View
+                          style={{
+                            height: '100%',
+                            width: `${pct}%`,
+                            backgroundColor: primaryAccent,
+                            borderRadius: 3,
+                          }}
+                        />
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </Card>
+          ) : null}
+
+          {/* Complaints Target Breakdown */}
+          {analyticsData?.complaintTypeBreakdown && analyticsData.complaintTypeBreakdown.length > 0 ? (
+            <Card style={styles.cardPad}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="alert-circle-outline" size={18} color="#F59E0B" />
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Community Complaints by Target</Text>
+              </View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                {analyticsData.complaintTypeBreakdown.map((comp: any) => (
+                  <View
+                    key={comp.targetType}
+                    style={[
+                      styles.tableChip,
+                      { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                    ]}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text, textTransform: 'uppercase' }}>
+                      {comp.targetType}:
+                    </Text>
+                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#F59E0B' }}>
+                      {comp.count} filed
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </Card>
+          ) : null}
+
           <Card style={styles.cardPad}>
             <Text style={[styles.cardTitle, { color: colors.text }]}>On-Demand CSV Export</Text>
             <Text style={[styles.copy, { color: colors.muted, marginBottom: 8 }]}>
@@ -1527,5 +1672,14 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
+  },
+  trendCard: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: 2,
+    minWidth: 64,
   },
 });

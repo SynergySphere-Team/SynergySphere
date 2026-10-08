@@ -162,49 +162,49 @@ export default function SettingsPage() {
       />
 
       {/* Tabs */}
-      <div className="mb-6 flex border-b border-white/[0.08] gap-6">
+      <div className="mb-6 flex border-b border-white/[0.08] gap-4 sm:gap-6 overflow-x-auto scrollbar-none flex-nowrap pb-0.5">
         <button
           onClick={() => { setActiveTab('profile'); setMessage(null); }}
-          className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
+          className={`pb-3 text-xs sm:text-sm font-medium transition-colors border-b-2 flex items-center gap-2 shrink-0 whitespace-nowrap ${
             activeTab === 'profile'
               ? 'border-primary text-primary font-semibold'
               : 'border-transparent text-muted-foreground hover:text-white'
           }`}
         >
-          <User className="h-4 w-4" />
+          <User className="h-4 w-4 shrink-0" />
           Developer Profile
         </button>
         <button
           onClick={() => { setActiveTab('preferences'); setMessage(null); }}
-          className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
+          className={`pb-3 text-xs sm:text-sm font-medium transition-colors border-b-2 flex items-center gap-2 shrink-0 whitespace-nowrap ${
             activeTab === 'preferences'
               ? 'border-primary text-primary font-semibold'
               : 'border-transparent text-muted-foreground hover:text-white'
           }`}
         >
-          <Palette className="h-4 w-4" />
+          <Palette className="h-4 w-4 shrink-0" />
           Preferences & POPIA
         </button>
         <button
           onClick={() => { setActiveTab('security'); setMessage(null); }}
-          className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
+          className={`pb-3 text-xs sm:text-sm font-medium transition-colors border-b-2 flex items-center gap-2 shrink-0 whitespace-nowrap ${
             activeTab === 'security'
               ? 'border-primary text-primary font-semibold'
               : 'border-transparent text-muted-foreground hover:text-white'
           }`}
         >
-          <Shield className="h-4 w-4" />
+          <Shield className="h-4 w-4 shrink-0" />
           Security & Account
         </button>
         <button
           onClick={() => { setActiveTab('support'); setMessage(null); }}
-          className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
+          className={`pb-3 text-xs sm:text-sm font-medium transition-colors border-b-2 flex items-center gap-2 shrink-0 whitespace-nowrap ${
             activeTab === 'support'
               ? 'border-primary text-primary font-semibold'
               : 'border-transparent text-muted-foreground hover:text-white'
           }`}
         >
-          <LifeBuoy className="h-4 w-4" />
+          <LifeBuoy className="h-4 w-4 shrink-0" />
           Help & Support
         </button>
       </div>

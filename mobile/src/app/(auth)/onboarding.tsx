@@ -396,11 +396,13 @@ export default function OnboardingScreen() {
                   : 'Get Started'
                 : 'Next'}
             </Text>
-            <Ionicons
-              name={isLastSlide ? 'rocket' : 'arrow-forward'}
-              size={18}
-              color={isLight ? '#FFFFFF' : '#0B1E13'}
-            />
+            {!isLastSlide ? (
+              <Ionicons
+                name="arrow-forward"
+                size={18}
+                color={isLight ? '#FFFFFF' : '#0B1E13'}
+              />
+            ) : null}
           </Pressable>
 
           {user ? (

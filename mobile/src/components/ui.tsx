@@ -176,7 +176,7 @@ export function Heading({
   const { fontSize } = useAccessibility();
 
   return (
-    <View style={styles.headingContainer}>
+    <View style={[styles.headingContainer, !rightAction && { paddingRight: 42 }]}>
       <View style={styles.headingTextGroup}>
         <Text
           allowFontScaling

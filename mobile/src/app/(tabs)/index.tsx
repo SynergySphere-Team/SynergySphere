@@ -329,7 +329,7 @@ export default function HomeScreen() {
     workspaces.push({
       title: 'Analytics',
       description: 'Review platform-wide learning and wellness metrics.',
-      route: '/admin',
+      route: '/admin?tab=analytics',
       icon: 'bar-chart',
     });
   }

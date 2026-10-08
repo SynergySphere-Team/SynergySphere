@@ -330,32 +330,48 @@ export function Screen({
     opacity: opacity.value,
   }));
 
-  const content = (
+  const bottomInsetPadding = Math.max(insets.bottom + 115, 145);
+
+  const renderTopNav = (shouldShowBack || headerRight) ? (
+    <View style={styles.topNavRow}>
+      {shouldShowBack ? (
+        <BackButton onPress={onBack || handleBack} />
+      ) : (
+        <View style={{ width: 38 }} />
+      )}
+      {headerRight ? (
+        <View style={styles.topNavRight}>
+          {headerRight}
+        </View>
+      ) : null}
+    </View>
+  ) : null;
+
+  const contentForScroll = (
+    <View
+      style={[
+        styles.scrollContent,
+        contentStyle,
+      ]}
+    >
+      {renderTopNav}
+      {children}
+    </View>
+  );
+
+  const contentForNonScroll = (
     <View
       style={[
         styles.content,
         {
           paddingBottom:
-            Math.max(insets.bottom + 90, 120) +
+            bottomInsetPadding +
             (keyboardHeight > 0 ? (Platform.OS === 'android' ? 32 : 24) : 0),
         },
         contentStyle,
       ]}
     >
-      {(shouldShowBack || headerRight) && (
-        <View style={styles.topNavRow}>
-          {shouldShowBack ? (
-            <BackButton onPress={onBack || handleBack} />
-          ) : (
-            <View style={{ width: 38 }} />
-          )}
-          {headerRight ? (
-            <View style={styles.topNavRight}>
-              {headerRight}
-            </View>
-          ) : null}
-        </View>
-      )}
+      {renderTopNav}
       {children}
     </View>
   );
@@ -379,10 +395,13 @@ export function Screen({
       style={styles.scroller}
       contentContainerStyle={[
         styles.scroll,
+        {
+          paddingBottom:
+            keyboardAvoiding && keyboardHeight > 0
+              ? Math.max(keyboardHeight + 40, bottomInsetPadding)
+              : bottomInsetPadding,
+        },
         contentContainerStyle,
-        keyboardAvoiding && keyboardHeight > 0
-          ? { paddingBottom: Math.max(keyboardHeight + 36, 100) }
-          : { paddingBottom: 36 },
       ]}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
@@ -391,11 +410,11 @@ export function Screen({
       showsVerticalScrollIndicator={false}
       refreshControl={refreshComponent}
     >
-      {content}
+      {contentForScroll}
     </ScrollView>
   );
 
-  const innerContent = scroll ? scrollBody : content;
+  const innerContent = scroll ? scrollBody : contentForNonScroll;
 
   const body = keyboardAvoiding ? (
     <KeyboardAvoidingView
@@ -512,6 +531,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 12,
   },

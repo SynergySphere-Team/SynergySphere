@@ -4111,9 +4111,9 @@ const styles =
 
     sectionLabel: {
 
-      marginTop: 10,
+      marginTop: 18,
 
-      marginBottom: -4,
+      marginBottom: 8,
 
       marginLeft: 4,
 
@@ -4608,6 +4608,8 @@ const styles =
       padding: 16,
 
       gap: 11,
+
+      marginTop: 14,
 
     },
 

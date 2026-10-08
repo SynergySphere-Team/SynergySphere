@@ -4,7 +4,7 @@
     "paths": {
       "@/*": ["mobile/src/*", "frontend/src/*"]
     },
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "jsx": "react",
     "allowJs": true,
     "skipLibCheck": true,
