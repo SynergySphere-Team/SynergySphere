@@ -29,9 +29,9 @@ export default function Index() {
 
   if (loading || checkingOnboarding) return <Loading />;
   if (user) {
-    if (!onboardingDone) return <Redirect href="/(auth)/onboarding" />;
+    if (!onboardingDone) return <Redirect href={'/(auth)/onboarding' as never} />;
     return <Redirect href="/(tabs)" />;
   }
-  if (!onboardingDone) return <Redirect href="/(auth)/onboarding" />;
+  if (!onboardingDone) return <Redirect href={'/(auth)/onboarding' as never} />;
   return <Redirect href="/(auth)/login" />;
 }

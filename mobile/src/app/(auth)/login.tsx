@@ -45,7 +45,7 @@ export default function LoginScreen() {
     try {
       await login(trimmedEmail, password);
       await onboardingStorage.reset();
-      router.replace('/(auth)/onboarding');
+      router.replace('/(auth)/onboarding' as never);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to sign in.');
     } finally {

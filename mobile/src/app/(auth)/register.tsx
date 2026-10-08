@@ -70,7 +70,7 @@ export default function RegisterScreen() {
         confirmPassword,
       });
       await onboardingStorage.reset();
-      router.replace('/(auth)/onboarding');
+      router.replace('/(auth)/onboarding' as never);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to create the account.');
     } finally {
