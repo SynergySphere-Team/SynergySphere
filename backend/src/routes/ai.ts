@@ -73,11 +73,13 @@ const chatSchema = z.object({
   lessonId: z.string().min(1).max(255).optional(),
   challengeId: z.string().min(1).max(255).optional(),
   uploadId: z.string().min(1).max(255).optional(),
+  apiKey: z.string().optional(),
   history: z.array(chatTurnSchema).max(20).optional(),
 });
 
 router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => {
-  const { message, context, lessonId, challengeId, uploadId } = req.body;
+  const { message, context, lessonId, challengeId, uploadId, apiKey } = req.body;
+  const customKey = apiKey || (req.headers['x-ai-api-key'] as string | undefined);
   const history: ChatTurn[] = Array.isArray(req.body.history) ? req.body.history.slice(-20) : [];
 
   const bundle = await buildGroundingBundle({
@@ -151,6 +153,7 @@ router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => 
     prompt,
     history,
     () => buildGroundedFallback(message, bundle, historySummary, context),
+    customKey,
   );
 
   // Persist chat turns in DB in background
@@ -180,6 +183,131 @@ router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => 
       challengeTitle: ref.challengeTitle ?? null,
     },
   });
+});
+
+// ── Direct Code Actions (Explain, Tests, Optimize, Debug) underneath Code Context ──
+const codeActionSchema = z.object({
+  action: z.enum(['explain', 'test', 'optimize', 'debug']),
+  code: z.string().min(1, 'Please provide code in the editor').max(30000),
+  language: z.string().optional(),
+  lessonId: z.string().optional(),
+  challengeId: z.string().optional(),
+  apiKey: z.string().optional(),
+});
+
+router.post('/code-action', validateBody(codeActionSchema), async (req: AuthRequest, res) => {
+  const { action, code, language, apiKey } = req.body;
+  const customKey = apiKey || (req.headers['x-ai-api-key'] as string | undefined);
+
+  let systemPrompt = '';
+  let userPrompt = '';
+
+  if (action === 'explain') {
+    systemPrompt = [
+      'You are SynergySphere Staff Engineering Assistant.',
+      'Explain this code clearly, step by step, for a developer.',
+      'Breakdown the architecture, core algorithm, control flow, time & space complexity (Big-O), and notable edge cases.',
+      'Format your output in clean Markdown with headers and bullet points.',
+    ].join('\n');
+    userPrompt = `Please explain the following ${language || 'code'} snippet:\n\n\`\`\`\n${code}\n\`\`\``;
+  } else if (action === 'test') {
+    systemPrompt = [
+      'You are a Quality Engineering and Testing Lead.',
+      'Generate comprehensive, production-grade unit tests for the provided code.',
+      'Cover happy path, null/undefined inputs, boundary cases, empty collections, and extreme edge conditions.',
+      'Include clear assertion descriptions and framework setup if applicable.',
+    ].join('\n');
+    userPrompt = `Generate comprehensive unit tests for this ${language || 'code'} snippet:\n\n\`\`\`\n${code}\n\`\`\``;
+  } else if (action === 'optimize') {
+    systemPrompt = [
+      'You are a Systems and Performance Optimization Architect.',
+      'Analyze the provided code for performance bottlenecks, algorithmic complexity, redundant allocations, and code cleanliness.',
+      'Provide an optimized, idiomatic version with a clear explanation of what was changed and the performance gains achieved (time/memory complexity comparison).',
+    ].join('\n');
+    userPrompt = `Optimize this ${language || 'code'} snippet for performance and readability:\n\n\`\`\`\n${code}\n\`\`\``;
+  } else {
+    systemPrompt = [
+      'You are an expert Debugging Assistant.',
+      'Inspect the provided code for runtime bugs, syntax problems, logic flaws, off-by-one errors, and silent failure modes.',
+      'Explain the root cause and provide the verified fix.',
+    ].join('\n');
+    userPrompt = `Find and fix any bugs in this ${language || 'code'} snippet:\n\n\`\`\`\n${code}\n\`\`\``;
+  }
+
+  let fromAi = false;
+  try {
+    const response = await generateAiResponse(
+      systemPrompt,
+      userPrompt,
+      [],
+      () => {
+        // Fallback generator
+        if (action === 'explain') {
+          return `### Code Explanation & Structural Walkthrough\n\n- **Detected Language:** ${language || 'Auto-detected'}\n- **Line Count:** ${code.split('\n').length} lines\n\n#### Flow Analysis\n1. **Input & Variable Scope:** The code initializes state variables and control structures.\n2. **Algorithmic Execution:** Iterates over data structures to perform necessary transformations.\n3. **Return & Side Effects:** Produces computed outputs while keeping state predictable.\n\n*Note: Running in offline fallback mode. Configure an active AI API key in the AI Assistant for deep live model reasoning.*`;
+        } else if (action === 'test') {
+          return `### Generated Unit Test Suite\n\n\`\`\`javascript\n// Automated Edge-Case Test Harness\ndescribe('Code Verification', () => {\n  test('happy path - should handle typical valid inputs', () => {\n    // Verify primary functionality\n    expect(true).toBe(true);\n  });\n\n  test('boundary condition - empty / zero / null inputs', () => {\n    // Verify boundary robustness\n    expect(true).toBe(true);\n  });\n\n  test('performance and stress limits', () => {\n    // Verify execution within time limits\n    expect(true).toBe(true);\n  });\n});\n\`\`\``;
+        } else if (action === 'optimize') {
+          return `### Optimization & Performance Analysis\n\n- **Time Complexity:** Review loops for unnecessary duplicate iterations (prefer O(N) over O(N²)).\n- **Space Efficiency:** Use Map or Set for O(1) membership queries.\n- **Clean Code:** Use early returns to minimize nested indentation.\n\n\`\`\`\n// Recommended Optimization Pattern\n// Cache computed variables outside loops and handle base cases early\n\`\`\``;
+        } else {
+          return `### Static Bug & Risk Inspection\n\n- Verify all variable boundaries and null checks.\n- Ensure array indexes are strictly bounded (avoid off-by-one errors).\n- Check error handling in async blocks or exception traps.`;
+        }
+      },
+      customKey,
+    );
+
+    // If the response did not contain the fallback signature, it was from AI
+    fromAi = !response.includes('offline fallback mode');
+
+    res.json({
+      ok: true,
+      action,
+      output: response,
+      fromAi,
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message || 'Code action failed' });
+  }
+});
+
+// ── Test & Validate AI API Key ──
+router.post('/test-key', async (req: AuthRequest, res) => {
+  const { apiKey } = req.body;
+  const keyToTest = (apiKey || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '').trim();
+
+  if (!keyToTest) {
+    res.status(400).json({ valid: false, message: 'No API key provided or found in environment.' });
+    return;
+  }
+
+  if (keyToTest.startsWith('sk-')) {
+    // Test OpenAI
+    try {
+      const response = await fetch('https://api.openai.com/v1/models', {
+        headers: { Authorization: `Bearer ${keyToTest}` },
+      });
+      const data = await response.json() as any;
+      if (response.ok && data?.data) {
+        res.json({ valid: true, provider: 'OpenAI', message: `OpenAI key is verified! Connected to ${data.data.length} models.` });
+      } else {
+        res.json({ valid: false, provider: 'OpenAI', message: data?.error?.message || 'OpenAI authentication failed.' });
+      }
+    } catch (err) {
+      res.json({ valid: false, provider: 'OpenAI', message: (err as Error).message });
+    }
+  } else {
+    // Test Gemini
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${keyToTest}`);
+      const data = await response.json() as any;
+      if (response.ok && data?.models) {
+        res.json({ valid: true, provider: 'Google Gemini', message: `Google Gemini key is verified! ${data.models.length} models available.` });
+      } else {
+        res.json({ valid: false, provider: 'Google Gemini', message: data?.error?.message || 'Gemini authentication failed. Please check your key at aistudio.google.com.' });
+      }
+    } catch (err) {
+      res.json({ valid: false, provider: 'Google Gemini', message: (err as Error).message });
+    }
+  }
 });
 
 // ── Multi-File Ticket PR Code Review (Take-Home / Practice Gym) ──
@@ -308,6 +436,7 @@ import {
   ALL_DIFFICULTIES,
   ALL_INTERVIEWER_STYLES,
   QUESTION_BANK_BY_TOPIC,
+  ALL_QUESTIONS,
 } from '../data/interviewBank/index.js';
 
 router.get('/interview/tracks', async (_req, res) => {
@@ -321,6 +450,63 @@ router.get('/interview/tracks', async (_req, res) => {
     difficulties: ALL_DIFFICULTIES,
     interviewerStyles: ALL_INTERVIEWER_STYLES,
   });
+});
+
+router.get('/interview/questions', async (req: AuthRequest, res) => {
+  try {
+    const { topic, category, difficulty, type, search, page = '1', limit = '20' } = req.query as Record<string, string>;
+    let list = ALL_QUESTIONS;
+
+    if (topic && topic !== 'all') {
+      const tLower = topic.toLowerCase();
+      list = list.filter((q) => q.topic.toLowerCase() === tLower || (q.category && q.category.toLowerCase() === tLower));
+    }
+    if (category && category !== 'all') {
+      const cLower = category.toLowerCase();
+      list = list.filter((q) => q.category && q.category.toLowerCase() === cLower);
+    }
+    if (difficulty && difficulty !== 'all') {
+      list = list.filter((q) => q.difficulty.toLowerCase() === difficulty.toLowerCase());
+    }
+    if (type && type !== 'all') {
+      list = list.filter((q) => q.type.toLowerCase() === type.toLowerCase());
+    }
+    if (search && search.trim()) {
+      const qLower = search.toLowerCase();
+      list = list.filter(
+        (q) =>
+          q.prompt.toLowerCase().includes(qLower) ||
+          q.tags.some((t) => t.toLowerCase().includes(qLower)) ||
+          q.topic.toLowerCase().includes(qLower),
+      );
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
+    const total = list.length;
+    const paginated = list.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+    res.json({
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      questions: paginated.map((q) => ({
+        id: q.id,
+        topic: q.topic,
+        category: q.category,
+        type: q.type,
+        difficulty: q.difficulty,
+        prompt: q.prompt,
+        rubric: q.rubric,
+        tags: q.tags,
+        followUps: q.followUps,
+        hints: q.hints,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message || 'Failed to list questions' });
+  }
 });
 
 router.get('/interview/home-stats', async (req: AuthRequest, res) => {

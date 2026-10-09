@@ -527,6 +527,23 @@ function AIAssistantInner() {
     sendMessage(action.prompt(codeContext), undefined, codeContext);
   }
 
+  function handleClearCodeAndOutput() {
+    setCodeContext('');
+    setCodeEditedByUser(false);
+    setAnalysis(null);
+    setMessages((prev) => {
+      if (prev.length <= 1) return prev;
+      const copy = [...prev];
+      if (copy.length > 1 && copy[copy.length - 1].role === 'assistant') {
+        copy.pop();
+        if (copy.length > 1 && copy[copy.length - 1].role === 'user') {
+          copy.pop();
+        }
+      }
+      return copy;
+    });
+  }
+
   async function clearChat() {
     try {
       await api('/ai/chat/history', { method: 'DELETE' });
@@ -864,13 +881,25 @@ function AIAssistantInner() {
               <Code2 className="h-4 w-4 text-primary" />
               Code Context
             </CardTitle>
-            <span className="rounded-lg border border-white/[0.08] bg-secondary/50 px-2 py-1 text-xs text-muted-foreground">
-              {lesson?.firstExampleLanguage
-                ? `${lesson.firstExampleLanguage} example from lesson`
-                : challenge?.language
-                  ? `${challenge.language} challenge starter`
-                  : 'Java / JS / Python'}
-            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearCodeAndOutput}
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 gap-1.5 transition"
+                title="Clear code editor and remove previous AI response"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Clear
+              </Button>
+              <span className="rounded-lg border border-white/[0.08] bg-secondary/50 px-2 py-1 text-xs text-muted-foreground">
+                {lesson?.firstExampleLanguage
+                  ? `${lesson.firstExampleLanguage} example from lesson`
+                  : challenge?.language
+                    ? `${challenge.language} challenge starter`
+                    : 'Java / JS / Python'}
+              </span>
+            </div>
           </CardHeader>
           <CardContent>
             <textarea
@@ -879,12 +908,12 @@ function AIAssistantInner() {
                 setCodeContext(e.target.value);
                 setCodeEditedByUser(true);
               }}
-              className="h-[430px] w-full resize-none rounded-lg border border-white/[0.08] bg-[#050a0d] p-4 font-mono text-sm leading-6 text-green-100 outline-none focus:ring-2 focus:ring-primary/30"
+              className="h-[430px] w-full resize-none rounded-lg border border-white/[0.08] bg-[#050a0d] p-4 font-mono text-sm leading-6 text-green-100 outline-none focus:ring-2 focus:ring-primary/30 overflow-y-auto"
               spellCheck={false}
               placeholder="Paste your code here, then use the action buttons below…"
             />
             {/* Quick action buttons – all wired up */}
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               {quickActions.map((action) => {
                 const Icon = action.icon;
                 return (
@@ -901,6 +930,16 @@ function AIAssistantInner() {
                   </Button>
                 );
               })}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearCodeAndOutput}
+                className="ml-auto gap-1.5 border-rose-500/20 text-xs text-muted-foreground hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300"
+                title="Clear code editor and remove previous AI output"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Clear Code & Output
+              </Button>
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground/60">
               {lesson?.firstExampleCode

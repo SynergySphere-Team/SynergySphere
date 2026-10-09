@@ -1263,7 +1263,8 @@ export default function CodingScreen() {
   }, [load]);
 
   function handleOpenLessonFromPath(path: RolePath, lessonId?: string) {
-    const targetId = lessonId || path.curatedLessonIds?.[0] || path.syllabus?.[0]?.id || 'java-java-tutorial-java-introduction';
+    const nextUncompleted = path.syllabus?.find((l) => !l.completed);
+    const targetId = lessonId || nextUncompleted?.id || path.curatedLessonIds?.[0] || path.syllabus?.[0]?.id || 'java-java-tutorial-java-introduction';
     setPreviousMode('rolepaths');
     setSelectedRolePathModal(null);
     setSelectedLessonId(targetId);
@@ -2334,19 +2335,9 @@ export default function CodingScreen() {
           {rolePaths.map((path) => {
             const isActive = activeTrackId === path.id;
             return (
-              <Card key={path.id} style={isActive ? { borderColor: primaryAccent, borderWidth: 1.5 } : undefined}>
-                {/* Active Goal Ribbon */}
-                {isActive ? (
-                  <View style={[styles.activeGoalBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)' }]}>
-                    <Ionicons name="star" size={12} color={primaryAccent} />
-                    <Text style={[styles.activeGoalBadgeText, { color: primaryAccent }]}>
-                      ACTIVE CAREER GOAL
-                    </Text>
-                  </View>
-                ) : null}
-
-                {/* Card Title & Meta Header */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, gap: 8 }}>
+              <View key={path.id} style={{ marginBottom: 16 }}>
+                {/* Heading placed outside of the card container */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 8 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text }}>
                       {path.title}
@@ -2362,9 +2353,20 @@ export default function CodingScreen() {
                   </View>
                 </View>
 
-                <Text style={{ fontSize: 13, color: colors.muted, lineHeight: 18, marginBottom: 12 }}>
-                  {path.tagline}
-                </Text>
+                <Card style={isActive ? { borderColor: primaryAccent, borderWidth: 1.5 } : undefined}>
+                  {/* Active Goal Ribbon */}
+                  {isActive ? (
+                    <View style={[styles.activeGoalBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)' }]}>
+                      <Ionicons name="star" size={12} color={primaryAccent} />
+                      <Text style={[styles.activeGoalBadgeText, { color: primaryAccent }]}>
+                        ACTIVE CAREER GOAL
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <Text style={{ fontSize: 13, color: colors.muted, lineHeight: 18, marginBottom: 12 }}>
+                    {path.tagline}
+                  </Text>
 
                 {/* Completion Progress Bar */}
                 <View style={{ marginBottom: 14 }}>
@@ -2531,8 +2533,9 @@ export default function CodingScreen() {
                   </Pressable>
                 </View>
               </Card>
-            );
-          })}
+            </View>
+          );
+        })}
         </>
       ) : null}
 

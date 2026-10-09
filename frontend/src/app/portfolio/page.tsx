@@ -761,13 +761,15 @@ export default function PortfolioPage() {
                           .filter((s) => s.completedLessons > 0)
                           .map((skill) => (
                             <div key={skill.id} className="group">
-                              <div className="mb-1 flex items-center justify-between text-xs">
-                                <span className="font-medium text-white flex items-center gap-1.5">
-                                  <CheckCircle2 className="h-3 w-3 text-primary" />
-                                  {skill.name}
+                              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs min-w-0">
+                                <span className="font-medium text-white flex items-center gap-1.5 min-w-0 max-w-[62%] truncate" title={skill.name}>
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                                  <span className="truncate">{skill.name}</span>
                                 </span>
-                                <div className="flex items-center gap-1.5 text-muted-foreground">
-                                  <span className="text-[10px]">{skill.completedLessons}/{skill.totalLessons}</span>
+                                <div className="flex items-center gap-2 text-muted-foreground shrink-0 ml-auto">
+                                  <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-slate-300">
+                                    {skill.completedLessons}/{skill.totalLessons}
+                                  </span>
                                   <span className="font-semibold text-primary">{skill.percent}%</span>
                                 </div>
                               </div>

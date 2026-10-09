@@ -294,15 +294,16 @@ export default function LectureToLifeScreen() {
         <View style={styles.headerText}>
           <Text
             allowFontScaling
+            numberOfLines={1}
             style={[
               styles.headerTitle,
               {
                 color: colors.text,
-                fontSize: fontSize(24),
+                fontSize: fontSize(22),
               },
             ]}
           >
-            Lecture{'\n'}to Life
+            Lecture to Life
           </Text>
 
           <Text

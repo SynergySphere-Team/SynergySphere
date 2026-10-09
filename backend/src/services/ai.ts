@@ -57,12 +57,34 @@ export async function generateAiResponse(
   userMessage: string,
   history: ChatTurn[] = [],
   offlineFallback: () => string = () => fallbackResponse(systemPrompt, userMessage),
+  customApiKey?: string,
 ): Promise<string> {
   refreshEnv();
   const priorTurns = usableHistory(history);
 
+  const cleanCustomKey = (customApiKey || '').trim();
+
+  // If user provided a custom key, prioritize it based on prefix
+  if (cleanCustomKey) {
+    if (cleanCustomKey.startsWith('sk-')) {
+      try {
+        const result = await callOpenAI(cleanCustomKey, systemPrompt, userMessage, priorTurns);
+        if (result) return result;
+      } catch (err) {
+        console.error('Custom OpenAI API error:', err);
+      }
+    } else {
+      try {
+        const result = await callGemini(cleanCustomKey, systemPrompt, userMessage, priorTurns);
+        if (result) return result;
+      } catch (err) {
+        console.error('Custom Gemini API error:', err);
+      }
+    }
+  }
+
   // 1. Try Gemini first (free)
-  const geminiKey = (process.env.GEMINI_API_KEY || '').trim();
+  const geminiKey = (cleanCustomKey && !cleanCustomKey.startsWith('sk-') ? cleanCustomKey : process.env.GEMINI_API_KEY || '').trim();
   if (geminiKey) {
     try {
       const result = await callGemini(geminiKey, systemPrompt, userMessage, priorTurns);
@@ -73,7 +95,13 @@ export async function generateAiResponse(
   }
 
   // 2. Try OpenAI
-  const openaiKey = (process.env.OPENAI_API_KEY || '').trim();
+  const openaiKey = (
+    cleanCustomKey && cleanCustomKey.startsWith('sk-')
+      ? cleanCustomKey
+      : process.env.OPENAI_API_KEY ||
+        (process.env.ANTHROPIC_API_KEY?.startsWith('sk-') ? process.env.ANTHROPIC_API_KEY : '') ||
+        ''
+  ).trim();
   if (openaiKey) {
     try {
       const result = await callOpenAI(openaiKey, systemPrompt, userMessage, priorTurns);
@@ -97,13 +125,12 @@ async function callGemini(
 ): Promise<string> {
   const models = [
     process.env.GEMINI_MODEL,
-    'gemini-3.5-flash-lite',
-    'gemini-3.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-flash-lite-latest',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro',
+    'gemini-2.5-flash',
     'gemini-flash-latest',
-    'gemini-3.8-flash',
-    'gemini-3.1-flash-lite',
   ].filter((model, index, all): model is string => Boolean(model) && all.indexOf(model) === index);
 
   let lastError = '';

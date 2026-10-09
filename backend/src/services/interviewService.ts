@@ -1143,6 +1143,69 @@ export async function getInterviewHomeStats(userId: string) {
     },
   ];
 
+  // Calculate practiced skills dynamically
+  const skillOccurrences = new Map<string, number>();
+  for (const row of recentInterviewRows) {
+    if (row.topic) {
+      skillOccurrences.set(row.topic, (skillOccurrences.get(row.topic) || 0) + 3);
+    }
+  }
+  for (const tp of topicProgressRows) {
+    if (tp.topic) {
+      skillOccurrences.set(tp.topic, (skillOccurrences.get(tp.topic) || 0) + (tp.attempts || 1));
+    }
+  }
+  const sortedSkills = Array.from(skillOccurrences.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([skill]) => skill);
+
+  const mostPractisedSkills = sortedSkills.length > 0
+    ? sortedSkills.slice(0, 4)
+    : ['TypeScript', 'React', 'Node.js', 'System Design'];
+
+  // Calculate actual recent improvement trajectory
+  let recentImprovement = 'Begin your first mock interview to track trajectory';
+  const scoredInterviews = recentInterviewRows.filter((r) => typeof r.score === 'number' && !isNaN(r.score!));
+  if (scoredInterviews.length >= 2) {
+    const latestScore = scoredInterviews[0].score!;
+    const previousScore = scoredInterviews[scoredInterviews.length - 1].score!;
+    const diff = latestScore - previousScore;
+    if (diff > 0) {
+      recentImprovement = `+${diff}% accuracy increase across recent sessions`;
+    } else if (diff === 0) {
+      recentImprovement = `Consistent ${latestScore}% benchmark maintained`;
+    } else {
+      recentImprovement = `${diff}% score delta across recent sessions`;
+    }
+  } else if (scoredInterviews.length === 1) {
+    recentImprovement = `Baseline established: ${scoredInterviews[0].score}% initial score`;
+  }
+
+  // Calculate daily streak
+  const activeDates = new Set<string>();
+  for (const r of recentInterviewRows) {
+    if (r.createdAt) activeDates.add(new Date(r.createdAt).toISOString().slice(0, 10));
+  }
+  for (const t of topicProgressRows) {
+    if (t.lastPractisedAt) activeDates.add(new Date(t.lastPractisedAt).toISOString().slice(0, 10));
+  }
+  let calculatedStreak = 0;
+  const today = new Date();
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    if (activeDates.has(dateStr)) {
+      calculatedStreak++;
+    } else if (i === 0) {
+      // today might not have a session yet
+      continue;
+    } else {
+      break;
+    }
+  }
+  const currentStreak = Math.max(calculatedStreak, scoredInterviews.length > 0 ? 1 : 0);
+
   return {
     interviewsCompleted,
     questionsAnswered,
@@ -1164,10 +1227,10 @@ export async function getInterviewHomeStats(userId: string) {
     analytics: {
       interviewsCompleted,
       practiceSessions,
-      topicsImproved: Math.max(1, topicProgressRows.filter((t) => t.currentLevel === 'Improving' || t.currentLevel === 'Strong').length),
-      currentStreak: 4,
-      mostPractisedSkills: ['C#', 'SQL', 'Algorithms'],
-      recentImprovement: '+18% accuracy over last 3 sessions',
+      topicsImproved: Math.max(0, topicProgressRows.filter((t) => t.currentLevel === 'Improving' || t.currentLevel === 'Strong').length),
+      currentStreak,
+      mostPractisedSkills,
+      recentImprovement,
     },
   };
 }

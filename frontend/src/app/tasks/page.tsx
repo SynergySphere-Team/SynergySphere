@@ -227,15 +227,15 @@ export default function TasksPage() {
       playNotificationChime('focus_done');
       const taskMsg = activeTask ? ` on "${activeTask.title}"` : '';
       const notifBody = `Your ${durationMinutes}-minute focus session${taskMsg} has ended! Time to recharge.`;
-      sendBrowserNotification('Focus Session Completed! ⏰', notifBody);
+      sendBrowserNotification('Focus Session Completed', notifBody);
 
       setAlertNotification({
-        title: '⏰ Focus Session Finished!',
+        title: 'Focus Session Finished',
         message: `Your ${durationMinutes}-minute session${taskMsg} has officially ended. Great work! Take a break before your next focus interval.`,
         type: 'focus_ended',
       });
 
-      setSuccess(`🎉 Focus session completed! +15 XP earned.`);
+      setSuccess(`Focus session completed! +15 XP earned.`);
       await Promise.all([loadTasks(), loadStats()]);
     } catch {
       /* count locally */
@@ -316,9 +316,9 @@ export default function TasksPage() {
       } else {
         // Break ended
         playNotificationChime('break');
-        sendBrowserNotification('Break Ended! ☕', 'Break time has finished. Ready to start your next sprint?');
+        sendBrowserNotification('Break Ended', 'Break time has finished. Ready to start your next sprint?');
         setAlertNotification({
-          title: '☕ Break Time Finished',
+          title: 'Break Time Finished',
           message: 'Your break has concluded! Ready to jump back into your next focus sprint?',
           type: 'break_time',
         });
@@ -420,7 +420,7 @@ export default function TasksPage() {
     setSecondsLeft(clamped * 60);
     setTimerStatus('running');
 
-    setSuccess(`🔥 Now focusing on "${task.title}" (${clamped}m sprint before break).`);
+    setSuccess(`Now focusing on "${task.title}" (${clamped}m sprint before break).`);
   }
 
   function pauseTaskTimer() {
@@ -472,9 +472,9 @@ export default function TasksPage() {
 
       if (formStatus === 'DONE') {
         playNotificationChime('task_done');
-        sendBrowserNotification('Task Created & Completed! 🎉', `"${formTitle}" is completed.`);
+        sendBrowserNotification('Task Created & Completed', `"${formTitle}" is completed.`);
         setAlertNotification({
-          title: '🎉 Task Completed!',
+          title: 'Task Completed',
           message: `Awesome work! "${formTitle}" has been logged as completed (+10 XP).`,
           type: 'task_done',
         });
@@ -502,13 +502,13 @@ export default function TasksPage() {
 
       if (status === 'DONE') {
         playNotificationChime('task_done');
-        sendBrowserNotification('Task Completed! 🎉', `"${task.title}" has been completed.`);
+        sendBrowserNotification('Task Completed', `"${task.title}" has been completed.`);
         setAlertNotification({
-          title: '🎉 Task Completed!',
+          title: 'Task Completed',
           message: `Great job! You finished "${task.title}". Keep up the strong momentum!`,
           type: 'task_done',
         });
-        setSuccess(`🎉 Task "${task.title}" marked as done!`);
+        setSuccess(`Task "${task.title}" marked as done!`);
       }
 
       await Promise.all([loadTasks(), loadStats()]);
@@ -541,16 +541,16 @@ export default function TasksPage() {
 
       if (checkInPushToPortfolio && target) {
         await api(`/tasks/${taskId}/push-to-portfolio`, { method: 'POST' });
-        setSuccess(`🎉 Task completed and boosted to Career Portfolio (+35 XP)!`);
+        setSuccess(`Task completed and boosted to Career Portfolio (+35 XP)!`);
       } else {
-        setSuccess('🎉 Task completed! Learning note logged.');
+        setSuccess('Task completed! Learning note logged.');
       }
 
       playNotificationChime('task_done');
-      sendBrowserNotification('Task Finished! 🏆', `"${target?.title || 'Task'}" completed and logged.`);
+      sendBrowserNotification('Task Finished', `"${target?.title || 'Task'}" completed and logged.`);
 
       setAlertNotification({
-        title: '🎉 Task Completed & Logged!',
+        title: 'Task Completed & Logged',
         message: `Outstanding! You wrapped up "${target?.title || 'your task'}" with reflection notes.`,
         type: 'task_done',
       });
@@ -569,15 +569,15 @@ export default function TasksPage() {
       setError('');
       await api(`/tasks/${task.id}/push-to-portfolio`, { method: 'POST' });
       playNotificationChime('task_done');
-      sendBrowserNotification('Career Portfolio Boosted! 🚀', `"${task.title}" was added to your portfolio.`);
+      sendBrowserNotification('Career Portfolio Boosted', `"${task.title}" was added to your portfolio.`);
 
       setAlertNotification({
-        title: '🚀 Portfolio Boosted!',
+        title: 'Portfolio Boosted',
         message: `"${task.title}" was successfully pushed to your Career Portfolio and is now showcased in your verified developer evidence locker!`,
         type: 'portfolio_boost',
       });
 
-      setSuccess(`🚀 Boosted! "${task.title}" was added to your Career Portfolio (+25 XP).`);
+      setSuccess(`Boosted! "${task.title}" was added to your Career Portfolio (+25 XP).`);
       await Promise.all([loadTasks(), loadStats()]);
     } catch {
       setError('Could not push task to Career Portfolio.');
@@ -874,6 +874,18 @@ export default function TasksPage() {
       <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
         {/* Left Column: Kanban Board & Knowledge Log */}
         <div className="space-y-4">
+          {/* Tasks & Kanban Section Header (Outside Cards) */}
+          <div className="flex items-center justify-between pb-1">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                Tasks &amp; Kanban Lanes
+              </h2>
+              <p className="text-xs text-muted-foreground">Manage your sprint workflow across development stages</p>
+            </div>
+            <span className="text-xs font-mono text-muted-foreground">{tasks.length} total tasks</span>
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-4">
             {columns.map((column) => {
               const items = tasks.filter((task) => task.status === column.key);
@@ -1255,20 +1267,20 @@ export default function TasksPage() {
 
         {/* Right Sidebar: Focus Timer & Stats */}
         <div className="space-y-4">
+          {/* Focus Timer Section Header (Outside Card) */}
+          <div className="flex items-center justify-between pb-1">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" />
+              Focus Timer
+            </h2>
+            <span className="text-[10px] font-mono rounded bg-secondary px-2 py-0.5 text-muted-foreground">
+              {timerPhase === 'work' ? 'Sprint Phase' : 'Break Phase'}
+            </span>
+          </div>
+
           {/* Enhanced Focus Timer Card */}
           <Card className="border-primary/25">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Clock className="h-4 w-4 text-primary" />
-                  Focus Timer
-                </CardTitle>
-                <span className="text-[10px] font-mono rounded bg-secondary px-2 py-0.5 text-muted-foreground">
-                  {timerPhase === 'work' ? 'Sprint Phase' : 'Break Phase'}
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent className="text-center pt-0">
+            <CardContent className="text-center pt-4">
               {/* Linked Active Task Banner */}
               {activeTask ? (
                 <div className="mb-4 rounded-lg border border-primary/30 bg-primary/10 p-2.5 text-left">
