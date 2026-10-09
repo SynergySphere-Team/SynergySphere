@@ -324,7 +324,7 @@ export default function TasksScreen() {
       setTimerMode('focus');
       setTimerState('idle');
       setTimeLeft(selectedMinutes * 60);
-      setSuccess('☕ Break over — ready for the next focus session?');
+      setSuccess('Break over — ready for the next focus session.');
       return;
     }
 
@@ -352,7 +352,7 @@ export default function TasksScreen() {
       const xpText = minutes >= XP_MIN_MINUTES ? ' +15 XP earned.' : '';
       const taskText = completedTask ? ` on "${completedTask.title}"` : '';
       const breakText = pomodoro ? ` Enjoy a ${BREAK_MINUTES}-minute break.` : '';
-      setSuccess(`🎉 ${minutes}m focus session completed${taskText}!${xpText}${breakText}`);
+      setSuccess(`${minutes}m focus session completed${taskText}!${xpText}${breakText}`);
       await Promise.all([load(), refreshAuth()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save focus session.');
@@ -520,7 +520,7 @@ export default function TasksScreen() {
     try {
       await api.patch<Task>(`/tasks/${task.id}`, { status: newStatus });
       if (!options?.silent && newStatus === 'DONE') {
-        setSuccess(`✅ "${task.title}" completed! +10 XP`);
+        setSuccess(`"${task.title}" completed! +10 XP`);
       }
       await load();
     } catch (e) {
@@ -631,13 +631,13 @@ export default function TasksScreen() {
   function actionsFor(task: Task): TaskCardAction[] {
     const isFocusTarget = focusTask?.id === task.id;
     const focusAction: TaskCardAction = {
-      label: isFocusTarget && isRunning ? '🔥 Focusing' : '▶ Focus',
+      label: isFocusTarget && isRunning ? 'Focusing' : 'Focus',
       onPress: () => focusOnTask(task),
       disabled: isRunning,
       secondary: true,
     };
     const doneAction: TaskCardAction = {
-      label: '✓ Done',
+      label: 'Done',
       onPress: () => updateStatus(task, 'DONE'),
       secondary: true,
     };
@@ -653,7 +653,7 @@ export default function TasksScreen() {
         ];
       case 'REVIEW':
         return [
-          { label: '↩ Rework', onPress: () => updateStatus(task, 'IN_PROGRESS'), secondary: true },
+          { label: 'Rework', onPress: () => updateStatus(task, 'IN_PROGRESS'), secondary: true },
           doneAction,
         ];
       case 'DONE':
@@ -840,7 +840,7 @@ export default function TasksScreen() {
           </View>
         ) : !isBreak && !isRunning && taskGroups.open.length > 0 ? (
           <Text style={[styles.focusHint, { color: colors.muted }]}>
-            Tip: tap “▶ Focus” on a task to log this session against it.
+            Tip: tap "Focus" on a task to log this session against it.
           </Text>
         ) : null}
 
@@ -1203,7 +1203,7 @@ export default function TasksScreen() {
 
         {tasks.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📋</Text>
+            <Ionicons name="clipboard-outline" size={40} color={colors.muted} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No tasks yet</Text>
             <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
               Tap + to add your first task.
@@ -1213,7 +1213,7 @@ export default function TasksScreen() {
           <View style={styles.tasksList}>
             {visibleTasks.length === 0 ? (
               <Text style={[styles.filterEmpty, { color: colors.muted }]}>
-                {filter === 'all' ? '🎉 All caught up — nothing open right now.' : 'No tasks here.'}
+                {filter === 'all' ? 'All caught up — nothing open right now.' : 'No tasks here.'}
               </Text>
             ) : (
               visibleTasks.map(renderTask)

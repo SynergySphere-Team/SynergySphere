@@ -77,7 +77,7 @@ export async function scheduleFocusCompletionNotification(
 
     return await Notifications.scheduleNotificationAsync({
       content: {
-        title: '🎯 Focus Session Complete!',
+        title: 'Focus Session Complete',
         body: `Great job! You completed your ${durationMinutes}-minute focus session. Take a break!`,
         sound: 'default',
         data: { type: 'focus-complete', durationMinutes },
@@ -106,7 +106,7 @@ export async function scheduleBreakCompletionNotification(
 
     return await Notifications.scheduleNotificationAsync({
       content: {
-        title: '☕ Break Over',
+        title: 'Break Over',
         body: `Your ${breakMinutes}-minute break has ended. Ready for the next focus session?`,
         sound: 'default',
         data: { type: 'break-complete', breakMinutes },
@@ -138,7 +138,7 @@ export async function sendImmediateFocusNotification(durationMinutes: number): P
     await setupNotificationChannels();
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: '🎯 Focus Session Complete!',
+        title: 'Focus Session Complete',
         body: `Great job! You completed your ${durationMinutes}-minute focus session. +15 XP earned!`,
         sound: 'default',
       },

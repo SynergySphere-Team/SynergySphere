@@ -116,7 +116,7 @@ export function TodaySummary({
 
       <View style={styles.goalHeader}>
         <Text style={[styles.goalLabel, { color: colors.text }]}>
-          {goalReached ? '🎯 Daily focus goal reached!' : 'Daily focus goal'}
+          {goalReached ? 'Daily focus goal reached!' : 'Daily focus goal'}
         </Text>
         <Pressable
           onPress={onCycleGoal}
@@ -243,7 +243,7 @@ export function WeeklyInsights({
           ]}
         >
           <Text style={[styles.streakText, { color: streak > 0 ? '#D97706' : colors.muted }]}>
-            {streak > 0 ? `🔥 ${streak}-day streak` : 'No streak yet'}
+            {streak > 0 ? `${streak}-day streak` : 'No streak yet'}
           </Text>
         </View>
       </View>

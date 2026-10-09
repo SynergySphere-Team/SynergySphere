@@ -128,12 +128,12 @@ export function TaskCard({
     if (isTodo) {
       return [
         {
-          label: '▶ Start',
+          label: 'Start',
           onPress: () => onUpdateStatus(task, 'IN_PROGRESS'),
           secondary: true,
         },
         {
-          label: '✓ Done',
+          label: 'Done',
           onPress: () => onUpdateStatus(task, 'DONE'),
           secondary: true,
         },
@@ -143,7 +143,7 @@ export function TaskCard({
     if (isInProgress) {
       const acts: TaskCardAction[] = [
         {
-          label: '✓ Done',
+          label: 'Done',
           onPress: () => onUpdateStatus(task, 'DONE'),
           secondary: true,
         },
@@ -180,7 +180,7 @@ export function TaskCard({
     // Fallback for REVIEW or any future task status
     return [
       {
-        label: '✓ Done',
+        label: 'Done',
         onPress: () => onUpdateStatus(task, 'DONE'),
         secondary: true,
       },
