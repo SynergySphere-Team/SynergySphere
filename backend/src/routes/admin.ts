@@ -1307,7 +1307,7 @@ router.get('/database/health', requireAdmin('admin'), async (_req, res) => {
       ),
       queryOne<{ createdAt: Date; description: string; adminName: string }>(
         `SELECT "createdAt", "description", "adminName"
-         FROM "AuditLog"
+         FROM "AdminAuditLog"
          WHERE "action" = 'DATABASE_BACKUP_CREATED'
          ORDER BY "createdAt" DESC
          LIMIT 1`,

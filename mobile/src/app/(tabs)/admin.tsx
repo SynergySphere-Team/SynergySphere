@@ -735,31 +735,40 @@ export default function AdminScreen() {
             <Text style={[styles.sectionSubtitleText, { color: colors.muted }]}>Immediate shortcuts to active operational queues.</Text>
           </View>
           <Card style={styles.cardPad}>
-            <View style={{ gap: 8 }}>
+            <View style={{ gap: 5 }}>
               <Button
                 title="Review Pending User Approvals"
                 onPress={() => setActiveTab('approvals')}
-                style={{ backgroundColor: primaryAccent }}
+                style={[styles.quickActionBtn, { backgroundColor: primaryAccent }]}
+                textStyle={styles.quickActionBtnText}
               />
               <Button
                 title="Triage Support Tickets & Issues"
                 secondary
                 onPress={() => setActiveTab('tickets')}
+                style={styles.quickActionBtn}
+                textStyle={styles.quickActionBtnText}
               />
               <Button
                 title="Moderate Posts & Flagged Content"
                 secondary
                 onPress={() => setActiveTab('moderation')}
+                style={styles.quickActionBtn}
+                textStyle={styles.quickActionBtnText}
               />
               <Button
                 title="Create & Manage Campus Events"
                 secondary
                 onPress={() => setActiveTab('events')}
+                style={styles.quickActionBtn}
+                textStyle={styles.quickActionBtnText}
               />
               <Button
                 title="Run Database Health & Maintenance"
                 secondary
                 onPress={() => setActiveTab('database')}
+                style={styles.quickActionBtn}
+                textStyle={styles.quickActionBtnText}
               />
             </View>
           </Card>
@@ -864,10 +873,10 @@ export default function AdminScreen() {
             usersList.map((u) => (
               <Card key={u.id} style={styles.cardPad}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontWeight: '800', fontSize: 15, color: colors.text }}>
+                  <Text style={{ fontWeight: '800', fontSize: 13.5, color: colors.text }}>
                     {u.firstName} {u.lastName}
                   </Text>
-                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <View style={{ flexDirection: 'row', gap: 4 }}>
                     <View
                       style={[
                         styles.tagBadge,
@@ -895,15 +904,15 @@ export default function AdminScreen() {
                   </View>
                 </View>
 
-                <Text style={[styles.copy, { color: colors.muted, marginTop: 2 }]}>{u.email}</Text>
+                <Text style={[styles.copy, { color: colors.muted }]}>{u.email}</Text>
                 {u.studentId ? (
-                  <Text style={[styles.copy, { color: colors.muted, fontSize: 11 }]}>Student ID: {u.studentId}</Text>
+                  <Text style={[styles.copy, { color: colors.muted, fontSize: 10.5 }]}>Student ID: {u.studentId}</Text>
                 ) : null}
 
                 {/* Role Change Modal / Options */}
                 {roleSelectUserId === u.id ? (
                   <View style={[styles.inlineActionBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-                    <Text style={{ fontWeight: '800', fontSize: 12, color: colors.text }}>Select New Role:</Text>
+                    <Text style={{ fontWeight: '800', fontSize: 11, color: colors.text }}>Select New Role:</Text>
                     <View style={{ flexDirection: 'row', gap: 6 }}>
                       {['STUDENT', 'MODERATOR', 'ADMIN'].map((r) => (
                         <Pressable
@@ -922,12 +931,13 @@ export default function AdminScreen() {
                 ) : null}
 
                 {/* Action Buttons */}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
                   <Button
                     title="Change Role"
                     secondary
                     onPress={() => setRoleSelectUserId(roleSelectUserId === u.id ? null : u.id)}
-                    style={{ flex: 1 }}
+                    style={[styles.cardActionBtn, { flex: 1 }]}
+                    textStyle={styles.cardActionBtnText}
                   />
                   {u.status === 'active' ? (
                     <Button
@@ -939,13 +949,15 @@ export default function AdminScreen() {
                           { text: 'Suspend', style: 'destructive', onPress: () => void handleUpdateUserStatus(u.id, 'suspended', 'Suspended by admin') },
                         ])
                       }
-                      style={{ flex: 1 }}
+                      style={[styles.cardActionBtn, { flex: 1 }]}
+                      textStyle={styles.cardActionBtnText}
                     />
                   ) : (
                     <Button
                       title="Activate"
                       onPress={() => void handleUpdateUserStatus(u.id, 'active')}
-                      style={{ flex: 1, backgroundColor: '#10B981' }}
+                      style={[styles.cardActionBtn, { flex: 1, backgroundColor: '#10B981' }]}
+                      textStyle={styles.cardActionBtnText}
                     />
                   )}
                 </View>
@@ -981,7 +993,7 @@ export default function AdminScreen() {
             pendingUsers.map((u) => (
               <Card key={u.id} style={styles.cardPad}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontWeight: '800', fontSize: 15, color: colors.text }}>
+                  <Text style={{ fontWeight: '800', fontSize: 13.5, color: colors.text }}>
                     {u.firstName} {u.lastName}
                   </Text>
                   <View style={[styles.tagBadge, { backgroundColor: '#FEF3C7' }]}>
@@ -989,47 +1001,51 @@ export default function AdminScreen() {
                   </View>
                 </View>
 
-                <Text style={[styles.copy, { color: colors.muted, marginTop: 2 }]}>{u.email}</Text>
-                <Text style={[styles.copy, { color: colors.muted, fontSize: 11 }]}>
+                <Text style={[styles.copy, { color: colors.muted }]}>{u.email}</Text>
+                <Text style={[styles.copy, { color: colors.muted, fontSize: 10.5 }]}>
                   Student ID: {u.studentId || 'Not provided'} · Registered: {new Date(u.createdAt).toLocaleDateString()}
                 </Text>
 
                 {rejectPromptUserId === u.id ? (
-                  <View style={[styles.inlineActionBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, marginTop: 8 }]}>
+                  <View style={[styles.inlineActionBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, marginTop: 6 }]}>
                     <Field
                       label="Rejection Reason"
                       value={rejectionReasonInput}
                       onChangeText={setRejectionReasonInput}
                       placeholder="e.g. Invalid student ID format"
                     />
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
                       <Button
                         title="Confirm Reject"
                         danger
                         onPress={() => void handleUpdateUserStatus(u.id, 'rejected', rejectionReasonInput)}
-                        style={{ flex: 1 }}
+                        style={[styles.cardActionBtn, { flex: 1 }]}
+                        textStyle={styles.cardActionBtnText}
                       />
                       <Button
                         title="Cancel"
                         secondary
                         onPress={() => setRejectPromptUserId(null)}
-                        style={{ flex: 1 }}
+                        style={[styles.cardActionBtn, { flex: 1 }]}
+                        textStyle={styles.cardActionBtnText}
                       />
                     </View>
                   </View>
                 ) : null}
 
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
                   <Button
                     title="Approve User"
                     onPress={() => void handleUpdateUserStatus(u.id, 'active')}
-                    style={{ flex: 1, backgroundColor: '#10B981' }}
+                    style={[styles.cardActionBtn, { flex: 1, backgroundColor: '#10B981' }]}
+                    textStyle={styles.cardActionBtnText}
                   />
                   <Button
                     title="Reject"
                     danger
                     onPress={() => setRejectPromptUserId(u.id)}
-                    style={{ flex: 1 }}
+                    style={[styles.cardActionBtn, { flex: 1 }]}
+                    textStyle={styles.cardActionBtnText}
                   />
                 </View>
               </Card>
@@ -1049,18 +1065,20 @@ export default function AdminScreen() {
               Enforce community safety, moderate flagged posts, and review reports.
             </Text>
           </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
             <Button
               title="Community Posts"
               secondary={modSubTab !== 'posts'}
               onPress={() => setModSubTab('posts')}
-              style={{ flex: 1 }}
+              style={[styles.quickActionBtn, { flex: 1 }]}
+              textStyle={styles.quickActionBtnText}
             />
             <Button
               title="Flagged & Complaints"
               secondary={modSubTab !== 'complaints'}
               onPress={() => setModSubTab('complaints')}
-              style={{ flex: 1 }}
+              style={[styles.quickActionBtn, { flex: 1 }]}
+              textStyle={styles.quickActionBtnText}
             />
           </View>
 
@@ -1105,13 +1123,15 @@ export default function AdminScreen() {
                       title={p.isHidden ? 'Unhide' : 'Hide Post'}
                       secondary
                       onPress={() => void handleToggleHidePost(p.id, p.isHidden)}
-                      style={{ flex: 1 }}
+                      style={[styles.cardActionBtn, { flex: 1 }]}
+                      textStyle={styles.cardActionBtnText}
                     />
                     <Button
                       title={p.commentsLocked ? 'Unlock' : 'Lock Comments'}
                       secondary
                       onPress={() => void handleToggleLockComments(p.id, p.commentsLocked)}
-                      style={{ flex: 1 }}
+                      style={[styles.cardActionBtn, { flex: 1 }]}
+                      textStyle={styles.cardActionBtnText}
                     />
                     <Button
                       title="Delete"
@@ -1122,7 +1142,8 @@ export default function AdminScreen() {
                           { text: 'Delete', style: 'destructive', onPress: () => void handleDeletePost(p.id) },
                         ])
                       }
-                      style={{ flex: 1 }}
+                      style={[styles.cardActionBtn, { flex: 1 }]}
+                      textStyle={styles.cardActionBtnText}
                     />
                   </View>
                 </Card>
@@ -1157,17 +1178,19 @@ export default function AdminScreen() {
                   </Text>
                 ) : null}
 
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
                   <Button
                     title="Resolve"
                     onPress={() => void handleUpdateComplaintStatus(c.id, 'resolved')}
-                    style={{ flex: 1, backgroundColor: '#10B981' }}
+                    style={[styles.cardActionBtn, { flex: 1, backgroundColor: '#10B981' }]}
+                    textStyle={styles.cardActionBtnText}
                   />
                   <Button
                     title="Dismiss"
                     secondary
                     onPress={() => void handleUpdateComplaintStatus(c.id, 'dismissed')}
-                    style={{ flex: 1 }}
+                    style={[styles.cardActionBtn, { flex: 1 }]}
+                    textStyle={styles.cardActionBtnText}
                   />
                 </View>
               </Card>
@@ -1191,7 +1214,8 @@ export default function AdminScreen() {
             <Button
               title="+ Create Campus Event"
               onPress={() => setShowCreateEvent(true)}
-              style={{ backgroundColor: primaryAccent }}
+              style={[styles.quickActionBtn, { backgroundColor: primaryAccent }]}
+              textStyle={styles.quickActionBtnText}
             />
           ) : (
             <Card style={styles.cardPad}>
@@ -1205,9 +1229,9 @@ export default function AdminScreen() {
               <Field label="Location" value={eventLoc} onChangeText={setEventLoc} placeholder="e.g. Main Auditorium / Discord" />
               <Field label="Description" value={eventDesc} onChangeText={setEventDesc} multiline numberOfLines={3} placeholder="Event overview..." />
               <Field label="Capacity" value={eventCapacity} onChangeText={setEventCapacity} keyboardType="number-pad" placeholder="50" />
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                <Button title={actionLoading ? 'Creating...' : 'Submit Event'} disabled={actionLoading} onPress={handleCreateEvent} style={{ flex: 1 }} />
-                <Button title="Cancel" secondary onPress={() => setShowCreateEvent(false)} style={{ flex: 1 }} />
+              <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
+                <Button title={actionLoading ? 'Creating...' : 'Submit Event'} disabled={actionLoading} onPress={handleCreateEvent} style={[styles.cardActionBtn, { flex: 1 }]} textStyle={styles.cardActionBtnText} />
+                <Button title="Cancel" secondary onPress={() => setShowCreateEvent(false)} style={[styles.cardActionBtn, { flex: 1 }]} textStyle={styles.cardActionBtnText} />
               </View>
             </Card>
           )}
@@ -1222,7 +1246,7 @@ export default function AdminScreen() {
             eventsList.map((ev) => (
               <Card key={ev.id} style={styles.cardPad}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontWeight: '800', fontSize: 15, color: colors.text, flex: 1 }}>{ev.title}</Text>
+                  <Text style={{ fontWeight: '800', fontSize: 14, color: colors.text, flex: 1 }}>{ev.title}</Text>
                   <View style={{ flexDirection: 'row', gap: 4 }}>
                     {ev.isFeatured ? (
                       <View style={[styles.tagBadge, { backgroundColor: '#FEF3C7' }]}>
@@ -1247,28 +1271,32 @@ export default function AdminScreen() {
                     <Button
                       title="Approve"
                       onPress={() => void handleUpdateEvent(ev.id, { status: 'APPROVED' })}
-                      style={{ flex: 1, backgroundColor: '#10B981' }}
+                      style={[styles.cardActionBtn, { flex: 1, backgroundColor: '#10B981' }]}
+                      textStyle={styles.cardActionBtnText}
                     />
                   ) : null}
                   <Button
                     title={ev.isFeatured ? 'Unfeature' : 'Feature'}
                     secondary
                     onPress={() => void handleUpdateEvent(ev.id, { isFeatured: !ev.isFeatured })}
-                    style={{ flex: 1 }}
+                    style={[styles.cardActionBtn, { flex: 1 }]}
+                    textStyle={styles.cardActionBtnText}
                   />
                   {ev.status !== 'CANCELLED' ? (
                     <Button
                       title="Cancel"
                       secondary
                       onPress={() => void handleUpdateEvent(ev.id, { status: 'CANCELLED' })}
-                      style={{ flex: 1 }}
+                      style={[styles.cardActionBtn, { flex: 1 }]}
+                      textStyle={styles.cardActionBtnText}
                     />
                   ) : null}
                   <Button
                     title="Delete"
                     danger
                     onPress={() => void handleDeleteEvent(ev.id)}
-                    style={{ flex: 1 }}
+                    style={[styles.cardActionBtn, { flex: 1 }]}
+                    textStyle={styles.cardActionBtnText}
                   />
                 </View>
               </Card>
@@ -1395,6 +1423,8 @@ export default function AdminScreen() {
                         title="Save Admin Notes"
                         secondary
                         onPress={() => void handleUpdateTicket(t.id, { adminNotes: ticketNotesInput[t.id] ?? t.adminNotes })}
+                        style={styles.cardActionBtn}
+                        textStyle={styles.cardActionBtnText}
                       />
                     </View>
                   ) : null}
@@ -1557,11 +1587,11 @@ export default function AdminScreen() {
             </Text>
           </View>
           <Card style={styles.cardPad}>
-            <View style={{ gap: 8 }}>
-              <Button title="Export Users CSV Report" secondary onPress={() => void handleExportCsv('users')} />
-              <Button title="Export Tickets CSV Report" secondary onPress={() => void handleExportCsv('tickets')} />
-              <Button title="Export Complaints CSV Report" secondary onPress={() => void handleExportCsv('complaints')} />
-              <Button title="Export Events CSV Report" secondary onPress={() => void handleExportCsv('events')} />
+            <View style={{ gap: 5 }}>
+              <Button title="Export Users CSV Report" secondary onPress={() => void handleExportCsv('users')} style={styles.quickActionBtn} textStyle={styles.quickActionBtnText} />
+              <Button title="Export Tickets CSV Report" secondary onPress={() => void handleExportCsv('tickets')} style={styles.quickActionBtn} textStyle={styles.quickActionBtnText} />
+              <Button title="Export Complaints CSV Report" secondary onPress={() => void handleExportCsv('complaints')} style={styles.quickActionBtn} textStyle={styles.quickActionBtnText} />
+              <Button title="Export Events CSV Report" secondary onPress={() => void handleExportCsv('events')} style={styles.quickActionBtn} textStyle={styles.quickActionBtnText} />
             </View>
           </Card>
 
@@ -1677,26 +1707,33 @@ export default function AdminScreen() {
             </Text>
           </View>
           <Card style={styles.cardPad}>
-            <View style={{ gap: 8 }}>
+            <View style={{ gap: 5 }}>
               <Button
                 title="Refresh Diagnostics & Telemetry"
                 secondary
                 onPress={() => void loadDatabase()}
+                style={styles.quickActionBtn}
+                textStyle={styles.quickActionBtnText}
               />
               <Button
                 title="Create Point-in-Time Backup Snapshot"
                 secondary
                 onPress={() => void handleRunMaintenance('create_snapshot')}
+                style={styles.quickActionBtn}
+                textStyle={styles.quickActionBtnText}
               />
               <Button
                 title="Clear System Cache"
                 onPress={() => void handleRunMaintenance('clear_cache')}
-                style={{ backgroundColor: primaryAccent }}
+                style={[styles.quickActionBtn, { backgroundColor: primaryAccent }]}
+                textStyle={styles.quickActionBtnText}
               />
               <Button
                 title="Vacuum & Optimize Database Tables"
                 secondary
                 onPress={() => void handleRunMaintenance('vacuum')}
+                style={styles.quickActionBtn}
+                textStyle={styles.quickActionBtnText}
               />
               <Button
                 title="Purge Soft-Deleted Records"
@@ -1707,6 +1744,8 @@ export default function AdminScreen() {
                     { text: 'Purge', style: 'destructive', onPress: () => void handleRunMaintenance('purge_soft_deleted') },
                   ])
                 }
+                style={styles.quickActionBtn}
+                textStyle={styles.quickActionBtnText}
               />
             </View>
 
@@ -1803,46 +1842,66 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   tabBadgeText: { fontSize: 10, fontWeight: '900' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  sectionGap: { gap: 12 },
-  cardPad: { padding: 12, gap: 8, borderRadius: 12 },
-  cardTitle: { fontSize: 15, fontWeight: '800' },
-  copy: { lineHeight: 18, fontSize: 12 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  sectionGap: { gap: 8 },
+  cardPad: { paddingVertical: 8, paddingHorizontal: 10, gap: 5, borderRadius: 10 },
+  cardTitle: { fontSize: 13.5, fontWeight: '800' },
+  copy: { lineHeight: 16, fontSize: 11 },
+  cardActionBtn: {
+    minHeight: 32,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  cardActionBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  quickActionBtn: {
+    minHeight: 34,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  quickActionBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   dbMetricRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
   },
   dbMetricCol: {
     flex: 1,
-    gap: 2,
+    gap: 1,
   },
   noticeBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    padding: 10,
-    borderRadius: 12,
+    padding: 8,
+    borderRadius: 10,
     borderWidth: 1,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   activityRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 5,
     borderBottomWidth: 1,
   },
   tagBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
   },
-  tagBadgeText: { fontSize: 10, fontWeight: '800' },
+  tagBadgeText: { fontSize: 9.5, fontWeight: '800' },
   filterChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     borderRadius: 16,
     borderWidth: 1,
   },

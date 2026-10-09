@@ -14,8 +14,6 @@ import {
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 
-export { TaskCard, type TaskCardAction, type TaskCardProps } from './TaskCard';
-
 export function Card({
   children,
   style,
@@ -268,15 +266,15 @@ export function Stat({
 
 const styles = StyleSheet.create({
   card: {
-    padding: 16,
-    gap: 12,
-    borderWidth: 1.5,
-    borderRadius: 20,
+    padding: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 14,
     shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1.5,
   },
   button: {
     minHeight: 46,
@@ -347,18 +345,20 @@ const styles = StyleSheet.create({
   subtitle: {},
   stat: {
     flex: 1,
-    padding: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     minWidth: '45%',
-    borderRadius: 16,
+    maxWidth: '49%',
+    borderRadius: 12,
     borderWidth: 1,
   },
   statValue: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
   },
   statLabel: {
-    marginTop: 3,
-    fontSize: 12,
+    marginTop: 2,
+    fontSize: 11,
     fontWeight: '600',
   },
 });
