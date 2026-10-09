@@ -394,11 +394,11 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
       {activeTechDetail ? (
         <View style={[styles.techHeaderCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.techTitleRow}>
-            <View>
-              <Text style={[styles.techName, { color: colors.text }]}>
+            <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
+              <Text style={[styles.techName, { color: colors.text }]} numberOfLines={1}>
                 {activeTechDetail.name}
               </Text>
-              <Text style={[styles.techCategory, { color: colors.muted }]}>
+              <Text style={[styles.techCategory, { color: colors.muted }]} numberOfLines={1}>
                 {activeTechDetail.category} · {activeTechDetail.difficulty}
               </Text>
             </View>
@@ -833,6 +833,7 @@ const styles = StyleSheet.create({
   },
   techProgressPill: {
     alignItems: 'flex-end',
+    flexShrink: 0,
   },
   techProgressPercent: {
     fontSize: 18,

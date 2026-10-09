@@ -407,10 +407,7 @@ export function Screen({
       contentContainerStyle={[
         styles.scroll,
         {
-          paddingBottom:
-            keyboardAvoiding && keyboardHeight > 0
-              ? Math.max(keyboardHeight + 40, bottomInsetPadding)
-              : bottomInsetPadding,
+          paddingBottom: bottomInsetPadding,
         },
         contentContainerStyle,
       ]}
@@ -428,19 +425,21 @@ export function Screen({
     </ScrollView>
   );
 
-  const innerContent = scroll ? scrollBody : contentForNonScroll;
-
-  const body = keyboardAvoiding ? (
+  const innerContent = scroll ? (
+    scrollBody
+  ) : keyboardAvoiding ? (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + keyboardOffset : keyboardOffset}
     >
-      {innerContent}
+      {contentForNonScroll}
     </KeyboardAvoidingView>
   ) : (
-    innerContent
+    contentForNonScroll
   );
+
+  const body = innerContent;
 
   const screenView = (
     <SafeAreaView

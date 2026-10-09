@@ -121,3 +121,35 @@ export interface CurriculumSearchResult {
   completed: boolean;
   snippet: string;
 }
+
+export interface RolePathLesson {
+  id: string;
+  title: string;
+  phase: string;
+  description: string;
+  completed?: boolean;
+}
+
+export interface RolePathChallenge {
+  id: string;
+  title: string;
+  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
+  xpReward: number;
+  passed?: boolean;
+}
+
+export interface RolePath {
+  id: string;
+  title: string;
+  targetRole: string;
+  tagline: string;
+  subjectIds: string[];
+  curatedLessonIds?: string[];
+  syllabus: RolePathLesson[];
+  totalLessons: number;
+  completedLessons: number;
+  percent: number;
+  recommendedChallenges: RolePathChallenge[];
+  interviewTags: string[];
+}
+

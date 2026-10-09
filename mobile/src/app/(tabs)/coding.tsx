@@ -960,6 +960,7 @@ export interface RolePathLesson {
   title: string;
   phase: string;
   description: string;
+  completed?: boolean;
 }
 
 export interface RolePathChallenge {
@@ -1135,6 +1136,22 @@ function normalizeRolePath(value: unknown): RolePath | null {
 
   const fallbackItem = BUILTIN_ROLE_PATHS.find((b) => b.id === path.id);
 
+  const rawSyllabus = Array.isArray(path.syllabus) && path.syllabus.length > 0 ? path.syllabus : defaultSyllabus;
+  const mergedSyllabus: RolePathLesson[] = rawSyllabus.map((item: any, idx: number) => {
+    const fallbackLesson = defaultSyllabus[idx] || defaultSyllabus.find((d) => d.id === item?.id);
+    return {
+      id: typeof item?.id === 'string' ? item.id : fallbackLesson?.id || `lesson-${idx}`,
+      title: typeof item?.title === 'string' ? item.title : fallbackLesson?.title || 'Lesson',
+      phase: typeof item?.phase === 'string' ? item.phase : fallbackLesson?.phase || 'Phase 1: Language Syntax',
+      description: typeof item?.description === 'string' ? item.description : fallbackLesson?.description || '',
+      completed: Boolean(item?.completed),
+    };
+  });
+
+  const totalLessons = typeof path.totalLessons === 'number' && Number.isFinite(path.totalLessons) ? path.totalLessons : mergedSyllabus.length;
+  const completedLessons = typeof path.completedLessons === 'number' ? path.completedLessons : mergedSyllabus.filter((l) => l.completed).length;
+  const percent = typeof path.percent === 'number' ? path.percent : Math.min(100, Math.round((completedLessons / Math.max(totalLessons, 1)) * 100));
+
   return {
     id: path.id,
     title: path.title,
@@ -1142,10 +1159,10 @@ function normalizeRolePath(value: unknown): RolePath | null {
     tagline: typeof path.tagline === 'string' ? path.tagline : fallbackItem?.tagline || '',
     subjectIds: stringList(path.subjectIds).length > 0 ? stringList(path.subjectIds) : (fallbackItem?.subjectIds || []),
     curatedLessonIds: stringList(path.curatedLessonIds),
-    syllabus: defaultSyllabus,
-    totalLessons: typeof path.totalLessons === 'number' && Number.isFinite(path.totalLessons) ? path.totalLessons : defaultSyllabus.length,
-    completedLessons: typeof path.completedLessons === 'number' ? path.completedLessons : 0,
-    percent: typeof path.percent === 'number' ? path.percent : 0,
+    syllabus: mergedSyllabus,
+    totalLessons,
+    completedLessons,
+    percent,
     recommendedChallenges: Array.isArray(path.recommendedChallenges) && path.recommendedChallenges.length > 0
       ? path.recommendedChallenges.map((c: any) => ({
           id: typeof c?.id === 'string' ? c.id : String(c || ''),
@@ -1198,6 +1215,7 @@ export default function CodingScreen() {
   const [rolePaths, setRolePaths] = useState<RolePath[]>(BUILTIN_ROLE_PATHS);
   const [activeTrackId, setActiveTrackId] = useState<string>('backend-intern');
   const [selectedRolePathModal, setSelectedRolePathModal] = useState<RolePath | null>(null);
+  const [activeRolePath, setActiveRolePath] = useState<RolePath | null>(null);
   const [enrolledToast, setEnrolledToast] = useState<string>('');
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0);
@@ -1265,6 +1283,7 @@ export default function CodingScreen() {
   function handleOpenLessonFromPath(path: RolePath, lessonId?: string) {
     const nextUncompleted = path.syllabus?.find((l) => !l.completed);
     const targetId = lessonId || nextUncompleted?.id || path.curatedLessonIds?.[0] || path.syllabus?.[0]?.id || 'java-java-tutorial-java-introduction';
+    setActiveRolePath(path);
     setPreviousMode('rolepaths');
     setSelectedRolePathModal(null);
     setSelectedLessonId(targetId);
@@ -1641,10 +1660,37 @@ export default function CodingScreen() {
       {selectedLessonId ? (
         <LessonViewer
           lessonId={selectedLessonId}
+          rolePath={activeRolePath}
+          onLessonCompleted={(completedLessonId) => {
+            setRolePaths((prevPaths) =>
+              prevPaths.map((rp) => {
+                const hasLesson = rp.syllabus.some((l) => l.id === completedLessonId);
+                if (!hasLesson && rp.id !== activeRolePath?.id) return rp;
+                const updatedSyllabus = rp.syllabus.map((item) =>
+                  item.id === completedLessonId ? { ...item, completed: true } : item
+                );
+                const completedCount = updatedSyllabus.filter((l) => l.completed).length;
+                const percent = Math.min(100, Math.round((completedCount / Math.max(updatedSyllabus.length, 1)) * 100));
+                const updated = {
+                  ...rp,
+                  syllabus: updatedSyllabus,
+                  completedLessons: completedCount,
+                  percent,
+                };
+                if (activeRolePath && activeRolePath.id === rp.id) {
+                  setActiveRolePath(updated);
+                }
+                return updated;
+              })
+            );
+          }}
           onBack={() => {
             setSelectedLessonId(null);
-            if (previousMode === 'rolepaths') {
+            if (activeRolePath) {
               setMode('rolepaths');
+              // Return directly to the "Curated Step-by-Step Curriculum" roadmap page
+              const targetPath = rolePaths.find((rp) => rp.id === activeRolePath.id) || activeRolePath;
+              setSelectedRolePathModal(targetPath);
             }
           }}
           onNavigateLesson={(nextId) => setSelectedLessonId(nextId)}
@@ -1652,6 +1698,7 @@ export default function CodingScreen() {
       ) : mode === 'academy' ? (
         <CurriculumDashboard
           onSelectLesson={(lessonId) => {
+            setActiveRolePath(null);
             setPreviousMode('academy');
             setSelectedLessonId(lessonId);
           }}
@@ -2615,11 +2662,16 @@ export default function CodingScreen() {
                   key={lesson.id}
                   style={[
                     styles.syllabusLessonItem,
-                    { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                    {
+                      backgroundColor: lesson.completed
+                        ? (isLight ? '#F0F9F1' : 'rgba(30, 104, 39, 0.12)')
+                        : colors.surfaceElevated,
+                      borderColor: lesson.completed ? primaryAccent : colors.border,
+                    },
                   ]}
                 >
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
                       <View style={[styles.phaseTag, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)' }]}>
                         <Text style={[styles.phaseTagText, { color: primaryAccent }]}>
                           {lesson.phase}
@@ -2628,11 +2680,17 @@ export default function CodingScreen() {
                       <Text style={{ fontSize: 11, color: colors.muted }}>
                         Lesson {idx + 1}
                       </Text>
+                      {lesson.completed ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Ionicons name="checkmark-circle" size={13} color={primaryAccent} />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: primaryAccent }}>Done</Text>
+                        </View>
+                      ) : null}
                     </View>
                     <Text style={[styles.syllabusLessonTitle, { color: colors.text }]}>
                       {lesson.title}
                     </Text>
-                    <Text style={[styles.syllabusLessonDesc, { color: colors.muted }]}>
+                    <Text style={[styles.syllabusLessonDesc, { color: colors.muted }]} numberOfLines={2}>
                       {lesson.description}
                     </Text>
                   </View>
@@ -2640,10 +2698,15 @@ export default function CodingScreen() {
                     onPress={() => selectedRolePathModal && handleOpenLessonFromPath(selectedRolePathModal, lesson.id)}
                     style={({ pressed }) => [
                       styles.studyBtn,
-                      { backgroundColor: primaryAccent, opacity: pressed ? 0.8 : 1 },
+                      {
+                        backgroundColor: lesson.completed ? (isLight ? '#2e7d32' : '#15803d') : primaryAccent,
+                        opacity: pressed ? 0.8 : 1,
+                      },
                     ]}
                   >
-                    <Text style={styles.studyBtnText}>Study ↗</Text>
+                    <Text style={styles.studyBtnText}>
+                      {lesson.completed ? 'Review ↗' : 'Study ↗'}
+                    </Text>
                   </Pressable>
                 </View>
               ))}

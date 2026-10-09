@@ -668,11 +668,11 @@ export default function PortfolioScreen() {
                 .map((skill) => (
                   <View key={skill.id} style={styles.skillItem}>
                     <View style={styles.skillHeader}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
                         <Ionicons name="checkmark-circle" size={14} color={primaryAccent} />
-                        <Text style={[styles.skillName, { color: colors.text }]}>{skill.name}</Text>
+                        <Text style={[styles.skillName, { color: colors.text }]} numberOfLines={1}>{skill.name}</Text>
                       </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                         <Text style={{ fontSize: 11, color: colors.muted }}>
                           {skill.completedLessons}/{skill.totalLessons}
                         </Text>
@@ -700,8 +700,10 @@ export default function PortfolioScreen() {
                 {manualSkills.map((s) => (
                   <View key={s.id} style={styles.skillItem}>
                     <View style={styles.skillHeader}>
-                      <Text style={[styles.skillName, { color: colors.text }]}>{s.name}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={[styles.skillName, { color: colors.text }]} numberOfLines={1}>{s.name}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                         <Text style={[styles.skillPercent, { color: primaryAccent }]}>{s.level}%</Text>
                         <Pressable onPress={() => removeSkill(s.id)} hitSlop={6}>
                           <Ionicons name="close-circle-outline" size={16} color={colors.muted} />
@@ -1086,21 +1088,20 @@ projectActionBtn: {
   skillHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 8,
+    width: '100%',
   },
   skillName: {
     fontSize: 13,
     fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-    paddingRight: 4,
+    flexShrink: 1,
   },
   skillPercent: {
     fontSize: 13,
     fontWeight: '800',
     flexShrink: 0,
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
   },
   progressTrack: {
     height: 7,

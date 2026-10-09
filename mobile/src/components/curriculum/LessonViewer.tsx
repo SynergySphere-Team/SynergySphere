@@ -12,18 +12,22 @@ import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import { CodeBlock } from './CodeBlock';
 import { MarkdownView } from '@/components/MarkdownView';
-import type { LessonDetail } from '@/types/curriculum';
+import type { LessonDetail, RolePath } from '@/types/curriculum';
 
 interface LessonViewerProps {
   lessonId: string;
   onBack: () => void;
   onNavigateLesson: (nextLessonId: string) => void;
+  rolePath?: RolePath | null;
+  onLessonCompleted?: (lessonId: string) => void;
 }
 
 export function LessonViewer({
   lessonId,
   onBack,
   onNavigateLesson,
+  rolePath,
+  onLessonCompleted,
 }: LessonViewerProps) {
   const { colors, theme } = useTheme();
   const isLight = theme === 'light';
@@ -34,6 +38,13 @@ export function LessonViewer({
   const [updatingProgress, setUpdatingProgress] = useState(false);
   const [xpBanner, setXpBanner] = useState<string | null>(null);
   const lessonRequestId = useRef(0);
+
+  const roadmapSyllabus = rolePath?.syllabus;
+  const roadmapIndex = roadmapSyllabus ? roadmapSyllabus.findIndex((l) => l.id === lessonId) : -1;
+  const isRoadmapMode = Boolean(rolePath && roadmapSyllabus && roadmapIndex !== -1);
+  const currentRoadmapLesson = isRoadmapMode && roadmapSyllabus ? roadmapSyllabus[roadmapIndex] : null;
+  const prevRoadmapLesson = isRoadmapMode && roadmapSyllabus && roadmapIndex > 0 ? roadmapSyllabus[roadmapIndex - 1] : null;
+  const nextRoadmapLesson = isRoadmapMode && roadmapSyllabus && roadmapIndex < roadmapSyllabus.length - 1 ? roadmapSyllabus[roadmapIndex + 1] : null;
 
   const fetchLesson = useCallback(async (id: string) => {
     const requestId = ++lessonRequestId.current;
@@ -64,8 +75,17 @@ export function LessonViewer({
         { completed: newStatus },
       );
       setLesson((prev) => (prev ? { ...prev, completed: res.completed } : null));
-      if (res.xpEarned > 0) {
-        setXpBanner(`🎉 Awesome! You earned +${res.xpEarned} XP for completing this lesson.`);
+      if (res.completed) {
+        onLessonCompleted?.(lesson.id);
+      }
+      if (res.xpEarned > 0 || res.completed) {
+        if (isRoadmapMode && nextRoadmapLesson) {
+          setXpBanner(`🎉 Task complete${res.xpEarned > 0 ? ` (+${res.xpEarned} XP)` : ''}! Next task in roadmap: "${nextRoadmapLesson.title}" (${nextRoadmapLesson.phase}).`);
+        } else if (isRoadmapMode && !nextRoadmapLesson) {
+          setXpBanner(`🏆 Incredible! You completed all tasks in the ${rolePath?.title} roadmap!`);
+        } else {
+          setXpBanner(`🎉 Awesome! You earned +${res.xpEarned} XP for completing this lesson.`);
+        }
       }
     } catch {
       // Handle error
@@ -126,7 +146,7 @@ export function LessonViewer({
       <View style={styles.navBar}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back to curriculum"
+          accessibilityLabel={isRoadmapMode ? `Back to ${rolePath?.title} roadmap` : 'Back to curriculum'}
           onPress={onBack}
           style={({ pressed }) => [
             styles.navBackBtn,
@@ -135,16 +155,37 @@ export function LessonViewer({
           ]}
         >
           <Ionicons name="arrow-back" size={16} color={colors.text} />
-          <Text style={[styles.navBackText, { color: colors.text }]}>
-            {lesson.subjectName}
+          <Text style={[styles.navBackText, { color: colors.text }]} numberOfLines={1}>
+            {isRoadmapMode ? (rolePath ? `${rolePath.title} Roadmap` : 'Roadmap') : lesson.subjectName}
           </Text>
         </Pressable>
 
         {/* Compact Breadcrumbs */}
         <Text style={[styles.breadcrumbText, { color: colors.muted }]} numberOfLines={1}>
-          LectureToLife › {lesson.subjectName} › {lesson.moduleName}
+          {isRoadmapMode && currentRoadmapLesson
+            ? `${rolePath?.title} › ${currentRoadmapLesson.phase}`
+            : `LectureToLife › ${lesson.subjectName} › ${lesson.moduleName}`}
         </Text>
       </View>
+
+      {/* Roadmap Phase Focus Banner */}
+      {isRoadmapMode && currentRoadmapLesson ? (
+        <View style={[styles.roadmapPhaseBanner, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)', borderColor: isLight ? '#81c784' : colors.primary }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+              <Ionicons name="map-outline" size={15} color={isLight ? '#1e6827' : colors.primary} />
+              <Text style={{ fontSize: 12, fontWeight: '800', color: isLight ? '#1e6827' : colors.primary }} numberOfLines={1}>
+                {currentRoadmapLesson.phase}
+              </Text>
+            </View>
+            <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: isLight ? '#ffffff' : colors.surfaceElevated }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text }}>
+                Task {roadmapIndex + 1} of {roadmapSyllabus?.length}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
 
       {/* XP Toast Notification Banner */}
       {xpBanner ? (
@@ -456,21 +497,29 @@ export function LessonViewer({
       <View style={styles.footerNav}>
         {/* Previous Button */}
         <Pressable
-          disabled={!lesson.previousLesson}
-          onPress={() => lesson.previousLesson && onNavigateLesson(lesson.previousLesson.id)}
+          disabled={isRoadmapMode ? !prevRoadmapLesson : !lesson.previousLesson}
+          onPress={() => {
+            if (isRoadmapMode && prevRoadmapLesson) {
+              onNavigateLesson(prevRoadmapLesson.id);
+            } else if (!isRoadmapMode && lesson.previousLesson) {
+              onNavigateLesson(lesson.previousLesson.id);
+            }
+          }}
           style={({ pressed }) => [
             styles.navPageBtn,
             {
               backgroundColor: colors.surfaceElevated,
               borderColor: colors.border,
-              opacity: lesson.previousLesson ? 1 : 0.4,
+              opacity: (isRoadmapMode ? prevRoadmapLesson : lesson.previousLesson) ? 1 : 0.4,
             },
-            pressed && lesson.previousLesson && { opacity: 0.7 },
+            pressed && (isRoadmapMode ? prevRoadmapLesson : lesson.previousLesson) && { opacity: 0.7 },
           ]}
         >
           <Ionicons name="arrow-back" size={15} color={colors.text} />
           <Text style={[styles.navPageBtnText, { color: colors.text }]} numberOfLines={1}>
-            {lesson.previousLesson ? lesson.previousLesson.title : 'First Lesson'}
+            {isRoadmapMode
+              ? (prevRoadmapLesson ? prevRoadmapLesson.title : 'First Task')
+              : (lesson.previousLesson ? lesson.previousLesson.title : 'First Lesson')}
           </Text>
         </Pressable>
 
@@ -498,20 +547,28 @@ export function LessonViewer({
 
         {/* Next Button */}
         <Pressable
-          disabled={!lesson.nextLesson}
-          onPress={() => lesson.nextLesson && onNavigateLesson(lesson.nextLesson.id)}
+          disabled={isRoadmapMode ? !nextRoadmapLesson : !lesson.nextLesson}
+          onPress={() => {
+            if (isRoadmapMode && nextRoadmapLesson) {
+              onNavigateLesson(nextRoadmapLesson.id);
+            } else if (!isRoadmapMode && lesson.nextLesson) {
+              onNavigateLesson(lesson.nextLesson.id);
+            }
+          }}
           style={({ pressed }) => [
             styles.navPageBtn,
             {
               backgroundColor: colors.surfaceElevated,
               borderColor: colors.border,
-              opacity: lesson.nextLesson ? 1 : 0.4,
+              opacity: (isRoadmapMode ? nextRoadmapLesson : lesson.nextLesson) ? 1 : 0.4,
             },
-            pressed && lesson.nextLesson && { opacity: 0.7 },
+            pressed && (isRoadmapMode ? nextRoadmapLesson : lesson.nextLesson) && { opacity: 0.7 },
           ]}
         >
           <Text style={[styles.navPageBtnText, { color: colors.text }]} numberOfLines={1}>
-            {lesson.nextLesson ? lesson.nextLesson.title : 'Complete'}
+            {isRoadmapMode
+              ? (nextRoadmapLesson ? nextRoadmapLesson.title : 'Roadmap Done')
+              : (lesson.nextLesson ? lesson.nextLesson.title : 'Complete')}
           </Text>
           <Ionicons name="arrow-forward" size={15} color={colors.text} />
         </Pressable>
@@ -523,6 +580,13 @@ export function LessonViewer({
 const styles = StyleSheet.create({
   container: {
     gap: 14,
+  },
+  roadmapPhaseBanner: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: -4,
   },
   centerContainer: {
     paddingVertical: 60,

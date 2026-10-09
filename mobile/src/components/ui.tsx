@@ -270,6 +270,7 @@ const styles = StyleSheet.create({
     gap: 8,
     borderWidth: 1,
     borderRadius: 14,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.03,
     shadowRadius: 6,
