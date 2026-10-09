@@ -1,4 +1,5 @@
 import {
+  Pressable,
   StyleSheet,
   Text as RNText,
   View,
@@ -6,6 +7,7 @@ import {
   type TextProps,
   type ViewStyle,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Button, Field } from '@/components/ui';
@@ -25,6 +27,7 @@ export interface TaskCardProps {
   actions?: TaskCardAction[];
   onUpdateStatus?: (task: Task, newStatus: Task['status']) => void | Promise<void>;
   onAdvance?: (task: Task) => void | Promise<void>;
+  onDelete?: (task: Task) => void | Promise<void>;
   learnedNote?: string;
   onChangeLearnedNote?: (value: string) => void;
   onSaveLearnedNote?: () => void | Promise<void>;
@@ -70,6 +73,7 @@ export function TaskCard({
   actions,
   onUpdateStatus,
   onAdvance,
+  onDelete,
   learnedNote,
   onChangeLearnedNote,
   onSaveLearnedNote,
@@ -122,13 +126,22 @@ export function TaskCard({
     }
 
     if (isDone) {
-      return [
+      const acts: TaskCardAction[] = [
         {
           label: 'Reopen',
           onPress: () => onUpdateStatus(task, 'TODO'),
           secondary: true,
         },
       ];
+      if (onDelete) {
+        acts.push({
+          label: 'Delete',
+          onPress: () => onDelete(task),
+          danger: true,
+          secondary: true,
+        });
+      }
+      return acts;
     }
 
     // Fallback for REVIEW or any future task status
@@ -154,7 +167,7 @@ export function TaskCard({
         style,
       ]}
     >
-      {/* Status label (top-left, full width) */}
+      {/* Status label (top-left) & delete icon (top-right for done tasks) */}
       <View style={styles.statusRow}>
         <Text
           style={[
@@ -166,6 +179,20 @@ export function TaskCard({
         >
           {statusLabel}
         </Text>
+        {isDone && onDelete ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Delete completed task"
+            onPress={() => onDelete(task)}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.deleteIconBtn,
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Ionicons name="trash-outline" size={16} color={colors.danger} />
+          </Pressable>
+        ) : null}
       </View>
 
       {/* Text Container: Full card width */}
@@ -250,8 +277,13 @@ const styles = StyleSheet.create({
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 6,
     width: '100%',
+  },
+  deleteIconBtn: {
+    padding: 2,
+    borderRadius: 6,
   },
   taskStatus: {
     fontSize: 11,

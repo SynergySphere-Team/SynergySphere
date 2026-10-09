@@ -6,7 +6,6 @@ import { Screen, Notice } from '@/components/Screen';
 import { Button, Field } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
-import { onboardingStorage } from '@/services/api';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -44,8 +43,7 @@ export default function LoginScreen() {
 
     try {
       await login(trimmedEmail, password);
-      await onboardingStorage.reset();
-      router.replace('/(auth)/onboarding' as never);
+      router.replace('/(tabs)');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to sign in.');
     } finally {

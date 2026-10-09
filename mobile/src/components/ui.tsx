@@ -70,14 +70,14 @@ export function Button({
         styles.button,
         {
           backgroundColor: danger
-            ? colors.danger
-            : colors.primary,
+            ? (secondary ? 'rgba(239, 68, 68, 0.1)' : colors.danger)
+            : (secondary ? colors.surfaceElevated : colors.primary),
         },
         secondary && [
           styles.secondary,
           {
-            backgroundColor: colors.surfaceElevated,
-            borderColor: colors.border,
+            backgroundColor: danger ? 'rgba(239, 68, 68, 0.08)' : colors.surfaceElevated,
+            borderColor: danger ? colors.danger : colors.border,
           },
         ],
         disabled && styles.disabled,
@@ -89,12 +89,14 @@ export function Button({
         style={[
           styles.buttonText,
           {
-            color: colors.primaryText,
+            color: danger
+              ? (secondary ? colors.danger : colors.primaryText)
+              : colors.primaryText,
             fontSize: fontSize(14),
           },
           secondary && [
             styles.secondaryText,
-            { color: colors.text },
+            { color: danger ? colors.danger : colors.text },
           ],
           textStyle,
         ]}

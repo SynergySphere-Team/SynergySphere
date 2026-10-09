@@ -1216,18 +1216,27 @@ export default function TasksPage() {
                   <div key={task.id} className="rounded-lg border border-white/[0.07] bg-secondary/40 p-3">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-white">{task.title}</p>
-                      {'pushedToPortfolio' in task && task.pushedToPortfolio ? (
-                        <span className="text-[10px] text-emerald-400 flex items-center gap-1">
-                          <Sparkles className="h-3 w-3" /> Featured in Portfolio
-                        </span>
-                      ) : (
+                      <div className="flex items-center gap-2">
+                        {'pushedToPortfolio' in task && task.pushedToPortfolio ? (
+                          <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                            <Sparkles className="h-3 w-3" /> Featured in Portfolio
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => pushToPortfolio(task as Task)}
+                            className="text-[10px] text-amber-300 hover:underline flex items-center gap-1"
+                          >
+                            <Rocket className="h-3 w-3" /> Push to Portfolio
+                          </button>
+                        )}
                         <button
-                          onClick={() => pushToPortfolio(task as Task)}
-                          className="text-[10px] text-amber-300 hover:underline flex items-center gap-1"
+                          onClick={() => deleteTask(task.id)}
+                          className="rounded p-1 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                          title="Delete task"
                         >
-                          <Rocket className="h-3 w-3" /> Push to Portfolio
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
-                      )}
+                      </div>
                     </div>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       {task.learnedNote || 'Completed — add a note next time to capture what you learned.'}

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -113,6 +113,12 @@ export default function OnboardingScreen() {
   const isLight = theme === 'light';
   const isLastSlide = currentIndex === SLIDES.length - 1;
   const isCompact = screenHeight < 740;
+
+  useEffect(() => {
+    if (user) {
+      router.replace('/(tabs)');
+    }
+  }, [user, router]);
 
   async function completeOnboarding(targetRoute?: '/(auth)/register' | '/(auth)/login' | '/(tabs)') {
     try {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Image, Pressable, StyleSheet, Text as RNText, TextInput as RNTextInput, Vibration, View, type TextProps, type TextInputProps } from 'react-native';
+import { Alert, AppState, Image, Platform, Pressable, StyleSheet, Text as RNText, TextInput as RNTextInput, Vibration, View, type TextProps, type TextInputProps } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams } from 'expo-router';
@@ -381,6 +381,43 @@ export default function TasksScreen() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save learned note.');
+    }
+  }
+
+  async function deleteTask(task: Task) {
+    try {
+      setTasks((prev) => prev.filter((t) => t.id !== task.id));
+      await api.delete(`/tasks/${task.id}`);
+      setSuccess(`Task "${task.title}" deleted.`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not delete task.');
+      await load();
+    }
+  }
+
+  function confirmDeleteTask(task: Task) {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm(`Are you sure you want to delete "${task.title}"?`)) {
+          void deleteTask(task);
+        }
+      } else {
+        void deleteTask(task);
+      }
+    } else {
+      Alert.alert(
+        'Delete Task',
+        `Are you sure you want to delete "${task.title}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => void deleteTask(task),
+          },
+        ],
+      );
     }
   }
 
@@ -807,6 +844,12 @@ export default function TasksScreen() {
                       onPress: () => updateStatus(task, 'TODO'),
                       secondary: true,
                     },
+                    {
+                      label: 'Delete',
+                      onPress: () => confirmDeleteTask(task),
+                      danger: true,
+                      secondary: true,
+                    },
                   ]
                 : [
                     {
@@ -822,6 +865,7 @@ export default function TasksScreen() {
                   task={task}
                   status={task.status}
                   actions={actions}
+                  onDelete={() => confirmDeleteTask(task)}
                   learnedNote={learned[task.id] ?? task.learnedNote ?? ''}
                   onChangeLearnedNote={(val) =>
                     setLearned((curr) => ({ ...curr, [task.id]: val }))
