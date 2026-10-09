@@ -31,7 +31,39 @@ export interface TaskCardProps {
   learnedNote?: string;
   onChangeLearnedNote?: (value: string) => void;
   onSaveLearnedNote?: () => void | Promise<void>;
+  isFocusTarget?: boolean;
   style?: StyleProp<ViewStyle>;
+}
+
+export type DueState = 'overdue' | 'today' | 'soon' | 'later';
+
+export function getDueInfo(dueDate: string | null | undefined): { state: DueState; label: string } | null {
+  if (!dueDate) return null;
+  const due = new Date(dueDate);
+  if (Number.isNaN(due.getTime())) return null;
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfDue = new Date(due);
+  startOfDue.setHours(0, 0, 0, 0);
+  const dayDiff = Math.round((startOfDue.getTime() - startOfToday.getTime()) / 86_400_000);
+
+  if (dayDiff < 0) {
+    return { state: 'overdue', label: dayDiff === -1 ? 'Overdue · yesterday' : `Overdue · ${Math.abs(dayDiff)}d` };
+  }
+  if (dayDiff === 0) return { state: 'today', label: 'Due today' };
+  if (dayDiff === 1) return { state: 'soon', label: 'Due tomorrow' };
+  if (dayDiff < 7) {
+    return { state: 'soon', label: `Due ${due.toLocaleDateString(undefined, { weekday: 'short' })}` };
+  }
+  return { state: 'later', label: `Due ${due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` };
+}
+
+function formatMinutes(total: number): string {
+  if (total < 60) return `${total}m`;
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
 function Text({ style, ...props }: TextProps) {
@@ -77,6 +109,7 @@ export function TaskCard({
   learnedNote,
   onChangeLearnedNote,
   onSaveLearnedNote,
+  isFocusTarget,
   style,
 }: TaskCardProps) {
   const { colors, theme } = useTheme();
@@ -154,7 +187,15 @@ export function TaskCard({
     ];
   })();
 
-  const statusLabel = currentStatus.replace('_', ' ');
+  const statusLabel = currentStatus === 'REVIEW' ? 'IN REVIEW' : currentStatus.replace('_', ' ');
+  const dueInfo = isDone ? null : getDueInfo(task.dueDate);
+  const dueColor =
+    dueInfo?.state === 'overdue'
+      ? colors.danger
+      : dueInfo?.state === 'today'
+      ? '#D97706'
+      : colors.muted;
+  const timeSpent = task.timeSpentMinutes ?? 0;
 
   return (
     <View
@@ -162,12 +203,13 @@ export function TaskCard({
         styles.card,
         {
           backgroundColor: isLight ? '#F9FBFA' : colors.surfaceElevated,
-          borderColor: colors.border,
+          borderColor: isFocusTarget ? brandGreen : colors.border,
+          borderWidth: isFocusTarget ? 1.5 : 1,
         },
         style,
       ]}
     >
-      {/* Status label (top-left) & delete icon (top-right for done tasks) */}
+      {/* Status label (top-left), badges & delete icon (top-right) */}
       <View style={styles.statusRow}>
         <Text
           style={[
@@ -179,6 +221,31 @@ export function TaskCard({
         >
           {statusLabel}
         </Text>
+        <View style={styles.badgeRow}>
+          {isFocusTarget ? (
+            <View style={[styles.badge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(145,219,94,0.15)' }]}>
+              <Ionicons name="flame" size={11} color={brandGreen} />
+              <Text style={[styles.badgeText, { color: brandGreen }]}>Focusing</Text>
+            </View>
+          ) : null}
+          {dueInfo ? (
+            <View
+              style={[
+                styles.badge,
+                {
+                  borderWidth: 1,
+                  borderColor: dueInfo.state === 'later' || dueInfo.state === 'soon' ? colors.border : dueColor,
+                },
+              ]}
+            >
+              <Ionicons
+                name={dueInfo.state === 'overdue' ? 'alert-circle' : 'calendar-outline'}
+                size={11}
+                color={dueColor}
+              />
+              <Text style={[styles.badgeText, { color: dueColor }]}>{dueInfo.label}</Text>
+            </View>
+          ) : null}
         {isDone && onDelete ? (
           <Pressable
             accessibilityRole="button"
@@ -193,6 +260,7 @@ export function TaskCard({
             <Ionicons name="trash-outline" size={16} color={colors.danger} />
           </Pressable>
         ) : null}
+        </View>
       </View>
 
       {/* Text Container: Full card width */}
@@ -218,6 +286,15 @@ export function TaskCard({
           >
             {task.description}
           </Text>
+        ) : null}
+
+        {timeSpent > 0 ? (
+          <View style={styles.metaRow}>
+            <Ionicons name="time-outline" size={13} color={colors.muted} />
+            <Text style={[styles.metaText, { color: colors.muted }]}>
+              {formatMinutes(timeSpent)} focused
+            </Text>
+          </View>
         ) : null}
 
         {/* Learned Note Section (for completed tasks) */}
@@ -280,6 +357,37 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
     width: '100%',
+    gap: 8,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+  },
+  metaText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   deleteIconBtn: {
     padding: 2,

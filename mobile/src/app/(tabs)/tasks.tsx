@@ -1,17 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Image, Platform, Pressable, StyleSheet, Text as RNText, TextInput as RNTextInput, Vibration, View, type TextProps, type TextInputProps } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, AppState, Image, Platform, Pressable, StyleSheet, Switch, Text as RNText, TextInput as RNTextInput, Vibration, View, type TextProps, type TextInputProps } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as SecureStore from 'expo-secure-store';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { useLocalSearchParams } from 'expo-router';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card, Field } from '@/components/ui';
 import { TaskCard, type TaskCardAction } from '@/components/TaskCard';
+import {
+  LearningLog,
+  ProgressRing,
+  SwipeableTaskRow,
+  TodaySummary,
+  WeeklyInsights,
+} from '@/components/ProductivityWidgets';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { api } from '@/services/api';
 import {
   scheduleFocusCompletionNotification,
+  scheduleBreakCompletionNotification,
   cancelFocusNotification,
   sendImmediateFocusNotification,
 } from '@/services/notifications';
@@ -20,13 +28,72 @@ import type { ProductivityStats, Task } from '@/types/api';
 const MIN_MINUTES = 1;
 const MAX_MINUTES = 240;
 const DEFAULT_MINUTES = 25;
+const BREAK_MINUTES = 5;
+const XP_MIN_MINUTES = 25;
+const DURATION_PRESETS = [15, 25, 50, 90];
 
-const nextStatus: Record<Task['status'], Task['status']> = {
-  TODO: 'IN_PROGRESS',
-  IN_PROGRESS: 'REVIEW',
-  REVIEW: 'DONE',
-  DONE: 'TODO',
-};
+const GOAL_OPTIONS = [60, 90, 120, 180, 240];
+const DEFAULT_GOAL_MINUTES = 120;
+const GOAL_STORAGE_KEY = 'synergysphere.focusGoalMinutes';
+
+type TimerState = 'idle' | 'running' | 'paused' | 'finished';
+type TimerMode = 'focus' | 'break';
+type TaskFilter = 'all' | 'todo' | 'active' | 'done';
+type DueOption = 'none' | 'today' | 'tomorrow' | 'in3' | 'week';
+
+const DUE_OPTIONS: { key: DueOption; label: string }[] = [
+  { key: 'none', label: 'No date' },
+  { key: 'today', label: 'Today' },
+  { key: 'tomorrow', label: 'Tomorrow' },
+  { key: 'in3', label: 'In 3 days' },
+  { key: 'week', label: 'Next week' },
+];
+
+function dueOptionToIso(option: DueOption): string | undefined {
+  if (option === 'none') return undefined;
+  const offsets: Record<Exclude<DueOption, 'none'>, number> = { today: 0, tomorrow: 1, in3: 3, week: 7 };
+  const date = new Date();
+  date.setDate(date.getDate() + offsets[option]);
+  date.setHours(23, 59, 0, 0);
+  return date.toISOString();
+}
+
+async function readGoal(): Promise<number> {
+  try {
+    const raw =
+      Platform.OS === 'web'
+        ? typeof window !== 'undefined'
+          ? window.localStorage.getItem(GOAL_STORAGE_KEY)
+          : null
+        : await SecureStore.getItemAsync(GOAL_STORAGE_KEY);
+    const value = raw ? parseInt(raw, 10) : NaN;
+    return GOAL_OPTIONS.includes(value) ? value : DEFAULT_GOAL_MINUTES;
+  } catch {
+    return DEFAULT_GOAL_MINUTES;
+  }
+}
+
+async function writeGoal(value: number): Promise<void> {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') window.localStorage.setItem(GOAL_STORAGE_KEY, String(value));
+      return;
+    }
+    await SecureStore.setItemAsync(GOAL_STORAGE_KEY, String(value));
+  } catch {
+    // Persisting the goal is best-effort
+  }
+}
+
+/** Active work first, then by due date (overdue/earliest first, undated last), then newest. */
+function sortTasks(list: Task[]): Task[] {
+  return [...list].sort((a, b) => {
+    const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
+    const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
+    if (aDue !== bDue) return aDue - bDue;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
 
 function Text({
   style,
@@ -103,11 +170,12 @@ function TextInput({
 export default function TasksScreen() {
   const { colors, theme } = useTheme();
   const { fontSize, largerText } = useAccessibility();
-  const { user, refresh: refreshAuth } = useAuth();
+  const { refresh: refreshAuth } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [initialStatus, setInitialStatus] = useState<Task['status']>('IN_PROGRESS');
+  const [dueOption, setDueOption] = useState<DueOption>('none');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [adding, setAdding] = useState(false);
@@ -115,16 +183,24 @@ export default function TasksScreen() {
   const [loaded, setLoaded] = useState(false);
   const [stats, setStats] = useState<ProductivityStats | null>(null);
   const [learned, setLearned] = useState<Record<string, string>>({});
+  const [filter, setFilter] = useState<TaskFilter>('all');
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [goalMinutes, setGoalMinutes] = useState(DEFAULT_GOAL_MINUTES);
 
   // Focus Timer States with Dynamic Custom Duration
   const [durationInput, setDurationInput] = useState(String(DEFAULT_MINUTES));
   const [selectedMinutes, setSelectedMinutes] = useState(DEFAULT_MINUTES);
   const [timeLeft, setTimeLeft] = useState(DEFAULT_MINUTES * 60);
-  const [timerState, setTimerState] = useState<'idle' | 'running' | 'paused' | 'finished'>('idle');
-  const [activeNotificationId, setActiveNotificationId] = useState<string | null>(null);
+  const [timerState, setTimerState] = useState<TimerState>('idle');
+  const [timerMode, setTimerMode] = useState<TimerMode>('focus');
+  const [pomodoro, setPomodoro] = useState(false);
+  const [focusTask, setFocusTask] = useState<Task | null>(null);
 
   const endTimeRef = useRef<number | null>(null);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const notificationIdRef = useRef<string | null>(null);
+  // Always points at the latest completion handler so the interval never runs stale state
+  const completeRef = useRef<() => void>(() => {});
 
   const isLight = theme === 'light';
   const brandGreen = isLight ? '#00875A' : colors.primary;
@@ -140,6 +216,8 @@ export default function TasksScreen() {
       ]);
       setTasks(taskData);
       setStats(statsData);
+      // Keep the focus target in sync with the latest server data
+      setFocusTask((current) => (current ? taskData.find((t) => t.id === current.id) ?? null : null));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load tasks.');
     } finally {
@@ -155,15 +233,79 @@ export default function TasksScreen() {
 
   useEffect(() => {
     load();
+    void readGoal().then(setGoalMinutes);
   }, [load]);
 
-  // Handle focus session completion
-  const handleTimerComplete = useCallback(async () => {
+  function cycleGoal() {
+    const index = GOAL_OPTIONS.indexOf(goalMinutes);
+    const next = GOAL_OPTIONS[(index + 1) % GOAL_OPTIONS.length];
+    setGoalMinutes(next);
+    void writeGoal(next);
+  }
+
+  function clearInterval_() {
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     timerIntervalRef.current = null;
     endTimeRef.current = null;
-    setTimerState('finished');
-    setTimeLeft(0);
+  }
+
+  async function cancelScheduledNotification() {
+    if (notificationIdRef.current) {
+      await cancelFocusNotification(notificationIdRef.current);
+      notificationIdRef.current = null;
+    }
+  }
+
+  async function beginCountdown(seconds: number, mode: TimerMode) {
+    setError('');
+    const targetSeconds = Math.max(1, Math.round(seconds));
+    endTimeRef.current = Date.now() + targetSeconds * 1000;
+    setTimeLeft(targetSeconds);
+    setTimerMode(mode);
+    setTimerState('running');
+
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    timerIntervalRef.current = setInterval(() => {
+      if (!endTimeRef.current) return;
+      const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
+      if (remaining <= 0) {
+        completeRef.current();
+      } else {
+        setTimeLeft(remaining);
+      }
+    }, 500);
+
+    try {
+      await activateKeepAwakeAsync();
+    } catch {}
+
+    // Schedule a notification for when the countdown expires
+    await cancelScheduledNotification();
+    notificationIdRef.current =
+      mode === 'focus'
+        ? await scheduleFocusCompletionNotification(targetSeconds, selectedMinutes)
+        : await scheduleBreakCompletionNotification(targetSeconds, BREAK_MINUTES);
+  }
+
+  function promptMarkDone(task: Task) {
+    const message = `Nice work! Mark "${task.title}" as done?`;
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm?.(message)) {
+        void updateStatus(task, 'DONE');
+      }
+      return;
+    }
+    Alert.alert('Session complete', message, [
+      { text: 'Keep working', style: 'cancel' },
+      { text: 'Mark done', onPress: () => void updateStatus(task, 'DONE') },
+    ]);
+  }
+
+  // Handle focus/break completion
+  async function handleTimerComplete() {
+    clearInterval_();
+    const hadScheduledNotification = Boolean(notificationIdRef.current);
+    notificationIdRef.current = null;
 
     try {
       deactivateKeepAwake();
@@ -171,24 +313,56 @@ export default function TasksScreen() {
       // Ignore keep awake deactivation errors
     }
 
-    // Trigger vibration and immediate notification
+    // Gentle single pulse
     try {
-      Vibration.vibrate([0, 500, 200, 500]);
+      Vibration.vibrate(150);
     } catch {
       // Ignore vibration error
     }
 
-    await sendImmediateFocusNotification(selectedMinutes);
+    if (timerMode === 'break') {
+      setTimerMode('focus');
+      setTimerState('idle');
+      setTimeLeft(selectedMinutes * 60);
+      setSuccess('☕ Break over — ready for the next focus session?');
+      return;
+    }
 
-    // Record session on backend
+    const completedTask = focusTask;
+    const minutes = selectedMinutes;
+
+    if (pomodoro) {
+      void beginCountdown(BREAK_MINUTES * 60, 'break');
+    } else {
+      setTimerState('finished');
+      setTimeLeft(0);
+    }
+
+    // The scheduled notification already fired if one was set
+    if (!hadScheduledNotification) {
+      await sendImmediateFocusNotification(minutes);
+    }
+
+    // Record session on backend (and log minutes against the task)
     try {
-      await api.post('/tasks/focus-session', { durationMinutes: selectedMinutes });
-      setSuccess(`🎉 Focus session completed! +15 XP earned.`);
+      await api.post('/tasks/focus-session', {
+        durationMinutes: minutes,
+        ...(completedTask ? { taskId: completedTask.id } : {}),
+      });
+      const xpText = minutes >= XP_MIN_MINUTES ? ' +15 XP earned.' : '';
+      const taskText = completedTask ? ` on "${completedTask.title}"` : '';
+      const breakText = pomodoro ? ` Enjoy a ${BREAK_MINUTES}-minute break.` : '';
+      setSuccess(`🎉 ${minutes}m focus session completed${taskText}!${xpText}${breakText}`);
       await Promise.all([load(), refreshAuth()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save focus session.');
     }
-  }, [selectedMinutes, load, refreshAuth]);
+
+    if (completedTask && completedTask.status !== 'DONE') {
+      promptMarkDone(completedTask);
+    }
+  }
+  completeRef.current = () => void handleTimerComplete();
 
   // Handle AppState changes (sync timer when returning to foreground)
   useEffect(() => {
@@ -196,7 +370,7 @@ export default function TasksScreen() {
       if (nextAppState === 'active' && timerState === 'running' && endTimeRef.current) {
         const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
         if (remaining <= 0) {
-          handleTimerComplete();
+          completeRef.current();
         } else {
           setTimeLeft(remaining);
         }
@@ -206,7 +380,7 @@ export default function TasksScreen() {
     return () => {
       subscription.remove();
     };
-  }, [timerState, handleTimerComplete]);
+  }, [timerState]);
 
   // Clean up interval on unmount
   useEffect(() => {
@@ -226,12 +400,10 @@ export default function TasksScreen() {
     setSelectedMinutes(clamped);
     setDurationInput(String(clamped));
     if (timerState !== 'running') {
+      setTimerMode('focus');
       setTimeLeft(clamped * 60);
       setTimerState('idle');
-      if (activeNotificationId) {
-        cancelFocusNotification(activeNotificationId);
-        setActiveNotificationId(null);
-      }
+      void cancelScheduledNotification();
     }
   }
 
@@ -248,12 +420,10 @@ export default function TasksScreen() {
       const clamped = Math.max(MIN_MINUTES, Math.min(MAX_MINUTES, val));
       setSelectedMinutes(clamped);
       if (timerState !== 'running') {
+        setTimerMode('focus');
         setTimeLeft(clamped * 60);
         setTimerState('idle');
-        if (activeNotificationId) {
-          cancelFocusNotification(activeNotificationId);
-          setActiveNotificationId(null);
-        }
+        void cancelScheduledNotification();
       }
     }
   }
@@ -276,55 +446,26 @@ export default function TasksScreen() {
   }
 
   async function startTimer() {
-    setError('');
     setSuccess('');
-    const targetSeconds = timeLeft > 0 ? timeLeft : selectedMinutes * 60;
-    const targetEndTime = Date.now() + targetSeconds * 1000;
-    endTimeRef.current = targetEndTime;
-    // Schedule notification for when the timer expires
-    const notifId = await scheduleFocusCompletionNotification(targetSeconds, selectedMinutes);
-    if (notifId) {
-      setActiveNotificationId(notifId);
-    }
-
-    try {
-      await activateKeepAwakeAsync();
-    } catch {}
-
-    setTimerState('running');
-
-    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    timerIntervalRef.current = setInterval(() => {
-      if (!endTimeRef.current) return;
-      const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
-      if (remaining <= 0) {
-        handleTimerComplete();
-      } else {
-        setTimeLeft(remaining);
-      }
-    }, 500);
+    const total = (timerMode === 'break' ? BREAK_MINUTES : selectedMinutes) * 60;
+    const resumeFrom = timerState === 'paused' && timeLeft > 0 ? timeLeft : total;
+    await beginCountdown(resumeFrom, timerMode);
   }
 
   async function pauseTimer() {
-    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    timerIntervalRef.current = null;
-    endTimeRef.current = null;
+    clearInterval_();
     setTimerState('paused');
 
     try {
       deactivateKeepAwake();
     } catch {}
 
-    if (activeNotificationId) {
-      await cancelFocusNotification(activeNotificationId);
-      setActiveNotificationId(null);
-    }
+    await cancelScheduledNotification();
   }
 
   async function resetTimer() {
-    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    timerIntervalRef.current = null;
-    endTimeRef.current = null;
+    clearInterval_();
+    setTimerMode('focus');
     setTimerState('idle');
     setTimeLeft(selectedMinutes * 60);
 
@@ -332,23 +473,35 @@ export default function TasksScreen() {
       deactivateKeepAwake();
     } catch {}
 
-    if (activeNotificationId) {
-      await cancelFocusNotification(activeNotificationId);
-      setActiveNotificationId(null);
+    await cancelScheduledNotification();
+  }
+
+  async function focusOnTask(task: Task) {
+    if (timerState === 'running') return;
+    setSuccess('');
+    setFocusTask(task);
+    if (task.status === 'TODO') {
+      void updateStatus(task, 'IN_PROGRESS', { silent: true });
     }
+    const resumeFrom =
+      timerMode === 'focus' && timerState === 'paused' && timeLeft > 0 ? timeLeft : selectedMinutes * 60;
+    await beginCountdown(resumeFrom, 'focus');
   }
 
   async function add() {
     if (!title.trim()) return;
     setAdding(true);
     try {
+      const dueDate = dueOptionToIso(dueOption);
       await api.post<Task>('/tasks', {
         title: title.trim(),
         status: initialStatus,
         ...(description.trim() ? { description: description.trim() } : {}),
+        ...(dueDate ? { dueDate } : {}),
       });
       setTitle('');
       setDescription('');
+      setDueOption('none');
       setShowAddTask(false);
       await load();
     } catch (e) {
@@ -358,21 +511,21 @@ export default function TasksScreen() {
     }
   }
 
-  async function updateStatus(task: Task, newStatus: Task['status']) {
+  async function updateStatus(task: Task, newStatus: Task['status'], options?: { silent?: boolean }) {
+    // Optimistic update so the list reacts instantly
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: newStatus } : t)));
+    if (newStatus === 'DONE' && focusTask?.id === task.id && timerState !== 'running') {
+      setFocusTask(null);
+    }
     try {
       await api.patch<Task>(`/tasks/${task.id}`, { status: newStatus });
+      if (!options?.silent && newStatus === 'DONE') {
+        setSuccess(`✅ "${task.title}" completed! +10 XP`);
+      }
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not update task.');
-    }
-  }
-
-  async function advance(task: Task) {
-    try {
-      await api.patch<Task>(`/tasks/${task.id}`, { status: nextStatus[task.status] });
       await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not update task.');
     }
   }
 
@@ -388,6 +541,7 @@ export default function TasksScreen() {
   async function deleteTask(task: Task) {
     try {
       setTasks((prev) => prev.filter((t) => t.id !== task.id));
+      if (focusTask?.id === task.id) setFocusTask(null);
       await api.delete(`/tasks/${task.id}`);
       setSuccess(`Task "${task.title}" deleted.`);
       await load();
@@ -422,20 +576,125 @@ export default function TasksScreen() {
     }
   }
 
+  const taskGroups = useMemo(() => {
+    const todo = sortTasks(tasks.filter((t) => t.status === 'TODO'));
+    const active = sortTasks(tasks.filter((t) => t.status === 'IN_PROGRESS' || t.status === 'REVIEW'));
+    const done = [...tasks.filter((t) => t.status === 'DONE')];
+    return { todo, active, done, open: sortTasks([...todo, ...active]) };
+  }, [tasks]);
+
   if (!loaded) return <Loading />;
 
   const minutesDisplay = String(Math.floor(timeLeft / 60)).padStart(2, '0');
   const secondsDisplay = String(timeLeft % 60).padStart(2, '0');
-  const completedCount = tasks.filter((t) => t.status === 'DONE').length;
+  const completedCount = taskGroups.done.length;
+  const isRunning = timerState === 'running';
+  const isBreak = timerMode === 'break';
+  const timerAccent = isBreak ? '#3B82F6' : brandGreen;
 
-  const timerStatusLabel =
-    timerState === 'running'
-      ? 'FOCUSING'
-      : timerState === 'paused'
-      ? 'PAUSED'
-      : timerState === 'finished'
-      ? 'COMPLETED'
-      : 'READY';
+  const totalSeconds = (isBreak ? BREAK_MINUTES : selectedMinutes) * 60;
+  const ringProgress =
+    timerState === 'finished'
+      ? 1
+      : timerState === 'idle'
+      ? 0
+      : Math.max(0, Math.min(1, 1 - timeLeft / totalSeconds));
+
+  const timerStatusLabel = isBreak
+    ? timerState === 'paused'
+      ? 'BREAK PAUSED'
+      : 'BREAK'
+    : timerState === 'running'
+    ? 'FOCUSING'
+    : timerState === 'paused'
+    ? 'PAUSED'
+    : timerState === 'finished'
+    ? 'COMPLETED'
+    : 'READY';
+
+  const filterTabs: { key: TaskFilter; label: string; count: number }[] = [
+    { key: 'all', label: 'All', count: tasks.length },
+    { key: 'todo', label: 'To Do', count: taskGroups.todo.length },
+    { key: 'active', label: 'In Progress', count: taskGroups.active.length },
+    { key: 'done', label: 'Done', count: taskGroups.done.length },
+  ];
+
+  const visibleTasks =
+    filter === 'todo'
+      ? taskGroups.todo
+      : filter === 'active'
+      ? taskGroups.active
+      : filter === 'done'
+      ? taskGroups.done
+      : taskGroups.open;
+
+  function actionsFor(task: Task): TaskCardAction[] {
+    const isFocusTarget = focusTask?.id === task.id;
+    const focusAction: TaskCardAction = {
+      label: isFocusTarget && isRunning ? '🔥 Focusing' : '▶ Focus',
+      onPress: () => focusOnTask(task),
+      disabled: isRunning,
+      secondary: true,
+    };
+    const doneAction: TaskCardAction = {
+      label: '✓ Done',
+      onPress: () => updateStatus(task, 'DONE'),
+      secondary: true,
+    };
+
+    switch (task.status) {
+      case 'TODO':
+        return [focusAction, doneAction];
+      case 'IN_PROGRESS':
+        return [
+          focusAction,
+          { label: 'Review', onPress: () => updateStatus(task, 'REVIEW'), secondary: true },
+          doneAction,
+        ];
+      case 'REVIEW':
+        return [
+          { label: '↩ Rework', onPress: () => updateStatus(task, 'IN_PROGRESS'), secondary: true },
+          doneAction,
+        ];
+      case 'DONE':
+      default:
+        return [
+          { label: 'Reopen', onPress: () => updateStatus(task, 'TODO'), secondary: true },
+          { label: 'Delete', onPress: () => confirmDeleteTask(task), danger: true, secondary: true },
+        ];
+    }
+  }
+
+  function renderTask(task: Task) {
+    return (
+      <SwipeableTaskRow
+        key={task.id}
+        isDone={task.status === 'DONE'}
+        onComplete={() => void updateStatus(task, 'DONE')}
+        onReopen={() => void updateStatus(task, 'TODO')}
+        onDelete={() => confirmDeleteTask(task)}
+      >
+        <TaskCard
+          task={task}
+          status={task.status}
+          actions={actionsFor(task)}
+          onDelete={() => confirmDeleteTask(task)}
+          isFocusTarget={focusTask?.id === task.id}
+          learnedNote={learned[task.id] ?? task.learnedNote ?? ''}
+          onChangeLearnedNote={(val) =>
+            setLearned((curr) => ({ ...curr, [task.id]: val }))
+          }
+          onSaveLearnedNote={() => saveLearned(task)}
+        />
+      </SwipeableTaskRow>
+    );
+  }
+
+  const stepButtonStyle = {
+    backgroundColor: isLight ? '#FFFFFF' : colors.surfaceElevated,
+    borderColor: isLight ? '#D1D5DB' : colors.border,
+  };
+  const stepIconColor = isLight ? '#374151' : colors.text;
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
@@ -507,30 +766,29 @@ export default function TasksScreen() {
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {success ? <Notice tone="success">{success}</Notice> : null}
+
+      {/* Today summary & daily goal */}
+      <TodaySummary stats={stats} goalMinutes={goalMinutes} onCycleGoal={cycleGoal} accent={brandGreen} />
+
       {/* Focus Timer Card */}
       <Card>
         <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Focus Timer</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>
+            {isBreak ? 'Break Time' : 'Focus Timer'}
+          </Text>
           <Text style={[styles.cardSubtitleRight, { color: colors.muted }]}>
             {stats?.focusSessionsToday ?? 0} done today
           </Text>
         </View>
 
-        {/* Circular Timer Display */}
+        {/* Circular Timer Display with live progress */}
         <View style={styles.timerCircleContainer}>
-          <View
-            style={[
-              styles.timerRing,
-              {
-                borderColor:
-                  timerState === 'running'
-                    ? brandGreen
-                    : isLight
-                    ? '#52606D'
-                    : '#334155',
-                backgroundColor: isLight ? '#FFFFFF' : colors.surfaceElevated,
-              },
-            ]}
+          <ProgressRing
+            size={210}
+            progress={ringProgress}
+            activeColor={timerAccent}
+            trackColor={isLight ? '#DCE3DF' : '#2A3A44'}
+            innerColor={isLight ? '#FFFFFF' : colors.surfaceElevated}
           >
             <Text style={[styles.timeDigits, { color: colors.text }]}>
               {minutesDisplay}:{secondsDisplay}
@@ -538,24 +796,103 @@ export default function TasksScreen() {
             <Text
               style={[
                 styles.timeStatus,
-                {
-                  color:
-                    timerState === 'running'
-                      ? brandGreen
-                      : colors.muted,
-                },
+                { color: isRunning || isBreak ? timerAccent : colors.muted },
               ]}
             >
               {timerStatusLabel}
             </Text>
-          </View>
+            {focusTask && !isBreak ? (
+              <Text
+                numberOfLines={2}
+                style={[styles.ringTaskTitle, { color: colors.muted }]}
+              >
+                {focusTask.title}
+              </Text>
+            ) : null}
+          </ProgressRing>
         </View>
 
+        {/* Linked task chip */}
+        {focusTask && !isBreak ? (
+          <View
+            style={[
+              styles.focusTaskChip,
+              {
+                backgroundColor: isLight ? '#E8F5E9' : 'rgba(145,219,94,0.12)',
+                borderColor: isLight ? '#B7DFC3' : 'rgba(145,219,94,0.3)',
+              },
+            ]}
+          >
+            <Ionicons name="link" size={14} color={brandGreen} />
+            <Text style={[styles.focusTaskChipText, { color: colors.text }]} numberOfLines={1}>
+              Focusing on: {focusTask.title}
+            </Text>
+            {!isRunning ? (
+              <Pressable
+                onPress={() => setFocusTask(null)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Unlink task from timer"
+              >
+                <Ionicons name="close-circle" size={18} color={colors.muted} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : !isBreak && !isRunning && taskGroups.open.length > 0 ? (
+          <Text style={[styles.focusHint, { color: colors.muted }]}>
+            Tip: tap “▶ Focus” on a task to log this session against it.
+          </Text>
+        ) : null}
+
         {/* Dynamic Custom Duration Input Controls */}
-        {timerState !== 'running' ? (
+        {isBreak ? (
+          <View style={styles.runningBanner}>
+            <Ionicons name="cafe" size={16} color={timerAccent} />
+            <Text style={[styles.runningBannerText, { color: timerAccent }]}>
+              Step away from the screen — {BREAK_MINUTES}-minute break
+            </Text>
+          </View>
+        ) : !isRunning ? (
           <View style={styles.customDurationSection}>
+            {/* Preset chips */}
+            <View style={styles.presetRow}>
+              {DURATION_PRESETS.map((preset) => {
+                const selected = selectedMinutes === preset;
+                return (
+                  <Pressable
+                    key={preset}
+                    onPress={() => applyDuration(preset)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`${preset} minute session`}
+                    style={({ pressed }) => [
+                      styles.presetChip,
+                      {
+                        backgroundColor: selected
+                          ? brandGreen
+                          : isLight
+                          ? '#F1F5F9'
+                          : colors.surfaceElevated,
+                        borderColor: selected ? brandGreen : isLight ? '#D1D5DB' : colors.border,
+                      },
+                      pressed && styles.btnPressed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.presetChipText,
+                        { color: selected ? '#FFFFFF' : isLight ? '#374151' : colors.text },
+                      ]}
+                    >
+                      {preset}m
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
             <Text style={[styles.durationLabel, { color: colors.muted }]}>
-              Set Duration (1 – 240 mins)
+              Or set custom (1 – 240 mins)
             </Text>
             <View style={styles.durationInputRow}>
               {/* Rapid -5m step */}
@@ -572,7 +909,7 @@ export default function TasksScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Decrease 5 minutes"
               >
-                <Text style={[styles.quickStepText, { color: isLight ? '#374151' : colors.text }]}>
+                <Text style={[styles.quickStepText, { color: stepIconColor }]}>
                   -5m
                 </Text>
               </Pressable>
@@ -582,20 +919,17 @@ export default function TasksScreen() {
                 onPress={() => adjustDuration(-1)}
                 style={({ pressed }) => [
                   styles.iconStepBtn,
-                  {
-                    backgroundColor: '#FFFFFF',
-                    borderColor: '#D1D5DB',
-                  },
+                  stepButtonStyle,
                   pressed && styles.btnPressed,
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Decrease 1 minute"
               >
-                <Ionicons name="remove" size={18} color="#374151" />
+                <Ionicons name="remove" size={18} color={stepIconColor} />
               </Pressable>
 
               {/* Editable Numerical Input */}
-              <View style={styles.editableFieldWrapper}>
+              <View style={[styles.editableFieldWrapper, stepButtonStyle]}>
                 <TextInput
                   value={durationInput}
                   onChangeText={handleInputChange}
@@ -603,12 +937,12 @@ export default function TasksScreen() {
                   keyboardType="number-pad"
                   maxLength={3}
                   selectTextOnFocus
-                  style={styles.editableTextInput}
+                  style={[styles.editableTextInput, { color: colors.text }]}
                   placeholder="25"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.muted}
                   accessibilityLabel="Custom focus duration in minutes"
                 />
-                <Text style={styles.inputUnitSuffix}>min</Text>
+                <Text style={[styles.inputUnitSuffix, { color: colors.muted }]}>min</Text>
               </View>
 
               {/* Step +1m button */}
@@ -616,16 +950,13 @@ export default function TasksScreen() {
                 onPress={() => adjustDuration(1)}
                 style={({ pressed }) => [
                   styles.iconStepBtn,
-                  {
-                    backgroundColor: '#FFFFFF',
-                    borderColor: '#D1D5DB',
-                  },
+                  stepButtonStyle,
                   pressed && styles.btnPressed,
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Increase 1 minute"
               >
-                <Ionicons name="add" size={18} color="#374151" />
+                <Ionicons name="add" size={18} color={stepIconColor} />
               </Pressable>
 
               {/* Rapid +5m step */}
@@ -642,7 +973,7 @@ export default function TasksScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Increase 5 minutes"
               >
-                <Text style={[styles.quickStepText, { color: isLight ? '#374151' : colors.text }]}>
+                <Text style={[styles.quickStepText, { color: stepIconColor }]}>
                   +5m
                 </Text>
               </Pressable>
@@ -657,23 +988,40 @@ export default function TasksScreen() {
           </View>
         )}
 
+        {/* Pomodoro mode toggle */}
+        <View style={[styles.pomodoroRow, { borderColor: colors.border }]}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[styles.pomodoroTitle, { color: colors.text }]}>Pomodoro mode</Text>
+            <Text style={[styles.pomodoroDesc, { color: colors.muted }]}>
+              Auto-start a {BREAK_MINUTES}-minute break after each session
+            </Text>
+          </View>
+          <Switch
+            value={pomodoro}
+            onValueChange={setPomodoro}
+            accessibilityLabel="Pomodoro mode"
+            trackColor={{ false: colors.border, true: isLight ? '#8fdf58' : brandGreen }}
+            thumbColor={pomodoro ? (isLight ? '#1e6827' : '#FFFFFF') : colors.surfaceElevated}
+          />
+        </View>
+
         {/* Timer Control Buttons */}
         <View style={styles.timerActionsRow}>
-          {timerState === 'running' ? (
+          {isRunning ? (
             <Pressable
               onPress={pauseTimer}
               style={[styles.primaryActionBtn, { backgroundColor: '#E07A5F' }]}
             >
               <Ionicons name="pause" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.actionBtnText}>Pause Session</Text>
+              <Text style={styles.actionBtnText}>{isBreak ? 'Pause Break' : 'Pause Session'}</Text>
             </Pressable>
           ) : timerState === 'paused' ? (
             <Pressable
               onPress={startTimer}
-              style={[styles.primaryActionBtn, { backgroundColor: brandGreen }]}
+              style={[styles.primaryActionBtn, { backgroundColor: timerAccent }]}
             >
               <Ionicons name="play" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.actionBtnText}>Resume Session</Text>
+              <Text style={styles.actionBtnText}>{isBreak ? 'Resume Break' : 'Resume Session'}</Text>
             </Pressable>
           ) : timerState === 'finished' ? (
             <Pressable
@@ -704,7 +1052,7 @@ export default function TasksScreen() {
             ]}
           >
             <Text style={[styles.resetBtnText, { color: isLight ? '#334155' : colors.text }]}>
-              Reset
+              {isBreak ? 'Skip' : 'Reset'}
             </Text>
           </Pressable>
         </View>
@@ -744,49 +1092,62 @@ export default function TasksScreen() {
               placeholder="Add context"
               multiline
             />
-            <View style={{ marginBottom: 10, gap: 6 }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.muted }}>Initial Status</Text>
+            <View style={{ gap: 6 }}>
+              <Text style={[styles.formLabel, { color: colors.muted }]}>Initial Status</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Pressable
-                  onPress={() => setInitialStatus('IN_PROGRESS')}
-                  style={{
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    paddingVertical: 8,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    backgroundColor: initialStatus === 'IN_PROGRESS' ? (isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)') : colors.surface,
-                    borderColor: initialStatus === 'IN_PROGRESS' ? brandGreen : colors.border,
-                  }}
-                >
-                  <Ionicons name="play" size={13} color={initialStatus === 'IN_PROGRESS' ? brandGreen : colors.muted} />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: initialStatus === 'IN_PROGRESS' ? brandGreen : colors.text }}>
-                    In Progress
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setInitialStatus('TODO')}
-                  style={{
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    paddingVertical: 8,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    backgroundColor: initialStatus === 'TODO' ? (isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)') : colors.surface,
-                    borderColor: initialStatus === 'TODO' ? brandGreen : colors.border,
-                  }}
-                >
-                  <Ionicons name="list" size={13} color={initialStatus === 'TODO' ? brandGreen : colors.muted} />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: initialStatus === 'TODO' ? brandGreen : colors.text }}>
-                    To Do
-                  </Text>
-                </Pressable>
+                {([
+                  { key: 'IN_PROGRESS', label: 'In Progress', icon: 'play' },
+                  { key: 'TODO', label: 'To Do', icon: 'list' },
+                ] as const).map((option) => {
+                  const selected = initialStatus === option.key;
+                  return (
+                    <Pressable
+                      key={option.key}
+                      onPress={() => setInitialStatus(option.key)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      style={[
+                        styles.statusOption,
+                        {
+                          backgroundColor: selected ? (isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)') : colors.surface,
+                          borderColor: selected ? brandGreen : colors.border,
+                        },
+                      ]}
+                    >
+                      <Ionicons name={option.icon} size={13} color={selected ? brandGreen : colors.muted} />
+                      <Text style={[styles.statusOptionText, { color: selected ? brandGreen : colors.text }]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+            <View style={{ gap: 6 }}>
+              <Text style={[styles.formLabel, { color: colors.muted }]}>Due date</Text>
+              <View style={styles.dueChipRow}>
+                {DUE_OPTIONS.map((option) => {
+                  const selected = dueOption === option.key;
+                  return (
+                    <Pressable
+                      key={option.key}
+                      onPress={() => setDueOption(option.key)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      style={[
+                        styles.dueChip,
+                        {
+                          backgroundColor: selected ? (isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)') : colors.surface,
+                          borderColor: selected ? brandGreen : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.statusOptionText, { color: selected ? brandGreen : colors.text }]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
             <Button
@@ -796,6 +1157,49 @@ export default function TasksScreen() {
             />
           </View>
         )}
+
+        {/* Filter tabs */}
+        {tasks.length > 0 ? (
+          <View
+            style={[
+              styles.tabBar,
+              {
+                backgroundColor: isLight ? '#F1F5F3' : colors.surfaceElevated,
+                borderColor: colors.border,
+              },
+            ]}
+            accessibilityRole="tablist"
+          >
+            {filterTabs.map((tab) => {
+              const selected = filter === tab.key;
+              return (
+                <Pressable
+                  key={tab.key}
+                  onPress={() => setFilter(tab.key)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected }}
+                  style={[
+                    styles.tabButton,
+                    selected && { backgroundColor: isLight ? '#FFFFFF' : colors.surface },
+                  ]}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.tabText, { color: selected ? brandGreen : colors.muted }]}
+                  >
+                    {tab.label} {tab.count}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {tasks.length > 0 && Platform.OS !== 'web' ? (
+          <Text style={[styles.swipeHint, { color: colors.muted }]}>
+            Swipe right to complete · swipe left to delete
+          </Text>
+        ) : null}
 
         {tasks.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -807,77 +1211,50 @@ export default function TasksScreen() {
           </View>
         ) : (
           <View style={styles.tasksList}>
-            {tasks.map((task) => {
-              const isDone = task.status === 'DONE';
-              const isInProgress = task.status === 'IN_PROGRESS';
-              const isTodo = task.status === 'TODO';
+            {visibleTasks.length === 0 ? (
+              <Text style={[styles.filterEmpty, { color: colors.muted }]}>
+                {filter === 'all' ? '🎉 All caught up — nothing open right now.' : 'No tasks here.'}
+              </Text>
+            ) : (
+              visibleTasks.map(renderTask)
+            )}
 
-              const actions: TaskCardAction[] = isTodo
-                ? [
-                    {
-                      label: '▶ Start',
-                      onPress: () => updateStatus(task, 'IN_PROGRESS'),
-                      secondary: true,
-                    },
-                    {
-                      label: '✓ Done',
-                      onPress: () => updateStatus(task, 'DONE'),
-                      secondary: true,
-                    },
-                  ]
-                : isInProgress
-                ? [
-                    {
-                      label: '✓ Done',
-                      onPress: () => updateStatus(task, 'DONE'),
-                      secondary: true,
-                    },
-                    {
-                      label: 'Advance',
-                      onPress: () => advance(task),
-                      secondary: true,
-                    },
-                  ]
-                : isDone
-                ? [
-                    {
-                      label: 'Reopen',
-                      onPress: () => updateStatus(task, 'TODO'),
-                      secondary: true,
-                    },
-                    {
-                      label: 'Delete',
-                      onPress: () => confirmDeleteTask(task),
-                      danger: true,
-                      secondary: true,
-                    },
-                  ]
-                : [
-                    {
-                      label: '✓ Done',
-                      onPress: () => updateStatus(task, 'DONE'),
-                      secondary: true,
-                    },
-                  ];
-
-              return (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  status={task.status}
-                  actions={actions}
-                  onDelete={() => confirmDeleteTask(task)}
-                  learnedNote={learned[task.id] ?? task.learnedNote ?? ''}
-                  onChangeLearnedNote={(val) =>
-                    setLearned((curr) => ({ ...curr, [task.id]: val }))
-                  }
-                  onSaveLearnedNote={() => saveLearned(task)}
-                />
-              );
-            })}
+            {/* Collapsible completed section (All view only) */}
+            {filter === 'all' && taskGroups.done.length > 0 ? (
+              <>
+                <Pressable
+                  onPress={() => setShowCompleted((value) => !value)}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showCompleted }}
+                  style={({ pressed }) => [
+                    styles.completedToggle,
+                    { borderColor: colors.border },
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <Ionicons
+                    name={showCompleted ? 'chevron-down' : 'chevron-forward'}
+                    size={16}
+                    color={colors.muted}
+                  />
+                  <Text style={[styles.completedToggleText, { color: colors.muted }]}>
+                    Completed ({taskGroups.done.length})
+                  </Text>
+                </Pressable>
+                {showCompleted ? taskGroups.done.map(renderTask) : null}
+              </>
+            ) : null}
           </View>
         )}
-        </Card>
+      </Card>
+
+      {/* Weekly insights */}
+      {stats?.weeklyFocus && stats.weeklyFocus.length > 0 ? (
+        <WeeklyInsights weeklyFocus={stats.weeklyFocus} streak={stats.focusStreak ?? 0} accent={brandGreen} />
+      ) : null}
+
+      {/* Learning log */}
+      <LearningLog items={stats?.learnedTasks ?? []} accent={brandGreen} />
     </Screen>
   );
 }
@@ -964,14 +1341,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flexShrink: 1,
   },
-  xpBadge: {
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    alignSelf: 'flex-start',
-    flexShrink: 0,
+  swipeHint: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: -4,
+    marginBottom: 8,
   },
-  xpBadgeText: {
+  filterEmpty: {
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 18,
+  },
+  completedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 4,
+  },
+  completedToggleText: {
     fontSize: 13,
     fontWeight: '700',
   },
@@ -1010,15 +1400,7 @@ const styles = StyleSheet.create({
   timerCircleContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 18,
-  },
-  timerRing: {
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    borderWidth: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginVertical: 14,
   },
   timeDigits: {
     fontSize: 38,
@@ -1031,10 +1413,55 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginTop: 4,
   },
+  ringTaskTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 6,
+    maxWidth: 120,
+  },
+  focusTaskChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 14,
+  },
+  focusTaskChipText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  focusHint: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
   customDurationSection: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
     gap: 8,
+  },
+  presetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+    marginBottom: 6,
+  },
+  presetChip: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetChipText: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   durationLabel: {
     fontSize: 12,
@@ -1073,9 +1500,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#D1D5DB',
     borderRadius: 10,
     paddingHorizontal: 14,
     height: 44,
@@ -1084,7 +1509,6 @@ const styles = StyleSheet.create({
   editableTextInput: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#111827',
     textAlign: 'center',
     paddingVertical: 0,
     minWidth: 40,
@@ -1092,7 +1516,6 @@ const styles = StyleSheet.create({
   inputUnitSuffix: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6B7280',
     marginLeft: 4,
   },
   runningBanner: {
@@ -1101,11 +1524,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 10,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   runningBannerText: {
     fontSize: 13,
     fontWeight: '700',
+    flexShrink: 1,
+  },
+  pomodoroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginBottom: 12,
+  },
+  pomodoroTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  pomodoroDesc: {
+    fontSize: 12,
+    marginTop: 2,
   },
   btnPressed: {
     opacity: 0.7,
@@ -1146,6 +1586,35 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 6,
     marginBottom: 16,
+  },
+  formLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statusOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  statusOptionText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dueChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  dueChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
   },
   emptyContainer: {
     alignItems: 'center',
