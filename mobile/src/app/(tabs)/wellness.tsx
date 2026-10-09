@@ -390,12 +390,9 @@ export default function WellnessScreen() {
     };
   }, [currentStreak]);
 
-  // Step 1: Haptic rating handler
+  // Step 1: Rating handler
   const setRatingWithHaptic = (setter: (v: number) => void, val: number) => {
     setter(val);
-    try {
-      Vibration.vibrate(15);
-    } catch {}
   };
 
   // Step 4: Contextual 1-Tap Interventions
@@ -882,7 +879,6 @@ export default function WellnessScreen() {
                       key={s.step}
                       onPress={() => {
                         setCheckInStep(s.step);
-                        try { Vibration.vibrate(15); } catch {}
                       }}
                       style={[
                         styles.stepDotBtn,
@@ -1163,7 +1159,6 @@ export default function WellnessScreen() {
                     title="Next: Physical Metrics & Sleep →"
                     onPress={() => {
                       setCheckInStep(2);
-                      try { Vibration.vibrate(15); } catch {}
                     }}
                     style={{ flex: 1 }}
                   />
@@ -1195,7 +1190,6 @@ export default function WellnessScreen() {
                             key={hrs}
                             onPress={() => {
                               updateSleep(hrs);
-                              try { Vibration.vibrate(15); } catch {}
                             }}
                             style={[
                               styles.presetChip,
@@ -1257,7 +1251,6 @@ export default function WellnessScreen() {
                             key={litres}
                             onPress={() => {
                               updateWater(litres);
-                              try { Vibration.vibrate(15); } catch {}
                             }}
                             style={[
                               styles.presetChip,
@@ -1273,7 +1266,6 @@ export default function WellnessScreen() {
                       <Pressable
                         onPress={() => {
                           updateWater(waterLitres + WATER_STEP);
-                          try { Vibration.vibrate(15); } catch {}
                         }}
                         style={styles.boosterChip}
                       >
@@ -1329,7 +1321,6 @@ export default function WellnessScreen() {
                               key={tag}
                               onPress={() => {
                                 toggleTag(tag);
-                                try { Vibration.vibrate(15); } catch {}
                               }}
                               style={[
                                 styles.categoryTagPill,
@@ -1369,7 +1360,6 @@ export default function WellnessScreen() {
                     secondary
                     onPress={() => {
                       setCheckInStep(1);
-                      try { Vibration.vibrate(15); } catch {}
                     }}
                     style={{ flex: 1 }}
                   />
@@ -1377,7 +1367,6 @@ export default function WellnessScreen() {
                     title="Next: Reflection →"
                     onPress={() => {
                       setCheckInStep(3);
-                      try { Vibration.vibrate(15); } catch {}
                     }}
                     style={{ flex: 1 }}
                   />
@@ -1400,7 +1389,6 @@ export default function WellnessScreen() {
                         key={i}
                         onPress={() => {
                           setGratitudeWin(isSelected ? '' : preset);
-                          try { Vibration.vibrate(15); } catch {}
                         }}
                         style={[
                           styles.gratitudePill,
@@ -1461,7 +1449,6 @@ export default function WellnessScreen() {
                     secondary
                     onPress={() => {
                       setCheckInStep(2);
-                      try { Vibration.vibrate(15); } catch {}
                     }}
                     style={{ flex: 1 }}
                   />
