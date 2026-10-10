@@ -118,12 +118,12 @@ export function WellnessQuickCheckIn({
   const energyAnchor = ENERGY_ANCHORS[energy] || ENERGY_ANCHORS[6];
 
   return (
-    <Card>
-      {/* Mode Switcher Banner */}
+    <View style={styles.sectionContainer}>
+      {/* Mode Switcher Banner Outside Card */}
       <View style={styles.headerRow}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Daily Check-In</Text>
-          <Text style={[styles.cardSubtitle, { color: colors.muted }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Daily Check-In</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.muted }]}>
             {mode === 'quick' ? '10-Second Quick Pulse' : 'Deep Reflection Log'}
           </Text>
         </View>
@@ -186,8 +186,9 @@ export function WellnessQuickCheckIn({
         </View>
       </View>
 
-      {/* CORE 3 SLIDERS (Always visible in both modes) */}
-      <View style={styles.scalesContainer}>
+      <Card>
+        {/* CORE 3 SLIDERS (Always visible in both modes) */}
+        <View style={styles.scalesContainer}>
         {/* 1. Stress */}
         <View style={styles.scaleItem}>
           <View style={styles.scaleHeader}>
@@ -486,22 +487,30 @@ export function WellnessQuickCheckIn({
         </View>
       )}
     </Card>
+  </View>
   );
 }
 
 const styles = StyleSheet.create({
+  sectionContainer: {
+    width: '100%',
+    marginTop: 22,
+    marginBottom: 4,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 10,
+    paddingHorizontal: 2,
     gap: 8,
   },
-  cardTitle: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
+    letterSpacing: -0.2,
   },
-  cardSubtitle: {
+  sectionSubtitle: {
     fontSize: 12,
     fontWeight: '600',
     marginTop: 2,

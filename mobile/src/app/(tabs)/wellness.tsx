@@ -813,9 +813,14 @@ export default function WellnessScreen() {
       </View>
 
       {/* Gamification Streak & Milestone Banner */}
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        Resilience &amp; Daily Streak
-      </Text>
+      <View style={[styles.sectionHeaderRow, { marginTop: 4 }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          Resilience &amp; Daily Streak
+        </Text>
+        <Text style={[styles.sectionCaption, { color: colors.muted }]}>
+          {currentStreak}d streak
+        </Text>
+      </View>
       <Card>
         <View style={styles.streakHeader}>
           <View style={styles.streakCountBox}>
@@ -922,21 +927,18 @@ export default function WellnessScreen() {
           {/* AI Task & Workflow Optimizer (Appears when task is specified) */}
           {taskDeconstruction ? (
             <>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                AI Workflow Optimizer
-              </Text>
-              <Card>
-                <View style={styles.optimizerHeader}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
-                    <Ionicons name="sparkles" size={18} color="#06b6d4" style={{ flexShrink: 0 }} />
-                    <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Focus Decomposition</Text>
-                  </View>
-                  {isHighStrain ? (
-                    <View style={[styles.strainBadge, { backgroundColor: 'rgba(244,114,182,0.2)', flexShrink: 0 }]}>
-                      <Text style={{ color: '#f472b6', fontSize: 10, fontWeight: '700' }}>High Strain</Text>
-                    </View>
-                  ) : null}
+              <View style={styles.sectionHeaderRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+                  <Ionicons name="sparkles" size={18} color="#06b6d4" style={{ flexShrink: 0 }} />
+                  <Text style={[styles.sectionTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Focus Decomposition</Text>
                 </View>
+                {isHighStrain ? (
+                  <View style={[styles.strainBadge, { backgroundColor: 'rgba(244,114,182,0.2)', flexShrink: 0 }]}>
+                    <Text style={{ color: '#f472b6', fontSize: 10, fontWeight: '700' }}>High Strain</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Card>
 
                 <Text style={[styles.optimizerAdvice, { color: colors.text }]}>
                   {taskDeconstruction.actionableAdvice}
@@ -1016,9 +1018,11 @@ export default function WellnessScreen() {
           ) : null}
 
           {/* Quick Resets Collapsible Card */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Quick Resets &amp; Micro-Tools
-          </Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Quick Resets &amp; Micro-Tools
+            </Text>
+          </View>
           <Card>
             <Pressable
               onPress={() => setResetSectionOpen(!resetSectionOpen)}
@@ -1169,9 +1173,11 @@ export default function WellnessScreen() {
         /* TAB 2: TRENDS & CORRELATION HEATMAP */
         <>
           {/* Time Range Filter */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Timeframe &amp; Averages
-          </Text>
+          <View style={[styles.sectionHeaderRow, { marginTop: 4 }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Timeframe &amp; Averages
+            </Text>
+          </View>
           <Card>
             <View style={styles.timeRangeBar}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>Range Filter</Text>
@@ -1227,9 +1233,11 @@ export default function WellnessScreen() {
           </Card>
 
           {/* Visual Trend Bars with Step 3 Baseline Equilibrium Line & Interactive Touch Tooltip */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Wellness Trajectory ({filteredEntries.length} entries)
-          </Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Wellness Trajectory ({filteredEntries.length} entries)
+            </Text>
+          </View>
           <Card>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, width: '100%', marginBottom: 4 }}>
               <Text style={[styles.sectionSubtitle, { color: colors.muted, marginBottom: 0 }]}>
@@ -1372,9 +1380,16 @@ export default function WellnessScreen() {
           </Card>
 
           {/* Academic vs. Wellness Correlation Heatmap: Step 3 Filter Active & Collapse Inactive */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Academic vs. Wellness Heatmap
-          </Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Academic vs. Wellness Heatmap
+            </Text>
+            <View style={[styles.heatBadge, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.08)' }]}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>
+                {activeModules.length} Active Modules
+              </Text>
+            </View>
+          </View>
           <Card>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, width: '100%', marginBottom: 4 }}>
               <Text style={[styles.sectionSubtitle, { color: colors.muted, marginBottom: 0 }]}>
@@ -1500,8 +1515,8 @@ export default function WellnessScreen() {
       )}
 
       {/* RECENT CHECK-IN HISTORY AS ACCORDION & LATEST SESSION SUMMARY */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, marginBottom: 6, gap: 8, width: '100%' }}>
-        <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 0, marginBottom: 0, flex: 1, minWidth: 0 }]} numberOfLines={1}>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionTitle, { color: colors.text, flex: 1, minWidth: 0 }]} numberOfLines={1}>
           Recent Activity Logs ({clusteredSessions.length})
         </Text>
         <View style={[styles.clusteringBadge, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.08)' }]}>
@@ -1593,9 +1608,11 @@ export default function WellnessScreen() {
       )}
 
       {/* DEVELOPER INTEGRATIONS & AUTOMATED ZERO-FRICTION HOOKS */}
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        Developer Integrations
-      </Text>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          Developer Integrations
+        </Text>
+      </View>
       <Card>
         <Pressable
           onPress={() => setDevHooksOpen(!devHooksOpen)}
@@ -1697,12 +1714,23 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.3,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 22,
+    marginBottom: 10,
+    paddingHorizontal: 2,
+    width: '100%',
+  },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     letterSpacing: -0.2,
-    marginTop: 14,
-    marginBottom: 6,
+  },
+  sectionCaption: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   stepIndicatorContainer: {
     marginBottom: 14,
@@ -1842,25 +1870,31 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    padding: 3,
-    marginBottom: 12,
+    padding: 4,
+    marginTop: 10,
+    marginBottom: 20,
     width: '100%',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   tabButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderRadius: 9,
+    gap: 7,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
     minWidth: 0,
   },
   tabText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
     flexShrink: 1,

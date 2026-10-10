@@ -49,7 +49,7 @@ export function BurnoutActionCard({
       };
 
   return (
-    <Card>
+    <View style={styles.sectionContainer}>
       <View style={styles.headerRow}>
         <View style={styles.titleInfo}>
           <Text style={[styles.title, { color: colors.text }]}>Strain &amp; Burnout Guard</Text>
@@ -71,7 +71,8 @@ export function BurnoutActionCard({
         </View>
       </View>
 
-      <Text style={[styles.descText, { color: colors.muted }]}>
+      <Card>
+        <Text style={[styles.descText, { color: colors.muted }]}>
         {statusConfig.desc}
       </Text>
 
@@ -141,23 +142,32 @@ export function BurnoutActionCard({
         </View>
       </View>
     </Card>
+  </View>
   );
 }
 
 const styles = StyleSheet.create({
+  sectionContainer: {
+    width: '100%',
+    marginTop: 22,
+    marginBottom: 4,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
   titleInfo: {
     flex: 1,
     minWidth: 0,
   },
   title: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '800',
+    letterSpacing: -0.2,
   },
   subtitle: {
     fontSize: 12,
