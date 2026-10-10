@@ -113,7 +113,13 @@ export class ApiError extends Error {
 }
 
 async function getToken(): Promise<string | null> {
-  return Platform.OS === 'web' ? webToken : SecureStore.getItemAsync(TOKEN_KEY);
+  if (Platform.OS === 'web') {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem(TOKEN_KEY) || webToken;
+    }
+    return webToken;
+  }
+  return SecureStore.getItemAsync(TOKEN_KEY);
 }
 
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -190,8 +196,22 @@ let webOnboardingCompleted = false;
 
 export const authStorage = {
   getToken,
-  setToken: (token: string) => Platform.OS === 'web' ? Promise.resolve(webToken = token) : SecureStore.setItemAsync(TOKEN_KEY, token),
-  clearToken: () => Platform.OS === 'web' ? Promise.resolve(webToken = null) : SecureStore.deleteItemAsync(TOKEN_KEY),
+  setToken: (token: string) => {
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(TOKEN_KEY, token);
+      webToken = token;
+      return Promise.resolve();
+    }
+    return SecureStore.setItemAsync(TOKEN_KEY, token);
+  },
+  clearToken: () => {
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') localStorage.removeItem(TOKEN_KEY);
+      webToken = null;
+      return Promise.resolve();
+    }
+    return SecureStore.deleteItemAsync(TOKEN_KEY);
+  },
 };
 
 export const onboardingStorage = {

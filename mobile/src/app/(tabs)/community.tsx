@@ -10,7 +10,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { CommunityChat } from '@/components/community/CommunityChat';
-//import { CommunityInitiatives } from '@/components/community/CommunityInitiatives';
 import { CommunityGithub } from '@/components/community/CommunityGithub';
 import { MyWorkView } from './my-work';
 import { useAccessibility } from '@/context/AccessibilityContext';
@@ -31,8 +30,8 @@ export default function CommunityScreen() {
     useState<'discover' | 'my-work'>('discover');
 
   useEffect(() => {
-    if (tab === 'initiatives' || tab === 'chat') {
-      setActiveTab(tab);
+    if (tab === 'initiatives' || tab === 'chat' || tab === 'posts') {
+      setActiveTab(tab === 'posts' ? 'chat' : tab);
     }
   }, [tab]);
 
@@ -225,7 +224,9 @@ export default function CommunityScreen() {
       </View>
 
       {/* COMMUNITY CONTENT */}
-      {activeTab === 'chat' && <CommunityChat />}
+      {activeTab === 'chat' && (
+        <CommunityChat initialView={tab === 'posts' ? 'posts' : 'live'} />
+      )}
 
       {activeTab === 'initiatives' && (
         <>

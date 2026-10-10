@@ -6,8 +6,10 @@ import {
 
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -349,7 +351,7 @@ function LiveChat() {
   const loadMessages =
     useCallback(
       async (
-        channelId: string,
+        targetChannel: CommunityChannel,
       ) => {
         try {
           setLoadingMessages(
@@ -358,18 +360,37 @@ function LiveChat() {
 
           setError('');
 
-          const result =
-            await api.get<
-              CommunityMessage[]
-            >(
-              `/community-chat/channels/${channelId}/messages`,
-            );
+          if (targetChannel.type === 'qa') {
+            const result =
+              await api.get<any[]>(
+                `/community-chat/channels/${targetChannel.id}/posts`,
+              );
 
-          setMessages(
-            Array.isArray(result)
-              ? result
-              : [],
-          );
+            const safePosts = Array.isArray(result) ? result : [];
+            const mapped: CommunityMessage[] = safePosts.map((p) => ({
+              id: p.id,
+              userId: p.userId,
+              body: p.title ? `📌 ${p.title}\n${p.body}` : p.body,
+              createdAt: p.createdAt,
+              firstName: p.firstName,
+              lastName: p.lastName,
+            }));
+
+            setMessages(mapped);
+          } else {
+            const result =
+              await api.get<
+                CommunityMessage[]
+              >(
+                `/community-chat/channels/${targetChannel.id}/messages`,
+              );
+
+            setMessages(
+              Array.isArray(result)
+                ? result
+                : [],
+            );
+          }
         } catch (e) {
           setMessages([]);
 
@@ -400,7 +421,7 @@ function LiveChat() {
     setDraft('');
 
     loadMessages(
-      activeChannel.id,
+      activeChannel,
     );
   }, [
     activeChannel,
@@ -423,32 +444,64 @@ function LiveChat() {
       setSending(true);
       setError('');
 
-      const created =
-        await api.post<
-          CommunityMessage
-        >(
-          `/community-chat/channels/${activeChannel.id}/messages`,
-          {
-            body,
-          },
-        );
+      if (activeChannel.type === 'qa') {
+        const title =
+          body.length > 80
+            ? body.slice(0, 80) + '...'
+            : body.length < 3
+              ? `${body} (Question)`
+              : body;
 
-      if (
-        created &&
-        created.id
-      ) {
-        setMessages(
-          (
-            current,
-          ) => [
-            ...current,
-            created,
-          ],
-        );
+        const createdPost =
+          await api.post<any>(
+            `/community-chat/channels/${activeChannel.id}/posts`,
+            {
+              title,
+              body,
+            },
+          );
+
+        if (createdPost && createdPost.id) {
+          const mappedPost: CommunityMessage = {
+            id: createdPost.id,
+            userId: createdPost.userId || user?.id || '',
+            body: createdPost.title ? `📌 ${createdPost.title}\n${createdPost.body}` : createdPost.body,
+            createdAt: createdPost.createdAt || new Date().toISOString(),
+            firstName: createdPost.firstName || user?.firstName,
+            lastName: createdPost.lastName || user?.lastName,
+          };
+          setMessages((current) => [...current, mappedPost]);
+        } else {
+          await loadMessages(activeChannel);
+        }
       } else {
-        await loadMessages(
-          activeChannel.id,
-        );
+        const created =
+          await api.post<
+            CommunityMessage
+          >(
+            `/community-chat/channels/${activeChannel.id}/messages`,
+            {
+              body,
+            },
+          );
+
+        if (
+          created &&
+          created.id
+        ) {
+          setMessages(
+            (
+              current,
+            ) => [
+              ...current,
+              created,
+            ],
+          );
+        } else {
+          await loadMessages(
+            activeChannel,
+          );
+        }
       }
 
       setDraft('');
@@ -520,7 +573,7 @@ function LiveChat() {
             accessibilityLabel="Refresh messages"
             onPress={() =>
               loadMessages(
-                activeChannel.id,
+                activeChannel,
               )
             }
             style={[
@@ -946,7 +999,9 @@ function LiveChat() {
           }
           placeholder={
             activeChannel
-              ? `Message #${activeChannel.name}...`
+              ? activeChannel.type === 'qa'
+                ? `Ask a question in #${activeChannel.name}...`
+                : `Message #${activeChannel.name}...`
               : 'Choose a channel first'
           }
           placeholderTextColor={
@@ -2038,148 +2093,153 @@ function CommunityPosts() {
             }
           />
 
-          <View
-            style={[
-              styles.modalSheet,
-              {
-                backgroundColor:
-                  colors.surface,
-                borderColor:
-                  colors.border,
-              },
-            ]}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ width: '100%' }}
           >
             <View
-              style={
-                styles.modalHeader
-              }
+              style={[
+                styles.modalSheet,
+                {
+                  backgroundColor:
+                    colors.surface,
+                  borderColor:
+                    colors.border,
+                },
+              ]}
             >
-              <Text
+              <View
+                style={
+                  styles.modalHeader
+                }
+              >
+                <Text
+                  style={[
+                    styles.modalTitle,
+                    {
+                      color:
+                        colors.text,
+                    },
+                  ]}
+                >
+                  Create a post
+                </Text>
+
+                <Pressable
+                  onPress={() =>
+                    setComposerOpen(
+                      false,
+                    )
+                  }
+                >
+                  <Ionicons
+                    name="close"
+                    size={22}
+                    color={
+                      colors.text
+                    }
+                  />
+                </Pressable>
+              </View>
+
+              <TextInput
+                autoFocus
+                multiline
+                value={
+                  postBody
+                }
+                onChangeText={
+                  setPostBody
+                }
+                placeholder="What would you like to share?"
+                placeholderTextColor={
+                  colors.muted
+                }
                 style={[
-                  styles.modalTitle,
+                  styles.postInput,
                   {
                     color:
                       colors.text,
+                    backgroundColor:
+                      colors.surfaceElevated,
+                    borderColor:
+                      colors.border,
+                  },
+                ]}
+              />
+
+              <TextInput
+                value={
+                  linkUrl
+                }
+                onChangeText={
+                  setLinkUrl
+                }
+                autoCapitalize="none"
+                keyboardType="url"
+                placeholder="Optional link: https://..."
+                placeholderTextColor={
+                  colors.muted
+                }
+                style={[
+                  styles.linkInput,
+                  {
+                    color:
+                      colors.text,
+                    backgroundColor:
+                      colors.surfaceElevated,
+                    borderColor:
+                      colors.border,
+                  },
+                ]}
+              />
+
+              <Pressable
+                onPress={
+                  createPost
+                }
+                disabled={
+                  !postBody.trim() ||
+                  posting
+                }
+                style={[
+                  styles.publishButton,
+                  {
+                    backgroundColor:
+                      accentColor,
+
+                    opacity:
+                      !postBody.trim() ||
+                      posting
+                        ? 0.45
+                        : 1,
                   },
                 ]}
               >
-                Create a post
-              </Text>
-
-              <Pressable
-                onPress={() =>
-                  setComposerOpen(
-                    false,
-                  )
-                }
-              >
-                <Ionicons
-                  name="close"
-                  size={22}
-                  color={
-                    colors.text
-                  }
-                />
-              </Pressable>
-            </View>
-
-            <TextInput
-              autoFocus
-              multiline
-              value={
-                postBody
-              }
-              onChangeText={
-                setPostBody
-              }
-              placeholder="What would you like to share?"
-              placeholderTextColor={
-                colors.muted
-              }
-              style={[
-                styles.postInput,
-                {
-                  color:
-                    colors.text,
-                  backgroundColor:
-                    colors.surfaceElevated,
-                  borderColor:
-                    colors.border,
-                },
-              ]}
-            />
-
-            <TextInput
-              value={
-                linkUrl
-              }
-              onChangeText={
-                setLinkUrl
-              }
-              autoCapitalize="none"
-              keyboardType="url"
-              placeholder="Optional link: https://..."
-              placeholderTextColor={
-                colors.muted
-              }
-              style={[
-                styles.linkInput,
-                {
-                  color:
-                    colors.text,
-                  backgroundColor:
-                    colors.surfaceElevated,
-                  borderColor:
-                    colors.border,
-                },
-              ]}
-            />
-
-            <Pressable
-              onPress={
-                createPost
-              }
-              disabled={
-                !postBody.trim() ||
-                posting
-              }
-              style={[
-                styles.publishButton,
-                {
-                  backgroundColor:
-                    accentColor,
-
-                  opacity:
-                    !postBody.trim() ||
-                    posting
-                      ? 0.45
-                      : 1,
-                },
-              ]}
-            >
-              {posting ? (
-                <ActivityIndicator
-                  color="#FFFFFF"
-                />
-              ) : (
-                <>
-                  <Text
-                    style={
-                      styles.publishText
-                    }
-                  >
-                    Post
-                  </Text>
-
-                  <Ionicons
-                    name="send"
-                    size={16}
+                {posting ? (
+                  <ActivityIndicator
                     color="#FFFFFF"
                   />
-                </>
-              )}
-            </Pressable>
-          </View>
+                ) : (
+                  <>
+                    <Text
+                      style={
+                        styles.publishText
+                      }
+                    >
+                      Post
+                    </Text>
+
+                    <Ionicons
+                      name="send"
+                      size={16}
+                      color="#FFFFFF"
+                    />
+                  </>
+                )}
+              </Pressable>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </View>
@@ -2187,11 +2247,21 @@ function CommunityPosts() {
 }
 
 
-export function CommunityChat() {
+export function CommunityChat({
+  initialView = 'live',
+}: {
+  initialView?: 'live' | 'posts';
+} = {}) {
   const { colors, theme } = useTheme();
   const accentColor = theme === 'light' ? '#1e6827' : colors.primary;
 
-  const [chatView, setChatView] = useState<'live' | 'posts'>('live');
+  const [chatView, setChatView] = useState<'live' | 'posts'>(initialView);
+
+  useEffect(() => {
+    if (initialView) {
+      setChatView(initialView);
+    }
+  }, [initialView]);
 
   return (
     <View style={styles.chatSectionContainer}>
