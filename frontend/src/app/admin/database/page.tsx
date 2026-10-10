@@ -56,7 +56,7 @@ export default function DatabaseAdminPage() {
 
   // Maintenance action states
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<'create_backup' | 'clear_cache' | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'create_backup' | 'clear_cache' | 'vacuum' | 'reindex' | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [latestBackup, setLatestBackup] = useState<{ snapshotId: string; counts: Record<string, number>; timestamp: string } | null>(null);
 
@@ -312,7 +312,7 @@ export default function DatabaseAdminPage() {
 
         <Card className="border-white/[0.08] bg-[#071015]/85 shadow-lg">
           <CardContent className="p-3.5">
-            <div className="grid sm:grid-cols-3 gap-3">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div className="rounded-lg border border-white/[0.06] bg-black/40 p-3.5 space-y-2">
                 <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
                   <Archive className="h-4 w-4 text-amber-400" />
@@ -346,6 +346,42 @@ export default function DatabaseAdminPage() {
                   className="w-full text-xs border-primary/30 text-primary hover:bg-primary/10"
                 >
                   Purge Caches
+                </Button>
+              </div>
+
+              <div className="rounded-lg border border-white/[0.06] bg-black/40 p-3.5 space-y-2">
+                <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <RefreshCw className="h-4 w-4 text-emerald-400" />
+                  Vacuum & Optimize Tables
+                </h3>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Reclaim dead tuple disk space and recalculate PostgreSQL query planner statistics.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setConfirmAction('vacuum')}
+                  className="w-full text-xs border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+                >
+                  Vacuum Analyze
+                </Button>
+              </div>
+
+              <div className="rounded-lg border border-white/[0.06] bg-black/40 p-3.5 space-y-2">
+                <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Database className="h-4 w-4 text-cyan-400" />
+                  Rebuild Schema Indexes
+                </h3>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Reindex public schema B-Trees to defragment index pages and optimize lookup latency.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setConfirmAction('reindex')}
+                  className="w-full text-xs border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10"
+                >
+                  Rebuild Indexes
                 </Button>
               </div>
 

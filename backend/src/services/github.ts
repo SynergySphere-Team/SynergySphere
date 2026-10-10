@@ -185,27 +185,59 @@ export function assertGithubConfigured(): string {
   return clientId;
 }
 
-export async function beginDeviceAuthorization() {
-  if (!isGithubConfigured()) {
-    const randomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const userCode = `SSPH-${randomCode}`;
-    return {
-      device_code: `mock_device_${Date.now()}`,
-      user_code: userCode,
-      verification_uri: 'https://github.com/login/device',
-      verification_uri_complete: `https://github.com/login/device?user_code=${userCode}`,
-      expires_in: 900,
-      interval: 3,
-    };
+type DeviceCodeResponse = { device_code: string; user_code: string; verification_uri: string; verification_uri_complete?: string; expires_in: number; interval?: number; error?: string; error_description?: string };
+
+function simulatedDeviceAuthorization(): DeviceCodeResponse {
+  const randomCode = Math.random().toString(36).substring(2, 6).toUpperCase().padEnd(4, 'X');
+  const userCode = `SSPH-${randomCode}`;
+  return {
+    device_code: `mock_device_${Date.now()}`,
+    user_code: userCode,
+    verification_uri: 'https://github.com/login/device',
+    verification_uri_complete: `https://github.com/login/device?user_code=${userCode}`,
+    expires_in: 900,
+    interval: 3,
+  };
+}
+
+let githubClientRejected = false;
+
+export async function beginDeviceAuthorization(): Promise<DeviceCodeResponse> {
+  const allowSimulation = process.env.NODE_ENV !== 'production';
+  if (!isGithubConfigured() || (githubClientRejected && allowSimulation)) {
+    return simulatedDeviceAuthorization();
   }
   const clientId = process.env.GITHUB_OAUTH_CLIENT_ID!.trim();
-  const response = await fetch(`${GITHUB_LOGIN}/device/code`, {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: clientId, scope: 'repo read:org' }),
-  });
-  if (!response.ok) throw await responseError(response);
-  return response.json() as Promise<{ device_code: string; user_code: string; verification_uri: string; verification_uri_complete?: string; expires_in: number; interval?: number }>;
+  let response: Response;
+  try {
+    response = await fetch(`${GITHUB_LOGIN}/device/code`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: clientId, scope: 'repo read:org' }),
+    });
+  } catch (error) {
+    if (allowSimulation) {
+      console.warn('GitHub device flow unreachable, using simulated mode:', error instanceof Error ? error.message : error);
+      return simulatedDeviceAuthorization();
+    }
+    throw new GithubError('GitHub could not be reached. Please try again shortly.', 503);
+  }
+  const body = await response.json().catch(() => ({})) as Partial<DeviceCodeResponse> & { message?: string };
+  // GitHub answers 404 "Not Found" (or `incorrect_client_credentials` / `device_flow_disabled`)
+  // when the OAuth client ID does not exist or Device Flow is not enabled for the app.
+  const clientRejected = response.status === 404 || ['incorrect_client_credentials', 'device_flow_disabled', 'unauthorized_client'].includes(body.error || '');
+  if (clientRejected) {
+    if (allowSimulation) {
+      githubClientRejected = true;
+      console.warn('GITHUB_OAUTH_CLIENT_ID was rejected by GitHub (invalid ID or Device Flow disabled). Falling back to simulated GitHub mode.');
+      return simulatedDeviceAuthorization();
+    }
+    throw new GithubError('GitHub sign-in is misconfigured: the OAuth client ID was not recognised or Device Flow is disabled. Ask an administrator to check GITHUB_OAUTH_CLIENT_ID.', 503, body.error);
+  }
+  if (!response.ok || body.error || !body.device_code) {
+    throw new GithubError(body.error_description || body.message || body.error || 'GitHub could not start device authorization.', response.status || 502, body.error);
+  }
+  return body as DeviceCodeResponse;
 }
 
 export async function pollDeviceAuthorization(deviceCode: string) {

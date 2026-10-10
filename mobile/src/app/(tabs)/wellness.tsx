@@ -10,6 +10,7 @@ import {
   Image,
   Vibration,
   TextInput,
+  Modal,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
@@ -106,36 +107,80 @@ export default function WellnessScreen() {
   // Proactive Triggers Checklist State
   const [checkedTriggers, setCheckedTriggers] = useState<Record<number, boolean>>({});
 
-  // 4-7-8 Breathing Timer Effect with Haptic Vibration Guidance
+  // Banner Action Modals
+  const [recoveryPlanModalVisible, setRecoveryPlanModalVisible] = useState(false);
+  const [breakModalVisible, setBreakModalVisible] = useState(false);
+  const [breakSecondsLeft, setBreakSecondsLeft] = useState(900); // 15 mins
+  const [isBreakRunning, setIsBreakRunning] = useState(false);
+  const [debriefModalVisible, setDebriefModalVisible] = useState(false);
+
+  // Global unmount cleanup: ensure any active vibration stops immediately
   useEffect(() => {
-    if (!isBreathingActive) return;
+    return () => {
+      try {
+        Vibration.cancel();
+      } catch {}
+    };
+  }, []);
+
+  // 4-7-8 Breathing Timer Effect with gentle non-looping pulse cues
+  useEffect(() => {
+    if (!isBreathingActive) {
+      try {
+        Vibration.cancel();
+      } catch {}
+      return;
+    }
     const interval = setInterval(() => {
       setBreathSecondsLeft((prev) => {
         if (prev > 1) return prev - 1;
         if (breathPhase === 'Inhale') {
           setBreathPhase('Hold');
           try {
-            Vibration.vibrate([0, 30, 80, 30]);
+            Vibration.vibrate(12);
           } catch {}
           return 7;
         } else if (breathPhase === 'Hold') {
           setBreathPhase('Exhale');
           try {
-            Vibration.vibrate(120);
+            Vibration.vibrate(12);
           } catch {}
           return 8;
         } else {
           setBreathPhase('Inhale');
           setBreathCycles((c) => c + 1);
           try {
-            Vibration.vibrate(40);
+            Vibration.vibrate(12);
           } catch {}
           return 4;
         }
       });
     }, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      try {
+        Vibration.cancel();
+      } catch {}
+    };
   }, [isBreathingActive, breathPhase]);
+
+  // Break Countdown Timer Effect
+  useEffect(() => {
+    if (!isBreakRunning) return;
+    const interval = setInterval(() => {
+      setBreakSecondsLeft((prev) => {
+        if (prev <= 1) {
+          setIsBreakRunning(false);
+          try {
+            Vibration.vibrate(20);
+          } catch {}
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isBreakRunning]);
 
   // Pomodoro Timer Effect
   useEffect(() => {
@@ -404,10 +449,13 @@ export default function WellnessScreen() {
 
   const handleScheduleBreak = () => {
     try {
-      Vibration.vibrate([0, 50, 100, 50]);
+      Vibration.vibrate(10);
     } catch {}
-    setInterventionNotice('🌿 15-minute screen-free break scheduled. Step away from your IDE.');
-    setTimeout(() => setInterventionNotice(''), 6000);
+    setBreakModalVisible(true);
+    setIsBreakRunning(true);
+    setBreakSecondsLeft(900);
+    setInterventionNotice('🌿 15-minute screen-free break started.');
+    setTimeout(() => setInterventionNotice(''), 5000);
   };
 
   const handleLaunchBreathing = () => {
@@ -418,26 +466,24 @@ export default function WellnessScreen() {
     setBreathPhase('Inhale');
     setBreathSecondsLeft(4);
     try {
-      Vibration.vibrate(40);
+      Vibration.vibrate(10);
     } catch {}
-    setInterventionNotice('🫁 4-7-8 Breathing activated with haptic pulse cues.');
+    setInterventionNotice('🫁 4-7-8 Breathing activated with soft rhythm cues.');
     setTimeout(() => setInterventionNotice(''), 5000);
   };
 
   const handleGenerateRecoveryPlan = () => {
-    if (!taskTitle.trim()) {
-      setTaskTitle('Refactor & Document Function Contracts');
-    }
-    setStress(4);
-    setEnergy(6);
-    setInterventionNotice('⚡ Recovery Plan engaged: Low-friction docstrings & linting mode activated.');
-    setTimeout(() => setInterventionNotice(''), 6000);
+    try {
+      Vibration.vibrate(10);
+    } catch {}
+    setRecoveryPlanModalVisible(true);
   };
 
   const handleDebriefSession = () => {
-    setNotes((prev) => (prev ? prev : 'Session debrief: cognitive friction around blocker; stepping back to review approach.'));
-    setInterventionNotice('📝 Debrief note primed in form below. Add takeaways and tap Log Check-in.');
-    setTimeout(() => setInterventionNotice(''), 6000);
+    try {
+      Vibration.vibrate(10);
+    } catch {}
+    setDebriefModalVisible(true);
   };
 
   if (!loaded) return <Loading />;
@@ -2351,6 +2397,250 @@ export default function WellnessScreen() {
         ) : null}
       </Card>
 
+      {/* ─── 1. Burnout Recovery Plan Modal ─── */}
+      <Modal
+        visible={recoveryPlanModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRecoveryPlanModalVisible(false)}
+      >
+        <View style={modalStyles.overlay}>
+          <View style={[modalStyles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={modalStyles.headerRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                <View style={[modalStyles.iconBadge, { backgroundColor: 'rgba(59,130,246,0.15)' }]}>
+                  <Ionicons name="flash" size={20} color="#3b82f6" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[modalStyles.title, { color: colors.text }]}>Burnout Recovery Plan</Text>
+                  <Text style={[modalStyles.subtitle, { color: colors.muted }]}>
+                    {burnoutRisk.label} Risk · Strain Index: {burnoutRisk.score}%
+                  </Text>
+                </View>
+              </View>
+              <Pressable onPress={() => setRecoveryPlanModalVisible(false)} hitSlop={10}>
+                <Ionicons name="close-circle" size={26} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
+              <View style={{ gap: 12, paddingVertical: 8 }}>
+                {/* Protocol Overview Banner */}
+                <View style={[modalStyles.bannerBox, { backgroundColor: isLight ? '#eff6ff' : 'rgba(59,130,246,0.1)', borderColor: '#3b82f6' }]}>
+                  <Text style={[modalStyles.bannerTitle, { color: isLight ? '#1e40af' : '#60a5fa' }]}>
+                    Active Recovery Protocol
+                  </Text>
+                  <Text style={[modalStyles.bannerCopy, { color: colors.text }]}>
+                    {burnoutRisk.score >= 65
+                      ? 'High cognitive exhaustion detected. Prioritize neuro-recovery: disengage from high-context debugging and reset nervous system.'
+                      : 'Moderate strain accumulation. Implement pacing boundaries to prevent progression to acute burnout.'}
+                  </Text>
+                </View>
+
+                {/* Phase 1 */}
+                <View style={[modalStyles.phaseCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                  <View style={modalStyles.phaseHeader}>
+                    <Ionicons name="eye-outline" size={16} color="#8b5cf6" />
+                    <Text style={[modalStyles.phaseTitle, { color: colors.text }]}>Phase 1: Immediate Decompression (Next 2h)</Text>
+                  </View>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Step away from IDE screens for 15 minutes.</Text>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• 20-20-20 visual rest rule: focus at a 20-ft distance.</Text>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Mute non-critical Slack and notification pings.</Text>
+                </View>
+
+                {/* Phase 2 */}
+                <View style={[modalStyles.phaseCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                  <View style={modalStyles.phaseHeader}>
+                    <Ionicons name="git-branch-outline" size={16} color="#10b981" />
+                    <Text style={[modalStyles.phaseTitle, { color: colors.text }]}>Phase 2: Workload & Task Triage (Today)</Text>
+                  </View>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Low-friction task mode: document contracts, write test cases.</Text>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Postpone architectural re-writes and major schema migrations.</Text>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Single-thread: run 25-minute Pomodoro sprints with strict 5m pauses.</Text>
+                </View>
+
+                {/* Phase 3 */}
+                <View style={[modalStyles.phaseCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                  <View style={modalStyles.phaseHeader}>
+                    <Ionicons name="moon-outline" size={16} color="#3b82f6" />
+                    <Text style={[modalStyles.phaseTitle, { color: colors.text }]}>Phase 3: Circadian Rest & Sleep Target</Text>
+                  </View>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Target 8.0 hours minimum recovery sleep tonight.</Text>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Digital sunset: close laptops 45 minutes before sleep.</Text>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Hydration goal: 2.5 Litres of water across the day.</Text>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Actions */}
+            <View style={{ paddingTop: 14, gap: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
+              <Button
+                title="Apply Recovery Targets to Today"
+                onPress={() => {
+                  setStress(3);
+                  setEnergy(6);
+                  setSleepHours(8.0);
+                  setWaterLitres(2.5);
+                  setNotes((prev) => (prev ? `${prev}\n\n[Applied Burnout Recovery Protocol]` : '[Applied Burnout Recovery Protocol: Low-friction tasks & circadian sleep prioritization]'));
+                  setRecoveryPlanModalVisible(false);
+                  setInterventionNotice('✅ Recovery Plan targets applied to today\'s check-in.');
+                  setTimeout(() => setInterventionNotice(''), 6000);
+                }}
+              />
+              <Button
+                title="Dismiss"
+                secondary
+                onPress={() => setRecoveryPlanModalVisible(false)}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── 2. 15-Minute Screen-Free Break Modal ─── */}
+      <Modal
+        visible={breakModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setBreakModalVisible(false)}
+      >
+        <View style={modalStyles.overlay}>
+          <View style={[modalStyles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={modalStyles.headerRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={[modalStyles.iconBadge, { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
+                  <Ionicons name="cafe" size={20} color="#10b981" />
+                </View>
+                <View>
+                  <Text style={[modalStyles.title, { color: colors.text }]}>Screen-Free Break</Text>
+                  <Text style={[modalStyles.subtitle, { color: colors.muted }]}>Rest your eyes and reset cognitive focus</Text>
+                </View>
+              </View>
+              <Pressable onPress={() => setBreakModalVisible(false)} hitSlop={10}>
+                <Ionicons name="close-circle" size={26} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <Text style={{ fontSize: 44, fontWeight: '900', color: '#10b981', fontVariant: ['tabular-nums'] }}>
+                {Math.floor(breakSecondsLeft / 60).toString().padStart(2, '0')}:{(breakSecondsLeft % 60).toString().padStart(2, '0')}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>
+                {isBreakRunning ? 'Break in progress · Keep screens away' : 'Break paused'}
+              </Text>
+            </View>
+
+            <View style={{ gap: 8, paddingBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#10b981" />
+                <Text style={{ fontSize: 12, color: colors.text }}>Stand up, stretch your neck and shoulders</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#10b981" />
+                <Text style={{ fontSize: 12, color: colors.text }}>Drink a glass of cool water</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#10b981" />
+                <Text style={{ fontSize: 12, color: colors.text }}>Look out the window at daylight</Text>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title={isBreakRunning ? 'Pause' : 'Resume'}
+                  secondary
+                  onPress={() => setIsBreakRunning(!isBreakRunning)}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="Finish Break"
+                  onPress={() => {
+                    setIsBreakRunning(false);
+                    setBreakModalVisible(false);
+                    setInterventionNotice('🎉 15m break completed! Rested focus achieved.');
+                    setTimeout(() => setInterventionNotice(''), 5000);
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── 3. Session Debrief Modal ─── */}
+      <Modal
+        visible={debriefModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setDebriefModalVisible(false)}
+      >
+        <View style={modalStyles.overlay}>
+          <View style={[modalStyles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={modalStyles.headerRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={[modalStyles.iconBadge, { backgroundColor: 'rgba(245,158,11,0.15)' }]}>
+                  <Ionicons name="chatbubbles" size={20} color="#f59e0b" />
+                </View>
+                <View>
+                  <Text style={[modalStyles.title, { color: colors.text }]}>Session Debrief</Text>
+                  <Text style={[modalStyles.subtitle, { color: colors.muted }]}>Unpack blockers and capture key learnings</Text>
+                </View>
+              </View>
+              <Pressable onPress={() => setDebriefModalVisible(false)} hitSlop={10}>
+                <Ionicons name="close-circle" size={26} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            <View style={{ paddingVertical: 12, gap: 10 }}>
+              <Text style={{ fontSize: 12, color: colors.muted }}>
+                Debrief notes are automatically saved into your daily wellness log for retrospectives.
+              </Text>
+              <TextInput
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                numberOfLines={5}
+                placeholder="What was the main technical friction or breakthrough in this coding sprint?"
+                placeholderTextColor={colors.muted}
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.surfaceElevated,
+                  color: colors.text,
+                  borderRadius: 10,
+                  padding: 12,
+                  fontSize: 13,
+                  minHeight: 110,
+                  textAlignVertical: 'top',
+                }}
+              />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10, paddingTop: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="Cancel"
+                  secondary
+                  onPress={() => setDebriefModalVisible(false)}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="Save Debrief"
+                  onPress={() => {
+                    setDebriefModalVisible(false);
+                    setInterventionNotice('📝 Debrief note saved into check-in.');
+                    setTimeout(() => setInterventionNotice(''), 5000);
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </Screen>
   );
 }
@@ -3444,6 +3734,86 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 13,
+    lineHeight: 18,
+  },
+});
+
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  sheet: {
+    width: '100%',
+    maxWidth: 500,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  iconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  subtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  bannerBox: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+  },
+  bannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  bannerCopy: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  phaseCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  phaseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  phaseTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  phaseItem: {
+    fontSize: 12,
     lineHeight: 18,
   },
 });

@@ -173,7 +173,7 @@ export default function TasksScreen() {
 
     // Trigger vibration and immediate notification
     try {
-      Vibration.vibrate([0, 500, 200, 500]);
+      Vibration.vibrate(80);
     } catch {
       // Ignore vibration error
     }

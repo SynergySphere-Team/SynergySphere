@@ -178,7 +178,7 @@ export default function HomeScreen() {
     } catch {}
 
     try {
-      Vibration.vibrate([0, 500, 200, 500]);
+      Vibration.vibrate(80);
     } catch {}
 
     await sendImmediateFocusNotification(focusMinutes);

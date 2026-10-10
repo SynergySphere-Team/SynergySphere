@@ -57,25 +57,31 @@ function isPrivateOrLocalIp(url: string): boolean {
   }
 }
 
-export function getApiUrl(): string {
+let cachedWorkingBaseUrl: string | null = null;
+
+export function getCandidateApiUrls(): string[] {
   const envUrl = normalizeApiUrl(process.env.EXPO_PUBLIC_API_URL);
   const targetPort = getPortFromApiUrl(envUrl);
+  const candidates: string[] = [];
+
+  if (cachedWorkingBaseUrl) {
+    candidates.push(cachedWorkingBaseUrl);
+  }
 
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window.location?.hostname) {
       const hostname = window.location.hostname;
-      // When accessed from localhost/loopback in the browser, always use localhost:4000
-      // so stale LAN IPs from .env files don't prevent local connections.
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return `http://localhost:${targetPort}/api`;
-      }
-      // If accessing via custom hostname or LAN IP in the browser and envUrl is not a remote production host,
-      // route to the same host on port 4000.
-      if (!envUrl || isPrivateOrLocalIp(envUrl)) {
-        return `http://${hostname}:${targetPort}/api`;
+        candidates.push(`http://localhost:${targetPort}/api`);
+        candidates.push(`http://127.0.0.1:${targetPort}/api`);
+      } else {
+        candidates.push(`http://${hostname}:${targetPort}/api`);
       }
     }
-    return envUrl || `http://localhost:${targetPort}/api`;
+    candidates.push(`http://localhost:${targetPort}/api`);
+    candidates.push(`http://127.0.0.1:${targetPort}/api`);
+    if (envUrl) candidates.push(envUrl);
+    return [...new Set(candidates.filter(Boolean))];
   }
 
   // Infer host from Expo Go / development client Metro connection
@@ -86,23 +92,27 @@ export function getApiUrl(): string {
 
   const metroUrl = apiUrlFromMetroHost(hostUri, targetPort);
 
-  // If envUrl is an explicit remote URL (e.g. https://... ngrok or deployed backend), respect it
+  // If envUrl is an explicit remote URL (e.g. cloud deployed), prioritize it
   if (envUrl && !isPrivateOrLocalIp(envUrl)) {
-    return envUrl;
+    candidates.push(envUrl);
+    return candidates;
   }
 
-  // In development, the active Metro host matches the dev server network
-  if (metroUrl) return metroUrl;
-
-  // Fallback to configured envUrl if available
-  if (envUrl) return envUrl;
-
-  // Final fallback by platform
+  if (metroUrl) candidates.push(metroUrl);
+  if (envUrl) candidates.push(envUrl);
+  // Always include localhost and loopback fallbacks for PC / dev tools
+  candidates.push(`http://localhost:${targetPort}/api`);
+  candidates.push(`http://127.0.0.1:${targetPort}/api`);
   if (Platform.OS === 'android') {
-    return `http://10.0.2.2:${targetPort}/api`;
+    candidates.push(`http://10.0.2.2:${targetPort}/api`);
   }
 
-  return `http://localhost:${targetPort}/api`;
+  return [...new Set(candidates.filter(Boolean))];
+}
+
+export function getApiUrl(): string {
+  const candidates = getCandidateApiUrls();
+  return candidates[0] || 'http://localhost:4000/api';
 }
 
 export class ApiError extends Error {
@@ -123,12 +133,14 @@ async function getToken(): Promise<string | null> {
 }
 
 const REQUEST_TIMEOUT_MS = 10_000;
+const FALLBACK_TIMEOUT_MS = 3_000;
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const baseUrl = getApiUrl();
-  if (!baseUrl) {
+  const candidateUrls = getCandidateApiUrls();
+  if (candidateUrls.length === 0) {
     throw new ApiError('API URL is not configured. Set EXPO_PUBLIC_API_URL in mobile/.env.');
   }
+
   const token = await getToken();
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -138,28 +150,48 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (options.body) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let lastError: any = null;
+  let response: Response | null = null;
+  let successfulBaseUrl: string | null = null;
 
-  let response: Response;
-  const fullUrl = `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
-  try {
-    response = await fetch(fullUrl, {
-      ...options,
-      headers,
-      signal: controller.signal,
-    });
-  } catch (err: any) {
-    if (err?.name === 'AbortError') {
+  for (let i = 0; i < candidateUrls.length; i++) {
+    const baseUrl = candidateUrls[i];
+    const fullUrl = `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+    const timeoutMs = i === 0 ? REQUEST_TIMEOUT_MS : FALLBACK_TIMEOUT_MS;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(fullUrl, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+      response = res;
+      successfulBaseUrl = baseUrl;
+      cachedWorkingBaseUrl = baseUrl;
+      clearTimeout(timer);
+      break;
+    } catch (err: any) {
+      clearTimeout(timer);
+      lastError = err;
+      // If there are more candidates, try the next fallback (e.g. localhost/127.0.0.1)
+      if (i < candidateUrls.length - 1) {
+        continue;
+      }
+    }
+  }
+
+  if (!response) {
+    const triedUrl = successfulBaseUrl || candidateUrls[0];
+    if (lastError?.name === 'AbortError') {
       throw new ApiError(
-        `Unable to connect to the SynergySphere server (connection timed out after 10s at ${baseUrl}). Check that the backend is running and that your device is connected to the same network.`
+        `Unable to connect to the SynergySphere server (connection timed out after 10s at ${triedUrl}). Check that the backend is running and that your device is connected to the same network.`
       );
     }
     throw new ApiError(
-      `Unable to connect to the SynergySphere server at ${baseUrl}. Check that the backend is running and that your device is connected to the same network.`
+      `Unable to connect to the SynergySphere server at ${triedUrl}. Check that the backend is running and that your device is connected to the same network.`
     );
-  } finally {
-    clearTimeout(timer);
   }
 
   const body = await response.json().catch(() => ({}));
