@@ -61,6 +61,21 @@ export default function PortfolioScreen() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
+  const [projectToast, setProjectToast] = useState<{
+  title: string;
+  message: string;
+  type: 'success' | 'delete';
+} | null>(null);
+
+useEffect(() => {
+  if (!projectToast) return;
+
+  const timer = setTimeout(() => {
+    setProjectToast(null);
+  }, 3500);
+
+  return () => clearTimeout(timer);
+}, [projectToast]);
 
   // Social Links
   const [links, setLinks] = useState({ github: '', linkedin: '' });
@@ -157,6 +172,11 @@ export default function PortfolioScreen() {
         category: 'Manual',
       });
       setManualSkills((prev) => [...prev.filter((s) => s.name.toLowerCase() !== name.toLowerCase()), added]);
+      setProjectToast({
+        title: 'Skill Added Successfully!',
+        message: `${name} has been added to your technical skills.`,
+        type: 'success',
+      });
     } catch {
       const fallback: ManualSkillSignal = { id: `local-${Date.now()}`, name, level };
       setManualSkills((prev) => [...prev.filter((s) => s.name.toLowerCase() !== name.toLowerCase()), fallback]);
@@ -185,11 +205,23 @@ export default function PortfolioScreen() {
         githubLink: form.githubLink.trim(),
       };
 
+      const wasEditing = Boolean(editingProjectId);
+
       if (editingProjectId) {
         await api.put(`/portfolio/${editingProjectId}`, payload);
       } else {
         await api.post('/portfolio', payload);
       }
+
+      setProjectToast({
+        title: wasEditing
+          ? 'Project Updated Successfully!'
+          : 'Project Added Successfully!',
+        message: wasEditing
+          ? 'Your project changes have been saved.'
+          : 'Your project has been added to your portfolio.',
+        type: 'success',
+      });
 
       setForm({
         title: '',
@@ -258,6 +290,11 @@ export default function PortfolioScreen() {
               setItems((current) =>
                 current.filter((item) => item.id !== id),
               );
+              setProjectToast({
+                title: 'Project Deleted Successfully!',
+                message: 'Your project has been removed from your portfolio.',
+                type: 'delete',
+              });
             } catch (e) {
               setError(
                 e instanceof Error
@@ -274,8 +311,80 @@ export default function PortfolioScreen() {
   if (!loaded) return <Loading />;
 
   return (
-    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <View style={styles.container}>
+  <Screen refreshing={refreshing} onRefresh={handleRefresh}>
+
+    {projectToast && (
+      <View
+        accessibilityRole="alert"
+        style={{
+          marginHorizontal: 16,
+          marginTop: 10,
+          marginBottom: 10,
+          padding: 14,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor:
+            projectToast.type === 'delete'
+              ? '#DC2626'
+              : colors.primary,
+          backgroundColor: colors.surfaceElevated,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <Ionicons
+          name={
+            projectToast.type === 'delete'
+              ? 'trash-outline'
+              : 'checkmark-circle'
+          }
+          size={24}
+          color={
+            projectToast.type === 'delete'
+              ? '#DC2626'
+              : colors.primary
+          }
+        />
+
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              color: colors.text,
+              fontSize: 14,
+              fontWeight: '800',
+            }}
+          >
+            {projectToast.title}
+          </Text>
+
+          <Text
+            style={{
+              color: colors.muted,
+              fontSize: 12,
+              marginTop: 3,
+            }}
+          >
+            {projectToast.message}
+          </Text>
+        </View>
+
+        <Pressable
+          onPress={() => setProjectToast(null)}
+          accessibilityLabel="Dismiss notification"
+          accessibilityRole="button"
+          hitSlop={10}
+        >
+          <Ionicons
+            name="close"
+            size={20}
+            color={colors.muted}
+          />
+        </Pressable>
+      </View>
+    )}
+
+    <View style={styles.container}>
         {/* Top Header & Actions */}
         <View style={styles.headerRow}>
           <View
@@ -427,8 +536,8 @@ export default function PortfolioScreen() {
                 <View style={[styles.levelBadge, { backgroundColor: isLight ? '#E8F5E9' : colors.surfaceElevated }]}>
                   <Text style={[styles.levelBadgeText, { color: isLight ? '#1e6827' : colors.text }]}>{user?.xp ?? 285} XP</Text>
                 </View>
-                {effectiveSkills.slice(0, 3).map(([sName]) => (
-                  <View key={sName} style={[styles.levelBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', borderWidth: 1, borderColor: primaryAccent }]}>
+                {effectiveSkills.slice(0, 3).map(([sName], index) => (
+                  <View key={`${sName}-${index}`} style={[styles.levelBadge, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)', borderWidth: 1, borderColor: primaryAccent }]}>
                     <Text style={[styles.levelBadgeText, { color: primaryAccent }]}>✓ {sName}</Text>
                   </View>
                 ))}
