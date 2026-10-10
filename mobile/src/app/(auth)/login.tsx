@@ -6,6 +6,7 @@ import { Screen, Notice } from '@/components/Screen';
 import { Button, Field } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import { onboardingStorage } from '@/services/api';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -42,7 +43,8 @@ export default function LoginScreen() {
     setSubmitting(true);
 
     try {
-      await login(trimmedEmail, password);
+      const loggedInUser = await login(trimmedEmail, password);
+      await onboardingStorage.setCompleted(loggedInUser?.id);
       router.replace('/(tabs)');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to sign in.');

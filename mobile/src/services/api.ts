@@ -247,34 +247,63 @@ export const authStorage = {
 };
 
 export const onboardingStorage = {
-  isCompleted: async (): Promise<boolean> => {
+  isCompleted: async (userId?: string): Promise<boolean> => {
+    const userKey = userId ? `${ONBOARDING_KEY}.${userId}` : ONBOARDING_KEY;
     if (Platform.OS === 'web') {
       if (typeof localStorage !== 'undefined') {
-        return localStorage.getItem(ONBOARDING_KEY) === 'true';
+        const val = localStorage.getItem(userKey);
+        if (val !== null) return val === 'true';
+        if (!userId) return localStorage.getItem(ONBOARDING_KEY) === 'true';
+        return false;
       }
       return webOnboardingCompleted;
     }
-    const val = await SecureStore.getItemAsync(ONBOARDING_KEY);
-    return val === 'true';
+    const val = await SecureStore.getItemAsync(userKey);
+    if (val !== null) return val === 'true';
+    if (!userId) {
+      const fallback = await SecureStore.getItemAsync(ONBOARDING_KEY);
+      return fallback === 'true';
+    }
+    return false;
   },
-  setCompleted: async (): Promise<void> => {
+  setCompleted: async (userId?: string): Promise<void> => {
+    const userKey = userId ? `${ONBOARDING_KEY}.${userId}` : ONBOARDING_KEY;
     if (Platform.OS === 'web') {
       if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(userKey, 'true');
         localStorage.setItem(ONBOARDING_KEY, 'true');
       }
       webOnboardingCompleted = true;
       return;
     }
-    await SecureStore.setItemAsync(ONBOARDING_KEY, 'true');
+    const ops = [SecureStore.setItemAsync(userKey, 'true')];
+    if (userId) ops.push(SecureStore.setItemAsync(ONBOARDING_KEY, 'true'));
+    await Promise.all(ops);
   },
-  reset: async (): Promise<void> => {
+  setPending: async (userId?: string): Promise<void> => {
+    const userKey = userId ? `${ONBOARDING_KEY}.${userId}` : ONBOARDING_KEY;
     if (Platform.OS === 'web') {
       if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(ONBOARDING_KEY);
+        localStorage.setItem(userKey, 'false');
       }
       webOnboardingCompleted = false;
       return;
     }
-    await SecureStore.deleteItemAsync(ONBOARDING_KEY);
+    await SecureStore.setItemAsync(userKey, 'false');
+  },
+  reset: async (userId?: string): Promise<void> => {
+    const userKey = userId ? `${ONBOARDING_KEY}.${userId}` : ONBOARDING_KEY;
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(userKey);
+        if (!userId) localStorage.removeItem(ONBOARDING_KEY);
+      }
+      webOnboardingCompleted = false;
+      return;
+    }
+    await SecureStore.deleteItemAsync(userKey);
+    if (!userId) {
+      await SecureStore.deleteItemAsync(ONBOARDING_KEY);
+    }
   },
 };

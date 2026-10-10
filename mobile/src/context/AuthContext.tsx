@@ -1,12 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, authStorage, ApiError, onboardingStorage } from '@/services/api';
+import { api, authStorage, ApiError } from '@/services/api';
 import { registerCommunityPushNotifications } from '@/services/notifications';
 import { github } from '@/services/github';
 import type { AuthResponse, User } from '@/types/api';
 
 type RegisterInput = { firstName: string; lastName: string; email: string; password: string; confirmPassword?: string; role?: 'STUDENT' | 'ORGANIZATION' };
 type ProfileInput = { firstName: string; lastName: string; profilePicture?: string | null };
-type AuthContextValue = { user: User | null; loading: boolean; login(email: string, password: string): Promise<void>; register(data: RegisterInput): Promise<void>; logout(): Promise<void>; refresh(): Promise<void>; updateProfile(data: ProfileInput): Promise<void>; };
+type AuthContextValue = { user: User | null; loading: boolean; login(email: string, password: string): Promise<User>; register(data: RegisterInput): Promise<User>; logout(): Promise<void>; refresh(): Promise<void>; updateProfile(data: ProfileInput): Promise<void>; };
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -20,7 +20,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => { refresh().finally(() => setLoading(false)); }, [refresh]);
   useEffect(() => { if (user) void registerCommunityPushNotifications(); }, [user]);
-  const establishSession = async (response: AuthResponse) => { await authStorage.setToken(response.token); setUser(response.user); };
+  const establishSession = async (response: AuthResponse): Promise<User> => {
+    await authStorage.setToken(response.token);
+    setUser(response.user);
+    return response.user;
+  };
   const value = useMemo<AuthContextValue>(() => ({
     user, loading, refresh,
     login: async (email, password) => establishSession(await api.post<AuthResponse>('/auth/login', { email, password })),
@@ -33,7 +37,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await Promise.all([
           authStorage.clearToken(),
           github.clearLocalToken(),
-          onboardingStorage.reset(),
         ]);
         setUser(null);
       }

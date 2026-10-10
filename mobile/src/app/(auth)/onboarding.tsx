@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { onboardingStorage } from '@/services/api';
+import { Loading } from '@/components/Screen';
 
 interface OnboardingSlide {
   id: string;
@@ -104,10 +105,11 @@ const SLIDES: OnboardingSlide[] = [
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const { colors, theme } = useTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [checkingAccess, setCheckingAccess] = useState(true);
   const flatListRef = useRef<FlatList<OnboardingSlide>>(null);
 
   const isLight = theme === 'light';
@@ -115,24 +117,37 @@ export default function OnboardingScreen() {
   const isCompact = screenHeight < 740;
 
   useEffect(() => {
-    if (user) {
-      router.replace('/(tabs)');
-    }
-  }, [user, router]);
+    if (loading) return;
 
-  async function completeOnboarding(targetRoute?: '/(auth)/register' | '/(auth)/login' | '/(tabs)') {
+    // Onboarding only displays after registering an account (requires authenticated user)
+    if (!user) {
+      router.replace('/(auth)/login');
+      return;
+    }
+
+    let mounted = true;
+    void onboardingStorage.isCompleted(user.id).then((completed) => {
+      if (!mounted) return;
+      if (completed) {
+        // If user has already completed onboarding, proceed to main workspace
+        router.replace('/(tabs)');
+      } else {
+        setCheckingAccess(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [user, loading, router]);
+
+  async function completeOnboarding() {
     try {
-      await onboardingStorage.setCompleted();
+      await onboardingStorage.setCompleted(user?.id);
     } catch {
       // Storage fallback
     }
-    if (targetRoute) {
-      router.replace(targetRoute as never);
-    } else if (user) {
-      router.replace('/(tabs)');
-    } else {
-      router.replace('/(auth)/register');
-    }
+    router.replace('/(tabs)');
   }
 
   function handleNext() {
@@ -143,7 +158,7 @@ export default function OnboardingScreen() {
       });
       setCurrentIndex(currentIndex + 1);
     } else {
-      void completeOnboarding(user ? '/(tabs)' : '/(auth)/register');
+      void completeOnboarding();
     }
   }
 
@@ -161,6 +176,10 @@ export default function OnboardingScreen() {
       animated: true,
     });
     setCurrentIndex(index);
+  }
+
+  if (loading || checkingAccess) {
+    return <Loading />;
   }
 
   return (
@@ -184,7 +203,7 @@ export default function OnboardingScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Skip onboarding"
-          onPress={() => completeOnboarding(user ? '/(tabs)' : '/(auth)/login')}
+          onPress={() => completeOnboarding()}
           hitSlop={12}
           style={({ pressed }) => [
             styles.skipButton,
@@ -374,11 +393,7 @@ export default function OnboardingScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
-              isLastSlide
-                ? user
-                  ? 'Enter SynergySphere'
-                  : 'Get Started'
-                : 'Next slide'
+              isLastSlide ? 'Get Started' : 'Next slide'
             }
             onPress={handleNext}
             style={({ pressed }) => [
@@ -396,11 +411,7 @@ export default function OnboardingScreen() {
                 { color: isLight ? '#FFFFFF' : '#0B1E13' },
               ]}
             >
-              {isLastSlide
-                ? user
-                  ? 'Enter SynergySphere'
-                  : 'Get Started'
-                : 'Next'}
+              {isLastSlide ? 'Get Started' : 'Next'}
             </Text>
             {!isLastSlide ? (
               <Ionicons
@@ -411,46 +422,23 @@ export default function OnboardingScreen() {
             ) : null}
           </Pressable>
 
-          {user ? (
-            <View style={styles.signInRow}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Skip to dashboard"
-                onPress={() => completeOnboarding('/(tabs)')}
-                hitSlop={8}
+          <View style={styles.signInRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Skip to workspace"
+              onPress={() => completeOnboarding()}
+              hitSlop={8}
+            >
+              <Text
+                style={[
+                  styles.signInLink,
+                  { color: isLight ? '#1e6827' : colors.primary },
+                ]}
               >
-                <Text
-                  style={[
-                    styles.signInLink,
-                    { color: isLight ? '#1e6827' : colors.primary },
-                  ]}
-                >
-                  Skip directly to workspace →
-                </Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={styles.signInRow}>
-              <Text style={[styles.signInPrompt, { color: colors.muted }]}>
-                Already have an account?
+                Skip directly to workspace →
               </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Sign in"
-                onPress={() => completeOnboarding('/(auth)/login')}
-                hitSlop={8}
-              >
-                <Text
-                  style={[
-                    styles.signInLink,
-                    { color: isLight ? '#1e6827' : colors.primary },
-                  ]}
-                >
-                  Sign In
-                </Text>
-              </Pressable>
-            </View>
-          )}
+            </Pressable>
+          </View>
         </View>
       </View>
     </SafeAreaView>
