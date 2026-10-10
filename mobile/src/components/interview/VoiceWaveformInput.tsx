@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '@/context/ThemeContext';
-import { startNativeAudioRecording, type ActiveRecordingSession } from '@/services/voiceRecording';
 
 export interface VoiceWaveformInputProps {
   onAppendTranscription: (text: string) => void;
@@ -61,7 +60,6 @@ export function VoiceWaveformInput({
   const audioContextRef = useRef<any>(null);
   const analyserRef = useRef<any>(null);
   const mediaStreamRef = useRef<any>(null);
-  const nativeSessionRef = useRef<ActiveRecordingSession | null>(null);
 
   useEffect(() => {
     return () => {
@@ -74,11 +72,6 @@ export function VoiceWaveformInput({
     if (timerRef.current) clearInterval(timerRef.current);
     if (waveAnimRef.current) clearInterval(waveAnimRef.current);
     if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
-
-    if (nativeSessionRef.current) {
-      nativeSessionRef.current.cancel().catch(() => {});
-      nativeSessionRef.current = null;
-    }
 
     if (speechRecRef.current) {
       try {
@@ -200,12 +193,11 @@ export function VoiceWaveformInput({
 
   function toggleRecord() {
     if (isRecordingRef.current) {
-      // ── STOP RECORDING ──
+      // ── STOP RECORDING / DICTATION ──
       isRecordingRef.current = false;
       setIsRecording(false);
 
       if (Platform.OS === 'web') {
-        // Flush final recognized transcript to parent answer box
         const finalSpoken = (committedSpeechRef.current + lastSessionFinalRef.current).trim();
         if (finalSpoken) {
           if (onLiveTranscriptionRef.current) {
@@ -214,11 +206,9 @@ export function VoiceWaveformInput({
             onAppendTranscriptionRef.current(finalSpoken);
           }
         }
-
         cleanupAudio();
         onRecordingEnd?.();
 
-        // Reset bars to idle
         barHeights.forEach((b) => {
           Animated.spring(b, {
             toValue: 10,
@@ -229,7 +219,7 @@ export function VoiceWaveformInput({
         setShowEditor(Boolean(finalSpoken));
         setStatusMessage(finalSpoken ? 'Voice input captured and saved.' : '');
       } else {
-        // Native mobile stop & transcribe
+        // Native mobile stop
         cleanupAudio();
         onRecordingEnd?.();
 
@@ -240,35 +230,28 @@ export function VoiceWaveformInput({
           }).start();
         });
 
-        setStatusMessage('Transcribing audio speech...');
-        if (nativeSessionRef.current) {
-          const session = nativeSessionRef.current;
-          nativeSessionRef.current = null;
-          session
-            .stopAndTranscribe('Technical interview answer')
-            .then((transcript) => {
-              const trimmed = transcript.trim();
-              if (trimmed) {
-                setTranscription(trimmed);
-                if (onLiveTranscriptionRef.current) {
-                  onLiveTranscriptionRef.current(trimmed);
-                } else if (onAppendTranscriptionRef.current) {
-                  onAppendTranscriptionRef.current(trimmed);
-                }
-                setShowEditor(true);
-                setStatusMessage('Voice input captured and inserted into answer box!');
-              } else {
-                setStatusMessage('No speech detected in audio.');
-              }
-            })
-            .catch((err) => {
-              console.warn('Native transcription error:', err);
-              setStatusMessage('Transcription failed. Please try again.');
-            });
+        const finalSpoken = transcription.trim();
+        if (finalSpoken) {
+          if (onLiveTranscriptionRef.current) {
+            onLiveTranscriptionRef.current(finalSpoken);
+          } else if (onAppendTranscriptionRef.current) {
+            onAppendTranscriptionRef.current(finalSpoken);
+          }
+          setShowEditor(true);
+          setStatusMessage('Voice input captured and inserted into answer box!');
+        } else {
+          setStatusMessage('Dictation paused.');
         }
       }
     } else {
-      // ── START RECORDING ──
+      // ── START RECORDING / DICTATION ──
+      isRecordingRef.current = true;
+      setIsRecording(true);
+      setSeconds(0);
+      setTranscription('');
+      setShowEditor(true);
+      onRecordingStart?.();
+
       if (Platform.OS === 'web') {
         const SpeechRecognition =
           typeof window !== 'undefined'
@@ -281,93 +264,46 @@ export function VoiceWaveformInput({
             'Web Speech API is not supported in this browser. Please use Google Chrome, Microsoft Edge, or Safari.',
             [{ text: 'OK' }]
           );
+          isRecordingRef.current = false;
+          setIsRecording(false);
           return;
         }
 
-        isRecordingRef.current = true;
-        setIsRecording(true);
-        setSeconds(0);
-        setTranscription('');
-        setShowEditor(false);
         setStatusMessage('Listening to microphone... Speak clearly.');
-
         committedSpeechRef.current = '';
         lastSessionFinalRef.current = '';
-
-        onRecordingStart?.();
-
-        // 1. Start SpeechRecognition SYNCHRONOUSLY to preserve the browser user-gesture token
         speechRecRef.current = startRecognitionInstance();
-
-        // 2. Seconds timer
-        timerRef.current = setInterval(() => {
-          setSeconds((s) => s + 1);
-        }, 1000);
-
-        // 3. Animate waveform bars according to real mic input if analyser is available, else active pulse
-        waveAnimRef.current = setInterval(() => {
-          let volumes: number[] = [];
-          if (analyserRef.current) {
-            const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-            analyserRef.current.getByteFrequencyData(dataArray);
-            for (let i = 0; i < barHeights.length; i++) {
-              const raw = dataArray[i % dataArray.length] || 0;
-              // Map 0-255 to 8-42px height
-              volumes.push(Math.max(8, Math.min(42, Math.round((raw / 255) * 36) + 8)));
-            }
-          } else {
-            volumes = barHeights.map(() => Math.floor(Math.random() * 26) + 8);
-          }
-
-          barHeights.forEach((b, idx) => {
-            Animated.timing(b, {
-              toValue: volumes[idx] || 10,
-              duration: 100,
-              useNativeDriver: false,
-            }).start();
-          });
-        }, 110);
       } else {
-        // Native mobile recording with expo-av
-        isRecordingRef.current = true;
-        setIsRecording(true);
-        setSeconds(0);
-        setTranscription('');
-        setShowEditor(false);
-        setStatusMessage('Listening to microphone... Speak clearly. Tap when done.');
-        onRecordingStart?.();
-
-        startNativeAudioRecording((status) => {
-          if (status.durationMillis) {
-            setSeconds(Math.floor(status.durationMillis / 1000));
-          }
-          if (status.metering !== undefined) {
-            const norm = Math.max(0, Math.min(1, (status.metering + 60) / 60));
-            barHeights.forEach((b, idx) => {
-              const variance = 0.7 + (idx % 3) * 0.2;
-              const barHeight = Math.max(8, Math.min(42, Math.round(norm * variance * 34) + 8));
-              Animated.timing(b, {
-                toValue: barHeight,
-                duration: 90,
-                useNativeDriver: false,
-              }).start();
-            });
-          }
-        })
-          .then((session) => {
-            nativeSessionRef.current = session;
-          })
-          .catch((err) => {
-            console.warn('Failed to start native recording:', err);
-            isRecordingRef.current = false;
-            setIsRecording(false);
-            Alert.alert(
-              'Microphone Permission Required',
-              'Please grant microphone permission in device settings to record your interview answers.',
-              [{ text: 'OK' }]
-            );
-          });
+        setStatusMessage('Speech dictation active: Speak or tap 🎙️ on your keyboard.');
       }
+
+      // Seconds timer
+      timerRef.current = setInterval(() => {
+        setSeconds((s) => s + 1);
+      }, 1000);
+
+      // Animate waveform bars
+      waveAnimRef.current = setInterval(() => {
+        let volumes: number[] = [];
+        if (analyserRef.current) {
+          const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+          analyserRef.current.getByteFrequencyData(dataArray);
+          for (let i = 0; i < barHeights.length; i++) {
+            const raw = dataArray[i % dataArray.length] || 0;
+            volumes.push(Math.max(8, Math.min(42, Math.round((raw / 255) * 36) + 8)));
+          }
+        } else {
+          volumes = barHeights.map(() => Math.floor(Math.random() * 26) + 8);
+        }
+
+        barHeights.forEach((b, idx) => {
+          Animated.timing(b, {
+            toValue: volumes[idx] || 10,
+            duration: 100,
+            useNativeDriver: false,
+          }).start();
+        });
+      }, 110);
     }
   }
 

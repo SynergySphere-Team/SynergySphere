@@ -20,7 +20,6 @@ import { api } from '@/services/api';
 import { InterviewTimer } from '@/components/interview/InterviewTimer';
 import { VoiceWaveformInput } from '@/components/interview/VoiceWaveformInput';
 import { PersonaHeader } from '@/components/interview/PersonaHeader';
-import { startNativeAudioRecording, type ActiveRecordingSession } from '@/services/voiceRecording';
 import { FAANGScorecardView } from '@/components/interview/FAANGScorecardView';
 import { MobileCodeEditor } from '@/components/coding/MobileCodeEditor';
 import { TestExecutionRunner } from '@/components/coding/TestExecutionRunner';
@@ -322,7 +321,6 @@ export default function InterviewsScreen() {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const speechRecognitionRef = useRef<any>(null);
-  const nativeVoiceSessionRef = useRef<ActiveRecordingSession | null>(null);
   const recordedSpeechRef = useRef<string>('');
   const stepRef = useRef(step);
   useEffect(() => {
@@ -689,10 +687,6 @@ export default function InterviewsScreen() {
           speechRecognitionRef.current.stop();
         } catch {}
       }
-      if (nativeVoiceSessionRef.current) {
-        nativeVoiceSessionRef.current.cancel().catch(() => {});
-        nativeVoiceSessionRef.current = null;
-      }
     };
   }, []);
 
@@ -736,38 +730,10 @@ export default function InterviewsScreen() {
         recordedSpeechRef.current = '';
         return;
       } else {
-        // Native mobile stop & transcribe
-        setVoiceBannerMessage('Transcribing audio speech response...');
-        if (nativeVoiceSessionRef.current) {
-          const session = nativeVoiceSessionRef.current;
-          nativeVoiceSessionRef.current = null;
-          const currentQuestionText = activeInterview?.questions[stepRef.current]?.prompt || 'Technical interview response';
-          session
-            .stopAndTranscribe(currentQuestionText)
-            .then((transcript) => {
-              const trimmed = transcript.trim();
-              if (trimmed) {
-                const base = initialAnswerBeforeRecordRef.current.trim();
-                const combined = base ? `${base} ${trimmed}` : trimmed;
-                setAnswers((prev) => {
-                  const next = [...prev];
-                  next[stepRef.current] = combined;
-                  return next;
-                });
-                triggerCritique(combined, stepRef.current);
-                setVoiceBannerMessage('Voice transcription pasted into answer!');
-                setTimeout(() => setVoiceBannerMessage(null), 4000);
-              } else {
-                setVoiceBannerMessage('No speech detected in audio.');
-                setTimeout(() => setVoiceBannerMessage(null), 3000);
-              }
-            })
-            .catch((err) => {
-              console.warn('Native voice transcription error:', err);
-              setVoiceBannerMessage('Transcription failed. Please try again.');
-              setTimeout(() => setVoiceBannerMessage(null), 3500);
-            });
-        }
+        // Native mobile stop dictation
+        setVoiceBannerMessage('Voice dictation completed. Text saved in answer box.');
+        setTimeout(() => setVoiceBannerMessage(null), 3500);
+        triggerCritique(answersRef.current[stepRef.current] || '', stepRef.current);
         recordedSpeechRef.current = '';
         return;
       }
@@ -884,36 +850,21 @@ export default function InterviewsScreen() {
         setRecordingSeconds((s) => s + 1);
       }, 1000);
     } else {
-      // Native iOS & Android recording using expo-av
+      // Native iOS & Android: focus answer box and enable dictation
       isRecordingRef.current = true;
       setIsRecording(true);
       setRecordingSeconds(0);
       recordedSpeechRef.current = '';
       initialAnswerBeforeRecordRef.current = answersRef.current[stepRef.current] || '';
-      setVoiceBannerMessage('Recording audio... Speak clearly. Tap Stop when finished.');
+      answerInputRef.current?.focus();
+      setTimeout(() => {
+        interviewScrollRef.current?.scrollToEnd({ animated: true });
+      }, 150);
+      setVoiceBannerMessage('🎙️ Voice dictation active: Speak into mic or tap 🎙️ on keyboard.');
 
       recordingTimerRef.current = setInterval(() => {
         setRecordingSeconds((s) => s + 1);
       }, 1000);
-
-      startNativeAudioRecording()
-        .then((session) => {
-          nativeVoiceSessionRef.current = session;
-        })
-        .catch((err) => {
-          console.warn('Failed to start native recording in interview:', err);
-          isRecordingRef.current = false;
-          setIsRecording(false);
-          if (recordingTimerRef.current) {
-            clearInterval(recordingTimerRef.current);
-            recordingTimerRef.current = null;
-          }
-          Alert.alert(
-            'Microphone Permission Required',
-            'Please grant microphone permission in device settings to dictate your interview answers.',
-            [{ text: 'OK' }]
-          );
-        });
     }
   };
 
