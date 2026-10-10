@@ -61,6 +61,7 @@ router.get('/productivity-stats', async (req: AuthRequest, res) => {
     learnedTasks,
     latestWellness,
     tasksByStatus,
+    recentFocusSessions,
   ] = await Promise.all([
     countTasks('WHERE "userId" = $1 AND "status" = $2 AND "updatedAt" >= $3', [userId, 'DONE', startOfDay]),
     countTasks('WHERE "userId" = $1 AND "status" = $2', [userId, 'DONE']),
@@ -94,6 +95,13 @@ router.get('/productivity-stats', async (req: AuthRequest, res) => {
        GROUP BY "status"`,
       [userId],
     ),
+    query<{ durationMinutes: number; completedAt: Date | string }>(
+      `SELECT "durationMinutes", "completedAt"
+       FROM "FocusSession"
+       WHERE "userId" = $1 AND "completedAt" >= $2
+       ORDER BY "completedAt" DESC`,
+      [userId, daysAgo(startOfDay, STREAK_LOOKBACK_DAYS)],
+    ),
   ]);
 
   const statusCounts = Object.fromEntries(
@@ -104,6 +112,31 @@ router.get('/productivity-stats', async (req: AuthRequest, res) => {
     ? Math.round(((10 - latestWellness.stressLevel) + latestWellness.mood + latestWellness.energyLevel) / 3 * 10)
     : null;
 
+  // Minutes per local day for the recent focus window
+  const minutesByDay = new Map<string, number>();
+  for (const session of recentFocusSessions) {
+    const key = dayKey(new Date(session.completedAt));
+    minutesByDay.set(key, (minutesByDay.get(key) || 0) + (session.durationMinutes || 0));
+  }
+
+  const weeklyFocus = Array.from({ length: 7 }, (_, index) => {
+    const date = daysAgo(startOfDay, 6 - index);
+    const key = dayKey(date);
+    return {
+      date: key,
+      label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+      minutes: minutesByDay.get(key) || 0,
+    };
+  });
+
+  // Consecutive days with at least one focus session. Today does not break
+  // the streak if the user simply hasn't focused yet.
+  let focusStreak = 0;
+  for (let offset = minutesByDay.has(dayKey(startOfDay)) ? 0 : 1; offset <= STREAK_LOOKBACK_DAYS; offset += 1) {
+    if (!minutesByDay.has(dayKey(daysAgo(startOfDay, offset)))) break;
+    focusStreak += 1;
+  }
+
   res.json({
     tasksCompletedToday,
     totalTasksCompleted,
@@ -113,6 +146,8 @@ router.get('/productivity-stats', async (req: AuthRequest, res) => {
     learnedTasks,
     wellnessScore,
     statusCounts,
+    weeklyFocus,
+    focusStreak,
   });
 });
 
@@ -419,4 +454,18 @@ async function countTable(tableSql: string, whereSql: string, params: readonly u
     params,
   );
   return row?.count || 0;
+}
+
+const STREAK_LOOKBACK_DAYS = 60;
+
+function daysAgo(from: Date, days: number): Date {
+  const date = new Date(from);
+  date.setDate(date.getDate() - days);
+  return date;
+}
+
+function dayKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
 }

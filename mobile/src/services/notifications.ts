@@ -77,7 +77,7 @@ export async function scheduleFocusCompletionNotification(
 
     return await Notifications.scheduleNotificationAsync({
       content: {
-        title: '🎯 Focus Session Complete!',
+        title: 'Focus Session Complete',
         body: `Great job! You completed your ${durationMinutes}-minute focus session. Take a break!`,
         sound: 'default',
         data: { type: 'focus-complete', durationMinutes },
@@ -90,6 +90,35 @@ export async function scheduleFocusCompletionNotification(
     });
   } catch (err) {
     console.warn('Failed to schedule focus notification:', err);
+    return null;
+  }
+}
+
+export async function scheduleBreakCompletionNotification(
+  seconds: number,
+  breakMinutes: number,
+): Promise<string | null> {
+  if (Platform.OS === 'web' || seconds <= 0) return null;
+  try {
+    await setupNotificationChannels();
+    const hasPerm = await requestNotificationPermissions();
+    if (!hasPerm) return null;
+
+    return await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Break Over',
+        body: `Your ${breakMinutes}-minute break has ended. Ready for the next focus session?`,
+        sound: 'default',
+        data: { type: 'break-complete', breakMinutes },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: Math.max(1, Math.round(seconds)),
+        channelId: 'focus-timer',
+      },
+    });
+  } catch (err) {
+    console.warn('Failed to schedule break notification:', err);
     return null;
   }
 }
@@ -109,7 +138,7 @@ export async function sendImmediateFocusNotification(durationMinutes: number): P
     await setupNotificationChannels();
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: '🎯 Focus Session Complete!',
+        title: 'Focus Session Complete',
         body: `Great job! You completed your ${durationMinutes}-minute focus session. +15 XP earned!`,
         sound: 'default',
       },
