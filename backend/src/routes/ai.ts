@@ -5,7 +5,7 @@ import { paramId } from '../lib/params.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { awardXp } from '../services/gamification.js';
-import { generateAiResponse, type ChatTurn } from '../services/ai.js';
+import { generateAiResponse, transcribeAudio, type ChatTurn } from '../services/ai.js';
 import {
   buildGroundingBundle,
   buildGroundedFallback,
@@ -25,10 +25,30 @@ router.use(authenticate);
 // Junior-safe AI Rate Limiter: throttles abusive bursts while allowing smooth learning flow
 const aiLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  max: 60,
+  max: 120,
   message: { error: 'You have sent several AI requests recently. Take a moment to experiment with the code before asking again!' },
 });
 router.use(aiLimiter);
+
+// ── Audio Speech-to-Text Transcription ──
+const transcribeSchema = z.object({
+  audio: z.string().min(1, 'Audio base64 data is required'),
+  mimeType: z.string().optional().default('audio/m4a'),
+  contextHint: z.string().optional(),
+  apiKey: z.string().optional(),
+});
+
+router.post('/transcribe', validateBody(transcribeSchema), async (req: AuthRequest, res) => {
+  try {
+    const { audio, mimeType, contextHint, apiKey } = req.body;
+    const customKey = apiKey || (req.headers['x-ai-api-key'] as string | undefined);
+    const transcript = await transcribeAudio(audio, mimeType, customKey, contextHint);
+    res.json({ transcript });
+  } catch (error: any) {
+    console.error('Audio transcription route error:', error);
+    res.status(500).json({ error: 'Failed to transcribe audio' });
+  }
+});
 
 // ── Persistent Chat Thread History ──
 router.get('/chat/history', async (req: AuthRequest, res) => {

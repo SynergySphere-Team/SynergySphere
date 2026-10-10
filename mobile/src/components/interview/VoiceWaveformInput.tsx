@@ -193,78 +193,96 @@ export function VoiceWaveformInput({
 
   function toggleRecord() {
     if (isRecordingRef.current) {
-      // ── STOP RECORDING ──
+      // ── STOP RECORDING / DICTATION ──
       isRecordingRef.current = false;
       setIsRecording(false);
 
-      // Flush final recognized transcript to parent answer box
-      const finalSpoken = (committedSpeechRef.current + lastSessionFinalRef.current).trim();
-      if (finalSpoken) {
-        if (onLiveTranscriptionRef.current) {
-          onLiveTranscriptionRef.current(finalSpoken);
-        } else if (onAppendTranscriptionRef.current) {
-          onAppendTranscriptionRef.current(finalSpoken);
+      if (Platform.OS === 'web') {
+        const finalSpoken = (committedSpeechRef.current + lastSessionFinalRef.current).trim();
+        if (finalSpoken) {
+          if (onLiveTranscriptionRef.current) {
+            onLiveTranscriptionRef.current(finalSpoken);
+          } else if (onAppendTranscriptionRef.current) {
+            onAppendTranscriptionRef.current(finalSpoken);
+          }
+        }
+        cleanupAudio();
+        onRecordingEnd?.();
+
+        barHeights.forEach((b) => {
+          Animated.spring(b, {
+            toValue: 10,
+            useNativeDriver: false,
+          }).start();
+        });
+
+        setShowEditor(Boolean(finalSpoken));
+        setStatusMessage(finalSpoken ? 'Voice input captured and saved.' : '');
+      } else {
+        // Native mobile stop
+        cleanupAudio();
+        onRecordingEnd?.();
+
+        barHeights.forEach((b) => {
+          Animated.spring(b, {
+            toValue: 10,
+            useNativeDriver: false,
+          }).start();
+        });
+
+        const finalSpoken = transcription.trim();
+        if (finalSpoken) {
+          if (onLiveTranscriptionRef.current) {
+            onLiveTranscriptionRef.current(finalSpoken);
+          } else if (onAppendTranscriptionRef.current) {
+            onAppendTranscriptionRef.current(finalSpoken);
+          }
+          setShowEditor(true);
+          setStatusMessage('Voice input captured and inserted into answer box!');
+        } else {
+          setStatusMessage('Dictation paused.');
         }
       }
-
-      cleanupAudio();
-      onRecordingEnd?.();
-
-      // Reset bars to idle
-      barHeights.forEach((b) => {
-        Animated.spring(b, {
-          toValue: 10,
-          useNativeDriver: false,
-        }).start();
-      });
-
-      setShowEditor(Boolean(finalSpoken));
-      setStatusMessage(finalSpoken ? 'Voice input captured and saved.' : '');
     } else {
-      // ── START RECORDING ──
-      const SpeechRecognition =
-        typeof window !== 'undefined'
-          ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-          : null;
+      // ── START RECORDING / DICTATION ──
+      isRecordingRef.current = true;
+      setIsRecording(true);
+      setSeconds(0);
+      setTranscription('');
+      setShowEditor(true);
+      onRecordingStart?.();
 
-      if (!SpeechRecognition) {
-        if (Platform.OS === 'web') {
+      if (Platform.OS === 'web') {
+        const SpeechRecognition =
+          typeof window !== 'undefined'
+            ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+            : null;
+
+        if (!SpeechRecognition) {
           Alert.alert(
             'Speech Recognition',
             'Web Speech API is not supported in this browser. Please use Google Chrome, Microsoft Edge, or Safari.',
             [{ text: 'OK' }]
           );
-        } else {
-          Alert.alert(
-            'Microphone Dictation Active',
-            'Tap the answer box above and use the Microphone icon (🎙️) on your keyboard (bottom-right next to spacebar on iOS / top-right on Android) to dictate directly into the box with native voice recognition!',
-            [{ text: 'Got it' }]
-          );
+          isRecordingRef.current = false;
+          setIsRecording(false);
+          return;
         }
-        return;
+
+        setStatusMessage('Listening to microphone... Speak clearly.');
+        committedSpeechRef.current = '';
+        lastSessionFinalRef.current = '';
+        speechRecRef.current = startRecognitionInstance();
+      } else {
+        setStatusMessage('Speech dictation active: Speak or tap 🎙️ on your keyboard.');
       }
 
-      isRecordingRef.current = true;
-      setIsRecording(true);
-      setSeconds(0);
-      setTranscription('');
-      setShowEditor(false);
-      setStatusMessage('Listening to microphone... Speak clearly.');
-
-      committedSpeechRef.current = '';
-      lastSessionFinalRef.current = '';
-
-      onRecordingStart?.();
-
-      // 1. Start SpeechRecognition SYNCHRONOUSLY to preserve the browser user-gesture token
-      speechRecRef.current = startRecognitionInstance();
-
-      // 2. Seconds timer
+      // Seconds timer
       timerRef.current = setInterval(() => {
         setSeconds((s) => s + 1);
       }, 1000);
 
-      // 4. Animate waveform bars according to real mic input if analyser is available, else active pulse
+      // Animate waveform bars
       waveAnimRef.current = setInterval(() => {
         let volumes: number[] = [];
         if (analyserRef.current) {
@@ -272,7 +290,6 @@ export function VoiceWaveformInput({
           analyserRef.current.getByteFrequencyData(dataArray);
           for (let i = 0; i < barHeights.length; i++) {
             const raw = dataArray[i % dataArray.length] || 0;
-            // Map 0-255 to 8-42px height
             volumes.push(Math.max(8, Math.min(42, Math.round((raw / 255) * 36) + 8)));
           }
         } else {

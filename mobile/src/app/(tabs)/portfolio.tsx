@@ -596,6 +596,29 @@ useEffect(() => {
                 Career Studio
               </Text>
             </Pressable>
+
+            <Pressable
+              onPress={() => setActiveCareerTool('cv')}
+              style={[
+                styles.socialPill,
+                {
+                  backgroundColor: isLight ? '#E0F2FE' : 'rgba(2, 132, 199, 0.15)',
+                  borderColor: isLight ? '#0284c7' : colors.border,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Download CV or Resume"
+            >
+              <Ionicons
+                name="download-outline"
+                size={15}
+                color="#0284c7"
+              />
+
+              <Text style={[styles.socialPillText, { color: '#0284c7' }]}>
+                Download CV / Resume
+              </Text>
+            </Pressable>
           </View>
         </Card>
 

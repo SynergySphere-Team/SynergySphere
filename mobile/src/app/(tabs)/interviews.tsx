@@ -677,6 +677,19 @@ export default function InterviewsScreen() {
     };
   }, [activeInterview, startTime]);
 
+  useEffect(() => {
+    return () => {
+      isRecordingRef.current = false;
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (restartVoiceTimerRef.current) clearTimeout(restartVoiceTimerRef.current);
+      if (speechRecognitionRef.current) {
+        try {
+          speechRecognitionRef.current.stop();
+        } catch {}
+      }
+    };
+  }, []);
+
   // Real voice recording & speech transcription
   const toggleRecording = () => {
     if (isRecordingRef.current) {
@@ -691,149 +704,168 @@ export default function InterviewsScreen() {
         clearTimeout(restartVoiceTimerRef.current);
         restartVoiceTimerRef.current = null;
       }
-      if (speechRecognitionRef.current) {
-        try {
-          speechRecognitionRef.current.stop();
-        } catch {}
-        speechRecognitionRef.current = null;
-      }
-      const finalSpoken = (committedSpeechRef.current + lastSessionFinalRef.current).trim();
-      if (finalSpoken) {
-        const base = initialAnswerBeforeRecordRef.current.trim();
-        const combined = base ? `${base} ${finalSpoken}` : finalSpoken;
-        setAnswers((prev) => {
-          const next = [...prev];
-          next[stepRef.current] = combined;
-          return next;
-        });
-        triggerCritique(combined, stepRef.current);
-        setVoiceBannerMessage('Voice transcription saved.');
-        setTimeout(() => setVoiceBannerMessage(null), 3500);
+
+      if (Platform.OS === 'web') {
+        if (speechRecognitionRef.current) {
+          try {
+            speechRecognitionRef.current.stop();
+          } catch {}
+          speechRecognitionRef.current = null;
+        }
+        const finalSpoken = (committedSpeechRef.current + lastSessionFinalRef.current).trim();
+        if (finalSpoken) {
+          const base = initialAnswerBeforeRecordRef.current.trim();
+          const combined = base ? `${base} ${finalSpoken}` : finalSpoken;
+          setAnswers((prev) => {
+            const next = [...prev];
+            next[stepRef.current] = combined;
+            return next;
+          });
+          triggerCritique(combined, stepRef.current);
+          setVoiceBannerMessage('Voice transcription saved.');
+          setTimeout(() => setVoiceBannerMessage(null), 3500);
+        } else {
+          triggerCritique(answersRef.current[stepRef.current] || '', stepRef.current);
+        }
+        recordedSpeechRef.current = '';
+        return;
       } else {
+        // Native mobile stop dictation
+        setVoiceBannerMessage('Voice dictation completed. Text saved in answer box.');
+        setTimeout(() => setVoiceBannerMessage(null), 3500);
         triggerCritique(answersRef.current[stepRef.current] || '', stepRef.current);
+        recordedSpeechRef.current = '';
+        return;
       }
-      recordedSpeechRef.current = '';
-      return;
     }
 
     // ── START RECORDING ──
-    const SpeechRecognition =
-      typeof window !== 'undefined'
-        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-        : null;
+    if (Platform.OS === 'web') {
+      const SpeechRecognition =
+        typeof window !== 'undefined'
+          ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+          : null;
 
-    if (!SpeechRecognition) {
-      // Platform does not support Web Speech API (e.g. native iOS/Android in Expo Go)
-      answerInputRef.current?.focus();
-      setTimeout(() => {
-        interviewScrollRef.current?.scrollToEnd({ animated: true });
-      }, 150);
-      if (Platform.OS === 'web') {
+      if (!SpeechRecognition) {
+        answerInputRef.current?.focus();
+        setTimeout(() => {
+          interviewScrollRef.current?.scrollToEnd({ animated: true });
+        }, 150);
         Alert.alert(
           'Speech Recognition',
           'Web Speech API is not supported in this browser. Please use Google Chrome, Microsoft Edge, or Safari.',
           [{ text: 'OK' }]
         );
-      } else {
-        Alert.alert(
-          'Microphone Dictation Active',
-          'Your answer box is focused! Tap the Microphone icon (🎙️) on your keyboard (bottom-right next to spacebar on iOS / top-right on Android) to dictate directly into the box with native voice recognition.',
-          [{ text: 'Start Dictating' }]
-        );
+        return;
       }
-      return;
-    }
 
-    // Web Speech API is supported
-    isRecordingRef.current = true;
-    setIsRecording(true);
-    setRecordingSeconds(0);
-    recordedSpeechRef.current = '';
-    initialAnswerBeforeRecordRef.current = answersRef.current[stepRef.current] || '';
-    committedSpeechRef.current = '';
-    lastSessionFinalRef.current = '';
-    setVoiceBannerMessage('Listening to microphone... Speak clearly.');
+      // Web Speech API is supported
+      isRecordingRef.current = true;
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordedSpeechRef.current = '';
+      initialAnswerBeforeRecordRef.current = answersRef.current[stepRef.current] || '';
+      committedSpeechRef.current = '';
+      lastSessionFinalRef.current = '';
+      setVoiceBannerMessage('Listening to microphone... Speak clearly.');
 
-    function startNewSpeechInstance(): any {
-      if (!isRecordingRef.current) return null;
-      try {
-        const rec = new SpeechRecognition();
-        rec.continuous = true;
-        rec.interimResults = true;
-        rec.lang = 'en-US';
-        rec.maxAlternatives = 1;
+      function startNewSpeechInstance(): any {
+        if (!isRecordingRef.current) return null;
+        try {
+          const rec = new SpeechRecognition();
+          rec.continuous = true;
+          rec.interimResults = true;
+          rec.lang = 'en-US';
+          rec.maxAlternatives = 1;
 
-        rec.onresult = (e: any) => {
-          let sessionFinal = '';
-          let sessionInterim = '';
-          for (let i = 0; i < e.results.length; i++) {
-            const res = e.results[i];
-            const t = res[0]?.transcript || '';
-            if (res.isFinal) {
-              sessionFinal += t + ' ';
-            } else {
-              sessionInterim += t;
-            }
-          }
-          lastSessionFinalRef.current = sessionFinal;
-          const currentSpoken = (committedSpeechRef.current + sessionFinal + sessionInterim).trim();
-          if (currentSpoken) {
-            recordedSpeechRef.current = currentSpoken;
-            const base = initialAnswerBeforeRecordRef.current.trim();
-            const liveAnswer = base ? `${base} ${currentSpoken}` : currentSpoken;
-            setAnswers((prev) => {
-              const next = [...prev];
-              next[stepRef.current] = liveAnswer;
-              return next;
-            });
-            setVoiceBannerMessage(`Dictating: "${currentSpoken.slice(-35)}"`);
-          }
-        };
-
-        rec.onerror = (e: any) => {
-          console.warn('SpeechRecognition error:', e?.error);
-          if (e?.error === 'not-allowed') {
-            setVoiceBannerMessage('Microphone access denied. Please allow microphone in browser settings.');
-            isRecordingRef.current = false;
-            setIsRecording(false);
-            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-          } else if (e?.error === 'audio-capture') {
-            setVoiceBannerMessage('No microphone detected or audio capture is blocked.');
-            isRecordingRef.current = false;
-            setIsRecording(false);
-            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-          }
-        };
-
-        rec.onend = () => {
-          if (isRecordingRef.current) {
-            if (lastSessionFinalRef.current) {
-              committedSpeechRef.current += lastSessionFinalRef.current.trim() + ' ';
-              lastSessionFinalRef.current = '';
-            }
-            // Auto-restart with a FRESH instance so Chrome/Safari never throws InvalidStateError
-            if (restartVoiceTimerRef.current) clearTimeout(restartVoiceTimerRef.current);
-            restartVoiceTimerRef.current = setTimeout(() => {
-              if (isRecordingRef.current) {
-                speechRecognitionRef.current = startNewSpeechInstance();
+          rec.onresult = (e: any) => {
+            let sessionFinal = '';
+            let sessionInterim = '';
+            for (let i = 0; i < e.results.length; i++) {
+              const res = e.results[i];
+              const t = res[0]?.transcript || '';
+              if (res.isFinal) {
+                sessionFinal += t + ' ';
+              } else {
+                sessionInterim += t;
               }
-            }, 100);
-          }
-        };
+            }
+            lastSessionFinalRef.current = sessionFinal;
+            const currentSpoken = (committedSpeechRef.current + sessionFinal + sessionInterim).trim();
+            if (currentSpoken) {
+              recordedSpeechRef.current = currentSpoken;
+              const base = initialAnswerBeforeRecordRef.current.trim();
+              const liveAnswer = base ? `${base} ${currentSpoken}` : currentSpoken;
+              setAnswers((prev) => {
+                const next = [...prev];
+                next[stepRef.current] = liveAnswer;
+                return next;
+              });
+              setVoiceBannerMessage(`Dictating: "${currentSpoken.slice(-35)}"`);
+            }
+          };
 
-        rec.start();
-        return rec;
-      } catch (err) {
-        console.warn('Could not start speech recognition instance:', err);
-        return null;
+          rec.onerror = (e: any) => {
+            console.warn('SpeechRecognition error:', e?.error);
+            if (e?.error === 'not-allowed') {
+              setVoiceBannerMessage('Microphone access denied. Please allow microphone in browser settings.');
+              isRecordingRef.current = false;
+              setIsRecording(false);
+              if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+            } else if (e?.error === 'audio-capture') {
+              setVoiceBannerMessage('No microphone detected or audio capture is blocked.');
+              isRecordingRef.current = false;
+              setIsRecording(false);
+              if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+            }
+          };
+
+          rec.onend = () => {
+            if (isRecordingRef.current) {
+              if (lastSessionFinalRef.current) {
+                committedSpeechRef.current += lastSessionFinalRef.current.trim() + ' ';
+                lastSessionFinalRef.current = '';
+              }
+              // Auto-restart with a FRESH instance so Chrome/Safari never throws InvalidStateError
+              if (restartVoiceTimerRef.current) clearTimeout(restartVoiceTimerRef.current);
+              restartVoiceTimerRef.current = setTimeout(() => {
+                if (isRecordingRef.current) {
+                  speechRecognitionRef.current = startNewSpeechInstance();
+                }
+              }, 100);
+            }
+          };
+
+          rec.start();
+          return rec;
+        } catch (err) {
+          console.warn('Could not start speech recognition instance:', err);
+          return null;
+        }
       }
+
+      speechRecognitionRef.current = startNewSpeechInstance();
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((s) => s + 1);
+      }, 1000);
+    } else {
+      // Native iOS & Android: focus answer box and enable dictation
+      isRecordingRef.current = true;
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordedSpeechRef.current = '';
+      initialAnswerBeforeRecordRef.current = answersRef.current[stepRef.current] || '';
+      answerInputRef.current?.focus();
+      setTimeout(() => {
+        interviewScrollRef.current?.scrollToEnd({ animated: true });
+      }, 150);
+      setVoiceBannerMessage('🎙️ Voice dictation active: Speak into mic or tap 🎙️ on keyboard.');
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((s) => s + 1);
+      }, 1000);
     }
-
-    speechRecognitionRef.current = startNewSpeechInstance();
-
-    recordingTimerRef.current = setInterval(() => {
-      setRecordingSeconds((s) => s + 1);
-    }, 1000);
   };
 
   // Debounced live rubric critique

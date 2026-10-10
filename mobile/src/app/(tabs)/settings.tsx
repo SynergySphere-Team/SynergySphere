@@ -392,6 +392,10 @@ export default function SettingsScreen() {
 
     setEyeComfort,
 
+    largerText,
+
+    fontSize,
+
   } = useAccessibility();
 
   const [
@@ -1466,17 +1470,76 @@ function confirmDeleteAccount() {
 
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
 
-      <Heading
-        subtitle="Manage your account, preferences, privacy and security."
-        rightAction={
-          <View style={[styles.headerStatusBadge, { backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)' }]}>
-            <Ionicons name="shield-checkmark" size={12} color={primaryAccent} />
-            <Text style={[styles.headerStatusBadgeText, { color: primaryAccent }]}>Synced</Text>
-          </View>
-        }
+      {/* SETTINGS HEADER */}
+      <View
+        style={[
+          styles.headerRow,
+          largerText && styles.headerRowLarge,
+        ]}
       >
-        Settings
-      </Heading>
+        <View
+          style={[
+            styles.settingsLogoWrapper,
+            largerText && styles.settingsLogoWrapperLarge,
+            {
+              backgroundColor:
+                theme === 'dark'
+                  ? 'rgba(16, 33, 40, 0.7)'
+                  : 'rgba(237, 243, 239, 0.85)',
+              borderColor:
+                theme === 'dark'
+                  ? 'rgba(145, 219, 94, 0.28)'
+                  : 'rgba(145, 219, 94, 0.45)',
+              shadowColor: theme === 'dark' ? '#91db5e' : '#10231D',
+            },
+          ]}
+        >
+          <Image
+            source={require('../../../assets/images/settings-logo.png')}
+            style={[
+              styles.settingsLogo,
+              largerText && styles.settingsLogoLarge,
+            ]}
+            resizeMode="contain"
+            accessibilityIgnoresInvertColors
+          />
+        </View>
+
+        <View style={styles.headerText}>
+          <RNText
+            allowFontScaling
+            style={[
+              styles.headerTitle,
+              {
+                color: colors.text,
+                fontSize: fontSize(24),
+              },
+            ]}
+          >
+            Settings
+          </RNText>
+
+          <RNText
+            allowFontScaling
+            numberOfLines={2}
+            style={[
+              styles.headerSubtitle,
+              {
+                color: colors.muted,
+                fontSize: fontSize(13),
+                lineHeight: fontSize(18),
+              },
+            ]}
+          >
+            Manage your account, preferences, privacy and security.
+          </RNText>
+        </View>
+
+        <View style={[styles.headerStatusBadge, { backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)' }]}>
+          <Ionicons name="shield-checkmark" size={12} color={primaryAccent} />
+          <Text style={[styles.headerStatusBadgeText, { color: primaryAccent }]}>Synced</Text>
+        </View>
+      </View>
 
       {message ? (
 
@@ -4198,6 +4261,63 @@ function confirmDeleteAccount() {
 const styles =
 
   StyleSheet.create({
+
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      marginBottom: 12,
+      minHeight: 88,
+      width: '100%',
+    },
+    headerRowLarge: {
+      alignItems: 'flex-start',
+    },
+    settingsLogoWrapper: {
+      width: 58,
+      height: 58,
+      borderRadius: 29,
+      padding: 2,
+      borderWidth: 1.5,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.16,
+      shadowRadius: 8,
+      elevation: 3,
+      flexShrink: 0,
+    },
+    settingsLogoWrapperLarge: {
+      width: 66,
+      height: 66,
+      borderRadius: 33,
+    },
+    settingsLogo: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 27,
+      backgroundColor: 'transparent',
+      overflow: 'hidden',
+    },
+    settingsLogoLarge: {
+      borderRadius: 31,
+    },
+    headerText: {
+      flex: 1,
+      minWidth: 0,
+      gap: 3,
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      fontSize: 24,
+      fontWeight: '900',
+      letterSpacing: -0.3,
+      lineHeight: 28,
+    },
+    headerSubtitle: {
+      fontSize: 13,
+      lineHeight: 18,
+    },
 
     headerStatusBadge: {
       flexDirection: 'row',

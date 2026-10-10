@@ -10,9 +10,11 @@ import {
   Image,
   Vibration,
   TextInput,
+  Modal,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card, Field } from '@/components/ui';
@@ -20,6 +22,13 @@ import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import type { WellnessEntry, WellnessInsights } from '@/types/api';
+import { ZenBreathingModal } from '@/components/wellness/ZenBreathingModal';
+import {
+  WellnessQuickCheckIn,
+  type QuickPulseData,
+  type DetailedCheckInData,
+} from '@/components/wellness/WellnessQuickCheckIn';
+import { BurnoutActionCard } from '@/components/wellness/BurnoutActionCard';
 import {
   WELLNESS_MODULES,
   MOOD_TAG_CATEGORIES,
@@ -41,9 +50,13 @@ type ActiveTab = 'checkin' | 'trends';
 type TimeRange = '7D' | '30D' | 'SEMESTER';
 
 export default function WellnessScreen() {
+  const router = useRouter();
   const { colors, theme } = useTheme();
   const { fontSize, largerText } = useAccessibility();
   const isLight = theme === 'light';
+
+  // Zen 4-7-8 Breathing Modal state
+  const [zenModalOpen, setZenModalOpen] = useState(false);
 
   // Navigation tab: 'checkin' | 'trends'
   const [activeTab, setActiveTab] = useState<ActiveTab>('checkin');
@@ -106,36 +119,80 @@ export default function WellnessScreen() {
   // Proactive Triggers Checklist State
   const [checkedTriggers, setCheckedTriggers] = useState<Record<number, boolean>>({});
 
-  // 4-7-8 Breathing Timer Effect with Haptic Vibration Guidance
+  // Banner Action Modals
+  const [recoveryPlanModalVisible, setRecoveryPlanModalVisible] = useState(false);
+  const [breakModalVisible, setBreakModalVisible] = useState(false);
+  const [breakSecondsLeft, setBreakSecondsLeft] = useState(900); // 15 mins
+  const [isBreakRunning, setIsBreakRunning] = useState(false);
+  const [debriefModalVisible, setDebriefModalVisible] = useState(false);
+
+  // Global unmount cleanup: ensure any active vibration stops immediately
   useEffect(() => {
-    if (!isBreathingActive) return;
+    return () => {
+      try {
+        Vibration.cancel();
+      } catch {}
+    };
+  }, []);
+
+  // 4-7-8 Breathing Timer Effect with gentle non-looping pulse cues
+  useEffect(() => {
+    if (!isBreathingActive) {
+      try {
+        Vibration.cancel();
+      } catch {}
+      return;
+    }
     const interval = setInterval(() => {
       setBreathSecondsLeft((prev) => {
         if (prev > 1) return prev - 1;
         if (breathPhase === 'Inhale') {
           setBreathPhase('Hold');
           try {
-            Vibration.vibrate([0, 30, 80, 30]);
+            Vibration.vibrate(12);
           } catch {}
           return 7;
         } else if (breathPhase === 'Hold') {
           setBreathPhase('Exhale');
           try {
-            Vibration.vibrate(120);
+            Vibration.vibrate(12);
           } catch {}
           return 8;
         } else {
           setBreathPhase('Inhale');
           setBreathCycles((c) => c + 1);
           try {
-            Vibration.vibrate(40);
+            Vibration.vibrate(12);
           } catch {}
           return 4;
         }
       });
     }, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      try {
+        Vibration.cancel();
+      } catch {}
+    };
   }, [isBreathingActive, breathPhase]);
+
+  // Break Countdown Timer Effect
+  useEffect(() => {
+    if (!isBreakRunning) return;
+    const interval = setInterval(() => {
+      setBreakSecondsLeft((prev) => {
+        if (prev <= 1) {
+          setIsBreakRunning(false);
+          try {
+            Vibration.vibrate(20);
+          } catch {}
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isBreakRunning]);
 
   // Pomodoro Timer Effect
   useEffect(() => {
@@ -232,40 +289,26 @@ export default function WellnessScreen() {
     setWaterInputText(waterLitres.toString());
   };
 
-  // Save check-in
-  async function save() {
+  // 10-Second Quick Pulse Save
+  async function handleQuickSave(data: QuickPulseData) {
+    setStress(data.stress);
+    setMood(data.mood);
+    setEnergy(data.energy);
     try {
       setSaving(true);
       setError('');
       setSavedMessage('');
 
       const res = await api.post<{ xpAwarded?: number; streak?: number }>('/wellness', {
-        stressLevel: stress,
-        mood,
-        energyLevel: energy,
+        stressLevel: data.stress,
+        mood: data.mood,
+        energyLevel: data.energy,
         moduleId,
-        sleepHours,
-        waterIntake: waterLitres,
-        tags: selectedTags,
-        ...(taskTitle.trim()
-          ? {
-              taskTitle: taskTitle.trim(),
-              taskStatus: markTaskDone ? 'DONE' : 'IN_PROGRESS',
-            }
-          : {}),
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
-        ...(gratitudeWin.trim() ? { gratitude: gratitudeWin.trim() } : {}),
       });
 
-      setNotes('');
-      setGratitudeWin('');
-      setTaskTitle('');
-      setMarkTaskDone(false);
-      setCheckInStep(1);
-
-      const xpEarned = res?.xpAwarded ?? (markTaskDone ? 25 : 15);
+      const xpEarned = res?.xpAwarded ?? 15;
       const streak = res?.streak ?? (insights?.streak?.current ? insights.streak.current + 1 : 1);
-      setSavedMessage(`Check-in saved! +${xpEarned} XP awarded. 🔥 Streak: ${streak} days.`);
+      setSavedMessage(`Check-in recorded! +${xpEarned} XP awarded. Streak: ${streak} days.`);
 
       await load();
       setTimeout(() => setSavedMessage(''), 6000);
@@ -274,6 +317,72 @@ export default function WellnessScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // Detailed Reflection Save
+  async function handleDetailedSave(data: DetailedCheckInData) {
+    setStress(data.stress);
+    setMood(data.mood);
+    setEnergy(data.energy);
+    setModuleId(data.moduleId);
+    setTaskTitle(data.taskTitle);
+    setMarkTaskDone(data.markTaskDone);
+    setSleepHours(data.sleepHours);
+    setWaterLitres(data.waterLitres);
+    setSelectedTags(data.selectedTags);
+    setGratitudeWin(data.gratitudeWin);
+    setNotes(data.notes);
+    try {
+      setSaving(true);
+      setError('');
+      setSavedMessage('');
+
+      const res = await api.post<{ xpAwarded?: number; streak?: number }>('/wellness', {
+        stressLevel: data.stress,
+        mood: data.mood,
+        energyLevel: data.energy,
+        moduleId: data.moduleId,
+        sleepHours: data.sleepHours,
+        waterIntake: data.waterLitres,
+        tags: data.selectedTags,
+        ...(data.taskTitle.trim()
+          ? {
+              taskTitle: data.taskTitle.trim(),
+              taskStatus: data.markTaskDone ? 'DONE' : 'IN_PROGRESS',
+            }
+          : {}),
+        ...(data.notes.trim() ? { notes: data.notes.trim() } : {}),
+        ...(data.gratitudeWin.trim() ? { gratitude: data.gratitudeWin.trim() } : {}),
+      });
+
+      const xpEarned = res?.xpAwarded ?? 25;
+      const streak = res?.streak ?? (insights?.streak?.current ? insights.streak.current + 1 : 1);
+      setSavedMessage(`Detailed reflection saved! +${xpEarned} XP awarded. Streak: ${streak} days.`);
+
+      await load();
+      setTimeout(() => setSavedMessage(''), 6000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save check-in.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Legacy save fallback
+  async function save() {
+    await handleDetailedSave({
+      stress,
+      mood,
+      energy,
+      moduleId,
+      taskTitle,
+      markTaskDone,
+      sleepHours,
+      waterLitres,
+      selectedTags,
+      gratitudeWin,
+      notes,
+    });
   }
 
   // Quick Gratitude Log
@@ -390,12 +499,9 @@ export default function WellnessScreen() {
     };
   }, [currentStreak]);
 
-  // Step 1: Haptic rating handler
+  // Step 1: Rating handler
   const setRatingWithHaptic = (setter: (v: number) => void, val: number) => {
     setter(val);
-    try {
-      Vibration.vibrate(15);
-    } catch {}
   };
 
   // Step 4: Contextual 1-Tap Interventions
@@ -404,40 +510,38 @@ export default function WellnessScreen() {
 
   const handleScheduleBreak = () => {
     try {
-      Vibration.vibrate([0, 50, 100, 50]);
+      Vibration.vibrate(10);
     } catch {}
-    setInterventionNotice('🌿 15-minute screen-free break scheduled. Step away from your IDE.');
-    setTimeout(() => setInterventionNotice(''), 6000);
-  };
-
-  const handleLaunchBreathing = () => {
-    setActiveTab('checkin');
-    setResetSectionOpen(true);
-    setActiveResetTool('breathing');
-    setIsBreathingActive(true);
-    setBreathPhase('Inhale');
-    setBreathSecondsLeft(4);
-    try {
-      Vibration.vibrate(40);
-    } catch {}
-    setInterventionNotice('🫁 4-7-8 Breathing activated with haptic pulse cues.');
+    setBreakModalVisible(true);
+    setIsBreakRunning(true);
+    setBreakSecondsLeft(900);
+    setInterventionNotice('🌿 15-minute screen-free break started.');
     setTimeout(() => setInterventionNotice(''), 5000);
   };
 
+  const handleLaunchBreathing = () => {
+    try {
+      Vibration.vibrate(10);
+    } catch {}
+    setZenModalOpen(true);
+  };
+
+  const handleLaunchTasksDecompression = () => {
+    router.push('/(tabs)/tasks' as never);
+  };
+
   const handleGenerateRecoveryPlan = () => {
-    if (!taskTitle.trim()) {
-      setTaskTitle('Refactor & Document Function Contracts');
-    }
-    setStress(4);
-    setEnergy(6);
-    setInterventionNotice('⚡ Recovery Plan engaged: Low-friction docstrings & linting mode activated.');
-    setTimeout(() => setInterventionNotice(''), 6000);
+    try {
+      Vibration.vibrate(10);
+    } catch {}
+    setRecoveryPlanModalVisible(true);
   };
 
   const handleDebriefSession = () => {
-    setNotes((prev) => (prev ? prev : 'Session debrief: cognitive friction around blocker; stepping back to review approach.'));
-    setInterventionNotice('📝 Debrief note primed in form below. Add takeaways and tap Log Check-in.');
-    setTimeout(() => setInterventionNotice(''), 6000);
+    try {
+      Vibration.vibrate(10);
+    } catch {}
+    setDebriefModalVisible(true);
   };
 
   if (!loaded) return <Loading />;
@@ -683,6 +787,22 @@ export default function WellnessScreen() {
             Track mental bandwidth, prevent burnout &amp; optimize tasks.
           </Text>
         </View>
+
+        <Pressable
+          onPress={() => setZenModalOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Start Zen Breathing"
+          style={[
+            styles.headerZenBadge,
+            {
+              backgroundColor: isLight ? '#E8F5E9' : 'rgba(52, 211, 153, 0.15)',
+              borderColor: isLight ? '#B7DFC3' : 'rgba(52, 211, 153, 0.3)',
+            },
+          ]}
+        >
+          <Ionicons name="leaf" size={13} color={isLight ? '#166534' : '#34D399'} />
+          <Text style={[styles.headerZenBadgeText, { color: isLight ? '#166534' : '#34D399' }]}>Zen</Text>
+        </Pressable>
       </View>
 
       {error ? <Notice>{error}</Notice> : null}
@@ -745,9 +865,14 @@ export default function WellnessScreen() {
       </View>
 
       {/* Gamification Streak & Milestone Banner */}
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        Resilience &amp; Daily Streak
-      </Text>
+      <View style={[styles.sectionHeaderRow, { marginTop: 4 }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          Resilience &amp; Daily Streak
+        </Text>
+        <Text style={[styles.sectionCaption, { color: colors.muted }]}>
+          {currentStreak}d streak
+        </Text>
+      </View>
       <Card>
         <View style={styles.streakHeader}>
           <View style={styles.streakCountBox}>
@@ -833,789 +958,39 @@ export default function WellnessScreen() {
       {/* TAB 1: CHECK-IN & AI COACH */}
       {activeTab === 'checkin' ? (
         <>
-          {/* Main Daily Check-In Form */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Daily Check-In
-          </Text>
-          <Card>
-            {/* Step Progress Bar & Discrete Step Buttons */}
-            <View style={styles.stepIndicatorContainer}>
-              <View style={styles.stepHeaderRow}>
-                <Text style={[styles.stepTitleText, { color: colors.text }]}>
-                  {checkInStep === 1
-                    ? 'Step 1: Mind & Focus'
-                    : checkInStep === 2
-                    ? 'Step 2: Physical Metrics & Sleep'
-                    : 'Step 3: Reflection & Debrief'}
-                </Text>
-                <View style={[styles.statusPill, { backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)' }]}>
-                  <Text style={[styles.statusPillText, { color: isLight ? '#1e6827' : colors.primary }]}>
-                    Step {checkInStep} of 3
-                  </Text>
-                </View>
-              </View>
+          {/* Enhanced Dual-Mode Check-In Form */}
+          <WellnessQuickCheckIn
+            onSaveQuick={handleQuickSave}
+            onSaveDetailed={handleDetailedSave}
+            saving={saving}
+            accent={isLight ? '#1e6827' : colors.primary}
+          />
 
-              {/* Progress Bar Track */}
-              <View style={[styles.stepProgressBarTrack, { backgroundColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.1)' }]}>
-                <View
-                  style={[
-                    styles.stepProgressBarFill,
-                    {
-                      width: checkInStep === 1 ? '33.3%' : checkInStep === 2 ? '66.6%' : '100%',
-                      backgroundColor: isLight ? '#00875A' : colors.primary,
-                    },
-                  ]}
-                />
-              </View>
-
-              {/* Discrete Step Tabs / Dots */}
-              <View style={styles.stepDotsRow}>
-                {[
-                  { step: 1 as const, label: 'Mind & Focus' },
-                  { step: 2 as const, label: 'Physical & Rest' },
-                  { step: 3 as const, label: 'Reflection' },
-                ].map((s) => {
-                  const active = checkInStep === s.step;
-                  const completed = checkInStep > s.step;
-                  return (
-                    <Pressable
-                      key={s.step}
-                      onPress={() => {
-                        setCheckInStep(s.step);
-                        try { Vibration.vibrate(15); } catch {}
-                      }}
-                      style={[
-                        styles.stepDotBtn,
-                        active && {
-                          backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)',
-                          borderColor: colors.primary,
-                        },
-                        completed && {
-                          backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.06)',
-                          borderColor: isLight ? '#CBD5E1' : 'rgba(255,255,255,0.15)',
-                        },
-                        !active && !completed && {
-                          borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)',
-                        },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.stepDotCircle,
-                          {
-                            backgroundColor: active
-                              ? (isLight ? '#00875A' : colors.primary)
-                              : completed
-                              ? '#22c55e'
-                              : isLight ? '#CBD5E1' : 'rgba(255,255,255,0.2)',
-                          },
-                        ]}
-                      >
-                        {completed ? (
-                          <Ionicons name="checkmark" size={10} color="#ffffff" />
-                        ) : (
-                          <Text style={styles.stepDotNumber}>{s.step}</Text>
-                        )}
-                      </View>
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.stepDotLabel,
-                          {
-                            color: active ? colors.text : colors.muted,
-                            fontWeight: active ? '800' : '500',
-                          },
-                        ]}
-                      >
-                        {s.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* STEP 1: MIND & FOCUS */}
-            {checkInStep === 1 ? (
-              <View style={{ gap: 4 }}>
-                {/* Module Picker */}
-                <Text style={[styles.sectionSubtitle, { color: colors.muted }]}>Linked Module</Text>
-                <View style={styles.moduleGrid}>
-                  {WELLNESS_MODULES.map((m) => {
-                    const isSelected = moduleId === m.id;
-                    return (
-                      <Pressable
-                        key={m.id}
-                        onPress={() => setModuleId(m.id)}
-                        style={[
-                          styles.moduleButton,
-                          {
-                            borderColor: isSelected ? m.color : 'rgba(255,255,255,0.1)',
-                            backgroundColor: isSelected ? 'rgba(255,255,255,0.1)' : 'transparent',
-                          },
-                        ]}
-                      >
-                        <View style={[styles.moduleDot, { backgroundColor: m.color }]} />
-                        <Text
-                          style={[
-                            styles.moduleButtonText,
-                            { color: isSelected ? colors.text : colors.muted, fontWeight: isSelected ? '700' : '500' },
-                          ]}
-                        >
-                          {m.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                {/* Task Input */}
-                <Field
-                  label="Active Task or Blocker"
-                  value={taskTitle}
-                  onChangeText={setTaskTitle}
-                  placeholder="e.g. Debugging Spring Security, LeetCode Binary Search..."
-                />
-
-                {taskTitle.trim().length > 0 ? (
-                  <Pressable
-                    onPress={() => setMarkTaskDone(!markTaskDone)}
-                    style={styles.checkboxRow}
-                  >
-                    <Ionicons
-                      name={markTaskDone ? 'checkbox' : 'square-outline'}
-                      size={18}
-                      color={markTaskDone ? colors.primary : colors.muted}
-                      style={{ flexShrink: 0 }}
-                    />
-                    <Text style={[styles.checkboxText, { color: colors.text }]}>
-                      Mark task as completed (DONE) (+10 XP)
-                    </Text>
-                  </Pressable>
-                ) : null}
-
-                {/* Rating Controls: Step 1 Labeled 1-10 Scale with Dynamic Semantic Anchors & Haptics */}
-                <View style={styles.ratingSection}>
-                  {/* Stress 1-10 Scale */}
-                  {(() => {
-                    const anchor = STRESS_ANCHORS[stress] || STRESS_ANCHORS[5];
-                    return (
-                      <View style={styles.scaleContainer}>
-                        <View style={styles.scaleLabelRow}>
-                          <Text style={[styles.ratingLabel, { color: colors.text }]}>
-                            Stress Level: <Text style={{ color: '#f472b6', fontWeight: '800' }}>{stress}/10</Text>
-                          </Text>
-                          <View style={[styles.scaleValueBadge, { backgroundColor: `${anchor.color}20`, borderColor: anchor.color }]}>
-                            <Text style={[styles.scaleValueBadgeText, { color: anchor.color }]}>
-                              {anchor.label}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.scaleButtonsRow}>
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
-                            const isSelected = stress === val;
-                            return (
-                              <Pressable
-                                key={val}
-                                onPress={() => setRatingWithHaptic(setStress, val)}
-                                style={[
-                                  styles.scaleBtn,
-                                  isSelected
-                                    ? { backgroundColor: '#f472b6', borderColor: '#f472b6' }
-                                    : { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
-                                ]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.scaleBtnText,
-                                    { color: isSelected ? '#ffffff' : colors.text },
-                                  ]}
-                                >
-                                  {val}
-                                </Text>
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-
-                        {/* Semantic Anchor Description */}
-                        <View style={[styles.anchorCard, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)' }]}>
-                          <View style={[styles.anchorDot, { backgroundColor: anchor.color }]} />
-                          <Text style={[styles.anchorDescText, { color: colors.muted }]}>
-                            {anchor.desc}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })()}
-
-                  {/* Mood 1-10 Scale */}
-                  {(() => {
-                    const anchor = MOOD_ANCHORS[mood] || MOOD_ANCHORS[6];
-                    return (
-                      <View style={styles.scaleContainer}>
-                        <View style={styles.scaleLabelRow}>
-                          <Text style={[styles.ratingLabel, { color: colors.text }]}>
-                            Mood / Outlook: <Text style={{ color: '#c084fc', fontWeight: '800' }}>{mood}/10</Text>
-                          </Text>
-                          <View style={[styles.scaleValueBadge, { backgroundColor: `${anchor.color}20`, borderColor: anchor.color }]}>
-                            <Text style={[styles.scaleValueBadgeText, { color: anchor.color }]}>
-                              {anchor.label}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.scaleButtonsRow}>
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
-                            const isSelected = mood === val;
-                            return (
-                              <Pressable
-                                key={val}
-                                onPress={() => setRatingWithHaptic(setMood, val)}
-                                style={[
-                                  styles.scaleBtn,
-                                  isSelected
-                                    ? { backgroundColor: '#c084fc', borderColor: '#c084fc' }
-                                    : { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
-                                ]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.scaleBtnText,
-                                    { color: isSelected ? '#ffffff' : colors.text },
-                                  ]}
-                                >
-                                  {val}
-                                </Text>
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-
-                        <View style={[styles.anchorCard, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)' }]}>
-                          <View style={[styles.anchorDot, { backgroundColor: anchor.color }]} />
-                          <Text style={[styles.anchorDescText, { color: colors.muted }]}>
-                            {anchor.desc}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })()}
-
-                  {/* Energy 1-10 Scale */}
-                  {(() => {
-                    const anchor = ENERGY_ANCHORS[energy] || ENERGY_ANCHORS[6];
-                    return (
-                      <View style={styles.scaleContainer}>
-                        <View style={styles.scaleLabelRow}>
-                          <Text style={[styles.ratingLabel, { color: colors.text }]}>
-                            Energy / Vitality: <Text style={{ color: '#2dd4bf', fontWeight: '800' }}>{energy}/10</Text>
-                          </Text>
-                          <View style={[styles.scaleValueBadge, { backgroundColor: `${anchor.color}20`, borderColor: anchor.color }]}>
-                            <Text style={[styles.scaleValueBadgeText, { color: anchor.color }]}>
-                              {anchor.label}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.scaleButtonsRow}>
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
-                            const isSelected = energy === val;
-                            return (
-                              <Pressable
-                                key={val}
-                                onPress={() => setRatingWithHaptic(setEnergy, val)}
-                                style={[
-                                  styles.scaleBtn,
-                                  isSelected
-                                    ? { backgroundColor: '#2dd4bf', borderColor: '#2dd4bf' }
-                                    : { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
-                                ]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.scaleBtnText,
-                                    { color: isSelected ? '#042f2e' : colors.text },
-                                  ]}
-                                >
-                                  {val}
-                                </Text>
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-
-                        <View style={[styles.anchorCard, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)' }]}>
-                          <View style={[styles.anchorDot, { backgroundColor: anchor.color }]} />
-                          <Text style={[styles.anchorDescText, { color: colors.muted }]}>
-                            {anchor.desc}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })()}
-                </View>
-
-                {/* Step 1 Navigation */}
-                <View style={styles.stepNavigationRow}>
-                  <Button
-                    title="Next: Physical Metrics & Sleep →"
-                    onPress={() => {
-                      setCheckInStep(2);
-                      try { Vibration.vibrate(15); } catch {}
-                    }}
-                    style={{ flex: 1 }}
-                  />
-                </View>
-              </View>
-            ) : null}
-
-            {/* STEP 2: PHYSICAL METRICS & SLEEP */}
-            {checkInStep === 2 ? (
-              <View style={{ gap: 6 }}>
-                {/* Micro-Trackers: Sleep & Water with Two-Way Keyboard Input & Steppers */}
-                <View style={styles.microTrackersRow}>
-                  {/* Sleep Tracker */}
-                  <View style={[styles.microCard, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.04)', borderColor: colors.border }]}>
-                    <View style={styles.microHeader}>
-                      <Ionicons name="moon" size={13} color="#c084fc" />
-                      <Text style={[styles.microTitle, { color: colors.text }]}>Sleep: {sleepHours}h</Text>
-                      <Text style={{ fontSize: 9, color: colors.muted, marginLeft: 'auto' }}>
-                        {sleepHours < 6 ? 'Deprived' : sleepHours < 7.5 ? 'Moderate' : 'Optimal'}
-                      </Text>
-                    </View>
-
-                    {/* Presets Row */}
-                    <View style={styles.quickPresetRow}>
-                      {SLEEP_PRESETS.map((hrs) => {
-                        const active = sleepHours === hrs;
-                        return (
-                          <Pressable
-                            key={hrs}
-                            onPress={() => {
-                              updateSleep(hrs);
-                              try { Vibration.vibrate(15); } catch {}
-                            }}
-                            style={[
-                              styles.presetChip,
-                              active && { backgroundColor: isLight ? '#e9d5ff' : 'rgba(192,132,252,0.25)', borderColor: '#c084fc' },
-                            ]}
-                          >
-                            <Text style={[styles.presetChipText, { color: active ? (isLight ? '#7e22ce' : '#e9d5ff') : colors.muted }]}>
-                              {hrs}h
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-
-                    {/* Stepper & Direct Editable Numeric Input */}
-                    <View style={styles.stepperRow}>
-                      <Pressable
-                        onPress={() => updateSleep(sleepHours - 0.5)}
-                        style={styles.stepBtn}
-                      >
-                        <Ionicons name="remove" size={14} color={colors.text} />
-                      </Pressable>
-                      <View style={[styles.metricInputBox, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' }]}>
-                        <TextInput
-                          keyboardType="decimal-pad"
-                          value={sleepInputText}
-                          onChangeText={handleSleepTextChange}
-                          onBlur={handleSleepBlur}
-                          style={[styles.metricTextInput, { color: '#c084fc' }]}
-                          selectTextOnFocus
-                        />
-                        <Text style={[styles.metricUnitLabel, { color: '#c084fc' }]}>hrs</Text>
-                      </View>
-                      <Pressable
-                        onPress={() => updateSleep(sleepHours + 0.5)}
-                        style={styles.stepBtn}
-                      >
-                        <Ionicons name="add" size={14} color={colors.text} />
-                      </Pressable>
-                    </View>
-                  </View>
-
-                  {/* Water Tracker (Litres - L) */}
-                  <View style={[styles.microCard, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.04)', borderColor: colors.border }]}>
-                    <View style={styles.microHeader}>
-                      <Ionicons name="water" size={13} color="#2dd4bf" />
-                      <Text style={[styles.microTitle, { color: colors.text }]}>Water: {waterLitres.toFixed(1)}L💧</Text>
-                      <Text style={{ fontSize: 9, color: colors.muted, marginLeft: 'auto' }}>
-                        {waterLitres < 1.5 ? 'Low' : waterLitres < 2.5 ? 'Good' : 'Hydrated'}
-                      </Text>
-                    </View>
-
-                    {/* Presets Row */}
-                    <View style={styles.quickPresetRow}>
-                      {WATER_PRESETS.map((litres) => {
-                        const active = Math.abs(waterLitres - litres) < 0.05;
-                        return (
-                          <Pressable
-                            key={litres}
-                            onPress={() => {
-                              updateWater(litres);
-                              try { Vibration.vibrate(15); } catch {}
-                            }}
-                            style={[
-                              styles.presetChip,
-                              active && { backgroundColor: isLight ? '#ccfbf1' : 'rgba(45,212,191,0.25)', borderColor: '#2dd4bf' },
-                            ]}
-                          >
-                            <Text style={[styles.presetChipText, { color: active ? (isLight ? '#0f766e' : '#99f6e4') : colors.muted }]}>
-                              {litres.toFixed(1)}L
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                      <Pressable
-                        onPress={() => {
-                          updateWater(waterLitres + WATER_STEP);
-                          try { Vibration.vibrate(15); } catch {}
-                        }}
-                        style={styles.boosterChip}
-                      >
-                        <Text style={styles.boosterChipText}>+0.25L</Text>
-                      </Pressable>
-                    </View>
-
-                    {/* Stepper & Direct Editable Numeric Input */}
-                    <View style={styles.stepperRow}>
-                      <Pressable
-                        onPress={() => updateWater(waterLitres - WATER_STEP)}
-                        style={styles.stepBtn}
-                      >
-                        <Ionicons name="remove" size={14} color={colors.text} />
-                      </Pressable>
-                      <View style={[styles.metricInputBox, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' }]}>
-                        <TextInput
-                          keyboardType="decimal-pad"
-                          value={waterInputText}
-                          onChangeText={handleWaterTextChange}
-                          onBlur={handleWaterBlur}
-                          style={[styles.metricTextInput, { color: '#2dd4bf' }]}
-                          selectTextOnFocus
-                        />
-                        <Text style={[styles.metricUnitLabel, { color: '#2dd4bf' }]}>L</Text>
-                      </View>
-                      <Pressable
-                        onPress={() => updateWater(waterLitres + WATER_STEP)}
-                        style={styles.stepBtn}
-                      >
-                        <Ionicons name="add" size={14} color={colors.text} />
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Categorized Focus & Mood Keywords */}
-                <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 12 }]}>
-                  Focus &amp; Mood Tags
-                </Text>
-                <View style={{ gap: 8, marginBottom: 8 }}>
-                  {MOOD_TAG_CATEGORIES.map((cat) => (
-                    <View key={cat.category} style={styles.tagCategoryBlock}>
-                      <View style={styles.tagCategoryHeader}>
-                        <Ionicons name={cat.icon as any} size={11} color={cat.color} />
-                        <Text style={[styles.tagCategoryTitle, { color: cat.color }]}>{cat.category}</Text>
-                      </View>
-                      <View style={styles.categoryPillWrap}>
-                        {cat.tags.map((tag) => {
-                          const active = selectedTags.includes(tag);
-                          return (
-                            <Pressable
-                              key={tag}
-                              onPress={() => {
-                                toggleTag(tag);
-                                try { Vibration.vibrate(15); } catch {}
-                              }}
-                              style={[
-                                styles.categoryTagPill,
-                                active && {
-                                  backgroundColor: `${cat.color}25`,
-                                  borderColor: cat.color,
-                                },
-                                !active && { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
-                              ]}
-                            >
-                              {active ? (
-                                <Ionicons name="checkmark" size={11} color={cat.color} style={{ marginRight: 2 }} />
-                              ) : null}
-                              <Text
-                                style={[
-                                  styles.categoryTagPillText,
-                                  {
-                                    color: active ? (isLight ? cat.color : '#ffffff') : colors.muted,
-                                    fontWeight: active ? '700' : '500',
-                                  },
-                                ]}
-                              >
-                                {tag}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  ))}
-                </View>
-
-                {/* Step 2 Navigation */}
-                <View style={styles.stepNavigationRow}>
-                  <Button
-                    title="← Back to Mind"
-                    secondary
-                    onPress={() => {
-                      setCheckInStep(1);
-                      try { Vibration.vibrate(15); } catch {}
-                    }}
-                    style={{ flex: 1 }}
-                  />
-                  <Button
-                    title="Next: Reflection →"
-                    onPress={() => {
-                      setCheckInStep(3);
-                      try { Vibration.vibrate(15); } catch {}
-                    }}
-                    style={{ flex: 1 }}
-                  />
-                </View>
-              </View>
-            ) : null}
-
-            {/* STEP 3: REFLECTION */}
-            {checkInStep === 3 ? (
-              <View style={{ gap: 8 }}>
-                {/* Gratitude Win */}
-                <Text style={[styles.sectionSubtitle, { color: colors.muted }]}>
-                  Micro-Win or Gratitude
-                </Text>
-                <View style={styles.gratitudePillWrap}>
-                  {GRATITUDE_PROMPT_PRESETS.map((preset, i) => {
-                    const isSelected = gratitudeWin === preset;
-                    return (
-                      <Pressable
-                        key={i}
-                        onPress={() => {
-                          setGratitudeWin(isSelected ? '' : preset);
-                          try { Vibration.vibrate(15); } catch {}
-                        }}
-                        style={[
-                          styles.gratitudePill,
-                          {
-                            borderColor: isSelected ? colors.primary : colors.border,
-                            backgroundColor: isSelected ? (isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)') : 'transparent',
-                          },
-                        ]}
-                      >
-                        <Text style={[styles.gratitudePillText, { color: isSelected ? (isLight ? '#1e6827' : colors.primary) : colors.text }]}>
-                          {preset}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <Field
-                  label="Custom Micro-Win"
-                  value={gratitudeWin}
-                  onChangeText={setGratitudeWin}
-                  placeholder="e.g. Shipped clean refactor without regressions..."
-                />
-
-                {/* Notes */}
-                <Field
-                  label="Session Notes & Blockers"
-                  value={notes}
-                  onChangeText={setNotes}
-                  multiline
-                  placeholder="What went well or what challenges did you face today?"
-                />
-
-                {/* Real-time Summary Card Before Submission */}
-                <View style={[styles.checkInPreviewCard, { backgroundColor: isLight ? '#f8faf9' : 'rgba(255,255,255,0.03)', borderColor: colors.border }]}>
-                  <Text style={[styles.previewCardTitle, { color: colors.text }]}>Check-In Summary</Text>
-                  <View style={styles.previewMetricsRow}>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>
-                      Stress: <Text style={{ color: '#f472b6', fontWeight: '800' }}>{stress}/10</Text> · Mood: <Text style={{ color: '#c084fc', fontWeight: '800' }}>{mood}/10</Text> · Energy: <Text style={{ color: '#2dd4bf', fontWeight: '800' }}>{energy}/10</Text>
-                    </Text>
-                  </View>
-                  <View style={styles.previewMetricsRow}>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>
-                      Sleep: <Text style={{ color: colors.text, fontWeight: '700' }}>{sleepHours} hrs</Text> · Water: <Text style={{ color: colors.text, fontWeight: '700' }}>{waterLitres.toFixed(1)} L</Text> · Module: <Text style={{ color: colors.primary, fontWeight: '700' }}>{moduleId}</Text>
-                    </Text>
-                  </View>
-                  {selectedTags.length > 0 ? (
-                    <Text style={{ fontSize: 10, color: colors.muted, fontStyle: 'italic', marginTop: 2 }}>
-                      {selectedTags.join('  ')}
-                    </Text>
-                  ) : null}
-                </View>
-
-                {/* Step 3 Navigation */}
-                <View style={styles.stepNavigationRow}>
-                  <Button
-                    title="← Back to Physical"
-                    secondary
-                    onPress={() => {
-                      setCheckInStep(2);
-                      try { Vibration.vibrate(15); } catch {}
-                    }}
-                    style={{ flex: 1 }}
-                  />
-                  <Button
-                    title={saving ? 'Logging...' : 'Log Check-in (+15 XP) ✓'}
-                    disabled={saving}
-                    onPress={save}
-                    style={{ flex: 2 }}
-                  />
-                </View>
-              </View>
-            ) : null}
-          </Card>
-
-          {/* AI Burnout Risk Meter: Active Actionable Tool & 1-Tap Interventions */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Burnout Risk Assessment
-          </Text>
-          <Card>
-            <View style={styles.burnoutHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
-                <Ionicons
-                  name={burnoutRisk.level === 'CRITICAL' ? 'flame' : burnoutRisk.level === 'MODERATE' ? 'warning' : 'shield-checkmark'}
-                  size={18}
-                  color={burnoutRisk.color}
-                  style={{ flexShrink: 0 }}
-                />
-                <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Cognitive Strain Monitor</Text>
-              </View>
-              <View
-                style={[
-                  styles.riskBadge,
-                  { backgroundColor: `${burnoutRisk.color}20`, borderColor: burnoutRisk.color },
-                ]}
-              >
-                <Text style={[styles.riskBadgeText, { color: burnoutRisk.color }]} numberOfLines={1}>
-                  {burnoutRisk.label} ({burnoutRisk.score}%)
-                </Text>
-              </View>
-            </View>
-
-            <Text style={[styles.burnoutDesc, { color: colors.muted }]}>
-              {burnoutRisk.description}
-            </Text>
-
-            {/* Real-Time Strain Spike Alert */}
-            {isHighStrainSpike ? (
-              <View style={[styles.strainAlertBanner, { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444' }]}>
-                <Ionicons name="alert-circle" size={18} color="#ef4444" style={{ flexShrink: 0, marginTop: 1 }} />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.strainAlertTitle, { color: '#ef4444' }]}>
-                    Cognitive Strain Spike ({liveStrain > 0 ? `+${liveStrain}` : liveStrain} Net Strain)
-                  </Text>
-                  <Text style={[styles.strainAlertSub, { color: colors.text }]}>
-                    Stress ({stress}/10) is exceeding Energy ({energy}/10). Risk of debugging tunnel-vision. Trigger an intervention below:
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-
-            {/* Quick Interventions */}
-            <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 10 }]}>
-              Quick Interventions
-            </Text>
-            <View style={styles.interventionGrid}>
-              <Pressable
-                onPress={handleScheduleBreak}
-                style={[styles.interventionBtn, { borderColor: '#10b981', backgroundColor: isLight ? '#f0fdf4' : 'rgba(16,185,129,0.1)' }]}
-              >
-                <Ionicons name="cafe" size={16} color="#10b981" />
-                <Text style={[styles.interventionBtnTitle, { color: isLight ? '#065f46' : '#34d399' }]} numberOfLines={1}>15m Break</Text>
-                <Text style={[styles.interventionBtnDesc, { color: colors.muted }]} numberOfLines={1}>Screen-free rest</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={handleLaunchBreathing}
-                style={[styles.interventionBtn, { borderColor: '#8b5cf6', backgroundColor: isLight ? '#f5f3ff' : 'rgba(139,92,246,0.1)' }]}
-              >
-                <Ionicons name="pulse" size={16} color="#8b5cf6" />
-                <Text style={[styles.interventionBtnTitle, { color: isLight ? '#5b21b6' : '#a78bfa' }]} numberOfLines={1}>4-7-8 Breath</Text>
-                <Text style={[styles.interventionBtnDesc, { color: colors.muted }]} numberOfLines={1}>Haptic breath pacing</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={handleGenerateRecoveryPlan}
-                style={[styles.interventionBtn, { borderColor: '#3b82f6', backgroundColor: isLight ? '#eff6ff' : 'rgba(59,130,246,0.1)' }]}
-              >
-                <Ionicons name="flash" size={16} color="#3b82f6" />
-                <Text style={[styles.interventionBtnTitle, { color: isLight ? '#1e40af' : '#60a5fa' }]} numberOfLines={1}>Recovery Plan</Text>
-                <Text style={[styles.interventionBtnDesc, { color: colors.muted }]} numberOfLines={1}>Low-friction docs</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={handleDebriefSession}
-                style={[styles.interventionBtn, { borderColor: '#f59e0b', backgroundColor: isLight ? '#fffbeb' : 'rgba(245,158,11,0.1)' }]}
-              >
-                <Ionicons name="chatbubbles" size={16} color="#f59e0b" />
-                <Text style={[styles.interventionBtnTitle, { color: isLight ? '#92400e' : '#fbbf24' }]} numberOfLines={1}>Debrief</Text>
-                <Text style={[styles.interventionBtnDesc, { color: colors.muted }]} numberOfLines={1}>Log takeaways</Text>
-              </Pressable>
-            </View>
-
-            {/* Triggers Checklist */}
-            <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 12 }]}>
-              Recovery Checklist
-            </Text>
-            {burnoutRisk.triggers.map((trigger, idx) => {
-              const isChecked = !!checkedTriggers[idx];
-              return (
-                <Pressable
-                  key={idx}
-                  onPress={() => setCheckedTriggers((prev) => ({ ...prev, [idx]: !prev[idx] }))}
-                  style={styles.triggerRow}
-                >
-                  <Ionicons
-                    name={isChecked ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={16}
-                    color={isChecked ? '#22c55e' : colors.muted}
-                  />
-                  <Text
-                    style={[
-                      styles.triggerText,
-                      {
-                        color: isChecked ? colors.muted : colors.text,
-                        textDecorationLine: isChecked ? 'line-through' : 'none',
-                      },
-                    ]}
-                  >
-                    {trigger}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </Card>
+          {/* Strain & Burnout Guard */}
+          <BurnoutActionCard
+            stress={stress}
+            energy={energy}
+            onLaunchBreathing={handleLaunchBreathing}
+            onLaunchTasksDecompression={handleLaunchTasksDecompression}
+            onScheduleBreak={handleScheduleBreak}
+          />
 
 
           {/* AI Task & Workflow Optimizer (Appears when task is specified) */}
           {taskDeconstruction ? (
             <>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                AI Workflow Optimizer
-              </Text>
-              <Card>
-                <View style={styles.optimizerHeader}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
-                    <Ionicons name="sparkles" size={18} color="#06b6d4" style={{ flexShrink: 0 }} />
-                    <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Focus Decomposition</Text>
-                  </View>
-                  {isHighStrain ? (
-                    <View style={[styles.strainBadge, { backgroundColor: 'rgba(244,114,182,0.2)', flexShrink: 0 }]}>
-                      <Text style={{ color: '#f472b6', fontSize: 10, fontWeight: '700' }}>High Strain</Text>
-                    </View>
-                  ) : null}
+              <View style={styles.sectionHeaderRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+                  <Ionicons name="sparkles" size={18} color="#06b6d4" style={{ flexShrink: 0 }} />
+                  <Text style={[styles.sectionTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Focus Decomposition</Text>
                 </View>
+                {isHighStrain ? (
+                  <View style={[styles.strainBadge, { backgroundColor: 'rgba(244,114,182,0.2)', flexShrink: 0 }]}>
+                    <Text style={{ color: '#f472b6', fontSize: 10, fontWeight: '700' }}>High Strain</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Card>
 
                 <Text style={[styles.optimizerAdvice, { color: colors.text }]}>
                   {taskDeconstruction.actionableAdvice}
@@ -1695,9 +1070,11 @@ export default function WellnessScreen() {
           ) : null}
 
           {/* Quick Resets Collapsible Card */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Quick Resets &amp; Micro-Tools
-          </Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Quick Resets &amp; Micro-Tools
+            </Text>
+          </View>
           <Card>
             <Pressable
               onPress={() => setResetSectionOpen(!resetSectionOpen)}
@@ -1848,9 +1225,11 @@ export default function WellnessScreen() {
         /* TAB 2: TRENDS & CORRELATION HEATMAP */
         <>
           {/* Time Range Filter */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Timeframe &amp; Averages
-          </Text>
+          <View style={[styles.sectionHeaderRow, { marginTop: 4 }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Timeframe &amp; Averages
+            </Text>
+          </View>
           <Card>
             <View style={styles.timeRangeBar}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>Range Filter</Text>
@@ -1906,9 +1285,11 @@ export default function WellnessScreen() {
           </Card>
 
           {/* Visual Trend Bars with Step 3 Baseline Equilibrium Line & Interactive Touch Tooltip */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Wellness Trajectory ({filteredEntries.length} entries)
-          </Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Wellness Trajectory ({filteredEntries.length} entries)
+            </Text>
+          </View>
           <Card>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, width: '100%', marginBottom: 4 }}>
               <Text style={[styles.sectionSubtitle, { color: colors.muted, marginBottom: 0 }]}>
@@ -2051,9 +1432,16 @@ export default function WellnessScreen() {
           </Card>
 
           {/* Academic vs. Wellness Correlation Heatmap: Step 3 Filter Active & Collapse Inactive */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Academic vs. Wellness Heatmap
-          </Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Academic vs. Wellness Heatmap
+            </Text>
+            <View style={[styles.heatBadge, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.08)' }]}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>
+                {activeModules.length} Active Modules
+              </Text>
+            </View>
+          </View>
           <Card>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, width: '100%', marginBottom: 4 }}>
               <Text style={[styles.sectionSubtitle, { color: colors.muted, marginBottom: 0 }]}>
@@ -2179,8 +1567,8 @@ export default function WellnessScreen() {
       )}
 
       {/* RECENT CHECK-IN HISTORY AS ACCORDION & LATEST SESSION SUMMARY */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, marginBottom: 6, gap: 8, width: '100%' }}>
-        <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 0, marginBottom: 0, flex: 1, minWidth: 0 }]} numberOfLines={1}>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionTitle, { color: colors.text, flex: 1, minWidth: 0 }]} numberOfLines={1}>
           Recent Activity Logs ({clusteredSessions.length})
         </Text>
         <View style={[styles.clusteringBadge, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.08)' }]}>
@@ -2272,9 +1660,11 @@ export default function WellnessScreen() {
       )}
 
       {/* DEVELOPER INTEGRATIONS & AUTOMATED ZERO-FRICTION HOOKS */}
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        Developer Integrations
-      </Text>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          Developer Integrations
+        </Text>
+      </View>
       <Card>
         <Pressable
           onPress={() => setDevHooksOpen(!devHooksOpen)}
@@ -2351,17 +1741,292 @@ export default function WellnessScreen() {
         ) : null}
       </Card>
 
+      {/* ─── 1. Burnout Recovery Plan Modal ─── */}
+      <Modal
+        visible={recoveryPlanModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRecoveryPlanModalVisible(false)}
+      >
+        <View style={modalStyles.overlay}>
+          <View style={[modalStyles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={modalStyles.headerRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                <View style={[modalStyles.iconBadge, { backgroundColor: 'rgba(59,130,246,0.15)' }]}>
+                  <Ionicons name="flash" size={20} color="#3b82f6" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[modalStyles.title, { color: colors.text }]}>Burnout Recovery Plan</Text>
+                  <Text style={[modalStyles.subtitle, { color: colors.muted }]}>
+                    {burnoutRisk.label} Risk · Strain Index: {burnoutRisk.score}%
+                  </Text>
+                </View>
+              </View>
+              <Pressable onPress={() => setRecoveryPlanModalVisible(false)} hitSlop={10}>
+                <Ionicons name="close-circle" size={26} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
+              <View style={{ gap: 12, paddingVertical: 8 }}>
+                {/* Protocol Overview Banner */}
+                <View style={[modalStyles.bannerBox, { backgroundColor: isLight ? '#eff6ff' : 'rgba(59,130,246,0.1)', borderColor: '#3b82f6' }]}>
+                  <Text style={[modalStyles.bannerTitle, { color: isLight ? '#1e40af' : '#60a5fa' }]}>
+                    Active Recovery Protocol
+                  </Text>
+                  <Text style={[modalStyles.bannerCopy, { color: colors.text }]}>
+                    {burnoutRisk.score >= 65
+                      ? 'High cognitive exhaustion detected. Prioritize neuro-recovery: disengage from high-context debugging and reset nervous system.'
+                      : 'Moderate strain accumulation. Implement pacing boundaries to prevent progression to acute burnout.'}
+                  </Text>
+                </View>
+
+                {/* Phase 1 */}
+                <View style={[modalStyles.phaseCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                  <View style={modalStyles.phaseHeader}>
+                    <Ionicons name="eye-outline" size={16} color="#8b5cf6" />
+                    <Text style={[modalStyles.phaseTitle, { color: colors.text }]}>Phase 1: Immediate Decompression (Next 2h)</Text>
+                  </View>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Step away from IDE screens for 15 minutes.</Text>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• 20-20-20 visual rest rule: focus at a 20-ft distance.</Text>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Mute non-critical Slack and notification pings.</Text>
+                </View>
+
+                {/* Phase 2 */}
+                <View style={[modalStyles.phaseCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                  <View style={modalStyles.phaseHeader}>
+                    <Ionicons name="git-branch-outline" size={16} color="#10b981" />
+                    <Text style={[modalStyles.phaseTitle, { color: colors.text }]}>Phase 2: Workload & Task Triage (Today)</Text>
+                  </View>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Low-friction task mode: document contracts, write test cases.</Text>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Postpone architectural re-writes and major schema migrations.</Text>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Single-thread: run 25-minute Pomodoro sprints with strict 5m pauses.</Text>
+                </View>
+
+                {/* Phase 3 */}
+                <View style={[modalStyles.phaseCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                  <View style={modalStyles.phaseHeader}>
+                    <Ionicons name="moon-outline" size={16} color="#3b82f6" />
+                    <Text style={[modalStyles.phaseTitle, { color: colors.text }]}>Phase 3: Circadian Rest & Sleep Target</Text>
+                  </View>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Target 8.0 hours minimum recovery sleep tonight.</Text>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Digital sunset: close laptops 45 minutes before sleep.</Text>
+                  <Text style={[modalStyles.phaseItem, { color: colors.muted }]}>• Hydration goal: 2.5 Litres of water across the day.</Text>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Actions */}
+            <View style={{ paddingTop: 14, gap: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
+              <Button
+                title="Apply Recovery Targets to Today"
+                onPress={() => {
+                  setStress(3);
+                  setEnergy(6);
+                  setSleepHours(8.0);
+                  setWaterLitres(2.5);
+                  setNotes((prev) => (prev ? `${prev}\n\n[Applied Burnout Recovery Protocol]` : '[Applied Burnout Recovery Protocol: Low-friction tasks & circadian sleep prioritization]'));
+                  setRecoveryPlanModalVisible(false);
+                  setInterventionNotice('✅ Recovery Plan targets applied to today\'s check-in.');
+                  setTimeout(() => setInterventionNotice(''), 6000);
+                }}
+              />
+              <Button
+                title="Dismiss"
+                secondary
+                onPress={() => setRecoveryPlanModalVisible(false)}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── 2. 15-Minute Screen-Free Break Modal ─── */}
+      <Modal
+        visible={breakModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setBreakModalVisible(false)}
+      >
+        <View style={modalStyles.overlay}>
+          <View style={[modalStyles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={modalStyles.headerRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={[modalStyles.iconBadge, { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
+                  <Ionicons name="cafe" size={20} color="#10b981" />
+                </View>
+                <View>
+                  <Text style={[modalStyles.title, { color: colors.text }]}>Screen-Free Break</Text>
+                  <Text style={[modalStyles.subtitle, { color: colors.muted }]}>Rest your eyes and reset cognitive focus</Text>
+                </View>
+              </View>
+              <Pressable onPress={() => setBreakModalVisible(false)} hitSlop={10}>
+                <Ionicons name="close-circle" size={26} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <Text style={{ fontSize: 44, fontWeight: '900', color: '#10b981', fontVariant: ['tabular-nums'] }}>
+                {Math.floor(breakSecondsLeft / 60).toString().padStart(2, '0')}:{(breakSecondsLeft % 60).toString().padStart(2, '0')}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>
+                {isBreakRunning ? 'Break in progress · Keep screens away' : 'Break paused'}
+              </Text>
+            </View>
+
+            <View style={{ gap: 8, paddingBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#10b981" />
+                <Text style={{ fontSize: 12, color: colors.text }}>Stand up, stretch your neck and shoulders</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#10b981" />
+                <Text style={{ fontSize: 12, color: colors.text }}>Drink a glass of cool water</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#10b981" />
+                <Text style={{ fontSize: 12, color: colors.text }}>Look out the window at daylight</Text>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title={isBreakRunning ? 'Pause' : 'Resume'}
+                  secondary
+                  onPress={() => setIsBreakRunning(!isBreakRunning)}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="Finish Break"
+                  onPress={() => {
+                    setIsBreakRunning(false);
+                    setBreakModalVisible(false);
+                    setInterventionNotice('🎉 15m break completed! Rested focus achieved.');
+                    setTimeout(() => setInterventionNotice(''), 5000);
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── 3. Session Debrief Modal ─── */}
+      <Modal
+        visible={debriefModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setDebriefModalVisible(false)}
+      >
+        <View style={modalStyles.overlay}>
+          <View style={[modalStyles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={modalStyles.headerRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={[modalStyles.iconBadge, { backgroundColor: 'rgba(245,158,11,0.15)' }]}>
+                  <Ionicons name="chatbubbles" size={20} color="#f59e0b" />
+                </View>
+                <View>
+                  <Text style={[modalStyles.title, { color: colors.text }]}>Session Debrief</Text>
+                  <Text style={[modalStyles.subtitle, { color: colors.muted }]}>Unpack blockers and capture key learnings</Text>
+                </View>
+              </View>
+              <Pressable onPress={() => setDebriefModalVisible(false)} hitSlop={10}>
+                <Ionicons name="close-circle" size={26} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            <View style={{ paddingVertical: 12, gap: 10 }}>
+              <Text style={{ fontSize: 12, color: colors.muted }}>
+                Debrief notes are automatically saved into your daily wellness log for retrospectives.
+              </Text>
+              <TextInput
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                numberOfLines={5}
+                placeholder="What was the main technical friction or breakthrough in this coding sprint?"
+                placeholderTextColor={colors.muted}
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.surfaceElevated,
+                  color: colors.text,
+                  borderRadius: 10,
+                  padding: 12,
+                  fontSize: 13,
+                  minHeight: 110,
+                  textAlignVertical: 'top',
+                }}
+              />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10, paddingTop: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="Cancel"
+                  secondary
+                  onPress={() => setDebriefModalVisible(false)}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="Save Debrief"
+                  onPress={() => {
+                    setDebriefModalVisible(false);
+                    setInterventionNotice('📝 Debrief note saved into check-in.');
+                    setTimeout(() => setInterventionNotice(''), 5000);
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 4-7-8 Zen Breathing Modal */}
+      <ZenBreathingModal
+        visible={zenModalOpen}
+        onClose={() => setZenModalOpen(false)}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  headerZenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  headerZenBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 22,
+    marginBottom: 10,
+    paddingHorizontal: 2,
+    width: '100%',
+  },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     letterSpacing: -0.2,
-    marginTop: 14,
-    marginBottom: 6,
+  },
+  sectionCaption: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   stepIndicatorContainer: {
     marginBottom: 14,
@@ -2501,25 +2166,31 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    padding: 3,
-    marginBottom: 12,
+    padding: 4,
+    marginTop: 10,
+    marginBottom: 20,
     width: '100%',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   tabButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderRadius: 9,
+    gap: 7,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
     minWidth: 0,
   },
   tabText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
     flexShrink: 1,
@@ -3444,6 +3115,86 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 13,
+    lineHeight: 18,
+  },
+});
+
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  sheet: {
+    width: '100%',
+    maxWidth: 500,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  iconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  subtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  bannerBox: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+  },
+  bannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  bannerCopy: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  phaseCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  phaseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  phaseTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  phaseItem: {
+    fontSize: 12,
     lineHeight: 18,
   },
 });

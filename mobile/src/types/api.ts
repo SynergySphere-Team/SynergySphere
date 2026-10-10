@@ -19,6 +19,8 @@ export interface Task {
   status: 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE';
   dueDate: string | null;
   createdAt: string;
+  timeSpentMinutes?: number | null;
+  targetDurationMinutes?: number | null;
 }
 
 export interface DeveloperProfile {
@@ -195,7 +197,8 @@ export interface LectureUpload {
   miniProjects: { title: string; description: string }[] | string;
   codingExercises: { title: string; description: string }[] | string;
 }
-export interface ProductivityStats { tasksCompletedToday: number; totalTasksCompleted: number; focusSessionsToday: number; focusMinutesToday: number; focusHoursToday: string; wellnessScore: number | null; statusCounts: Record<string, number>; learnedTasks: { id: string; title: string; learnedNote: string | null }[]; }
+export interface WeeklyFocusDay { date: string; label: string; minutes: number; }
+export interface ProductivityStats { tasksCompletedToday: number; totalTasksCompleted: number; focusSessionsToday: number; focusMinutesToday: number; focusHoursToday: string; wellnessScore: number | null; statusCounts: Record<string, number>; learnedTasks: { id: string; title: string; learnedNote: string | null; updatedAt?: string }[]; weeklyFocus?: WeeklyFocusDay[]; focusStreak?: number; }
 export interface AdminOverviewKpis {
   totalActiveUsers?: number;
   totalUsers?: number;

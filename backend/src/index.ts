@@ -113,7 +113,7 @@ app.use(express.json({
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 300,
+  max: process.env.NODE_ENV === 'production' ? 600 : 10000,
   message: { error: 'Too many requests, please try again later.' },
 });
 app.use('/api/', limiter);

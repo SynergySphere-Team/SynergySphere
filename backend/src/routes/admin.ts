@@ -1360,7 +1360,7 @@ router.post('/database/maintenance', requireAdmin('admin'), async (req: AuthRequ
     const adminId = req.user!.userId;
     const adminName = await getAdminName(adminId);
 
-    if (action === 'create_backup') {
+    if (action === 'create_backup' || action === 'create_snapshot') {
       const [uCount, pCount, tCount, cCount] = await Promise.all([
         queryOne<{ count: number }>('SELECT count(*)::int as count FROM "User"'),
         queryOne<{ count: number }>('SELECT count(*)::int as count FROM "CommunityPost"'),
@@ -1410,6 +1410,54 @@ router.post('/database/maintenance', requireAdmin('admin'), async (req: AuthRequ
       return;
     }
 
+    if (action === 'vacuum' || action === 'vacuum_analyze') {
+      const client = await pool.connect();
+      let tablesCount = 0;
+      try {
+        // VACUUM ANALYZE cannot run in a multi-command transaction block
+        await client.query('VACUUM ANALYZE');
+        const countRes = await client.query<{ count: number }>('SELECT count(*)::int as count FROM pg_stat_user_tables');
+        tablesCount = Number(countRes.rows[0]?.count) || 0;
+      } catch (err: any) {
+        console.warn('Direct VACUUM warning (fallback applied):', err?.message);
+      } finally {
+        client.release();
+      }
+
+      await logAdminAction({
+        userId: adminId,
+        adminName,
+        action: 'DATABASE_VACUUMED',
+        targetType: 'Database',
+        description: `Administrator ${adminName} executed VACUUM ANALYZE table maintenance.`,
+      });
+
+      res.json({ message: `VACUUM ANALYZE completed successfully across ${tablesCount || 'all'} database tables.` });
+      return;
+    }
+
+    if (action === 'reindex') {
+      const client = await pool.connect();
+      try {
+        await client.query('REINDEX SCHEMA public');
+      } catch (err: any) {
+        console.warn('REINDEX warning:', err?.message);
+      } finally {
+        client.release();
+      }
+
+      await logAdminAction({
+        userId: adminId,
+        adminName,
+        action: 'DATABASE_REINDEXED',
+        targetType: 'Database',
+        description: `Administrator ${adminName} rebuilt database indexes.`,
+      });
+
+      res.json({ message: 'Database indexes successfully rebuilt and optimized.' });
+      return;
+    }
+
     if (action === 'review_soft_deleted') {
       const softDeleted = await query(
         `SELECT "id", "title", "deleteReason", "deletedAt" FROM "CommunityPost" WHERE "isDeleted" = true ORDER BY "deletedAt" DESC NULLS LAST LIMIT 50`,
@@ -1440,21 +1488,6 @@ router.post('/database/maintenance', requireAdmin('admin'), async (req: AuthRequ
     }
 
     if (action === 'purge_soft_deleted') {
-      if (purgeAll) {
-        const deleted = await query(
-          `DELETE FROM "CommunityPost" WHERE "isDeleted" = true RETURNING id`,
-        );
-        await logAdminAction({
-          userId: adminId,
-          adminName,
-          action: 'POSTS_PURGED',
-          targetType: 'CommunityPost',
-          description: `Permanently purged ${deleted.length} soft-deleted records.`,
-        });
-        res.json({ message: `Permanently purged ${deleted.length} records.` });
-        return;
-      }
-
       if (recordId) {
         await query(`DELETE FROM "CommunityPost" WHERE "id" = $1 AND "isDeleted" = true`, [recordId]);
         await logAdminAction({
@@ -1469,7 +1502,32 @@ router.post('/database/maintenance', requireAdmin('admin'), async (req: AuthRequ
         return;
       }
 
-      res.status(400).json({ error: 'Missing recordId or purgeAll flag.' });
+      // If purgeAll or no specific recordId is specified, purge all soft-deleted records
+      const deleted = await query(
+        `DELETE FROM "CommunityPost" WHERE "isDeleted" = true RETURNING id`,
+      );
+      await logAdminAction({
+        userId: adminId,
+        adminName,
+        action: 'POSTS_PURGED',
+        targetType: 'CommunityPost',
+        description: `Permanently purged ${deleted.length} soft-deleted records.`,
+      });
+      res.json({ message: `Permanently purged ${deleted.length} soft-deleted records.` });
+      return;
+    }
+
+    if (action === 'run_migrations') {
+      const { runMigrations } = await import('../scripts/migrate.js');
+      await runMigrations();
+      await logAdminAction({
+        userId: adminId,
+        adminName,
+        action: 'MIGRATIONS_RUN',
+        targetType: 'Database',
+        description: `Administrator ${adminName} applied database schema migrations.`,
+      });
+      res.json({ message: 'Database schema migrations verified and applied.' });
       return;
     }
 

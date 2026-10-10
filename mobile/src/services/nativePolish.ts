@@ -36,8 +36,7 @@ export function triggerMediumHaptic(): void {
 export function triggerSuccessHaptic(): void {
   try {
     if (Platform.OS === 'android') {
-      // 2 short pulses for success
-      Vibration.vibrate([0, 20, 50, 30]);
+      Vibration.vibrate(30);
     } else {
       Vibration.vibrate(30);
     }
@@ -49,10 +48,9 @@ export function triggerSuccessHaptic(): void {
 export function triggerErrorHaptic(): void {
   try {
     if (Platform.OS === 'android') {
-      // 3 assertive pulses for fail/error
-      Vibration.vibrate([0, 50, 40, 50, 40, 60]);
+      Vibration.vibrate(50);
     } else {
-      Vibration.vibrate(60);
+      Vibration.vibrate(50);
     }
   } catch {
     // Vibration silently ignored
