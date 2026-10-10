@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card, Field } from '@/components/ui';
@@ -20,6 +21,13 @@ import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import type { WellnessEntry, WellnessInsights } from '@/types/api';
+import { ZenBreathingModal } from '@/components/wellness/ZenBreathingModal';
+import {
+  WellnessQuickCheckIn,
+  type QuickPulseData,
+  type DetailedCheckInData,
+} from '@/components/wellness/WellnessQuickCheckIn';
+import { BurnoutActionCard } from '@/components/wellness/BurnoutActionCard';
 import {
   WELLNESS_MODULES,
   MOOD_TAG_CATEGORIES,
@@ -41,9 +49,13 @@ type ActiveTab = 'checkin' | 'trends';
 type TimeRange = '7D' | '30D' | 'SEMESTER';
 
 export default function WellnessScreen() {
+  const router = useRouter();
   const { colors, theme } = useTheme();
   const { fontSize, largerText } = useAccessibility();
   const isLight = theme === 'light';
+
+  // Zen 4-7-8 Breathing Modal state
+  const [zenModalOpen, setZenModalOpen] = useState(false);
 
   // Navigation tab: 'checkin' | 'trends'
   const [activeTab, setActiveTab] = useState<ActiveTab>('checkin');
@@ -232,40 +244,26 @@ export default function WellnessScreen() {
     setWaterInputText(waterLitres.toString());
   };
 
-  // Save check-in
-  async function save() {
+  // 10-Second Quick Pulse Save
+  async function handleQuickSave(data: QuickPulseData) {
+    setStress(data.stress);
+    setMood(data.mood);
+    setEnergy(data.energy);
     try {
       setSaving(true);
       setError('');
       setSavedMessage('');
 
       const res = await api.post<{ xpAwarded?: number; streak?: number }>('/wellness', {
-        stressLevel: stress,
-        mood,
-        energyLevel: energy,
+        stressLevel: data.stress,
+        mood: data.mood,
+        energyLevel: data.energy,
         moduleId,
-        sleepHours,
-        waterIntake: waterLitres,
-        tags: selectedTags,
-        ...(taskTitle.trim()
-          ? {
-              taskTitle: taskTitle.trim(),
-              taskStatus: markTaskDone ? 'DONE' : 'IN_PROGRESS',
-            }
-          : {}),
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
-        ...(gratitudeWin.trim() ? { gratitude: gratitudeWin.trim() } : {}),
       });
 
-      setNotes('');
-      setGratitudeWin('');
-      setTaskTitle('');
-      setMarkTaskDone(false);
-      setCheckInStep(1);
-
-      const xpEarned = res?.xpAwarded ?? (markTaskDone ? 25 : 15);
+      const xpEarned = res?.xpAwarded ?? 15;
       const streak = res?.streak ?? (insights?.streak?.current ? insights.streak.current + 1 : 1);
-      setSavedMessage(`Check-in saved! +${xpEarned} XP awarded. 🔥 Streak: ${streak} days.`);
+      setSavedMessage(`Check-in recorded! +${xpEarned} XP awarded. Streak: ${streak} days.`);
 
       await load();
       setTimeout(() => setSavedMessage(''), 6000);
@@ -274,6 +272,72 @@ export default function WellnessScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // Detailed Reflection Save
+  async function handleDetailedSave(data: DetailedCheckInData) {
+    setStress(data.stress);
+    setMood(data.mood);
+    setEnergy(data.energy);
+    setModuleId(data.moduleId);
+    setTaskTitle(data.taskTitle);
+    setMarkTaskDone(data.markTaskDone);
+    setSleepHours(data.sleepHours);
+    setWaterLitres(data.waterLitres);
+    setSelectedTags(data.selectedTags);
+    setGratitudeWin(data.gratitudeWin);
+    setNotes(data.notes);
+    try {
+      setSaving(true);
+      setError('');
+      setSavedMessage('');
+
+      const res = await api.post<{ xpAwarded?: number; streak?: number }>('/wellness', {
+        stressLevel: data.stress,
+        mood: data.mood,
+        energyLevel: data.energy,
+        moduleId: data.moduleId,
+        sleepHours: data.sleepHours,
+        waterIntake: data.waterLitres,
+        tags: data.selectedTags,
+        ...(data.taskTitle.trim()
+          ? {
+              taskTitle: data.taskTitle.trim(),
+              taskStatus: data.markTaskDone ? 'DONE' : 'IN_PROGRESS',
+            }
+          : {}),
+        ...(data.notes.trim() ? { notes: data.notes.trim() } : {}),
+        ...(data.gratitudeWin.trim() ? { gratitude: data.gratitudeWin.trim() } : {}),
+      });
+
+      const xpEarned = res?.xpAwarded ?? 25;
+      const streak = res?.streak ?? (insights?.streak?.current ? insights.streak.current + 1 : 1);
+      setSavedMessage(`Detailed reflection saved! +${xpEarned} XP awarded. Streak: ${streak} days.`);
+
+      await load();
+      setTimeout(() => setSavedMessage(''), 6000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save check-in.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Legacy save fallback
+  async function save() {
+    await handleDetailedSave({
+      stress,
+      mood,
+      energy,
+      moduleId,
+      taskTitle,
+      markTaskDone,
+      sleepHours,
+      waterLitres,
+      selectedTags,
+      gratitudeWin,
+      notes,
+    });
   }
 
   // Quick Gratitude Log
@@ -400,25 +464,16 @@ export default function WellnessScreen() {
   const isHighStrainSpike = liveStrain >= 2 || stress >= 7 || burnoutRisk.level === 'CRITICAL';
 
   const handleScheduleBreak = () => {
-    try {
-      Vibration.vibrate([0, 50, 100, 50]);
-    } catch {}
-    setInterventionNotice('🌿 15-minute screen-free break scheduled. Step away from your IDE.');
+    setInterventionNotice('15-minute screen-free break scheduled. Step away from your IDE.');
     setTimeout(() => setInterventionNotice(''), 6000);
   };
 
   const handleLaunchBreathing = () => {
-    setActiveTab('checkin');
-    setResetSectionOpen(true);
-    setActiveResetTool('breathing');
-    setIsBreathingActive(true);
-    setBreathPhase('Inhale');
-    setBreathSecondsLeft(4);
-    try {
-      Vibration.vibrate(40);
-    } catch {}
-    setInterventionNotice('🫁 4-7-8 Breathing activated with haptic pulse cues.');
-    setTimeout(() => setInterventionNotice(''), 5000);
+    setZenModalOpen(true);
+  };
+
+  const handleLaunchTasksDecompression = () => {
+    router.push('/(tabs)/tasks' as never);
   };
 
   const handleGenerateRecoveryPlan = () => {
@@ -427,13 +482,13 @@ export default function WellnessScreen() {
     }
     setStress(4);
     setEnergy(6);
-    setInterventionNotice('⚡ Recovery Plan engaged: Low-friction docstrings & linting mode activated.');
+    setInterventionNotice('Recovery Plan engaged: Low-friction docstrings & linting mode activated.');
     setTimeout(() => setInterventionNotice(''), 6000);
   };
 
   const handleDebriefSession = () => {
     setNotes((prev) => (prev ? prev : 'Session debrief: cognitive friction around blocker; stepping back to review approach.'));
-    setInterventionNotice('📝 Debrief note primed in form below. Add takeaways and tap Log Check-in.');
+    setInterventionNotice('Debrief note primed in form below. Add takeaways and tap Log Check-in.');
     setTimeout(() => setInterventionNotice(''), 6000);
   };
 
@@ -680,6 +735,22 @@ export default function WellnessScreen() {
             Track mental bandwidth, prevent burnout &amp; optimize tasks.
           </Text>
         </View>
+
+        <Pressable
+          onPress={() => setZenModalOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Start Zen Breathing"
+          style={[
+            styles.headerZenBadge,
+            {
+              backgroundColor: isLight ? '#E8F5E9' : 'rgba(52, 211, 153, 0.15)',
+              borderColor: isLight ? '#B7DFC3' : 'rgba(52, 211, 153, 0.3)',
+            },
+          ]}
+        >
+          <Ionicons name="leaf" size={13} color={isLight ? '#166534' : '#34D399'} />
+          <Text style={[styles.headerZenBadgeText, { color: isLight ? '#166534' : '#34D399' }]}>Zen</Text>
+        </Pressable>
       </View>
 
       {error ? <Notice>{error}</Notice> : null}
@@ -830,759 +901,22 @@ export default function WellnessScreen() {
       {/* TAB 1: CHECK-IN & AI COACH */}
       {activeTab === 'checkin' ? (
         <>
-          {/* Main Daily Check-In Form */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Daily Check-In
-          </Text>
-          <Card>
-            {/* Step Progress Bar & Discrete Step Buttons */}
-            <View style={styles.stepIndicatorContainer}>
-              <View style={styles.stepHeaderRow}>
-                <Text style={[styles.stepTitleText, { color: colors.text }]}>
-                  {checkInStep === 1
-                    ? 'Step 1: Mind & Focus'
-                    : checkInStep === 2
-                    ? 'Step 2: Physical Metrics & Sleep'
-                    : 'Step 3: Reflection & Debrief'}
-                </Text>
-                <View style={[styles.statusPill, { backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)' }]}>
-                  <Text style={[styles.statusPillText, { color: isLight ? '#1e6827' : colors.primary }]}>
-                    Step {checkInStep} of 3
-                  </Text>
-                </View>
-              </View>
+          {/* Enhanced Dual-Mode Check-In Form */}
+          <WellnessQuickCheckIn
+            onSaveQuick={handleQuickSave}
+            onSaveDetailed={handleDetailedSave}
+            saving={saving}
+            accent={isLight ? '#1e6827' : colors.primary}
+          />
 
-              {/* Progress Bar Track */}
-              <View style={[styles.stepProgressBarTrack, { backgroundColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.1)' }]}>
-                <View
-                  style={[
-                    styles.stepProgressBarFill,
-                    {
-                      width: checkInStep === 1 ? '33.3%' : checkInStep === 2 ? '66.6%' : '100%',
-                      backgroundColor: isLight ? '#00875A' : colors.primary,
-                    },
-                  ]}
-                />
-              </View>
-
-              {/* Discrete Step Tabs / Dots */}
-              <View style={styles.stepDotsRow}>
-                {[
-                  { step: 1 as const, label: 'Mind & Focus' },
-                  { step: 2 as const, label: 'Physical & Rest' },
-                  { step: 3 as const, label: 'Reflection' },
-                ].map((s) => {
-                  const active = checkInStep === s.step;
-                  const completed = checkInStep > s.step;
-                  return (
-                    <Pressable
-                      key={s.step}
-                      onPress={() => {
-                        setCheckInStep(s.step);
-                      }}
-                      style={[
-                        styles.stepDotBtn,
-                        active && {
-                          backgroundColor: isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)',
-                          borderColor: colors.primary,
-                        },
-                        completed && {
-                          backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.06)',
-                          borderColor: isLight ? '#CBD5E1' : 'rgba(255,255,255,0.15)',
-                        },
-                        !active && !completed && {
-                          borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)',
-                        },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.stepDotCircle,
-                          {
-                            backgroundColor: active
-                              ? (isLight ? '#00875A' : colors.primary)
-                              : completed
-                              ? '#22c55e'
-                              : isLight ? '#CBD5E1' : 'rgba(255,255,255,0.2)',
-                          },
-                        ]}
-                      >
-                        {completed ? (
-                          <Ionicons name="checkmark" size={10} color="#ffffff" />
-                        ) : (
-                          <Text style={styles.stepDotNumber}>{s.step}</Text>
-                        )}
-                      </View>
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.stepDotLabel,
-                          {
-                            color: active ? colors.text : colors.muted,
-                            fontWeight: active ? '800' : '500',
-                          },
-                        ]}
-                      >
-                        {s.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* STEP 1: MIND & FOCUS */}
-            {checkInStep === 1 ? (
-              <View style={{ gap: 4 }}>
-                {/* Module Picker */}
-                <Text style={[styles.sectionSubtitle, { color: colors.muted }]}>Linked Module</Text>
-                <View style={styles.moduleGrid}>
-                  {WELLNESS_MODULES.map((m) => {
-                    const isSelected = moduleId === m.id;
-                    return (
-                      <Pressable
-                        key={m.id}
-                        onPress={() => setModuleId(m.id)}
-                        style={[
-                          styles.moduleButton,
-                          {
-                            borderColor: isSelected ? m.color : 'rgba(255,255,255,0.1)',
-                            backgroundColor: isSelected ? 'rgba(255,255,255,0.1)' : 'transparent',
-                          },
-                        ]}
-                      >
-                        <View style={[styles.moduleDot, { backgroundColor: m.color }]} />
-                        <Text
-                          style={[
-                            styles.moduleButtonText,
-                            { color: isSelected ? colors.text : colors.muted, fontWeight: isSelected ? '700' : '500' },
-                          ]}
-                        >
-                          {m.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                {/* Task Input */}
-                <Field
-                  label="Active Task or Blocker"
-                  value={taskTitle}
-                  onChangeText={setTaskTitle}
-                  placeholder="e.g. Debugging Spring Security, LeetCode Binary Search..."
-                />
-
-                {taskTitle.trim().length > 0 ? (
-                  <Pressable
-                    onPress={() => setMarkTaskDone(!markTaskDone)}
-                    style={styles.checkboxRow}
-                  >
-                    <Ionicons
-                      name={markTaskDone ? 'checkbox' : 'square-outline'}
-                      size={18}
-                      color={markTaskDone ? colors.primary : colors.muted}
-                      style={{ flexShrink: 0 }}
-                    />
-                    <Text style={[styles.checkboxText, { color: colors.text }]}>
-                      Mark task as completed (DONE) (+10 XP)
-                    </Text>
-                  </Pressable>
-                ) : null}
-
-                {/* Rating Controls: Step 1 Labeled 1-10 Scale with Dynamic Semantic Anchors & Haptics */}
-                <View style={styles.ratingSection}>
-                  {/* Stress 1-10 Scale */}
-                  {(() => {
-                    const anchor = STRESS_ANCHORS[stress] || STRESS_ANCHORS[5];
-                    return (
-                      <View style={styles.scaleContainer}>
-                        <View style={styles.scaleLabelRow}>
-                          <Text style={[styles.ratingLabel, { color: colors.text }]}>
-                            Stress Level: <Text style={{ color: '#f472b6', fontWeight: '800' }}>{stress}/10</Text>
-                          </Text>
-                          <View style={[styles.scaleValueBadge, { backgroundColor: `${anchor.color}20`, borderColor: anchor.color }]}>
-                            <Text style={[styles.scaleValueBadgeText, { color: anchor.color }]}>
-                              {anchor.label}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.scaleButtonsRow}>
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
-                            const isSelected = stress === val;
-                            return (
-                              <Pressable
-                                key={val}
-                                onPress={() => setRatingWithHaptic(setStress, val)}
-                                style={[
-                                  styles.scaleBtn,
-                                  isSelected
-                                    ? { backgroundColor: '#f472b6', borderColor: '#f472b6' }
-                                    : { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
-                                ]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.scaleBtnText,
-                                    { color: isSelected ? '#ffffff' : colors.text },
-                                  ]}
-                                >
-                                  {val}
-                                </Text>
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-
-                        {/* Semantic Anchor Description */}
-                        <View style={[styles.anchorCard, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)' }]}>
-                          <View style={[styles.anchorDot, { backgroundColor: anchor.color }]} />
-                          <Text style={[styles.anchorDescText, { color: colors.muted }]}>
-                            {anchor.desc}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })()}
-
-                  {/* Mood 1-10 Scale */}
-                  {(() => {
-                    const anchor = MOOD_ANCHORS[mood] || MOOD_ANCHORS[6];
-                    return (
-                      <View style={styles.scaleContainer}>
-                        <View style={styles.scaleLabelRow}>
-                          <Text style={[styles.ratingLabel, { color: colors.text }]}>
-                            Mood / Outlook: <Text style={{ color: '#c084fc', fontWeight: '800' }}>{mood}/10</Text>
-                          </Text>
-                          <View style={[styles.scaleValueBadge, { backgroundColor: `${anchor.color}20`, borderColor: anchor.color }]}>
-                            <Text style={[styles.scaleValueBadgeText, { color: anchor.color }]}>
-                              {anchor.label}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.scaleButtonsRow}>
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
-                            const isSelected = mood === val;
-                            return (
-                              <Pressable
-                                key={val}
-                                onPress={() => setRatingWithHaptic(setMood, val)}
-                                style={[
-                                  styles.scaleBtn,
-                                  isSelected
-                                    ? { backgroundColor: '#c084fc', borderColor: '#c084fc' }
-                                    : { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
-                                ]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.scaleBtnText,
-                                    { color: isSelected ? '#ffffff' : colors.text },
-                                  ]}
-                                >
-                                  {val}
-                                </Text>
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-
-                        <View style={[styles.anchorCard, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)' }]}>
-                          <View style={[styles.anchorDot, { backgroundColor: anchor.color }]} />
-                          <Text style={[styles.anchorDescText, { color: colors.muted }]}>
-                            {anchor.desc}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })()}
-
-                  {/* Energy 1-10 Scale */}
-                  {(() => {
-                    const anchor = ENERGY_ANCHORS[energy] || ENERGY_ANCHORS[6];
-                    return (
-                      <View style={styles.scaleContainer}>
-                        <View style={styles.scaleLabelRow}>
-                          <Text style={[styles.ratingLabel, { color: colors.text }]}>
-                            Energy / Vitality: <Text style={{ color: '#2dd4bf', fontWeight: '800' }}>{energy}/10</Text>
-                          </Text>
-                          <View style={[styles.scaleValueBadge, { backgroundColor: `${anchor.color}20`, borderColor: anchor.color }]}>
-                            <Text style={[styles.scaleValueBadgeText, { color: anchor.color }]}>
-                              {anchor.label}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.scaleButtonsRow}>
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => {
-                            const isSelected = energy === val;
-                            return (
-                              <Pressable
-                                key={val}
-                                onPress={() => setRatingWithHaptic(setEnergy, val)}
-                                style={[
-                                  styles.scaleBtn,
-                                  isSelected
-                                    ? { backgroundColor: '#2dd4bf', borderColor: '#2dd4bf' }
-                                    : { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
-                                ]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.scaleBtnText,
-                                    { color: isSelected ? '#042f2e' : colors.text },
-                                  ]}
-                                >
-                                  {val}
-                                </Text>
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-
-                        <View style={[styles.anchorCard, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.08)' }]}>
-                          <View style={[styles.anchorDot, { backgroundColor: anchor.color }]} />
-                          <Text style={[styles.anchorDescText, { color: colors.muted }]}>
-                            {anchor.desc}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })()}
-                </View>
-
-                {/* Step 1 Navigation */}
-                <View style={styles.stepNavigationRow}>
-                  <Button
-                    title="Next: Physical Metrics & Sleep →"
-                    onPress={() => {
-                      setCheckInStep(2);
-                    }}
-                    style={{ flex: 1 }}
-                  />
-                </View>
-              </View>
-            ) : null}
-
-            {/* STEP 2: PHYSICAL METRICS & SLEEP */}
-            {checkInStep === 2 ? (
-              <View style={{ gap: 6 }}>
-                {/* Micro-Trackers: Sleep & Water with Two-Way Keyboard Input & Steppers */}
-                <View style={styles.microTrackersRow}>
-                  {/* Sleep Tracker */}
-                  <View style={[styles.microCard, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.04)', borderColor: colors.border }]}>
-                    <View style={styles.microHeader}>
-                      <Ionicons name="moon" size={13} color="#c084fc" />
-                      <Text style={[styles.microTitle, { color: colors.text }]}>Sleep: {sleepHours}h</Text>
-                      <Text style={{ fontSize: 9, color: colors.muted, marginLeft: 'auto' }}>
-                        {sleepHours < 6 ? 'Deprived' : sleepHours < 7.5 ? 'Moderate' : 'Optimal'}
-                      </Text>
-                    </View>
-
-                    {/* Presets Row */}
-                    <View style={styles.quickPresetRow}>
-                      {SLEEP_PRESETS.map((hrs) => {
-                        const active = sleepHours === hrs;
-                        return (
-                          <Pressable
-                            key={hrs}
-                            onPress={() => {
-                              updateSleep(hrs);
-                            }}
-                            style={[
-                              styles.presetChip,
-                              active && { backgroundColor: isLight ? '#e9d5ff' : 'rgba(192,132,252,0.25)', borderColor: '#c084fc' },
-                            ]}
-                          >
-                            <Text style={[styles.presetChipText, { color: active ? (isLight ? '#7e22ce' : '#e9d5ff') : colors.muted }]}>
-                              {hrs}h
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-
-                    {/* Stepper & Direct Editable Numeric Input */}
-                    <View style={styles.stepperRow}>
-                      <Pressable
-                        onPress={() => updateSleep(sleepHours - 0.5)}
-                        style={styles.stepBtn}
-                      >
-                        <Ionicons name="remove" size={14} color={colors.text} />
-                      </Pressable>
-                      <View style={[styles.metricInputBox, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' }]}>
-                        <TextInput
-                          keyboardType="decimal-pad"
-                          value={sleepInputText}
-                          onChangeText={handleSleepTextChange}
-                          onBlur={handleSleepBlur}
-                          style={[styles.metricTextInput, { color: '#c084fc' }]}
-                          selectTextOnFocus
-                        />
-                        <Text style={[styles.metricUnitLabel, { color: '#c084fc' }]}>hrs</Text>
-                      </View>
-                      <Pressable
-                        onPress={() => updateSleep(sleepHours + 0.5)}
-                        style={styles.stepBtn}
-                      >
-                        <Ionicons name="add" size={14} color={colors.text} />
-                      </Pressable>
-                    </View>
-                  </View>
-
-                  {/* Water Tracker (Litres - L) */}
-                  <View style={[styles.microCard, { backgroundColor: isLight ? '#f1f5f3' : 'rgba(255,255,255,0.04)', borderColor: colors.border }]}>
-                    <View style={styles.microHeader}>
-                      <Ionicons name="water" size={13} color="#2dd4bf" />
-                      <Text style={[styles.microTitle, { color: colors.text }]}>Water: {waterLitres.toFixed(1)}L💧</Text>
-                      <Text style={{ fontSize: 9, color: colors.muted, marginLeft: 'auto' }}>
-                        {waterLitres < 1.5 ? 'Low' : waterLitres < 2.5 ? 'Good' : 'Hydrated'}
-                      </Text>
-                    </View>
-
-                    {/* Presets Row */}
-                    <View style={styles.quickPresetRow}>
-                      {WATER_PRESETS.map((litres) => {
-                        const active = Math.abs(waterLitres - litres) < 0.05;
-                        return (
-                          <Pressable
-                            key={litres}
-                            onPress={() => {
-                              updateWater(litres);
-                            }}
-                            style={[
-                              styles.presetChip,
-                              active && { backgroundColor: isLight ? '#ccfbf1' : 'rgba(45,212,191,0.25)', borderColor: '#2dd4bf' },
-                            ]}
-                          >
-                            <Text style={[styles.presetChipText, { color: active ? (isLight ? '#0f766e' : '#99f6e4') : colors.muted }]}>
-                              {litres.toFixed(1)}L
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                      <Pressable
-                        onPress={() => {
-                          updateWater(waterLitres + WATER_STEP);
-                        }}
-                        style={styles.boosterChip}
-                      >
-                        <Text style={styles.boosterChipText}>+0.25L</Text>
-                      </Pressable>
-                    </View>
-
-                    {/* Stepper & Direct Editable Numeric Input */}
-                    <View style={styles.stepperRow}>
-                      <Pressable
-                        onPress={() => updateWater(waterLitres - WATER_STEP)}
-                        style={styles.stepBtn}
-                      >
-                        <Ionicons name="remove" size={14} color={colors.text} />
-                      </Pressable>
-                      <View style={[styles.metricInputBox, { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' }]}>
-                        <TextInput
-                          keyboardType="decimal-pad"
-                          value={waterInputText}
-                          onChangeText={handleWaterTextChange}
-                          onBlur={handleWaterBlur}
-                          style={[styles.metricTextInput, { color: '#2dd4bf' }]}
-                          selectTextOnFocus
-                        />
-                        <Text style={[styles.metricUnitLabel, { color: '#2dd4bf' }]}>L</Text>
-                      </View>
-                      <Pressable
-                        onPress={() => updateWater(waterLitres + WATER_STEP)}
-                        style={styles.stepBtn}
-                      >
-                        <Ionicons name="add" size={14} color={colors.text} />
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Categorized Focus & Mood Keywords */}
-                <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 12 }]}>
-                  Focus &amp; Mood Tags
-                </Text>
-                <View style={{ gap: 8, marginBottom: 8 }}>
-                  {MOOD_TAG_CATEGORIES.map((cat) => (
-                    <View key={cat.category} style={styles.tagCategoryBlock}>
-                      <View style={styles.tagCategoryHeader}>
-                        <Ionicons name={cat.icon as any} size={11} color={cat.color} />
-                        <Text style={[styles.tagCategoryTitle, { color: cat.color }]}>{cat.category}</Text>
-                      </View>
-                      <View style={styles.categoryPillWrap}>
-                        {cat.tags.map((tag) => {
-                          const active = selectedTags.includes(tag);
-                          return (
-                            <Pressable
-                              key={tag}
-                              onPress={() => {
-                                toggleTag(tag);
-                              }}
-                              style={[
-                                styles.categoryTagPill,
-                                active && {
-                                  backgroundColor: `${cat.color}25`,
-                                  borderColor: cat.color,
-                                },
-                                !active && { borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)' },
-                              ]}
-                            >
-                              {active ? (
-                                <Ionicons name="checkmark" size={11} color={cat.color} style={{ marginRight: 2 }} />
-                              ) : null}
-                              <Text
-                                style={[
-                                  styles.categoryTagPillText,
-                                  {
-                                    color: active ? (isLight ? cat.color : '#ffffff') : colors.muted,
-                                    fontWeight: active ? '700' : '500',
-                                  },
-                                ]}
-                              >
-                                {tag}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  ))}
-                </View>
-
-                {/* Step 2 Navigation */}
-                <View style={styles.stepNavigationRow}>
-                  <Button
-                    title="← Back to Mind"
-                    secondary
-                    onPress={() => {
-                      setCheckInStep(1);
-                    }}
-                    style={{ flex: 1 }}
-                  />
-                  <Button
-                    title="Next: Reflection →"
-                    onPress={() => {
-                      setCheckInStep(3);
-                    }}
-                    style={{ flex: 1 }}
-                  />
-                </View>
-              </View>
-            ) : null}
-
-            {/* STEP 3: REFLECTION */}
-            {checkInStep === 3 ? (
-              <View style={{ gap: 8 }}>
-                {/* Gratitude Win */}
-                <Text style={[styles.sectionSubtitle, { color: colors.muted }]}>
-                  Micro-Win or Gratitude
-                </Text>
-                <View style={styles.gratitudePillWrap}>
-                  {GRATITUDE_PROMPT_PRESETS.map((preset, i) => {
-                    const isSelected = gratitudeWin === preset;
-                    return (
-                      <Pressable
-                        key={i}
-                        onPress={() => {
-                          setGratitudeWin(isSelected ? '' : preset);
-                        }}
-                        style={[
-                          styles.gratitudePill,
-                          {
-                            borderColor: isSelected ? colors.primary : colors.border,
-                            backgroundColor: isSelected ? (isLight ? '#e6f4ea' : 'rgba(145,219,94,0.15)') : 'transparent',
-                          },
-                        ]}
-                      >
-                        <Text style={[styles.gratitudePillText, { color: isSelected ? (isLight ? '#1e6827' : colors.primary) : colors.text }]}>
-                          {preset}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <Field
-                  label="Custom Micro-Win"
-                  value={gratitudeWin}
-                  onChangeText={setGratitudeWin}
-                  placeholder="e.g. Shipped clean refactor without regressions..."
-                />
-
-                {/* Notes */}
-                <Field
-                  label="Session Notes & Blockers"
-                  value={notes}
-                  onChangeText={setNotes}
-                  multiline
-                  placeholder="What went well or what challenges did you face today?"
-                />
-
-                {/* Real-time Summary Card Before Submission */}
-                <View style={[styles.checkInPreviewCard, { backgroundColor: isLight ? '#f8faf9' : 'rgba(255,255,255,0.03)', borderColor: colors.border }]}>
-                  <Text style={[styles.previewCardTitle, { color: colors.text }]}>Check-In Summary</Text>
-                  <View style={styles.previewMetricsRow}>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>
-                      Stress: <Text style={{ color: '#f472b6', fontWeight: '800' }}>{stress}/10</Text> · Mood: <Text style={{ color: '#c084fc', fontWeight: '800' }}>{mood}/10</Text> · Energy: <Text style={{ color: '#2dd4bf', fontWeight: '800' }}>{energy}/10</Text>
-                    </Text>
-                  </View>
-                  <View style={styles.previewMetricsRow}>
-                    <Text style={{ fontSize: 11, color: colors.muted }}>
-                      Sleep: <Text style={{ color: colors.text, fontWeight: '700' }}>{sleepHours} hrs</Text> · Water: <Text style={{ color: colors.text, fontWeight: '700' }}>{waterLitres.toFixed(1)} L</Text> · Module: <Text style={{ color: colors.primary, fontWeight: '700' }}>{moduleId}</Text>
-                    </Text>
-                  </View>
-                  {selectedTags.length > 0 ? (
-                    <Text style={{ fontSize: 10, color: colors.muted, fontStyle: 'italic', marginTop: 2 }}>
-                      {selectedTags.join('  ')}
-                    </Text>
-                  ) : null}
-                </View>
-
-                {/* Step 3 Navigation */}
-                <View style={styles.stepNavigationRow}>
-                  <Button
-                    title="← Back to Physical"
-                    secondary
-                    onPress={() => {
-                      setCheckInStep(2);
-                    }}
-                    style={{ flex: 1 }}
-                  />
-                  <Button
-                    title={saving ? 'Logging...' : 'Log Check-in (+15 XP) ✓'}
-                    disabled={saving}
-                    onPress={save}
-                    style={{ flex: 2 }}
-                  />
-                </View>
-              </View>
-            ) : null}
-          </Card>
-
-          {/* AI Burnout Risk Meter: Active Actionable Tool & 1-Tap Interventions */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Burnout Risk Assessment
-          </Text>
-          <Card>
-            <View style={styles.burnoutHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
-                <Ionicons
-                  name={burnoutRisk.level === 'CRITICAL' ? 'flame' : burnoutRisk.level === 'MODERATE' ? 'warning' : 'shield-checkmark'}
-                  size={18}
-                  color={burnoutRisk.color}
-                  style={{ flexShrink: 0 }}
-                />
-                <Text style={[styles.cardTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>Cognitive Strain Monitor</Text>
-              </View>
-              <View
-                style={[
-                  styles.riskBadge,
-                  { backgroundColor: `${burnoutRisk.color}20`, borderColor: burnoutRisk.color },
-                ]}
-              >
-                <Text style={[styles.riskBadgeText, { color: burnoutRisk.color }]} numberOfLines={1}>
-                  {burnoutRisk.label} ({burnoutRisk.score}%)
-                </Text>
-              </View>
-            </View>
-
-            <Text style={[styles.burnoutDesc, { color: colors.muted }]}>
-              {burnoutRisk.description}
-            </Text>
-
-            {/* Real-Time Strain Spike Alert */}
-            {isHighStrainSpike ? (
-              <View style={[styles.strainAlertBanner, { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444' }]}>
-                <Ionicons name="alert-circle" size={18} color="#ef4444" style={{ flexShrink: 0, marginTop: 1 }} />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.strainAlertTitle, { color: '#ef4444' }]}>
-                    Cognitive Strain Spike ({liveStrain > 0 ? `+${liveStrain}` : liveStrain} Net Strain)
-                  </Text>
-                  <Text style={[styles.strainAlertSub, { color: colors.text }]}>
-                    Stress ({stress}/10) is exceeding Energy ({energy}/10). Risk of debugging tunnel-vision. Trigger an intervention below:
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-
-            {/* Quick Interventions */}
-            <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 10 }]}>
-              Quick Interventions
-            </Text>
-            <View style={styles.interventionGrid}>
-              <Pressable
-                onPress={handleScheduleBreak}
-                style={[styles.interventionBtn, { borderColor: '#10b981', backgroundColor: isLight ? '#f0fdf4' : 'rgba(16,185,129,0.1)' }]}
-              >
-                <Ionicons name="cafe" size={16} color="#10b981" />
-                <Text style={[styles.interventionBtnTitle, { color: isLight ? '#065f46' : '#34d399' }]} numberOfLines={1}>15m Break</Text>
-                <Text style={[styles.interventionBtnDesc, { color: colors.muted }]} numberOfLines={1}>Screen-free rest</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={handleLaunchBreathing}
-                style={[styles.interventionBtn, { borderColor: '#8b5cf6', backgroundColor: isLight ? '#f5f3ff' : 'rgba(139,92,246,0.1)' }]}
-              >
-                <Ionicons name="pulse" size={16} color="#8b5cf6" />
-                <Text style={[styles.interventionBtnTitle, { color: isLight ? '#5b21b6' : '#a78bfa' }]} numberOfLines={1}>4-7-8 Breath</Text>
-                <Text style={[styles.interventionBtnDesc, { color: colors.muted }]} numberOfLines={1}>Haptic breath pacing</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={handleGenerateRecoveryPlan}
-                style={[styles.interventionBtn, { borderColor: '#3b82f6', backgroundColor: isLight ? '#eff6ff' : 'rgba(59,130,246,0.1)' }]}
-              >
-                <Ionicons name="flash" size={16} color="#3b82f6" />
-                <Text style={[styles.interventionBtnTitle, { color: isLight ? '#1e40af' : '#60a5fa' }]} numberOfLines={1}>Recovery Plan</Text>
-                <Text style={[styles.interventionBtnDesc, { color: colors.muted }]} numberOfLines={1}>Low-friction docs</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={handleDebriefSession}
-                style={[styles.interventionBtn, { borderColor: '#f59e0b', backgroundColor: isLight ? '#fffbeb' : 'rgba(245,158,11,0.1)' }]}
-              >
-                <Ionicons name="chatbubbles" size={16} color="#f59e0b" />
-                <Text style={[styles.interventionBtnTitle, { color: isLight ? '#92400e' : '#fbbf24' }]} numberOfLines={1}>Debrief</Text>
-                <Text style={[styles.interventionBtnDesc, { color: colors.muted }]} numberOfLines={1}>Log takeaways</Text>
-              </Pressable>
-            </View>
-
-            {/* Triggers Checklist */}
-            <Text style={[styles.sectionSubtitle, { color: colors.muted, marginTop: 12 }]}>
-              Recovery Checklist
-            </Text>
-            {burnoutRisk.triggers.map((trigger, idx) => {
-              const isChecked = !!checkedTriggers[idx];
-              return (
-                <Pressable
-                  key={idx}
-                  onPress={() => setCheckedTriggers((prev) => ({ ...prev, [idx]: !prev[idx] }))}
-                  style={styles.triggerRow}
-                >
-                  <Ionicons
-                    name={isChecked ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={16}
-                    color={isChecked ? '#22c55e' : colors.muted}
-                  />
-                  <Text
-                    style={[
-                      styles.triggerText,
-                      {
-                        color: isChecked ? colors.muted : colors.text,
-                        textDecorationLine: isChecked ? 'line-through' : 'none',
-                      },
-                    ]}
-                  >
-                    {trigger}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </Card>
+          {/* Strain & Burnout Guard */}
+          <BurnoutActionCard
+            stress={stress}
+            energy={energy}
+            onLaunchBreathing={handleLaunchBreathing}
+            onLaunchTasksDecompression={handleLaunchTasksDecompression}
+            onScheduleBreak={handleScheduleBreak}
+          />
 
 
           {/* AI Task & Workflow Optimizer (Appears when task is specified) */}
@@ -2338,11 +1672,31 @@ export default function WellnessScreen() {
         ) : null}
       </Card>
 
+      {/* 4-7-8 Zen Breathing Modal */}
+      <ZenBreathingModal
+        visible={zenModalOpen}
+        onClose={() => setZenModalOpen(false)}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  headerZenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  headerZenBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '800',

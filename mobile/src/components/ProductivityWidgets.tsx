@@ -81,15 +81,16 @@ export function TodaySummary({
   ];
 
   return (
-    <Card>
-      <View style={styles.cardHeaderRow}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>Today</Text>
-        <Text style={[styles.cardCaption, { color: colors.muted }]}>
+    <View style={styles.sectionContainer}>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Today</Text>
+        <Text style={[styles.sectionCaption, { color: colors.muted }]}>
           {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
         </Text>
       </View>
 
-      <View style={styles.tilesRow}>
+      <Card>
+        <View style={styles.tilesRow}>
         {tiles.map((tile) => (
           <View
             key={tile.label}
@@ -144,6 +145,7 @@ export function TodaySummary({
         <View style={[styles.goalFill, { width: `${goalProgress * 100}%`, backgroundColor: accent }]} />
       </View>
     </Card>
+  </View>
   );
 }
 
@@ -233,9 +235,9 @@ export function WeeklyInsights({
   const todayIndex = weeklyFocus.length - 1;
 
   return (
-    <Card>
-      <View style={styles.cardHeaderRow}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>This Week</Text>
+    <View style={styles.sectionContainer}>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>This Week</Text>
         <View
           style={[
             styles.streakPill,
@@ -248,7 +250,8 @@ export function WeeklyInsights({
         </View>
       </View>
 
-      <View style={styles.weekSummaryRow}>
+      <Card>
+        <View style={styles.weekSummaryRow}>
         <View style={styles.weekSummaryItem}>
           <Text style={[styles.weekSummaryValue, { color: colors.text }]}>{formatFocusMinutes(total)}</Text>
           <Text style={[styles.weekSummaryLabel, { color: colors.muted }]}>Total focus</Text>
@@ -299,6 +302,7 @@ export function WeeklyInsights({
         })}
       </View>
     </Card>
+  </View>
   );
 }
 
@@ -317,13 +321,15 @@ export function LearningLog({ items, accent }: { items: ProductivityStats['learn
   const visible = expanded ? notes : notes.slice(0, LEARNING_PREVIEW_COUNT);
 
   return (
-    <Card>
-      <View style={styles.cardHeaderRow}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>Learning Log</Text>
-        <Text style={[styles.cardCaption, { color: colors.muted }]}>
+    <View style={styles.sectionContainer}>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Learning Log</Text>
+        <Text style={[styles.sectionCaption, { color: colors.muted }]}>
           {notes.length} {notes.length === 1 ? 'note' : 'notes'}
         </Text>
       </View>
+
+      <Card>
 
       {notes.length === 0 ? (
         <View style={styles.logEmpty}>
@@ -371,6 +377,7 @@ export function LearningLog({ items, accent }: { items: ProductivityStats['learn
         </View>
       )}
     </Card>
+  </View>
   );
 }
 
@@ -441,6 +448,30 @@ export function SwipeableTaskRow({
 }
 
 const styles = StyleSheet.create({
+  sectionContainer: {
+    width: '100%',
+    marginBottom: 4,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+    flexShrink: 1,
+  },
+  sectionCaption: {
+    fontSize: 12,
+    fontWeight: '600',
+    flexShrink: 0,
+  },
   cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',

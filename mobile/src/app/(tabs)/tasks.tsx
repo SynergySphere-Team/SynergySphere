@@ -770,17 +770,18 @@ export default function TasksScreen() {
       {/* Today summary & daily goal */}
       <TodaySummary stats={stats} goalMinutes={goalMinutes} onCycleGoal={cycleGoal} accent={brandGreen} />
 
+      {/* Focus Timer Section Header */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          {isBreak ? 'Break Time' : 'Focus Timer'}
+        </Text>
+        <Text style={[styles.sectionSubtitleRight, { color: colors.muted }]}>
+          {stats?.focusSessionsToday ?? 0} done today
+        </Text>
+      </View>
+
       {/* Focus Timer Card */}
       <Card>
-        <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>
-            {isBreak ? 'Break Time' : 'Focus Timer'}
-          </Text>
-          <Text style={[styles.cardSubtitleRight, { color: colors.muted }]}>
-            {stats?.focusSessionsToday ?? 0} done today
-          </Text>
-        </View>
-
         {/* Circular Timer Display with live progress */}
         <View style={styles.timerCircleContainer}>
           <ProgressRing
@@ -1058,25 +1059,26 @@ export default function TasksScreen() {
         </View>
       </Card>
 
+      {/* Tasks Section Header */}
+      <View style={styles.sectionHeaderRow}>
+        <View style={{ flex: 1, minWidth: 0, paddingRight: 6 }}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Tasks</Text>
+          <Text style={[styles.tasksSubtitle, { color: colors.muted }]}>
+            {completedCount}/{tasks.length} completed
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => setShowAddTask((prev) => !prev)}
+          style={[styles.addTaskIconBtn, { backgroundColor: brandGreen }]}
+          accessibilityRole="button"
+          accessibilityLabel="Add Task"
+        >
+          <Ionicons name={showAddTask ? 'close' : 'add'} size={22} color="#FFFFFF" />
+        </Pressable>
+      </View>
+
       {/* Tasks Section Card */}
       <Card>
-        <View style={styles.cardHeader}>
-          <View style={{ flex: 1, minWidth: 0, paddingRight: 6 }}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Tasks</Text>
-            <Text style={[styles.tasksSubtitle, { color: colors.muted }]}>
-              {completedCount}/{tasks.length} completed
-            </Text>
-          </View>
-          <Pressable
-            onPress={() => setShowAddTask((prev) => !prev)}
-            style={[styles.addTaskIconBtn, { backgroundColor: brandGreen }]}
-            accessibilityRole="button"
-            accessibilityLabel="Add Task"
-          >
-            <Ionicons name={showAddTask ? 'close' : 'add'} size={22} color="#FFFFFF" />
-          </Pressable>
-        </View>
-
         {showAddTask && (
           <View style={styles.addTaskForm}>
             <Field
@@ -1364,6 +1366,28 @@ const styles = StyleSheet.create({
   completedToggleText: {
     fontSize: 13,
     fontWeight: '700',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 14,
+    marginBottom: 8,
+    paddingHorizontal: 2,
+    width: '100%',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+    flexShrink: 1,
+  },
+  sectionSubtitleRight: {
+    fontSize: 13,
+    fontWeight: '500',
+    flexShrink: 0,
+    alignSelf: 'center',
   },
   cardHeader: {
     flexDirection: 'row',
