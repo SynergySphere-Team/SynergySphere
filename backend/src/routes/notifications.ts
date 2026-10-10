@@ -82,4 +82,26 @@ router.patch('/:id/read', async (req: AuthRequest, res) => {
   res.json({ success: true });
 });
 
+router.delete('/clear-read', async (req: AuthRequest, res) => {
+  await execute(
+    `DELETE FROM "Notification"
+     WHERE "userId" = $1
+       AND COALESCE("read", FALSE) = TRUE`,
+    [req.user!.userId],
+  );
+
+  res.json({ success: true });
+});
+
+router.delete('/:id', async (req: AuthRequest, res) => {
+  await execute(
+    `DELETE FROM "Notification"
+     WHERE "id" = $1
+       AND "userId" = $2`,
+    [paramId(req), req.user!.userId],
+  );
+
+  res.json({ success: true });
+});
+
 export default router;
