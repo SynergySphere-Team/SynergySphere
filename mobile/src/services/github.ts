@@ -20,6 +20,13 @@ export const github = {
     if (result.status === 'connected' && result.accessToken && Platform.OS !== 'web') await SecureStore.setItemAsync(GITHUB_ACCESS_TOKEN_KEY, result.accessToken);
     return result;
   },
+  async connectDirect(input: string): Promise<{ connected: boolean; username: string; avatarUrl: string | null }> {
+    const result = await api.post<{ connected: boolean; username: string; avatarUrl: string | null; accessToken?: string }>('/github/connect-direct', { input });
+    if (result.accessToken && Platform.OS !== 'web') {
+      await SecureStore.setItemAsync(GITHUB_ACCESS_TOKEN_KEY, result.accessToken);
+    }
+    return result;
+  },
   disconnect: async () => {
     await api.delete('/github/connection');
     if (Platform.OS !== 'web') await Promise.all([SecureStore.deleteItemAsync(DEVICE_SESSION_KEY), SecureStore.deleteItemAsync(GITHUB_ACCESS_TOKEN_KEY)]);

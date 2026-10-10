@@ -8,6 +8,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import * as Linking from 'expo-linking';
@@ -24,6 +25,9 @@ export default function GithubConnectScreen() {
   const { colors, theme } = useTheme();
   const isDark = theme === 'dark';
 
+  const [activeMethod, setActiveMethod] = useState<'instant' | 'device'>('instant');
+  const [directInput, setDirectInput] = useState('');
+  const [directLoading, setDirectLoading] = useState(false);
   const [authorization, setAuthorization] = useState<GithubDeviceAuthorization | null>(null);
   const [status, setStatus] = useState<'idle' | 'starting' | 'waiting' | 'checking' | 'connected'>('idle');
   const [error, setError] = useState('');
@@ -53,6 +57,35 @@ export default function GithubConnectScreen() {
       router.replace('/(tabs)/community' as never);
     }
   };
+
+  async function handleDirectConnect() {
+    const val = directInput.trim();
+    if (!val) {
+      setError('Please enter your GitHub username or personal access token.');
+      return;
+    }
+    setError('');
+    setDirectLoading(true);
+    try {
+      const res = await github.connectDirect(val);
+      setStatus('connected');
+      Alert.alert(
+        'GitHub Connected ✓',
+        `Your account @${res.username} was connected successfully.`,
+        [
+          {
+            text: 'Continue',
+            onPress: navigateBackOrToReturn,
+          },
+        ],
+        { cancelable: false },
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not connect GitHub account.');
+    } finally {
+      setDirectLoading(false);
+    }
+  }
 
   async function poll(current: GithubDeviceAuthorization, retryCount = 0) {
     if (statusRef.current === 'connected') return;
@@ -175,144 +208,260 @@ export default function GithubConnectScreen() {
 
       {/* Main Connection Box */}
       <View style={[styles.connectCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={styles.cardHeroHeader}>
-          <View style={[styles.githubLogoBadge, { backgroundColor: isDark ? '#161b22' : '#f0f3f6' }]}>
-            <Ionicons name="logo-github" size={32} color={colors.text} />
-          </View>
-          <Text style={[styles.connectTitle, { color: colors.text }]}>GitHub Device Authorization</Text>
-          <Text style={[styles.connectCopy, { color: colors.muted }]}>
-            SynergySphere uses GitHub's official OAuth Device Flow. We never handle your password, and access tokens are encrypted with AES-256-GCM.
-          </Text>
+        {/* Method Switcher Tabs */}
+        <View style={[styles.methodTabsRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+          <Pressable
+            style={[
+              styles.methodTab,
+              activeMethod === 'instant' && [styles.methodTabActive, { backgroundColor: colors.primary }],
+            ]}
+            onPress={() => setActiveMethod('instant')}
+          >
+            <Ionicons
+              name="flash"
+              size={15}
+              color={activeMethod === 'instant' ? colors.primaryText : colors.muted}
+            />
+            <Text
+              style={[
+                styles.methodTabText,
+                { color: activeMethod === 'instant' ? colors.primaryText : colors.muted, fontWeight: activeMethod === 'instant' ? '800' : '600' },
+              ]}
+            >
+              Quick Connect
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.methodTab,
+              activeMethod === 'device' && [styles.methodTabActive, { backgroundColor: colors.primary }],
+            ]}
+            onPress={() => setActiveMethod('device')}
+          >
+            <Ionicons
+              name="phone-portrait-outline"
+              size={15}
+              color={activeMethod === 'device' ? colors.primaryText : colors.muted}
+            />
+            <Text
+              style={[
+                styles.methodTabText,
+                { color: activeMethod === 'device' ? colors.primaryText : colors.muted, fontWeight: activeMethod === 'device' ? '800' : '600' },
+              ]}
+            >
+              Device Flow
+            </Text>
+          </Pressable>
         </View>
 
-        {/* Device Code Display Box */}
-        {authorization ? (
-          <View style={[styles.codeDisplayCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-            {authorization.userCode.startsWith('SSPH-') || authorization.userCode.startsWith('MOCK-') ? (
-              <View
-                style={[
-                  styles.mockNoticeBox,
-                  {
-                    backgroundColor: isDark ? 'rgba(59, 130, 246, 0.12)' : '#EFF6FF',
-                    borderColor: isDark ? '#1d4ed8' : '#93C5FD',
-                  },
-                ]}
-              >
-                <Ionicons name="construct-outline" size={18} color="#3B82F6" />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={[styles.mockNoticeTitle, { color: colors.text }]}>
-                    Simulated Development Mode Active
+        {activeMethod === 'instant' ? (
+          /* Instant Connection Panel */
+          <View style={styles.instantPanel}>
+            <View style={styles.cardHeroHeader}>
+              <View style={[styles.githubLogoBadge, { backgroundColor: isDark ? '#161b22' : '#f0f3f6' }]}>
+                <Ionicons name="logo-github" size={32} color={colors.text} />
+              </View>
+              <Text style={[styles.connectTitle, { color: colors.text }]}>Instant GitHub Connect</Text>
+              <Text style={[styles.connectCopy, { color: colors.muted }]}>
+                Enter your GitHub username or Personal Access Token (PAT) to connect your account in seconds.
+              </Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.muted }]}>
+                GITHUB USERNAME OR ACCESS TOKEN
+              </Text>
+              <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                <Ionicons name="logo-github" size={18} color={colors.muted} style={{ marginRight: 8 }} />
+                <TextInput
+                  value={directInput}
+                  onChangeText={setDirectInput}
+                  placeholder="e.g. Mufhumudzi or ghp_..."
+                  placeholderTextColor={colors.muted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={[styles.textInput, { color: colors.text }]}
+                />
+                {directInput.length > 0 && (
+                  <Pressable onPress={() => setDirectInput('')} hitSlop={8}>
+                    <Ionicons name="close-circle" size={16} color={colors.muted} />
+                  </Pressable>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.quickTipsBox}>
+              <View style={styles.quickTipRow}>
+                <Ionicons name="checkmark-circle-outline" size={16} color={colors.primary} />
+                <Text style={[styles.quickTipText, { color: colors.muted }]}>
+                  <Text style={{ fontWeight: '700', color: colors.text }}>Username:</Text> Links your verified GitHub profile & avatar for community project invitations.
+                </Text>
+              </View>
+              <View style={styles.quickTipRow}>
+                <Ionicons name="key-outline" size={16} color={colors.primary} />
+                <Text style={[styles.quickTipText, { color: colors.muted }]}>
+                  <Text style={{ fontWeight: '700', color: colors.text }}>Access Token:</Text> Enables full repo creation and commit synchronization.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.btnGroup}>
+              <Button
+                title={directLoading ? 'Connecting…' : 'Connect Account'}
+                onPress={handleDirectConnect}
+                disabled={directLoading || status === 'connected'}
+              />
+              <Button
+                title="Create a GitHub token (github.com)"
+                secondary
+                onPress={() => Linking.openURL('https://github.com/settings/tokens/new?scopes=repo,read:org&description=SynergySphere')}
+              />
+            </View>
+          </View>
+        ) : (
+          /* Device Code Flow Panel */
+          <View style={styles.devicePanel}>
+            <View style={styles.cardHeroHeader}>
+              <View style={[styles.githubLogoBadge, { backgroundColor: isDark ? '#161b22' : '#f0f3f6' }]}>
+                <Ionicons name="logo-github" size={32} color={colors.text} />
+              </View>
+              <Text style={[styles.connectTitle, { color: colors.text }]}>GitHub Device Authorization</Text>
+              <Text style={[styles.connectCopy, { color: colors.muted }]}>
+                SynergySphere uses GitHub's official OAuth Device Flow. We never handle your password, and access tokens are encrypted with AES-256-GCM.
+              </Text>
+            </View>
+
+            {/* Device Code Display Box */}
+            {authorization ? (
+              <View style={[styles.codeDisplayCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                {authorization.userCode.startsWith('SSPH-') || authorization.userCode.startsWith('MOCK-') ? (
+                  <View
+                    style={[
+                      styles.mockNoticeBox,
+                      {
+                        backgroundColor: isDark ? 'rgba(59, 130, 246, 0.12)' : '#EFF6FF',
+                        borderColor: isDark ? '#1d4ed8' : '#93C5FD',
+                      },
+                    ]}
+                  >
+                    <Ionicons name="construct-outline" size={18} color="#3B82F6" />
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={[styles.mockNoticeTitle, { color: colors.text }]}>
+                        Simulated Development Mode Active
+                      </Text>
+                      <Text style={[styles.mockNoticeText, { color: colors.muted }]}>
+                        GitHub Client ID is not configured in backend. Tap below to connect the simulated account locally (do not enter on github.com).
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <Text style={[styles.codeInstructionLabel, { color: colors.muted }]}>
+                    Enter this one-time code at GitHub
                   </Text>
-                  <Text style={[styles.mockNoticeText, { color: colors.muted }]}>
-                    GitHub Client ID is not configured in backend. Tap below to connect the simulated account locally (do not enter on github.com).
-                  </Text>
+                )}
+
+                <View style={styles.codeBoxesRow}>
+                  {parts.map((part, index) => (
+                    <View key={index} style={[styles.codeSegmentBox, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
+                      <Text selectable style={[styles.codeSegmentText, { color: colors.text }]}>
+                        {part}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                {authorization.userCode.startsWith('SSPH-') || authorization.userCode.startsWith('MOCK-') ? (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.openVerificationBtn,
+                      { backgroundColor: colors.primary },
+                      pressed && styles.pressed,
+                    ]}
+                    onPress={handleManualCheck}
+                  >
+                    <Ionicons name="flash-outline" size={16} color={colors.primaryText} />
+                    <Text style={[styles.openVerificationText, { color: colors.primaryText, fontWeight: '800' }]}>
+                      Authorize Simulated Account
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.openVerificationBtn,
+                      { backgroundColor: colors.primary },
+                      pressed && styles.pressed,
+                    ]}
+                    onPress={() => Linking.openURL(authorization.verificationUri)}
+                  >
+                    <Ionicons name="open-outline" size={16} color={colors.primaryText} />
+                    <Text style={[styles.openVerificationText, { color: colors.primaryText }]}>
+                      Open GitHub Verification
+                    </Text>
+                  </Pressable>
+                )}
+
+                {/* Live Polling Status Indicator */}
+                <View style={styles.pollingStatusRow}>
+                  {status === 'connected' ? (
+                    <>
+                      <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
+                      <Text style={[styles.statusMessage, { color: colors.primary, fontWeight: '700' }]}>
+                        Connected! Returning to SynergySphere...
+                      </Text>
+                    </>
+                  ) : status === 'checking' ? (
+                    <>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={[styles.statusMessage, { color: colors.primary }]}>
+                        Checking GitHub authorization status...
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={[styles.statusMessage, { color: colors.muted }]}>
+                        Waiting for your authorization in GitHub...
+                      </Text>
+                    </>
+                  )}
                 </View>
               </View>
-            ) : (
-              <Text style={[styles.codeInstructionLabel, { color: colors.muted }]}>
-                Enter this one-time code at GitHub
-              </Text>
-            )}
+            ) : null}
 
-            <View style={styles.codeBoxesRow}>
-              {parts.map((part, index) => (
-                <View key={index} style={[styles.codeSegmentBox, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
-                  <Text selectable style={[styles.codeSegmentText, { color: colors.text }]}>
-                    {part}
-                  </Text>
-                </View>
-              ))}
-            </View>
-
-            {authorization.userCode.startsWith('SSPH-') || authorization.userCode.startsWith('MOCK-') ? (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.openVerificationBtn,
-                  { backgroundColor: colors.primary },
-                  pressed && styles.pressed,
-                ]}
-                onPress={handleManualCheck}
-              >
-                <Ionicons name="flash-outline" size={16} color={colors.primaryText} />
-                <Text style={[styles.openVerificationText, { color: colors.primaryText, fontWeight: '800' }]}>
-                  Authorize Simulated Account
-                </Text>
-              </Pressable>
-            ) : (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.openVerificationBtn,
-                  { backgroundColor: colors.primary },
-                  pressed && styles.pressed,
-                ]}
-                onPress={() => Linking.openURL(authorization.verificationUri)}
-              >
-                <Ionicons name="open-outline" size={16} color={colors.primaryText} />
-                <Text style={[styles.openVerificationText, { color: colors.primaryText }]}>
-                  Open GitHub Verification
-                </Text>
-              </Pressable>
-            )}
-
-            {/* Live Polling Status Indicator */}
-            <View style={styles.pollingStatusRow}>
+            {/* Action Buttons */}
+            <View style={styles.btnGroup}>
               {status === 'connected' ? (
+                <Button
+                  title="Continue to Community"
+                  onPress={navigateBackOrToReturn}
+                />
+              ) : authorization ? (
+                <Button
+                  title={status === 'checking' ? 'Checking...' : "I've Authorized on GitHub"}
+                  onPress={handleManualCheck}
+                  disabled={status === 'checking'}
+                />
+              ) : null}
+
+              {status !== 'connected' ? (
                 <>
-                  <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-                  <Text style={[styles.statusMessage, { color: colors.primary, fontWeight: '700' }]}>
-                    Connected! Returning to SynergySphere...
-                  </Text>
+                  <Button
+                    title={status === 'starting' ? 'Preparing GitHub…' : authorization ? 'Start Over with New Code' : 'Connect via Device Code'}
+                    secondary={Boolean(authorization)}
+                    onPress={start}
+                    disabled={status === 'starting'}
+                  />
+                  <Button
+                    title="Create a GitHub account"
+                    secondary
+                    onPress={() => Linking.openURL('https://github.com/join')}
+                  />
                 </>
-              ) : status === 'checking' ? (
-                <>
-                  <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={[styles.statusMessage, { color: colors.primary }]}>
-                    Checking GitHub authorization status...
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={[styles.statusMessage, { color: colors.muted }]}>
-                    Waiting for your authorization in GitHub...
-                  </Text>
-                </>
-              )}
+              ) : null}
             </View>
           </View>
-        ) : null}
-
-        {/* Action Buttons */}
-        <View style={styles.btnGroup}>
-          {status === 'connected' ? (
-            <Button
-              title="Continue to Community"
-              onPress={navigateBackOrToReturn}
-            />
-          ) : authorization ? (
-            <Button
-              title={status === 'checking' ? 'Checking...' : "I've Authorized on GitHub"}
-              onPress={handleManualCheck}
-              disabled={status === 'checking'}
-            />
-          ) : null}
-
-          {status !== 'connected' ? (
-            <>
-              <Button
-                title={status === 'starting' ? 'Preparing GitHub…' : authorization ? 'Start Over with New Code' : 'Connect GitHub Account'}
-                secondary={Boolean(authorization)}
-                onPress={start}
-                disabled={status === 'starting'}
-              />
-              <Button
-                title="Create a GitHub account"
-                secondary
-                onPress={() => Linking.openURL('https://github.com/join')}
-              />
-            </>
-          ) : null}
-        </View>
+        )}
       </View>
 
       {/* Security & Feature Highlights */}
@@ -346,6 +495,69 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     padding: 18,
     gap: 16,
+  },
+  methodTabsRow: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 3,
+    gap: 4,
+  },
+  methodTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 9,
+  },
+  methodTabActive: {},
+  methodTabText: {
+    fontSize: 13,
+  },
+  instantPanel: {
+    gap: 16,
+  },
+  devicePanel: {
+    gap: 16,
+  },
+  inputGroup: {
+    gap: 6,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 0,
+  },
+  quickTipsBox: {
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(128, 128, 128, 0.06)',
+  },
+  quickTipRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  quickTipText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
   },
   cardHeroHeader: {
     alignItems: 'center',

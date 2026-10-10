@@ -111,6 +111,13 @@ export default function CommunityPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // GitHub Connection State
+  const [githubConnection, setGithubConnection] = useState<{ connected: boolean; username: string | null; avatarUrl: string | null } | null>(null);
+  const [showGithubModal, setShowGithubModal] = useState(false);
+  const [githubInput, setGithubInput] = useState('');
+  const [githubLoading, setGithubLoading] = useState(false);
+  const [githubError, setGithubError] = useState('');
+
   // Project Creation Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
@@ -145,6 +152,9 @@ export default function CommunityPage() {
       api<MyApplicationsResponse>('/projects/my-applications')
         .then((res) => setMyStats(res.stats))
         .catch(() => setMyStats(null)),
+      api<{ connected: boolean; username: string | null; avatarUrl: string | null }>('/github/connection')
+        .then(setGithubConnection)
+        .catch(() => setGithubConnection(null)),
     ])
       .catch(() => setError('Could not load community projects from the backend.'))
       .finally(() => setLoading(false));
@@ -167,6 +177,28 @@ export default function CommunityPage() {
       } else {
         setError('Could not apply to this project. Please try again.');
       }
+    }
+  }
+
+  async function handleConnectGithub(e: React.FormEvent) {
+    e.preventDefault();
+    const val = githubInput.trim();
+    if (!val) return;
+    setGithubLoading(true);
+    setGithubError('');
+    try {
+      const res = await api<{ connected: boolean; username: string; avatarUrl: string | null }>('/github/connect-direct', {
+        method: 'POST',
+        body: JSON.stringify({ input: val }),
+      });
+      setGithubConnection(res);
+      setShowGithubModal(false);
+      setGithubInput('');
+      setSuccess(`Successfully connected GitHub account @${res.username}!`);
+    } catch (err) {
+      setGithubError((err as Error).message || 'Failed to connect GitHub account.');
+    } finally {
+      setGithubLoading(false);
     }
   }
 
@@ -291,6 +323,22 @@ export default function CommunityPage() {
               <Filter className="h-4 w-4" />
               {categoryLabels[category] || 'All Categories'}
             </Button>
+            {githubConnection?.connected ? (
+              <div className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
+                <Github className="h-3.5 w-3.5" />
+                <span>@{githubConnection.username}</span>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowGithubModal(true)}
+                className="border-white/10 hover:border-primary/40 text-xs"
+              >
+                <Github className="mr-1.5 h-3.5 w-3.5" />
+                Connect GitHub
+              </Button>
+            )}
           </div>
 
           {showSearch && (
@@ -666,6 +714,82 @@ export default function CommunityPage() {
                     {createLoading ? 'Publishing...' : 'Publish Initiative'}
                   </Button>
                 </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Connect GitHub Modal */}
+      {showGithubModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-[#0d131f] p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.08]">
+                  <Github className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Connect GitHub</h3>
+                  <p className="text-xs text-muted-foreground">Link your profile for community collaboration</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowGithubModal(false);
+                  setGithubError('');
+                }}
+                className="rounded-lg p-1 text-muted-foreground hover:bg-white/[0.08] hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConnectGithub} className="mt-4 space-y-4">
+              {githubError && (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/15 p-3 text-xs text-destructive">
+                  {githubError}
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  GitHub Username or Personal Access Token (PAT) *
+                </label>
+                <div className="relative mt-1">
+                  <Input
+                    required
+                    placeholder="e.g. Mufhumudzi or ghp_..."
+                    value={githubInput}
+                    onChange={(e) => setGithubInput(e.target.value)}
+                    className="pr-8"
+                  />
+                </div>
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  Enter your GitHub username to link your avatar and receive project invitations, or a Personal Access Token for full repository synchronization.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 border-t border-white/[0.08] pt-4">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setShowGithubModal(false);
+                    setGithubError('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={githubLoading}
+                  className="bg-primary font-bold text-black"
+                >
+                  {githubLoading ? 'Connecting...' : 'Connect Account'}
+                </Button>
               </div>
             </form>
           </div>
