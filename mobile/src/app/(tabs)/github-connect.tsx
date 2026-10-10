@@ -70,7 +70,7 @@ export default function GithubConnectScreen() {
         clearTimer();
 
         Alert.alert(
-          'GitHub Connected ✓',
+          'GitHub Connected ',
           'Your GitHub account was connected successfully.',
           [
             {
@@ -144,10 +144,6 @@ export default function GithubConnectScreen() {
       setStatus('waiting');
       // Start polling loop immediately (do NOT await browser open)
       poll(next);
-      // Launch verification URI in in-app browser or external browser (skip automatic popup in mock mode)
-      if (!next.userCode.startsWith('SSPH-') && !next.userCode.startsWith('MOCK-')) {
-        void github.openVerification(next);
-      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not start GitHub connection.');
       setStatus('idle');

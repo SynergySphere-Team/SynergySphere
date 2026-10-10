@@ -106,12 +106,24 @@ export function CommunityGithub() {
   [projects],
 );
 
-const opportunities = useMemo(
-  () =>
-    projects.filter(
-      (project) => !project.isCreator,
-    ),
+const [showAllApplications, setShowAllApplications] = useState(false);
+
+  const visibleApplications = useMemo(
+    () => showAllApplications ? myApplications : myApplications.slice(0, 3),
+    [myApplications, showAllApplications],
+  );
+
+  const opportunities = useMemo(
+  () => projects,
   [projects],
+);
+const [showAllOpportunities, setShowAllOpportunities] = useState(false);
+
+const visibleOpportunities = useMemo(
+  () => showAllOpportunities
+    ? opportunities
+    : opportunities.slice(0, 3),
+  [opportunities, showAllOpportunities],
 );
 
   const load = useCallback(async (queryText = '', cat = selectedCategory) => {
@@ -252,24 +264,7 @@ const opportunities = useMemo(
         </View>
 
         <View style={styles.connectionActions}>
-          {connection?.connected ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="View my GitHub work"
-              style={({ pressed }) => [
-                styles.actionChip,
-                largerText && styles.actionChipLarge,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                pressed && styles.pressed,
-              ]}
-              onPress={() => router.push('/my-work' as never)}
-            >
-              <Ionicons name="briefcase-outline" size={largerText ? 18 : 16} color={accentColor} />
-              <Text style={[styles.actionChipText, { color: colors.text, fontSize: fontSize(13) }]}>
-                My Work
-              </Text>
-            </Pressable>
-          ) : (
+          {!connection?.connected ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Connect GitHub account"
@@ -291,7 +286,7 @@ const opportunities = useMemo(
                 Connect GitHub
               </Text>
             </Pressable>
-          )}
+          ) : null}
 
           <Pressable
             accessibilityRole="button"
@@ -337,7 +332,7 @@ const opportunities = useMemo(
         </View>
       </View>
       {/* My Applications */}
-      {myApplications.length > 0 ? (
+      {myApplications.length > 0 && (
         <View style={styles.applicationsSection}>
           <View style={styles.applicationsHeader}>
             <View>
@@ -386,17 +381,17 @@ const opportunities = useMemo(
             </View>
           </View>
 
-          {myApplications.map((project) => (
+          {visibleApplications.map((project) => (
             <Pressable
               key={project.id}
               accessibilityRole="button"
               accessibilityLabel={`Open application for ${project.title}`}
               onPress={() =>
-                router.push({
-                  pathname: '/project-detail',
-                  params: { projectId: project.id },
-                } as never)
-              }
+              router.push({
+                pathname: '/community/[id]',
+                params: { id: project.id },
+              } as never)
+            }
               style={({ pressed }) => [
                 styles.applicationCard,
                 {
@@ -461,8 +456,32 @@ const opportunities = useMemo(
               />
             </Pressable>
           ))}
+          {myApplications.length > 3 && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={showAllApplications ? 'Show fewer applications' : 'Show all applications'}
+              onPress={() => setShowAllApplications((previous) => !previous)}
+              style={({ pressed }) => [
+                styles.showAllButton,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Text style={{ color: accentColor, fontSize: fontSize(14), fontWeight: '700' }}>
+                {showAllApplications ? 'Show Less' : `Show All Results (${myApplications.length})`}
+              </Text>
+              <Ionicons
+                name={showAllApplications ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                color={accentColor}
+              />
+            </Pressable>
+          )}
         </View>
-      ) : null}
+      )}
       {/* Integrated Search Bar */}
       <View style={[styles.searchBar, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
         <Ionicons name="search" size={18} color={colors.placeholderText} style={styles.searchIcon} />
@@ -564,7 +583,7 @@ const opportunities = useMemo(
         </Text>
       </View>
 
-      {opportunities.map((item) => {
+      {visibleOpportunities.map((item) => {
         const langColor =
           LANGUAGE_COLORS[item.primaryLanguage || ''] || '#7f929a';
         const isPrivate = item.githubVisibility === 'private';
@@ -576,8 +595,8 @@ const opportunities = useMemo(
             accessibilityLabel={`Open repository ${item.githubFullName || item.title}`}
             onPress={() =>
               router.push({
-                pathname: '/project-detail',
-                params: { projectId: item.id },
+                pathname: '/community/[id]',
+                params: { id: item.id },
               } as never)
             }
             style={({ pressed }) => [
@@ -765,9 +784,44 @@ const opportunities = useMemo(
               </Text>
               <Ionicons name="chevron-forward" size={14} color={accentColor} />
             </View>
-          </Pressable>
+                    </Pressable>
         );
       })}
+
+      {/* Show All / Show Less Opportunities */}
+      {opportunities.length > 3 && (
+        <Pressable
+          onPress={() => setShowAllOpportunities((previous) => !previous)}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.showAllButton,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}
+        >
+          <Text
+            style={{
+              color: accentColor,
+              fontSize: fontSize(14),
+              fontWeight: '600',
+              marginRight: 8,
+            }}
+          >
+            {showAllOpportunities
+              ? 'Show Less'
+              : `Show All Results (${opportunities.length})`}
+          </Text>
+
+          <Ionicons
+            name={showAllOpportunities ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={accentColor}
+          />
+        </Pressable>
+      )}
 
       {projects.length === 0 ? (
         <Card>
@@ -1053,6 +1107,18 @@ applicationStatusText: {
     fontSize: 11,
     fontWeight: '600',
   },
+  showAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    marginTop: 8,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+
   projectCard: {
     borderRadius: 18,
     borderWidth: 1.5,
@@ -1205,7 +1271,7 @@ applicationStatusText: {
     fontSize: 16,
     fontWeight: '800',
   },
-  
+
   emptySub: {
     fontSize: 13,
     textAlign: 'center',
@@ -1215,5 +1281,5 @@ applicationStatusText: {
   pressed: {
     opacity: 0.8,
   },
-  
+
 });

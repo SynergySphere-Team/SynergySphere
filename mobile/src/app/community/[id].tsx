@@ -1,10 +1,10 @@
 import {
+  type ComponentProps,
   useCallback,
   useEffect,
   useMemo,
   useState,
 } from 'react';
-
 import {
   Linking,
   Pressable,
@@ -12,31 +12,24 @@ import {
   Text,
   View,
 } from 'react-native';
-
 import {
   useLocalSearchParams,
   useRouter,
 } from 'expo-router';
-
 import { Image } from 'expo-image';
 import Ionicons from '@expo/vector-icons/Ionicons';
-
 import {
   Screen,
   Loading,
   Notice,
 } from '@/components/Screen';
-
 import {
   Button,
   Card,
-  Heading,
 } from '@/components/ui';
-
 import { api } from '@/services/api';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
-
 type ApplicationStatus =
   | 'PENDING'
   | 'APPROVED'
@@ -44,39 +37,31 @@ type ApplicationStatus =
   | 'INVITATION_SENT'
   | 'ACCEPTED'
   | 'COMPLETED';
-
 type ProjectApplication = {
   id: string;
   status: ApplicationStatus;
   userId: string;
   createdAt: string;
 };
-
 type ProjectDetails = {
   id: string;
   creatorId?: string | null;
-
   title: string;
   category: string;
   location: string | null;
   organization: string;
   description: string;
   requirements: string | null;
-
   xpReward: number;
   isActive?: boolean;
-
   techStack?: string | null;
   teamCapacity?: number | null;
   deliverableType?: string | null;
-
   skillsNeeded?: string | null;
   durationWeeks?: number | null;
   applicationDeadline?: string | null;
-
   imageUrl?: string | null;
   projectUrl?: string | null;
-
   githubUrl?: string | null;
   githubFullName?: string | null;
   githubOwner?: string | null;
@@ -86,14 +71,15 @@ type ProjectDetails = {
   githubStars?: number | null;
   githubForks?: number | null;
   isGithubBacked?: boolean;
-
   applications: ProjectApplication[];
-
   isCreator?: boolean;
   hasApplied?: boolean;
   applicationStatus?: ApplicationStatus | null;
+  problem?: string | null;
+  audience?: string | null;
+  license?: string | null;
+  starterTemplate?: string | null;
 };
-
 function formatCategory(value: string) {
   return value
     .replaceAll('_', ' ')
@@ -102,25 +88,6 @@ function formatCategory(value: string) {
       letter.toUpperCase()
     );
 }
-
-function formatDeadline(value?: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return date.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-}
-
 function getStatusDetails(
   status: ApplicationStatus | null
 ) {
@@ -133,7 +100,6 @@ function getStatusDetails(
         icon: 'checkmark-circle' as const,
         tone: 'success' as const,
       };
-
     case 'DECLINED':
       return {
         label: 'Declined',
@@ -142,7 +108,6 @@ function getStatusDetails(
         icon: 'close-circle' as const,
         tone: 'danger' as const,
       };
-
     case 'INVITATION_SENT':
       return {
         label: 'GitHub Invitation Sent',
@@ -151,7 +116,6 @@ function getStatusDetails(
         icon: 'logo-github' as const,
         tone: 'success' as const,
       };
-
     case 'ACCEPTED':
       return {
         label: 'Joined',
@@ -160,7 +124,6 @@ function getStatusDetails(
         icon: 'people-circle' as const,
         tone: 'success' as const,
       };
-
     case 'COMPLETED':
       return {
         label: 'Completed',
@@ -169,7 +132,6 @@ function getStatusDetails(
         icon: 'ribbon' as const,
         tone: 'success' as const,
       };
-
     case 'PENDING':
     default:
       return {
@@ -181,22 +143,17 @@ function getStatusDetails(
       };
   }
 }
-
 export default function OpportunityDetailsScreen() {
   const { id } =
     useLocalSearchParams<{
       id: string;
     }>();
-
   const router = useRouter();
-
   const {
     colors,
     theme,
   } = useTheme();
-
   const { user } = useAuth();
-
   const [
     project,
     setProject,
@@ -204,36 +161,30 @@ export default function OpportunityDetailsScreen() {
     useState<ProjectDetails | null>(
       null
     );
-
   const [
     loading,
     setLoading,
   ] =
     useState(true);
-
   const [
     applying,
     setApplying,
   ] =
     useState(false);
-
   const [
     error,
     setError,
   ] =
     useState('');
-
   const [
     success,
     setSuccess,
   ] =
     useState('');
-
   const accentColor =
     theme === 'light'
       ? '#1e6827'
       : colors.primary;
-
   const currentUserId =
     (
       user as
@@ -253,18 +204,14 @@ export default function OpportunityDetailsScreen() {
         | null
         | undefined
     )?.userId;
-
   const role =
     String(
       user?.role ?? ''
     ).toUpperCase();
-
   const isStudent =
     role === 'STUDENT';
-
   const isAdmin =
     role === 'ADMIN';
-
   const loadProject =
     useCallback(
       async () => {
@@ -272,19 +219,15 @@ export default function OpportunityDetailsScreen() {
           setError(
             'Project ID was not provided.'
           );
-
           setLoading(false);
           return;
         }
-
         try {
           setError('');
-
           const result =
             await api.get<ProjectDetails>(
               `/projects/${id}`
             );
-
           setProject(result);
         } catch (e) {
           setError(
@@ -298,25 +241,20 @@ export default function OpportunityDetailsScreen() {
       },
       [id]
     );
-
   const [refreshing, setRefreshing] = useState(false);
-
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadProject();
     setRefreshing(false);
   }, [loadProject]);
-
   useEffect(() => {
     loadProject();
   }, [loadProject]);
-
   const myApplication =
     useMemo(() => {
       if (!project) {
         return undefined;
       }
-
       if (
         project.applicationStatus
       ) {
@@ -329,11 +267,9 @@ export default function OpportunityDetailsScreen() {
           createdAt: '',
         } satisfies ProjectApplication;
       }
-
       if (!currentUserId) {
         return undefined;
       }
-
       return project.applications?.find(
         (application) =>
           application.userId ===
@@ -343,16 +279,13 @@ export default function OpportunityDetailsScreen() {
       project,
       currentUserId,
     ]);
-
   const applicationStatus =
     myApplication?.status ?? null;
-
   const hasApplied =
     Boolean(
       project?.hasApplied ||
         myApplication
     );
-
   const isCreator =
     Boolean(
       project?.isCreator ||
@@ -363,18 +296,15 @@ export default function OpportunityDetailsScreen() {
             currentUserId
         )
     );
-
   const canManage =
     isCreator ||
     isAdmin;
-
   const deadlineDate =
     project?.applicationDeadline
       ? new Date(
           project.applicationDeadline
         )
       : null;
-
   const applicationsClosed =
     Boolean(
       deadlineDate &&
@@ -384,7 +314,6 @@ export default function OpportunityDetailsScreen() {
         deadlineDate.getTime() <
           Date.now()
     );
-
   const canApply =
     Boolean(
       project &&
@@ -396,14 +325,12 @@ export default function OpportunityDetailsScreen() {
         !applicationsClosed &&
         !applying
     );
-
   const statusDetails =
     applicationStatus
       ? getStatusDetails(
           applicationStatus
         )
       : null;
-
   const statusColor =
     statusDetails?.tone ===
     'danger'
@@ -412,7 +339,6 @@ export default function OpportunityDetailsScreen() {
         'warning'
         ? '#B7791F'
         : accentColor;
-
   async function applyToProject() {
     if (
       !project ||
@@ -420,21 +346,17 @@ export default function OpportunityDetailsScreen() {
     ) {
       return;
     }
-
     setApplying(true);
     setError('');
     setSuccess('');
-
     try {
       await api.post(
         `/projects/${project.id}/apply`,
         {}
       );
-
       setSuccess(
         'Your application has been submitted successfully.'
       );
-
       await loadProject();
     } catch (e) {
       setError(
@@ -446,7 +368,6 @@ export default function OpportunityDetailsScreen() {
       setApplying(false);
     }
   }
-
   async function openUrl(
     url: string
   ) {
@@ -455,14 +376,12 @@ export default function OpportunityDetailsScreen() {
         await Linking.canOpenURL(
           url
         );
-
       if (!supported) {
         setError(
           'This link could not be opened.'
         );
         return;
       }
-
       await Linking.openURL(
         url
       );
@@ -472,11 +391,9 @@ export default function OpportunityDetailsScreen() {
       );
     }
   }
-
   if (loading) {
     return <Loading />;
   }
-
   if (!project) {
     return (
       <Screen>
@@ -487,32 +404,40 @@ export default function OpportunityDetailsScreen() {
       </Screen>
     );
   }
-
-  const formattedDeadline =
-    formatDeadline(
-      project.applicationDeadline
-    );
-
   return (
-    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      {/* HEADER */}
-
-      <Heading
-        subtitle={
-          canManage
-            ? 'View the full project information and manage this initiative.'
-            : 'Review the complete project information before joining.'
-        }
-      >
-        Opportunity Details
-      </Heading>
-
+    <Screen
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+      showBackButton={false}
+    >
+      <View style={styles.headerRow}>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/community' as never);
+            }
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          style={styles.headerBackButton}
+        >
+          <Ionicons
+            name="arrow-back"
+            size={24}
+            color={colors.text}
+          />
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Opportunity Details
+        </Text>
+      </View>
       {error ? (
         <Notice>
           {error}
         </Notice>
       ) : null}
-
       {success ? (
         <Card>
           <View
@@ -527,7 +452,6 @@ export default function OpportunityDetailsScreen() {
                 accentColor
               }
             />
-
             <Text
               style={[
                 styles.successText,
@@ -542,9 +466,7 @@ export default function OpportunityDetailsScreen() {
           </View>
         </Card>
       ) : null}
-
       {/* PROJECT IMAGE */}
-
       {project.imageUrl ? (
         <Image
           source={{
@@ -557,9 +479,7 @@ export default function OpportunityDetailsScreen() {
           }
         />
       ) : null}
-
       {/* PROJECT SUMMARY */}
-
       <Card>
         <View
           style={
@@ -582,7 +502,6 @@ export default function OpportunityDetailsScreen() {
                 accentColor
               }
             />
-
             <Text
               style={[
                 styles.categoryText,
@@ -597,7 +516,6 @@ export default function OpportunityDetailsScreen() {
               )}
             </Text>
           </View>
-
           <Text
             style={[
               styles.xp,
@@ -610,7 +528,6 @@ export default function OpportunityDetailsScreen() {
             {project.xpReward} XP
           </Text>
         </View>
-
         <Text
           style={[
             styles.projectTitle,
@@ -622,7 +539,7 @@ export default function OpportunityDetailsScreen() {
         >
           {project.title}
         </Text>
-
+        {project.organization?.trim() ? (
         <View
           style={
             styles.infoRow
@@ -635,7 +552,6 @@ export default function OpportunityDetailsScreen() {
               colors.muted
             }
           />
-
           <Text
             style={[
               styles.infoText,
@@ -648,7 +564,7 @@ export default function OpportunityDetailsScreen() {
             {project.organization}
           </Text>
         </View>
-
+        ) : null}
         {project.location ? (
           <View
             style={
@@ -662,7 +578,6 @@ export default function OpportunityDetailsScreen() {
                 colors.muted
               }
             />
-
             <Text
               style={[
                 styles.infoText,
@@ -676,7 +591,6 @@ export default function OpportunityDetailsScreen() {
             </Text>
           </View>
         ) : null}
-
         <View
           style={
             styles.infoRow
@@ -697,7 +611,6 @@ export default function OpportunityDetailsScreen() {
                 : accentColor
             }
           />
-
           <Text
             style={[
               styles.infoText,
@@ -707,7 +620,6 @@ export default function OpportunityDetailsScreen() {
                   false
                     ? '#B7791F'
                     : accentColor,
-
                 fontWeight:
                   '700',
               },
@@ -720,9 +632,7 @@ export default function OpportunityDetailsScreen() {
           </Text>
         </View>
       </Card>
-
       {/* APPLICATION STATUS */}
-
       {isStudent &&
       hasApplied &&
       statusDetails ? (
@@ -741,7 +651,6 @@ export default function OpportunityDetailsScreen() {
                 statusColor
               }
             />
-
             <View
               style={
                 styles.statusCopy
@@ -758,7 +667,6 @@ export default function OpportunityDetailsScreen() {
               >
                 Application Status
               </Text>
-
               <Text
                 style={[
                   styles.statusValue,
@@ -774,7 +682,6 @@ export default function OpportunityDetailsScreen() {
               </Text>
             </View>
           </View>
-
           <Text
             style={[
               styles.bodyText,
@@ -790,9 +697,7 @@ export default function OpportunityDetailsScreen() {
           </Text>
         </Card>
       ) : null}
-
       {/* OVERVIEW */}
-
       <Card>
         <SectionHeading
           icon="information-circle-outline"
@@ -804,7 +709,6 @@ export default function OpportunityDetailsScreen() {
             accentColor
           }
         />
-
         <Text
           style={[
             styles.bodyText,
@@ -817,168 +721,89 @@ export default function OpportunityDetailsScreen() {
           {project.description}
         </Text>
       </Card>
-
-      {/* PROJECT DETAILS */}
-
+      {/* PROJECT CONFIGURATION */}
       <Card>
         <SectionHeading
-          icon="calendar-outline"
-          title="Project Details"
-          color={
-            colors.text
-          }
-          accent={
-            accentColor
-          }
+          icon="settings-outline"
+          title="Project Configuration"
+          color={colors.text}
+          accent={accentColor}
         />
-
         <DetailRow
-          icon="time-outline"
-          label="Duration"
-          value={
-            project.durationWeeks
-              ? `${project.durationWeeks} week${
-                  project.durationWeeks ===
-                  1
-                    ? ''
-                    : 's'
-                }`
-              : 'Flexible / not specified'
-          }
-          textColor={
-            colors.text
-          }
-          mutedColor={
-            colors.muted
-          }
+          icon="grid-outline"
+          label="Category"
+          value={formatCategory(project.category)}
+          textColor={colors.text}
+          mutedColor={colors.muted}
         />
-
         <DetailRow
-          icon="calendar-number-outline"
-          label="Application Deadline"
-          value={
-            formattedDeadline ??
-            'No deadline specified'
-          }
-          textColor={
-            colors.text
-          }
-          mutedColor={
-            colors.muted
-          }
+          icon="code-slash-outline"
+          label="Programming Language"
+          value={project.primaryLanguage || 'Not specified'}
+          textColor={colors.text}
+          mutedColor={colors.muted}
         />
-
         <DetailRow
-          icon="people-outline"
-          label="Team Capacity"
+          icon="shield-checkmark-outline"
+          label="License"
+          value={project.license === 'NONE' ? 'No License' : project.license || 'Not specified'}
+          textColor={colors.text}
+          mutedColor={colors.muted}
+        />
+        <DetailRow
+          icon="globe-outline"
+          label="Visibility"
           value={
-            project.teamCapacity
-              ? `${project.teamCapacity} participant${
-                  project.teamCapacity ===
-                  1
-                    ? ''
-                    : 's'
-                }`
+            project.githubVisibility
+              ? formatCategory(project.githubVisibility)
               : 'Not specified'
           }
-          textColor={
-            colors.text
-          }
-          mutedColor={
-            colors.muted
-          }
+          textColor={colors.text}
+          mutedColor={colors.muted}
         />
-
         <DetailRow
-          icon="cube-outline"
-          label="Deliverable Type"
+          icon="layers-outline"
+          label="Starter Template"
           value={
-            project.deliverableType ||
-            'Software Solution'
+            project.starterTemplate
+              ? formatCategory(project.starterTemplate)
+              : 'Not specified'
           }
-          textColor={
-            colors.text
-          }
-          mutedColor={
-            colors.muted
-          }
+          textColor={colors.text}
+          mutedColor={colors.muted}
         />
       </Card>
-
-      {/* SKILLS */}
-
+      {/* PROJECT PURPOSE */}
       <Card>
         <SectionHeading
-          icon="construct-outline"
-          title="Skills & Technology"
-          color={
-            colors.text
-          }
-          accent={
-            accentColor
-          }
+          icon="bulb-outline"
+          title="Project Purpose"
+          color={colors.text}
+          accent={accentColor}
         />
-
         <DetailTextBlock
-          label="Skills Needed"
-          value={
-            project.skillsNeeded
-          }
-          fallback="No specific skills were listed."
-          textColor={
-            colors.text
-          }
-          mutedColor={
-            colors.muted
-          }
+          label="Problem Being Solved"
+          value={project.problem}
+          fallback="No problem statement provided."
+          textColor={colors.text}
+          mutedColor={colors.muted}
         />
-
         <DetailTextBlock
-          label="Tech Stack"
-          value={
-            project.techStack
-          }
-          fallback="No technology stack was specified."
-          textColor={
-            colors.text
-          }
-          mutedColor={
-            colors.muted
-          }
+          label="Target Audience"
+          value={project.audience}
+          fallback="No target audience specified."
+          textColor={colors.text}
+          mutedColor={colors.muted}
+        />
+        <DetailTextBlock
+          label="Project Goal"
+          value={project.requirements}
+          fallback="No project goal provided."
+          textColor={colors.text}
+          mutedColor={colors.muted}
         />
       </Card>
-
-      {/* REQUIREMENTS */}
-
-      <Card>
-        <SectionHeading
-          icon="checkmark-circle-outline"
-          title="Requirements"
-          color={
-            colors.text
-          }
-          accent={
-            accentColor
-          }
-        />
-
-        <Text
-          style={[
-            styles.bodyText,
-            {
-              color:
-                colors.muted,
-            },
-          ]}
-        >
-          {project.requirements?.trim()
-            ? project.requirements
-            : 'No specific requirements were provided for this project.'}
-        </Text>
-      </Card>
-
       {/* LINKS */}
-
       {(project.projectUrl ||
         project.githubUrl ||
         project.isGithubBacked) ? (
@@ -993,7 +818,6 @@ export default function OpportunityDetailsScreen() {
               accentColor
             }
           />
-
           {project.githubUrl ? (
             <View
               style={
@@ -1012,7 +836,6 @@ export default function OpportunityDetailsScreen() {
                     colors.text
                   }
                 />
-
                 <View
                   style={
                     styles.linkTitleCopy
@@ -1029,7 +852,6 @@ export default function OpportunityDetailsScreen() {
                   >
                     GitHub Repository
                   </Text>
-
                   <Text
                     style={[
                       styles.smallText,
@@ -1050,7 +872,6 @@ export default function OpportunityDetailsScreen() {
                   </Text>
                 </View>
               </View>
-
               {(project.primaryLanguage ||
                 project.githubVisibility) ? (
                 <Text
@@ -1080,7 +901,6 @@ export default function OpportunityDetailsScreen() {
                     .join(' • ')}
                 </Text>
               ) : null}
-
               <Button
                 title="Open GitHub Repository"
                 secondary
@@ -1107,7 +927,6 @@ export default function OpportunityDetailsScreen() {
               available.
             </Text>
           ) : null}
-
           {project.projectUrl ? (
             <View
               style={
@@ -1126,7 +945,6 @@ export default function OpportunityDetailsScreen() {
                     accentColor
                   }
                 />
-
                 <View
                   style={
                     styles.linkTitleCopy
@@ -1143,7 +961,6 @@ export default function OpportunityDetailsScreen() {
                   >
                     Project / Demo
                   </Text>
-
                   <Text
                     numberOfLines={
                       1
@@ -1162,7 +979,6 @@ export default function OpportunityDetailsScreen() {
                   </Text>
                 </View>
               </View>
-
               <Button
                 title="Open Project Link"
                 secondary
@@ -1176,9 +992,7 @@ export default function OpportunityDetailsScreen() {
           ) : null}
         </Card>
       ) : null}
-
       {/* EXPERIENCE */}
-
       <Card>
         <SectionHeading
           icon="star-outline"
@@ -1190,7 +1004,6 @@ export default function OpportunityDetailsScreen() {
             accentColor
           }
         />
-
         <Text
           style={[
             styles.xpLarge,
@@ -1202,7 +1015,6 @@ export default function OpportunityDetailsScreen() {
         >
           {project.xpReward} XP
         </Text>
-
         <Text
           style={[
             styles.smallText,
@@ -1218,9 +1030,7 @@ export default function OpportunityDetailsScreen() {
           and completion rules.
         </Text>
       </Card>
-
       {/* DEADLINE / INACTIVE NOTICE */}
-
       {!hasApplied &&
       isStudent &&
       applicationsClosed ? (
@@ -1235,7 +1045,6 @@ export default function OpportunityDetailsScreen() {
               size={22}
               color="#B7791F"
             />
-
             <View
               style={
                 styles.statusCopy
@@ -1252,7 +1061,6 @@ export default function OpportunityDetailsScreen() {
               >
                 Applications Closed
               </Text>
-
               <Text
                 style={[
                   styles.smallText,
@@ -1270,7 +1078,6 @@ export default function OpportunityDetailsScreen() {
           </View>
         </Card>
       ) : null}
-
       {!hasApplied &&
       isStudent &&
       project.isActive ===
@@ -1286,7 +1093,6 @@ export default function OpportunityDetailsScreen() {
               size={22}
               color="#B7791F"
             />
-
             <View
               style={
                 styles.statusCopy
@@ -1303,7 +1109,6 @@ export default function OpportunityDetailsScreen() {
               >
                 Project Inactive
               </Text>
-
               <Text
                 style={[
                   styles.smallText,
@@ -1321,9 +1126,7 @@ export default function OpportunityDetailsScreen() {
           </View>
         </Card>
       ) : null}
-
       {/* ACTION AREA */}
-
       {canManage ? (
         <>
           <Button
@@ -1334,7 +1137,6 @@ export default function OpportunityDetailsScreen() {
               )
             }
           />
-
           <Button
             title="Review Join Requests"
             secondary
@@ -1359,7 +1161,6 @@ export default function OpportunityDetailsScreen() {
               colors.muted
             }
           />
-
           <Text
             style={[
               styles.applicationCompleteText,
@@ -1404,7 +1205,6 @@ export default function OpportunityDetailsScreen() {
                 colors.muted
               }
             />
-
             <Text
               style={[
                 styles.viewOnlyText,
@@ -1425,21 +1225,13 @@ export default function OpportunityDetailsScreen() {
     </Screen>
   );
 }
-
+type IconName = ComponentProps<typeof Ionicons>['name'];
 type SectionHeadingProps = {
-  icon:
-    | 'information-circle-outline'
-    | 'calendar-outline'
-    | 'construct-outline'
-    | 'checkmark-circle-outline'
-    | 'link-outline'
-    | 'star-outline';
-
+  icon: IconName;
   title: string;
   color: string;
   accent: string;
 };
-
 function SectionHeading({
   icon,
   title,
@@ -1461,7 +1253,6 @@ function SectionHeading({
           accent
         }
       />
-
       <Text
         style={[
           styles.sectionTitle,
@@ -1475,20 +1266,13 @@ function SectionHeading({
     </View>
   );
 }
-
 type DetailRowProps = {
-  icon:
-    | 'time-outline'
-    | 'calendar-number-outline'
-    | 'people-outline'
-    | 'cube-outline';
-
+  icon: IconName;
   label: string;
   value: string;
   textColor: string;
   mutedColor: string;
 };
-
 function DetailRow({
   icon,
   label,
@@ -1511,7 +1295,6 @@ function DetailRow({
           mutedColor
         }
       />
-
       <View
         style={
           styles.detailCopy
@@ -1528,7 +1311,6 @@ function DetailRow({
         >
           {label}
         </Text>
-
         <Text
           style={[
             styles.detailValue,
@@ -1544,7 +1326,6 @@ function DetailRow({
     </View>
   );
 }
-
 type DetailTextBlockProps = {
   label: string;
   value?: string | null;
@@ -1552,7 +1333,6 @@ type DetailTextBlockProps = {
   textColor: string;
   mutedColor: string;
 };
-
 function DetailTextBlock({
   label,
   value,
@@ -1577,7 +1357,6 @@ function DetailTextBlock({
       >
         {label}
       </Text>
-
       <Text
         style={[
           styles.bodyText,
@@ -1594,273 +1373,220 @@ function DetailTextBlock({
     </View>
   );
 }
-
 const styles =
   StyleSheet.create({
     backButton: {
       alignSelf:
         'flex-start',
-
       flexDirection:
         'row',
-
       alignItems:
         'center',
-
       gap: 6,
-
       paddingVertical: 8,
       paddingHorizontal: 4,
-
       marginBottom: 4,
     },
-
     backText: {
       fontSize: 15,
       fontWeight: '700',
     },
-
     pressed: {
       opacity: 0.65,
     },
-
     heroImage: {
       width: '100%',
       height: 200,
       borderRadius: 18,
     },
-
     categoryRow: {
       flexDirection:
         'row',
-
       alignItems:
         'center',
-
       justifyContent:
         'space-between',
-
       gap: 10,
     },
-
     categoryBadge: {
       flexDirection:
         'row',
-
       alignItems:
         'center',
-
       gap: 6,
-
       borderRadius: 14,
-
       paddingHorizontal: 10,
       paddingVertical: 7,
-
       flexShrink: 1,
     },
-
     categoryText: {
       fontSize: 11,
       fontWeight: '800',
       flexShrink: 1,
     },
-
     xp: {
       fontSize: 13,
       fontWeight: '800',
     },
-
     projectTitle: {
       fontSize: 24,
       fontWeight: '800',
       marginTop: 12,
     },
-
     infoRow: {
       flexDirection:
         'row',
-
       alignItems:
         'center',
-
       gap: 7,
-
       marginTop: 8,
     },
-
     infoText: {
       flex: 1,
       fontSize: 13,
     },
-
     messageRow: {
       flexDirection:
         'row',
-
       alignItems:
         'center',
-
       gap: 9,
     },
-
     successText: {
       flex: 1,
       fontSize: 13,
       fontWeight: '700',
     },
-
     sectionHeadingRow: {
       flexDirection:
         'row',
-
       alignItems:
         'center',
-
       gap: 8,
     },
-
     sectionTitle: {
       fontSize: 17,
       fontWeight: '800',
     },
-
     bodyText: {
       fontSize: 14,
       lineHeight: 21,
       marginTop: 7,
     },
-
     statusRow: {
       flexDirection:
         'row',
-
       alignItems:
         'center',
-
       gap: 10,
     },
-
     warningRow: {
       flexDirection:
         'row',
-
       alignItems:
         'flex-start',
-
       gap: 10,
     },
-
     statusCopy: {
       flex: 1,
     },
-
     statusHeading: {
       fontSize: 15,
       fontWeight: '800',
     },
-
     statusValue: {
       fontSize: 14,
       fontWeight: '800',
       marginTop: 2,
     },
-
     detailRow: {
       flexDirection:
         'row',
-
       alignItems:
         'flex-start',
-
       gap: 10,
-
       paddingVertical: 4,
     },
-
     detailCopy: {
       flex: 1,
     },
-
     detailLabel: {
       fontSize: 13,
       fontWeight: '800',
     },
-
     detailValue: {
       fontSize: 13,
       lineHeight: 19,
       marginTop: 2,
     },
-
     textBlock: {
       marginTop: 5,
     },
-
     linkBlock: {
       gap: 8,
       marginTop: 6,
     },
-
     linkTitleRow: {
       flexDirection:
         'row',
-
       alignItems:
         'center',
-
       gap: 9,
     },
-
     linkTitleCopy: {
       flex: 1,
     },
-
     smallText: {
       fontSize: 12,
       lineHeight: 18,
     },
-
     xpLarge: {
       fontSize: 20,
       fontWeight: '800',
       marginTop: 8,
     },
-
     applicationComplete: {
       flexDirection:
         'row',
-
       alignItems:
         'center',
-
       justifyContent:
         'center',
-
       gap: 7,
-
       paddingVertical: 10,
     },
-
     applicationCompleteText: {
       fontSize: 13,
       fontWeight: '600',
     },
-
     viewOnlyRow: {
       flexDirection:
         'row',
-
       alignItems:
         'center',
-
       gap: 9,
     },
-
     viewOnlyText: {
       flex: 1,
       fontSize: 13,
       lineHeight: 19,
       fontWeight: '600',
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      marginBottom: 16,
+    },
+    headerBackButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      fontSize: 22,
+      fontWeight: '700',
+      flexShrink: 1,
     },
   });
