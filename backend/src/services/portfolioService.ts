@@ -94,7 +94,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
   ).catch(() => []);
 
   const completedSet = new Set(completedRows.map((r) => r.lessonId));
-
   // Map every lessonId in curriculum to its subjectId
   const lessonToSubjectMap = new Map<string, string>();
   for (const subject of w3schoolsProgrammingDomain.subjects) {

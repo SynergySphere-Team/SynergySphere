@@ -201,9 +201,48 @@ bodyRouter.post('/projects', authenticate, validateBody(wizardSchema), async (re
 
     await Promise.all(generated.issues.map((issue) => githubRequest(`/repos/${repo.full_name}/issues`, auth.token, { method: 'POST', body: JSON.stringify({ ...issue, labels: ['good first issue'] }) }).catch(() => null)));
     const project = await queryOne<{ id: string }>(
-      `INSERT INTO "Project" ("id", "creatorId", "title", "category", "organization", "description", "requirements", "xpReward", "githubOwner", "githubRepo", "githubFullName", "githubNodeId", "githubUrl", "githubVisibility", "primaryLanguage", "license", "starterTemplate", "githubStars", "githubForks", "contributorAvatars", "isGithubBacked")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 250, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, TRUE) RETURNING "id"`,
-      [newId(), req.user!.userId, repo.name, input.category, repo.owner.login, generated.description, input.goal, repo.owner.login, repo.name, repo.full_name, repo.node_id, repo.html_url, repo.private ? 'private' : 'public', input.language, input.license, input.starterTemplate, repo.stargazers_count || 0, repo.forks_count || 0, JSON.stringify(repo.owner.avatar_url ? [repo.owner.avatar_url] : [])],
+      `INSERT INTO "Project" (
+        "id", "creatorId", "title", "category", "organization",
+        "description", "requirements", "problem", "audience",
+        "xpReward", "githubOwner", "githubRepo", "githubFullName",
+        "githubNodeId", "githubUrl", "githubVisibility",
+        "primaryLanguage", "license", "starterTemplate",
+        "githubStars", "githubForks", "contributorAvatars",
+        "isGithubBacked"
+      )
+      VALUES (
+        $1, $2, $3, $4, $5,
+        $6, $7, $8, $9,
+        250, $10, $11, $12,
+        $13, $14, $15,
+        $16, $17, $18,
+        $19, $20, $21,
+        TRUE
+      )
+      RETURNING "id"`,
+      [
+        newId(),
+        req.user!.userId,
+        repo.name,
+        input.category,
+        repo.owner.login,
+        generated.description,
+        input.goal,
+        input.problem,
+        input.audience,
+        repo.owner.login,
+        repo.name,
+        repo.full_name,
+        repo.node_id,
+        repo.html_url,
+        repo.private ? 'private' : 'public',
+        input.language,
+        input.license,
+        input.starterTemplate,
+        repo.stargazers_count || 0,
+        repo.forks_count || 0,
+        JSON.stringify(repo.owner.avatar_url ? [repo.owner.avatar_url] : []),
+      ],
     );
     let webhookWarning: string | null = null;
     if (process.env.GITHUB_WEBHOOK_URL && process.env.GITHUB_WEBHOOK_SECRET) {

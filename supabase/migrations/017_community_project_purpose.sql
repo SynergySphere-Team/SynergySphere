@@ -1,0 +1,3 @@
+ALTER TABLE "Project"
+  ADD COLUMN IF NOT EXISTS "problem" TEXT,
+  ADD COLUMN IF NOT EXISTS "audience" TEXT;
