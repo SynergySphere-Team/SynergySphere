@@ -4,7 +4,7 @@ import { newId, query, queryOne } from '../lib/db.js';
 import { authenticate, type AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { awardXp } from '../services/gamification.js';
-import { accessTokenForUser, beginDeviceAuthorization, connectDirectAccount, githubConnection, githubRequest, GithubError, isValidWebhookSignature, pollDeviceAuthorization, revokeGithubConnection, saveGithubToken } from '../services/github.js';
+import { accessTokenForUser, beginDeviceAuthorization, githubConnection, githubRequest, GithubError, isValidWebhookSignature, pollDeviceAuthorization, revokeGithubConnection, saveGithubToken } from '../services/github.js';
 import { decryptSecret, encryptSecret } from '../services/crypto.js';
 import { generateCommunityProject, type WizardInput } from '../services/projectGeneration.js';
 
@@ -127,28 +127,6 @@ bodyRouter.get('/connection', authenticate, async (req: AuthRequest, res) => {
 bodyRouter.delete('/connection', authenticate, async (req: AuthRequest, res) => {
   await revokeGithubConnection(req.user!.userId);
   res.status(204).send();
-});
-
-const directConnectSchema = z.object({
-  input: z.string().trim().min(1, 'Please enter a GitHub username or personal access token'),
-});
-
-bodyRouter.post('/connect-direct', authenticate, validateBody(directConnectSchema), async (req: AuthRequest, res) => {
-  try {
-    const result = await connectDirectAccount(req.user!.userId, req.body.input);
-    res.json({
-      status: 'connected',
-      connected: true,
-      username: result.username,
-      avatarUrl: result.avatarUrl,
-      accessToken: result.accessToken,
-    });
-  } catch (error) {
-    const status = error instanceof GithubError ? error.status : 400;
-    res.status(status).json({
-      error: error instanceof Error ? error.message : 'Could not connect GitHub account.',
-    });
-  }
 });
 
 const pushTokenSchema = z.object({ token: z.string().min(10).max(500), platform: z.enum(['ios', 'android']) });
