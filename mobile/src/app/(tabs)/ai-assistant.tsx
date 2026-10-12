@@ -105,6 +105,11 @@ export default function AIAssistantScreen() {
 
   const scrollViewRef = useRef<ScrollView>(null);
 
+  // Tab State: 'conversation' vs 'codeContext'
+  const [activeTab, setActiveTab] = useState<'conversation' | 'codeContext'>('conversation');
+  // Expandable & Collapsible Chat History state
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -155,6 +160,16 @@ export default function AIAssistantScreen() {
   }, [lessonParam]);
 
   const liveAnalysis = useMemo(() => analyzeCodeLocally(context), [context]);
+
+  // Derived user questions for the expandable chat history
+  const userQuestions = useMemo(() => {
+    return messages
+      .filter((m) => m.role === 'user')
+      .map((m, index) => ({
+        index,
+        content: m.content,
+      }));
+  }, [messages]);
 
   const historyFromMessages = useCallback(
     (msgs: Message[]): Array<{ role: 'user' | 'assistant'; content: string }> => {
@@ -220,6 +235,7 @@ export default function AIAssistantScreen() {
           content: 'Please paste code in the Code Context editor first to run this quick action!',
         },
       ]);
+      setActiveTab('codeContext');
       return;
     }
     const prompts: Record<string, string> = {
@@ -228,6 +244,8 @@ export default function AIAssistantScreen() {
       Optimize: `Optimize this code for better performance and readability. Show the improved version:\n\n\`\`\`\n${context}\n\`\`\``,
       'Generate Tests': `Generate comprehensive unit tests for this code including edge cases:\n\n\`\`\`\n${context}\n\`\`\``,
     };
+    // Switch to Conversation tab so user immediately sees the query and answer stream
+    setActiveTab('conversation');
     send(prompts[action], context);
   }
 
@@ -270,6 +288,7 @@ export default function AIAssistantScreen() {
           : 'Chat cleared! Ask about any programming concept or paste code for review.',
       },
     ]);
+    setIsHistoryExpanded(false);
   }
 
   const isLight = theme === 'light';
@@ -277,6 +296,7 @@ export default function AIAssistantScreen() {
 
   return (
     <Screen scrollViewRef={scrollViewRef}>
+      {/* ── Screen Header ── */}
       <View
         style={[
           styles.headerRow,
@@ -374,156 +394,713 @@ export default function AIAssistantScreen() {
         </Card>
       ) : null}
 
-      {/* Code Context Editor */}
-      <Text style={[styles.section, { color: colors.text }]}>Code Context</Text>
-      <Card>
-        <TextInput
-          value={context}
-          onChangeText={(text) => {
-            setContext(text);
-            setContextEditedByUser(true);
-          }}
-          multiline
-          keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
-          placeholder="Paste your code snippet here to analyze, debug, or optimize…"
-          placeholderTextColor={colors.muted}
-          style={[styles.codeEditor, { backgroundColor: isLight ? '#F5F5F5' : '#050a0d', color: primaryAccent }]}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {/* Quick Action Buttons */}
-        <View style={styles.quickActionsGrid}>
-          <Pressable
-            onPress={() => handleQuickAction('Explain')}
-            disabled={loading}
-            style={({ pressed }) => [styles.quickActionBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }, pressed && styles.pressed]}
+      {/* ── Segmented Tab Bar: Conversation vs Code Context ── */}
+      <View
+        style={[
+          styles.tabBar,
+          {
+            backgroundColor: isLight ? '#EBF2EE' : 'rgba(255, 255, 255, 0.05)',
+            borderColor: isLight ? '#D3DFD7' : 'rgba(255, 255, 255, 0.1)',
+          },
+        ]}
+      >
+        <Pressable
+          accessibilityRole="tab"
+          accessibilityLabel="Conversation Tab"
+          accessibilityState={{ selected: activeTab === 'conversation' }}
+          onPress={() => setActiveTab('conversation')}
+          style={[
+            styles.tabItem,
+            activeTab === 'conversation' && [
+              styles.tabItemActive,
+              {
+                backgroundColor: isLight ? '#FFFFFF' : 'rgba(145, 219, 94, 0.18)',
+                borderColor: isLight ? 'rgba(30, 104, 39, 0.28)' : 'rgba(145, 219, 94, 0.45)',
+                shadowColor: isLight ? '#000' : '#91db5e',
+              },
+            ],
+          ]}
+        >
+          <Ionicons
+            name={activeTab === 'conversation' ? 'chatbubbles' : 'chatbubbles-outline'}
+            size={16}
+            color={activeTab === 'conversation' ? primaryAccent : colors.muted}
+          />
+          <Text
+            allowFontScaling
+            style={[
+              styles.tabLabel,
+              {
+                color: activeTab === 'conversation' ? (isLight ? '#1e6827' : '#91db5e') : colors.muted,
+                fontWeight: activeTab === 'conversation' ? '800' : '600',
+                fontSize: fontSize(13),
+              },
+            ]}
           >
-            <Ionicons name="sparkles" size={14} color={primaryAccent} />
-            <Text style={[styles.quickActionText, { color: colors.text }]}>Explain</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => handleQuickAction('Debug')}
-            disabled={loading}
-            style={({ pressed }) => [styles.quickActionBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }, pressed && styles.pressed]}
-          >
-            <Ionicons name="bug" size={14} color={primaryAccent} />
-            <Text style={[styles.quickActionText, { color: colors.text }]}>Debug</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => handleQuickAction('Optimize')}
-            disabled={loading}
-            style={({ pressed }) => [styles.quickActionBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }, pressed && styles.pressed]}
-          >
-            <Ionicons name="flash" size={14} color={primaryAccent} />
-            <Text style={[styles.quickActionText, { color: colors.text }]}>Optimize</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => handleQuickAction('Generate Tests')}
-            disabled={loading}
-            style={({ pressed }) => [styles.quickActionBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }, pressed && styles.pressed]}
-          >
-            <Ionicons name="flask" size={14} color={primaryAccent} />
-            <Text style={[styles.quickActionText, { color: colors.text }]}>Tests</Text>
-          </Pressable>
-        </View>
-      </Card>
-
-      {/* Live Complexity & Structure Analysis */}
-      {liveAnalysis ? (
-        <>
-          <Text style={[styles.section, { color: colors.text }]}>Live Code Analysis</Text>
-          <Card>
-            {liveAnalysis.map((sec, idx) => (
-              <View
-                key={sec.title}
+            Conversation
+          </Text>
+          {userQuestions.length > 0 && (
+            <View
+              style={[
+                styles.tabBadge,
+                {
+                  backgroundColor:
+                    activeTab === 'conversation'
+                      ? isLight
+                        ? 'rgba(30, 104, 39, 0.12)'
+                        : 'rgba(145, 219, 94, 0.25)'
+                      : isLight
+                      ? 'rgba(0, 0, 0, 0.06)'
+                      : 'rgba(255, 255, 255, 0.08)',
+                },
+              ]}
+            >
+              <Text
                 style={[
-                  styles.analysisSection,
-                  idx > 0 && [styles.divider, { borderTopColor: colors.border }],
+                  styles.tabBadgeText,
+                  { color: activeTab === 'conversation' ? primaryAccent : colors.muted },
                 ]}
               >
-                <Text style={[styles.analysisTitle, { color: primaryAccent }]}>{sec.title}</Text>
-                {sec.items.map((item, itemIdx) => (
-                  <Text key={itemIdx} style={[styles.analysisItem, { color: colors.text }]}>
-                    {item}
+                {userQuestions.length}
+              </Text>
+            </View>
+          )}
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="tab"
+          accessibilityLabel="Code Context Tab"
+          accessibilityState={{ selected: activeTab === 'codeContext' }}
+          onPress={() => setActiveTab('codeContext')}
+          style={[
+            styles.tabItem,
+            activeTab === 'codeContext' && [
+              styles.tabItemActive,
+              {
+                backgroundColor: isLight ? '#FFFFFF' : 'rgba(145, 219, 94, 0.18)',
+                borderColor: isLight ? 'rgba(30, 104, 39, 0.28)' : 'rgba(145, 219, 94, 0.45)',
+                shadowColor: isLight ? '#000' : '#91db5e',
+              },
+            ],
+          ]}
+        >
+          <Ionicons
+            name={activeTab === 'codeContext' ? 'code-slash' : 'code-slash-outline'}
+            size={16}
+            color={activeTab === 'codeContext' ? primaryAccent : colors.muted}
+          />
+          <Text
+            allowFontScaling
+            style={[
+              styles.tabLabel,
+              {
+                color: activeTab === 'codeContext' ? (isLight ? '#1e6827' : '#91db5e') : colors.muted,
+                fontWeight: activeTab === 'codeContext' ? '800' : '600',
+                fontSize: fontSize(13),
+              },
+            ]}
+          >
+            Code Context
+          </Text>
+          {context.trim().length > 0 && (
+            <View
+              style={[
+                styles.tabIndicatorDot,
+                { backgroundColor: '#10B981' },
+              ]}
+            />
+          )}
+        </Pressable>
+      </View>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          TAB 1: CONVERSATION TAB
+      ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'conversation' && (
+        <>
+          {/* ── Expandable & Collapsible Chat History ── */}
+          <Card>
+            <Pressable
+              onPress={() => setIsHistoryExpanded((prev) => !prev)}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={isHistoryExpanded ? 'Collapse Chat History' : 'Expand Chat History'}
+              style={styles.historyHeaderRow}
+            >
+              <View style={styles.historyHeaderLeft}>
+                <View
+                  style={[
+                    styles.historyIconWrapper,
+                    {
+                      backgroundColor: isLight
+                        ? 'rgba(30, 104, 39, 0.1)'
+                        : 'rgba(145, 219, 94, 0.16)',
+                    },
+                  ]}
+                >
+                  <Ionicons name="time-outline" size={17} color={primaryAccent} />
+                </View>
+                <View style={styles.historyHeaderTextWrapper}>
+                  <View style={styles.historyTitleRow}>
+                    <Text
+                      style={[
+                        styles.historyTitle,
+                        { color: colors.text, fontSize: fontSize(14) },
+                      ]}
+                    >
+                      Chat History
+                    </Text>
+                    <View
+                      style={[
+                        styles.historyCountPill,
+                        {
+                          backgroundColor: isLight
+                            ? '#E8F5E9'
+                            : 'rgba(145, 219, 94, 0.2)',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.historyCountPillText,
+                          { color: primaryAccent },
+                        ]}
+                      >
+                        {userQuestions.length}{' '}
+                        {userQuestions.length === 1 ? 'query' : 'queries'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.historySubtitle,
+                      { color: colors.muted, fontSize: fontSize(12) },
+                    ]}
+                  >
+                    {userQuestions.length === 0
+                      ? 'No past questions recorded yet'
+                      : isHistoryExpanded
+                      ? 'Tap to collapse history list'
+                      : `Recent: "${userQuestions[userQuestions.length - 1].content.slice(0, 36)}…"`}
                   </Text>
-                ))}
+                </View>
               </View>
+
+              <View style={styles.historyChevronWrapper}>
+                <Ionicons
+                  name={isHistoryExpanded ? 'chevron-up-circle' : 'chevron-down-circle'}
+                  size={22}
+                  color={primaryAccent}
+                />
+              </View>
+            </Pressable>
+
+            {isHistoryExpanded && (
+              <View
+                style={[
+                  styles.historyExpandedContent,
+                  { borderTopColor: colors.border },
+                ]}
+              >
+                {userQuestions.length === 0 ? (
+                  <View style={styles.historyEmptyContainer}>
+                    <Ionicons
+                      name="chatbubbles-outline"
+                      size={24}
+                      color={colors.muted}
+                    />
+                    <Text
+                      style={[
+                        styles.historyEmptyText,
+                        { color: colors.muted, fontSize: fontSize(12) },
+                      ]}
+                    >
+                      Your past questions and discussion topics will appear here for easy review and reuse.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.historyListContainer}>
+                    <Text
+                      style={[
+                        styles.historyListHint,
+                        { color: colors.muted, fontSize: fontSize(11) },
+                      ]}
+                    >
+                      Tap any previous query to reload it into your message box:
+                    </Text>
+                    {userQuestions.map((q, idx) => (
+                      <Pressable
+                        key={idx}
+                        onPress={() => {
+                          setMessage(q.content);
+                          setIsHistoryExpanded(false);
+                          setTimeout(() => {
+                            scrollViewRef.current?.scrollToEnd({ animated: true });
+                          }, 100);
+                        }}
+                        style={({ pressed }) => [
+                          styles.historyListItem,
+                          {
+                            backgroundColor: colors.surfaceElevated,
+                            borderColor: colors.border,
+                          },
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <View style={styles.historyListItemTop}>
+                          <View style={styles.historyListItemIndexBadge}>
+                            <Ionicons
+                              name="chatbubble-ellipses-outline"
+                              size={12}
+                              color={primaryAccent}
+                            />
+                            <Text
+                              style={[
+                                styles.historyListItemIndexText,
+                                { color: primaryAccent },
+                              ]}
+                            >
+                              Query #{idx + 1}
+                            </Text>
+                          </View>
+                          <View style={styles.historyReuseAction}>
+                            <Text
+                              style={[
+                                styles.historyReuseActionText,
+                                { color: primaryAccent },
+                              ]}
+                            >
+                              Load query ↵
+                            </Text>
+                          </View>
+                        </View>
+                        <Text
+                          numberOfLines={2}
+                          style={[
+                            styles.historyListItemText,
+                            { color: colors.text, fontSize: fontSize(13) },
+                          ]}
+                        >
+                          {q.content}
+                        </Text>
+                      </Pressable>
+                    ))}
+
+                    <View style={styles.historyActionButtonsRow}>
+                      <Pressable
+                        onPress={clearChat}
+                        hitSlop={6}
+                        style={({ pressed }) => [
+                          styles.historyClearBtn,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Ionicons name="trash-outline" size={13} color="#EF4444" />
+                        <Text style={styles.historyClearBtnText}>Clear History</Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() => setIsHistoryExpanded(false)}
+                        hitSlop={6}
+                        style={({ pressed }) => [
+                          styles.historyCollapseBtn,
+                          { borderColor: colors.border },
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Ionicons
+                          name="chevron-up"
+                          size={13}
+                          color={colors.muted}
+                        />
+                        <Text
+                          style={[
+                            styles.historyCollapseBtnText,
+                            { color: colors.muted },
+                          ]}
+                        >
+                          Collapse
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+          </Card>
+
+          {/* ── Active Code Attached Pill in Conversation ── */}
+          {context.trim().length > 0 && (
+            <Pressable
+              onPress={() => setActiveTab('codeContext')}
+              style={({ pressed }) => [
+                styles.attachedCodeBanner,
+                {
+                  backgroundColor: isLight
+                    ? '#E8F5E9'
+                    : 'rgba(145, 219, 94, 0.1)',
+                  borderColor: isLight
+                    ? '#C8E6C9'
+                    : 'rgba(145, 219, 94, 0.28)',
+                },
+                pressed && styles.pressed,
+              ]}
+            >
+              <View style={styles.attachedCodeLeft}>
+                <Ionicons name="code-slash" size={16} color={primaryAccent} />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[
+                      styles.attachedCodeTitle,
+                      { color: primaryAccent, fontSize: fontSize(13) },
+                    ]}
+                  >
+                    Code Context Attached
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.attachedCodeSub,
+                      { color: colors.muted, fontSize: fontSize(11) },
+                    ]}
+                  >
+                    {context.trim().split('\n').length} lines loaded • Tap to edit or inspect code
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={primaryAccent} />
+            </Pressable>
+          )}
+
+          {/* ── Suggested Prompts Chips ── */}
+          <Text style={[styles.section, { color: colors.text }]}>Suggested Topics</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsScroll}
+          >
+            {starterPrompts.map((prompt) => (
+              <Pressable
+                key={prompt}
+                onPress={() => send(prompt)}
+                disabled={loading}
+                style={({ pressed }) => [
+                  styles.chip,
+                  { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons
+                  name="chatbubble-ellipses-outline"
+                  size={13}
+                  color={primaryAccent}
+                />
+                <Text style={[styles.chipText, { color: colors.text }]}>{prompt}</Text>
+              </Pressable>
             ))}
+          </ScrollView>
+
+          {/* ── Conversation Thread ── */}
+          <View style={styles.conversationHeaderRow}>
+            <Text style={[styles.section, { color: colors.text }]}>Conversation</Text>
+            <Text style={[styles.conversationCountText, { color: colors.muted }]}>
+              {messages.length} message{messages.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+
+          {messages.map((item, index) => (
+            <Card key={index}>
+              <View style={styles.msgHeader}>
+                <View
+                  style={[
+                    styles.roleBadge,
+                    {
+                      backgroundColor:
+                        item.role === 'user'
+                          ? isLight
+                            ? '#E8F5E9'
+                            : 'rgba(30, 104, 39, 0.2)'
+                          : colors.surfaceElevated,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={item.role === 'user' ? 'person' : 'hardware-chip'}
+                    size={12}
+                    color={item.role === 'user' ? primaryAccent : colors.muted}
+                  />
+                  <Text
+                    style={[
+                      styles.roleText,
+                      { color: item.role === 'user' ? primaryAccent : colors.muted },
+                    ]}
+                  >
+                    {item.role === 'user' ? 'You' : 'SynergySphere AI'}
+                  </Text>
+                </View>
+                {item.lessonTitle ? (
+                  <View style={[styles.groundBadge, { borderColor: primaryAccent }]}>
+                    <Text style={[styles.groundText, { color: primaryAccent }]}>
+                      Lesson: {item.lessonTitle}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              {item.role === 'assistant' ? (
+                <MarkdownView content={item.content} />
+              ) : (
+                <Text style={[styles.msgBody, { color: colors.text }]}>{item.content}</Text>
+              )}
+            </Card>
+          ))}
+
+          {/* ── Ask Input Box ── */}
+          <Card>
+            <TextInput
+              value={message}
+              onChangeText={setMessage}
+              onFocus={() => {
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollToEnd({ animated: true });
+                }, 180);
+              }}
+              keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
+              placeholder={
+                lesson
+                  ? `Ask about ${lesson.title}…`
+                  : 'Ask about code concepts, debug traces, syntax…'
+              }
+              placeholderTextColor={colors.muted}
+              multiline
+              style={[
+                styles.inputBox,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
+            />
+            <Button
+              title={loading ? 'Thinking…' : 'Send Question'}
+              onPress={() => send()}
+              disabled={loading || !message.trim()}
+            />
           </Card>
         </>
-      ) : null}
+      )}
 
-      {/* Suggested Prompts */}
-      <Text style={[styles.section, { color: colors.text }]}>Suggested Topics</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-        {starterPrompts.map((prompt) => (
+      {/* ═══════════════════════════════════════════════════════════════════
+          TAB 2: CODE CONTEXT TAB
+      ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'codeContext' && (
+        <>
+          {/* Code Context Editor Card */}
+          <View style={styles.codeContextHeaderRow}>
+            <Text style={[styles.section, { color: colors.text, marginTop: 4 }]}>
+              Code Context Editor
+            </Text>
+            {context.trim().length > 0 && (
+              <Pressable
+                onPress={() => {
+                  setContext('');
+                  setContextEditedByUser(false);
+                }}
+                hitSlop={6}
+                style={({ pressed }) => [
+                  styles.clearCodeSnippetBtn,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons name="trash-outline" size={12} color={colors.muted} />
+                <Text style={[styles.clearCodeSnippetText, { color: colors.muted }]}>
+                  Clear Editor
+                </Text>
+              </Pressable>
+            )}
+          </View>
+
+          <Card>
+            <View style={styles.editorHeaderInfo}>
+              <View style={styles.editorBadge}>
+                <Ionicons name="code" size={12} color={primaryAccent} />
+                <Text style={[styles.editorBadgeText, { color: primaryAccent }]}>
+                  {context.trim().split('\n').filter(Boolean).length} Lines
+                </Text>
+              </View>
+              <Text style={[styles.editorHintText, { color: colors.muted }]}>
+                {context.trim().length} characters
+              </Text>
+            </View>
+
+            <TextInput
+              value={context}
+              onChangeText={(text) => {
+                setContext(text);
+                setContextEditedByUser(true);
+              }}
+              multiline
+              keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
+              placeholder="Paste your code snippet here to analyze, debug, or optimize…"
+              placeholderTextColor={colors.muted}
+              style={[
+                styles.codeEditor,
+                {
+                  backgroundColor: isLight ? '#F5F5F5' : '#050a0d',
+                  color: primaryAccent,
+                },
+              ]}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            {/* Quick Action Buttons */}
+            <Text
+              style={[
+                styles.quickActionsLabel,
+                { color: colors.muted, fontSize: fontSize(11) },
+              ]}
+            >
+              Run Instant Actions (switches to Conversation for explanations):
+            </Text>
+            <View style={styles.quickActionsGrid}>
+              <Pressable
+                onPress={() => handleQuickAction('Explain')}
+                disabled={loading}
+                style={({ pressed }) => [
+                  styles.quickActionBtn,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons name="sparkles" size={14} color={primaryAccent} />
+                <Text style={[styles.quickActionText, { color: colors.text }]}>
+                  Explain
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleQuickAction('Debug')}
+                disabled={loading}
+                style={({ pressed }) => [
+                  styles.quickActionBtn,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons name="bug" size={14} color={primaryAccent} />
+                <Text style={[styles.quickActionText, { color: colors.text }]}>Debug</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleQuickAction('Optimize')}
+                disabled={loading}
+                style={({ pressed }) => [
+                  styles.quickActionBtn,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons name="flash" size={14} color={primaryAccent} />
+                <Text style={[styles.quickActionText, { color: colors.text }]}>
+                  Optimize
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleQuickAction('Generate Tests')}
+                disabled={loading}
+                style={({ pressed }) => [
+                  styles.quickActionBtn,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons name="flask" size={14} color={primaryAccent} />
+                <Text style={[styles.quickActionText, { color: colors.text }]}>Tests</Text>
+              </Pressable>
+            </View>
+          </Card>
+
+          {/* ── Switch to Conversation Navigation Card ── */}
           <Pressable
-            key={prompt}
-            onPress={() => send(prompt)}
-            disabled={loading}
+            onPress={() => setActiveTab('conversation')}
             style={({ pressed }) => [
-              styles.chip,
-              { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+              styles.switchToConversationCard,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+              },
               pressed && styles.pressed,
             ]}
           >
-            <Ionicons name="chatbubble-ellipses-outline" size={13} color={primaryAccent} />
-            <Text style={[styles.chipText, { color: colors.text }]}>{prompt}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      {/* Conversation Thread */}
-      <Text style={[styles.section, { color: colors.text }]}>Conversation</Text>
-      {messages.map((item, index) => (
-        <Card key={index}>
-          <View style={styles.msgHeader}>
-            <View style={[styles.roleBadge, { backgroundColor: item.role === 'user' ? (isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.2)') : colors.surfaceElevated }]}>
-              <Ionicons
-                name={item.role === 'user' ? 'person' : 'hardware-chip'}
-                size={12}
-                color={item.role === 'user' ? primaryAccent : colors.muted}
-              />
-              <Text style={[styles.roleText, { color: item.role === 'user' ? primaryAccent : colors.muted }]}>
-                {item.role === 'user' ? 'You' : 'SynergySphere AI'}
-              </Text>
-            </View>
-            {item.lessonTitle ? (
-              <View style={[styles.groundBadge, { borderColor: primaryAccent }]}>
-                <Text style={[styles.groundText, { color: primaryAccent }]}>Lesson: {item.lessonTitle}</Text>
+            <View style={styles.switchToConversationLeft}>
+              <Ionicons name="chatbubbles-outline" size={18} color={primaryAccent} />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[
+                    styles.switchToConversationTitle,
+                    { color: colors.text, fontSize: fontSize(13) },
+                  ]}
+                >
+                  Ask about this Code
+                </Text>
+                <Text
+                  style={[
+                    styles.switchToConversationSub,
+                    { color: colors.muted, fontSize: fontSize(11) },
+                  ]}
+                >
+                  Switch back to Conversation to ask custom follow-ups.
+                </Text>
               </View>
-            ) : null}
-          </View>
-          {item.role === 'assistant' ? (
-            <MarkdownView content={item.content} />
-          ) : (
-            <Text style={[styles.msgBody, { color: colors.text }]}>{item.content}</Text>
-          )}
-        </Card>
-      ))}
+            </View>
+            <Ionicons name="arrow-forward" size={16} color={primaryAccent} />
+          </Pressable>
 
-      {/* Ask Input Card */}
-      <Card>
-        <TextInput
-          value={message}
-          onChangeText={setMessage}
-          onFocus={() => {
-            setTimeout(() => {
-              scrollViewRef.current?.scrollToEnd({ animated: true });
-            }, 180);
-          }}
-          keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
-          placeholder={lesson ? `Ask about ${lesson.title}…` : 'Ask about code concepts, debug traces, syntax…'}
-          placeholderTextColor={colors.muted}
-          multiline
-          style={[styles.inputBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.text }]}
-        />
-        <Button
-          title={loading ? 'Thinking…' : 'Send Question'}
-          onPress={() => send()}
-          disabled={loading || !message.trim()}
-        />
-      </Card>
+          {/* ── Live Complexity & Structure Analysis ── */}
+          {liveAnalysis ? (
+            <>
+              <Text style={[styles.section, { color: colors.text }]}>
+                Live Code Analysis
+              </Text>
+              <Card>
+                {liveAnalysis.map((sec, idx) => (
+                  <View
+                    key={sec.title}
+                    style={[
+                      styles.analysisSection,
+                      idx > 0 && [styles.divider, { borderTopColor: colors.border }],
+                    ]}
+                  >
+                    <Text style={[styles.analysisTitle, { color: primaryAccent }]}>
+                      {sec.title}
+                    </Text>
+                    {sec.items.map((item, itemIdx) => (
+                      <Text
+                        key={itemIdx}
+                        style={[styles.analysisItem, { color: colors.text }]}
+                      >
+                        {item}
+                      </Text>
+                    ))}
+                  </View>
+                ))}
+              </Card>
+            </>
+          ) : null}
+        </>
+      )}
     </Screen>
   );
 }
@@ -585,29 +1162,436 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  clearButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, marginTop: 4 },
-  clearText: { fontSize: 12, fontWeight: '600' },
-  pressed: { opacity: 0.7 },
-  groundedRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flexWrap: 'wrap' },
-  groundedText: { fontSize: 12, fontWeight: '800' },
-  groundedLesson: { fontSize: 12, fontWeight: '600', flexShrink: 1 },
-  section: { fontSize: 17, fontWeight: '800', marginTop: 14, marginBottom: 4 },
-  codeEditor: { minHeight: 120, padding: 12, borderRadius: 8, fontFamily: 'monospace', fontSize: 12, lineHeight: 18, textAlignVertical: 'top' },
-  quickActionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
-  quickActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
-  quickActionText: { fontSize: 12, fontWeight: '700' },
-  analysisSection: { paddingVertical: 8, gap: 4 },
-  divider: { borderTopWidth: 1 },
-  analysisTitle: { fontSize: 13, fontWeight: '800' },
-  analysisItem: { fontSize: 12, lineHeight: 18 },
-  chipsScroll: { gap: 8, paddingVertical: 4 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
-  chipText: { fontSize: 12, fontWeight: '600' },
-  msgHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  roleBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  roleText: { fontSize: 11, fontWeight: '800' },
-  groundBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1 },
-  groundText: { fontSize: 10, fontWeight: '700' },
-  msgBody: { fontSize: 14, lineHeight: 22 },
-  inputBox: { minHeight: 80, padding: 12, borderRadius: 10, borderWidth: 1, fontSize: 14, lineHeight: 20, textAlignVertical: 'top', marginBottom: 10 },
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  clearText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  groundedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    flexWrap: 'wrap',
+  },
+  groundedText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  groundedLesson: {
+    fontSize: 12,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+
+  /* ── Segmented Tab Bar ── */
+  tabBar: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 4,
+    gap: 4,
+    marginVertical: 10,
+  },
+  tabItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    gap: 6,
+  },
+  tabItemActive: {
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  tabBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+    minWidth: 18,
+    alignItems: 'center',
+  },
+  tabBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  tabIndicatorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+
+  /* ── Expandable Chat History Card ── */
+  historyHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  historyHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
+  },
+  historyIconWrapper: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  historyHeaderTextWrapper: {
+    flex: 1,
+    minWidth: 0,
+  },
+  historyTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  historyTitle: {
+    fontWeight: '800',
+  },
+  historyCountPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 10,
+  },
+  historyCountPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  historySubtitle: {
+    marginTop: 1,
+  },
+  historyChevronWrapper: {
+    padding: 2,
+  },
+  historyExpandedContent: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  historyEmptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  historyEmptyText: {
+    textAlign: 'center',
+    paddingHorizontal: 12,
+  },
+  historyListContainer: {
+    gap: 8,
+  },
+  historyListHint: {
+    marginBottom: 2,
+  },
+  historyListItem: {
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+  },
+  historyListItemTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  historyListItemIndexBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  historyListItemIndexText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  historyReuseAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historyReuseActionText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  historyListItemText: {
+    lineHeight: 18,
+  },
+  historyActionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    paddingTop: 4,
+  },
+  historyClearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  historyClearBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
+  historyCollapseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  historyCollapseBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  /* ── Attached Code Banner ── */
+  attachedCodeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginVertical: 4,
+    gap: 8,
+  },
+  attachedCodeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  attachedCodeTitle: {
+    fontWeight: '800',
+  },
+  attachedCodeSub: {
+    marginTop: 1,
+  },
+
+  /* ── Common Sections ── */
+  section: {
+    fontSize: 17,
+    fontWeight: '800',
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  conversationHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  conversationCountText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+
+  /* ── Code Context Tab Components ── */
+  codeContextHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  clearCodeSnippetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  clearCodeSnippetText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  editorHeaderInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  editorBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  editorBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  editorHintText: {
+    fontSize: 11,
+  },
+  codeEditor: {
+    minHeight: 180,
+    padding: 12,
+    borderRadius: 8,
+    fontFamily: 'monospace',
+    fontSize: 12,
+    lineHeight: 18,
+    textAlignVertical: 'top',
+  },
+  quickActionsLabel: {
+    marginTop: 12,
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  quickActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  quickActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  switchToConversationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 10,
+    gap: 8,
+  },
+  switchToConversationLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  switchToConversationTitle: {
+    fontWeight: '800',
+  },
+  switchToConversationSub: {
+    marginTop: 2,
+  },
+
+  /* ── Analysis ── */
+  analysisSection: {
+    paddingVertical: 8,
+    gap: 4,
+  },
+  divider: {
+    borderTopWidth: 1,
+  },
+  analysisTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  analysisItem: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
+  /* ── Chips & Messages ── */
+  chipsScroll: {
+    gap: 8,
+    paddingVertical: 4,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  msgHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  roleText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  groundBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  groundText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  msgBody: {
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  inputBox: {
+    minHeight: 80,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlignVertical: 'top',
+    marginBottom: 10,
+  },
 });

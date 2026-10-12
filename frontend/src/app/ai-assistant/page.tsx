@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState, useCallback } from 'react';
+import { Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,10 +9,14 @@ import { Input } from '@/components/ui/input';
 import { MarkdownView } from '@/components/ui/MarkdownView';
 import { api } from '@/lib/utils';
 import {
+  ArrowRight,
   Bot,
   Bug,
   BookOpen,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
   Code2,
   FileCode2,
   Loader2,
@@ -219,6 +223,22 @@ function AIAssistantInner() {
   const [recentPrompts, setRecentPrompts] = useState<string[]>([]);
   const [lesson, setLesson] = useState<LessonPreview | null>(null);
   const [challenge, setChallenge] = useState<ChallengePreview | null>(null);
+
+  // Tab State: 'conversation' vs 'codeContext' vs 'split'
+  const [activeTab, setActiveTab] = useState<'conversation' | 'codeContext' | 'split'>('conversation');
+  // Expandable & Collapsible Chat History state
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+
+  // Derived user questions for the expandable chat history
+  const userQuestions = useMemo(() => {
+    return messages
+      .filter((m) => m.role === 'user')
+      .map((m, index) => ({
+        index,
+        content: m.content,
+        timestamp: m.timestamp,
+      }));
+  }, [messages]);
 
   // Search & Grounding states
   const [searchQuery, setSearchQuery] = useState('');
@@ -522,7 +542,11 @@ function AIAssistantInner() {
           timestamp: new Date(),
         },
       ]);
+      setActiveTab('codeContext');
       return;
+    }
+    if (activeTab === 'codeContext') {
+      setActiveTab('conversation');
     }
     sendMessage(action.prompt(codeContext), undefined, codeContext);
   }
@@ -782,176 +806,340 @@ function AIAssistantInner() {
         </div>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[0.85fr_1.3fr_0.75fr]">
-        {/* ── AI Chat ── */}
-        <Card className="min-h-[650px]">
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle className="flex items-center gap-2">
-              <Bot className="h-4 w-4 text-primary" />
-              AI Assistant
-            </CardTitle>
-            <button
-              onClick={clearChat}
-              className="rounded-md p-1 text-muted-foreground transition hover:text-white"
-              title="Clear chat"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </CardHeader>
-          <CardContent className="flex h-[560px] flex-col">
-            {/* Messages */}
-            <div className="scrollbar-thin flex-1 space-y-4 overflow-y-auto pr-1">
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                  {msg.role === 'assistant' && (
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <Bot className="h-4 w-4 text-primary" />
+      {/* ── Tabs Navigation ── */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('conversation')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition ${
+              activeTab === 'conversation'
+                ? 'bg-primary text-black font-bold shadow-sm'
+                : 'bg-secondary/40 text-muted-foreground hover:bg-secondary/70 hover:text-white'
+            }`}
+          >
+            <Bot className="h-3.5 w-3.5" />
+            Conversation
+            {userQuestions.length > 0 && (
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  activeTab === 'conversation'
+                    ? 'bg-black/20 text-black'
+                    : 'bg-primary/20 text-primary'
+                }`}
+              >
+                {userQuestions.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('codeContext')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition ${
+              activeTab === 'codeContext'
+                ? 'bg-primary text-black font-bold shadow-sm'
+                : 'bg-secondary/40 text-muted-foreground hover:bg-secondary/70 hover:text-white'
+            }`}
+          >
+            <Code2 className="h-3.5 w-3.5" />
+            Code Context
+            {codeContext.trim() && (
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('split')}
+            className={`hidden xl:flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition ${
+              activeTab === 'split'
+                ? 'bg-white/10 text-white border border-white/15'
+                : 'text-muted-foreground hover:text-white'
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Split View
+          </button>
+        </div>
+
+        {codeContext.trim() && activeTab === 'conversation' && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('codeContext')}
+            className="flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+          >
+            <Code2 className="h-3.5 w-3.5" />
+            View Active Code Context ({codeContext.split('\n').filter(Boolean).length} lines) →
+          </button>
+        )}
+      </div>
+
+      <div
+        className={
+          activeTab === 'split'
+            ? 'grid gap-4 xl:grid-cols-[0.85fr_1.3fr_0.75fr]'
+            : 'grid gap-4 xl:grid-cols-[1.5fr_0.8fr]'
+        }
+      >
+        {/* ── AI Chat Card (Visible in 'conversation' and 'split' tabs) ── */}
+        {(activeTab === 'conversation' || activeTab === 'split') && (
+          <Card className="min-h-[650px]">
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-4 w-4 text-primary" />
+                AI Assistant
+              </CardTitle>
+              <button
+                onClick={clearChat}
+                className="rounded-md p-1 text-muted-foreground transition hover:text-white"
+                title="Clear chat"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </CardHeader>
+            <CardContent className="flex h-[560px] flex-col">
+              {/* ── Collapsible Chat History ── */}
+              <div className="mb-3 rounded-lg border border-white/[0.08] bg-secondary/30 transition">
+                <button
+                  type="button"
+                  onClick={() => setHistoryExpanded((prev) => !prev)}
+                  className="flex w-full items-center justify-between p-2.5 text-left text-xs font-medium text-white transition hover:bg-white/[0.04]"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary shrink-0">
+                      <Clock className="h-3.5 w-3.5" />
                     </div>
-                  )}
-                  <div
-                    className={`max-w-[84%] space-y-1 ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col`}
-                  >
-                    <div
-                      className={`rounded-lg border px-4 py-3 text-sm leading-6 ${
-                        msg.role === 'user'
-                          ? 'border-primary/30 bg-primary/[0.15] text-primary'
-                          : 'border-white/[0.08] bg-secondary/45 text-muted-foreground'
-                      }`}
-                    >
-                      {msg.role === 'assistant' ? (
-                        <MarkdownView content={msg.content} />
-                      ) : (
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
-                      )}
-                    </div>
-                    {msg.role === 'assistant' && (msg.lessonTitle || msg.challengeTitle) && (
-                      <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                        {msg.lessonTitle ? `Based on: ${msg.lessonTitle}` : `Challenge: ${msg.challengeTitle}`}
+                    <span className="font-semibold text-white">Chat History</span>
+                    <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">
+                      {userQuestions.length} {userQuestions.length === 1 ? 'query' : 'queries'}
+                    </span>
+                    {!historyExpanded && userQuestions.length > 0 && (
+                      <span className="hidden sm:inline-block truncate text-[11px] text-muted-foreground/70 max-w-[200px]">
+                        Recent: &ldquo;{userQuestions[userQuestions.length - 1].content}&rdquo;
                       </span>
                     )}
-                    <span className="text-[10px] text-muted-foreground/50">{formatTime(msg.timestamp)}</span>
                   </div>
-                  {msg.role === 'user' && (
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary">
-                      <User className="h-4 w-4" />
+                  <div className="flex items-center gap-1.5 text-muted-foreground shrink-0">
+                    <span className="text-[11px]">{historyExpanded ? 'Collapse' : 'Expand'}</span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform duration-200 ${
+                        historyExpanded ? 'rotate-180 text-primary' : ''
+                      }`}
+                    />
+                  </div>
+                </button>
+
+                {historyExpanded && (
+                  <div className="border-t border-white/[0.08] p-3 space-y-2 max-h-48 overflow-y-auto scrollbar-thin">
+                    {userQuestions.length === 0 ? (
+                      <p className="py-2 text-center text-xs text-muted-foreground">
+                        No previous questions recorded yet. Ask anything below!
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-[11px] text-muted-foreground">
+                          Click any previous question to load it into the input:
+                        </p>
+                        <div className="space-y-1.5">
+                          {userQuestions.map((q, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setInput(q.content);
+                                setHistoryExpanded(false);
+                              }}
+                              className="flex w-full items-center justify-between gap-2 rounded-md border border-white/[0.06] bg-secondary/50 px-2.5 py-1.5 text-left text-xs text-muted-foreground transition hover:border-primary/30 hover:text-white group"
+                            >
+                              <span className="truncate flex-1">
+                                <span className="text-[10px] text-primary/70 font-semibold mr-1.5">#{idx + 1}</span>
+                                {q.content}
+                              </span>
+                              <span className="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition shrink-0">
+                                Load ↵
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex justify-between items-center pt-2 border-t border-white/[0.06]">
+                          <button
+                            type="button"
+                            onClick={clearChat}
+                            className="flex items-center gap-1 text-[11px] text-rose-400 hover:text-rose-300"
+                          >
+                            <Trash2 className="h-3 w-3" /> Clear History
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHistoryExpanded(false)}
+                            className="text-[11px] text-muted-foreground hover:text-white"
+                          >
+                            Collapse
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Messages */}
+              <div className="scrollbar-thin flex-1 space-y-4 overflow-y-auto pr-1">
+                {messages.map((msg, i) => (
+                  <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                    {msg.role === 'assistant' && (
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                        <Bot className="h-4 w-4 text-primary" />
+                      </div>
+                    )}
+                    <div
+                      className={`max-w-[84%] space-y-1 ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col`}
+                    >
+                      <div
+                        className={`rounded-lg border px-4 py-3 text-sm leading-6 ${
+                          msg.role === 'user'
+                            ? 'border-primary/30 bg-primary/[0.15] text-primary'
+                            : 'border-white/[0.08] bg-secondary/45 text-muted-foreground'
+                        }`}
+                      >
+                        {msg.role === 'assistant' ? (
+                          <MarkdownView content={msg.content} />
+                        ) : (
+                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                        )}
+                      </div>
+                      {msg.role === 'assistant' && (msg.lessonTitle || msg.challengeTitle) && (
+                        <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                          {msg.lessonTitle ? `Based on: ${msg.lessonTitle}` : `Challenge: ${msg.challengeTitle}`}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-muted-foreground/50">{formatTime(msg.timestamp)}</span>
                     </div>
-                  )}
-                </div>
-              ))}
-              {loading && (
-                <div className="flex gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                    <Bot className="h-4 w-4 text-primary" />
+                    {msg.role === 'user' && (
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary">
+                        <User className="h-4 w-4" />
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-secondary/45 px-4 py-3 text-sm text-muted-foreground">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                    Thinking…
+                ))}
+                {loading && (
+                  <div className="flex gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                      <Bot className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-secondary/45 px-4 py-3 text-sm text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                      Thinking…
+                    </div>
                   </div>
-                </div>
-              )}
-              <div ref={bottomRef} />
-            </div>
+                )}
+                <div ref={bottomRef} />
+              </div>
 
-            {/* Input */}
-            <div className="mt-4 flex gap-2 border-t border-white/[0.08] pt-4">
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage(input)}
-                placeholder={
-                  lesson
-                    ? `Ask about ${lesson.title}…`
-                    : challenge
-                      ? `Ask for hints on ${challenge.title}…`
-                      : 'Ask about code, concepts, errors, or search above…'
-                }
-                disabled={loading}
+              {/* Input */}
+              <div className="mt-4 flex gap-2 border-t border-white/[0.08] pt-4">
+                <Input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage(input)}
+                  placeholder={
+                    lesson
+                      ? `Ask about ${lesson.title}…`
+                      : challenge
+                        ? `Ask for hints on ${challenge.title}…`
+                        : 'Ask about code, concepts, errors, or search above…'
+                  }
+                  disabled={loading}
+                />
+                <Button onClick={() => sendMessage(input)} disabled={loading || !input.trim()}>
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ── Code Context Editor Card (Visible in 'codeContext' and 'split' tabs) ── */}
+        {(activeTab === 'codeContext' || activeTab === 'split') && (
+          <Card className="min-h-[650px]">
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle className="flex items-center gap-2">
+                <Code2 className="h-4 w-4 text-primary" />
+                Code Context
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearCodeAndOutput}
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 gap-1.5 transition"
+                  title="Clear code editor and remove previous AI response"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Clear
+                </Button>
+                <span className="rounded-lg border border-white/[0.08] bg-secondary/50 px-2 py-1 text-xs text-muted-foreground">
+                  {lesson?.firstExampleLanguage
+                    ? `${lesson.firstExampleLanguage} example from lesson`
+                    : challenge?.language
+                      ? `${challenge.language} challenge starter`
+                      : 'Java / JS / Python'}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <textarea
+                value={codeContext}
+                onChange={(e) => {
+                  setCodeContext(e.target.value);
+                  setCodeEditedByUser(true);
+                }}
+                className="h-[430px] w-full resize-none rounded-lg border border-white/[0.08] bg-[#050a0d] p-4 font-mono text-sm leading-6 text-green-100 outline-none focus:ring-2 focus:ring-primary/30 overflow-y-auto"
+                spellCheck={false}
+                placeholder="Paste your code here, then use the action buttons below…"
               />
-              <Button onClick={() => sendMessage(input)} disabled={loading || !input.trim()}>
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              {/* Quick action buttons – all wired up */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {quickActions.map((action) => {
+                  const Icon = action.icon;
+                  return (
+                    <Button
+                      key={action.label}
+                      variant="secondary"
+                      size="sm"
+                      disabled={loading}
+                      onClick={() => handleQuickAction(action)}
+                      className="gap-1.5"
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {action.label}
+                    </Button>
+                  );
+                })}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearCodeAndOutput}
+                  className="ml-auto gap-1.5 border-rose-500/20 text-xs text-muted-foreground hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300"
+                  title="Clear code editor and remove previous AI output"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Clear Code & Output
+                </Button>
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground/60">
+                {lesson?.firstExampleCode
+                  ? 'Pre-filled with the first example from this lesson — edit it or paste your own code.'
+                  : challenge?.starterCode
+                    ? 'Pre-filled with challenge starter code — edit it or ask for algorithmic hints!'
+                    : 'Paste code above and click a button, or type a question in the chat.'}
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* ── Code editor ── */}
-        <Card className="min-h-[650px]">
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle className="flex items-center gap-2">
-              <Code2 className="h-4 w-4 text-primary" />
-              Code Context
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleClearCodeAndOutput}
-                className="h-7 px-2 text-xs text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 gap-1.5 transition"
-                title="Clear code editor and remove previous AI response"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Clear
-              </Button>
-              <span className="rounded-lg border border-white/[0.08] bg-secondary/50 px-2 py-1 text-xs text-muted-foreground">
-                {lesson?.firstExampleLanguage
-                  ? `${lesson.firstExampleLanguage} example from lesson`
-                  : challenge?.language
-                    ? `${challenge.language} challenge starter`
-                    : 'Java / JS / Python'}
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <textarea
-              value={codeContext}
-              onChange={(e) => {
-                setCodeContext(e.target.value);
-                setCodeEditedByUser(true);
-              }}
-              className="h-[430px] w-full resize-none rounded-lg border border-white/[0.08] bg-[#050a0d] p-4 font-mono text-sm leading-6 text-green-100 outline-none focus:ring-2 focus:ring-primary/30 overflow-y-auto"
-              spellCheck={false}
-              placeholder="Paste your code here, then use the action buttons below…"
-            />
-            {/* Quick action buttons – all wired up */}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {quickActions.map((action) => {
-                const Icon = action.icon;
-                return (
-                  <Button
-                    key={action.label}
-                    variant="secondary"
-                    size="sm"
-                    disabled={loading}
-                    onClick={() => handleQuickAction(action)}
-                    className="gap-1.5"
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {action.label}
-                  </Button>
-                );
-              })}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleClearCodeAndOutput}
-                className="ml-auto gap-1.5 border-rose-500/20 text-xs text-muted-foreground hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300"
-                title="Clear code editor and remove previous AI output"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Clear Code & Output
-              </Button>
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground/60">
-              {lesson?.firstExampleCode
-                ? 'Pre-filled with the first example from this lesson — edit it or paste your own code.'
-                : challenge?.starterCode
-                  ? 'Pre-filled with challenge starter code — edit it or ask for algorithmic hints!'
-                  : 'Paste code above and click a button, or type a question in the chat.'}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* ── Right panel ── */}
+        {/* ── Right Panel (Live Analysis & Recent Prompts) ── */}
         <div className="space-y-4">
           {/* Live analysis */}
           <Card>
@@ -999,7 +1187,10 @@ function AIAssistantInner() {
                 recentPrompts.map((prompt, i) => (
                   <button
                     key={i}
-                    onClick={() => sendMessage(prompt)}
+                    onClick={() => {
+                      sendMessage(prompt);
+                      if (activeTab === 'codeContext') setActiveTab('conversation');
+                    }}
                     disabled={loading}
                     className="flex w-full items-start gap-2 rounded-lg border border-white/[0.07] bg-secondary/40 p-3 text-left text-xs text-muted-foreground transition hover:border-primary/25 hover:text-white"
                   >
