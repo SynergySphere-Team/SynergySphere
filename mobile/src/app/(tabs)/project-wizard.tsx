@@ -173,20 +173,19 @@ export default function ProjectWizardScreen() {
       setError('');
 
       Alert.alert(
-        'Project Created!',
-        'Community project created successfully.',
-        [
-          {
-            text: 'View Project',
-            onPress: () =>
-              router.replace({
-                pathname: '/project-detail',
-                params: { projectId: result.project.id },
-              } as never),
-          },
-        ],
-        { cancelable: false }
-      );
+      'Project Created!',
+      'Your GitHub project was created successfully.',
+      [
+        {
+          text: 'View Opportunities',
+          onPress: () =>
+            router.replace(
+              '/community?tab=initiatives&view=discover' as never
+            ),
+        },
+      ],
+      { cancelable: false }
+    );
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Could not create the GitHub repository.';
       setError(message);

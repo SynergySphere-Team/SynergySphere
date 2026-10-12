@@ -17,7 +17,9 @@ import { useTheme } from '@/context/ThemeContext';
 
 export default function CommunityScreen() {
   const { colors, theme } = useTheme();
-  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const { tab, view } = useLocalSearchParams<{ 
+    tab?: string; 
+    view?: string }>();
 
   const {
     fontSize,
@@ -35,6 +37,11 @@ export default function CommunityScreen() {
     }
   }, [tab]);
 
+  useEffect(() => {
+    if (view === 'discover' || view === 'my-work') {
+      setInitiativesTab(view);
+    }
+  }, [view]);
   const isLight = theme === 'light';
 
   const activeBackground =
@@ -237,7 +244,8 @@ export default function CommunityScreen() {
               backgroundColor: colors.surface,
               borderRadius: 14,
               padding: 5,
-              marginVertical: 16,
+              marginTop: 0,
+              marginBottom: 12,
               gap: 8,
             }}
           >
@@ -337,8 +345,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderRadius: 16,
     borderWidth: 1.5,
-    padding: 3,
-    gap: 4,
+    padding: 5,
+    gap: 12,
   },
 
   topTabBarLarge: {
@@ -351,7 +359,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     paddingVertical: 9,
     paddingHorizontal: 6,
     borderRadius: 12,

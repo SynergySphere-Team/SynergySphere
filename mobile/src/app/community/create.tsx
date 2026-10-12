@@ -416,7 +416,7 @@ export default function CreateCommunityProjectScreen() {
         }
       }
       router.replace(
-        `/community/manage/${createdProject.id}` as never
+        `/community?tab=initiatives&view=discover` as never
       );
     } catch (e) {
       setError(
@@ -487,7 +487,7 @@ export default function CreateCommunityProjectScreen() {
         accessibilityRole="button"
         accessibilityLabel="Go back"
         onPress={() =>
-          router.replace('/community?tab=initiatives' as never)
+          router.replace('/community?tab=initiatives&view=discover' as never)
         }
         style={({
           pressed,
@@ -971,10 +971,10 @@ export default function CreateCommunityProjectScreen() {
       {createdProjectId ? (
         <>
           <Button
-            title="Open Manage Project"
+            title="View Community Initiatives"
             onPress={() =>
               router.replace(
-                `/community/manage/${createdProjectId}` as never
+                `/community?tab=initiatives&view=discover` as never
               )
             }
           />
@@ -983,7 +983,7 @@ export default function CreateCommunityProjectScreen() {
             secondary
             onPress={() =>
               router.replace(
-                '/community' as never
+                '/community?tab=initiatives&view=discover' as never
               )
             }
           />
