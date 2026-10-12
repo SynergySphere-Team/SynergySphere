@@ -301,11 +301,15 @@ function CodeBlockRenderer({
   code,
   isLight,
   borderColor,
+  onApplyCode,
+  accentColor,
 }: {
   language?: string;
   code: string;
   isLight: boolean;
   borderColor: string;
+  onApplyCode?: (code: string) => void;
+  accentColor?: string;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -336,16 +340,42 @@ function CodeBlockRenderer({
         <View style={styles.langTag}>
           <Text style={styles.langText}>{(language || 'CODE').toUpperCase()}</Text>
         </View>
-        <Pressable onPress={handleCopy} hitSlop={8} style={styles.copyBtn}>
-          <Ionicons
-            name={copied ? 'checkmark' : 'copy-outline'}
-            size={13}
-            color={copied ? '#4ade80' : '#94a3b8'}
-          />
-          <Text style={[styles.copyText, { color: copied ? '#4ade80' : '#94a3b8' }]}>
-            {copied ? 'Copied' : 'Copy'}
-          </Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {onApplyCode && (
+            <Pressable
+              onPress={() => onApplyCode(code)}
+              hitSlop={8}
+              style={[
+                styles.copyBtn,
+                {
+                  backgroundColor: isLight ? 'rgba(30, 104, 39, 0.12)' : 'rgba(145, 219, 94, 0.15)',
+                  borderColor: isLight ? 'rgba(30, 104, 39, 0.28)' : 'rgba(145, 219, 94, 0.35)',
+                  borderWidth: 1,
+                  paddingHorizontal: 8,
+                },
+              ]}
+            >
+              <Ionicons
+                name="arrow-redo-outline"
+                size={12}
+                color={accentColor || '#4ade80'}
+              />
+              <Text style={[styles.copyText, { color: accentColor || '#4ade80', fontWeight: '700' }]}>
+                Apply to Editor
+              </Text>
+            </Pressable>
+          )}
+          <Pressable onPress={handleCopy} hitSlop={8} style={styles.copyBtn}>
+            <Ionicons
+              name={copied ? 'checkmark' : 'copy-outline'}
+              size={13}
+              color={copied ? '#4ade80' : '#94a3b8'}
+            />
+            <Text style={[styles.copyText, { color: copied ? '#4ade80' : '#94a3b8' }]}>
+              {copied ? 'Copied' : 'Copy'}
+            </Text>
+          </Pressable>
+        </View>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.codeScroll}>
         <Text style={styles.codeFont}>{code}</Text>
@@ -358,12 +388,14 @@ interface MarkdownViewProps {
   content: string;
   style?: StyleProp<ViewStyle>;
   baseFontSize?: number;
+  onApplyCode?: (code: string) => void;
 }
 
 export const MarkdownView = memo(function MarkdownView({
   content,
   style,
   baseFontSize = 13.5,
+  onApplyCode,
 }: MarkdownViewProps) {
   const { colors, theme } = useTheme();
   const { fontSize } = useAccessibility();
@@ -509,6 +541,8 @@ export const MarkdownView = memo(function MarkdownView({
               code={block.code}
               isLight={isLight}
               borderColor={colors.border}
+              onApplyCode={onApplyCode}
+              accentColor={primaryAccent}
             />
           );
         }

@@ -1,13 +1,54 @@
 import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View, TextInput, ScrollView, Image } from 'react-native';
+import {
+  Animated,
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  UIManager,
+  View,
+  Image,
+} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { Screen, Notice } from '@/components/Screen';
 import { Button, Card } from '@/components/ui';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import { MarkdownView } from '@/components/MarkdownView';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const DRAFT_CODE_KEY = 'synergysphere_ai_code_draft';
+const QUERY_HISTORY_STORAGE_KEY = 'synergysphere_ai_query_history_v2';
+
+export interface QueryHistoryItem {
+  id: string;
+  query: string;
+  timestamp: number;
+  lessonTitle?: string;
+  responseSnippet?: string;
+}
+
+function formatRelativeTime(ts: number): string {
+  const diff = Math.max(0, Date.now() - ts);
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days}d ago`;
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
 type Message = {
   role: 'user' | 'assistant';
@@ -107,14 +148,42 @@ export default function AIAssistantScreen() {
 
   // Tab State: 'conversation' vs 'codeContext'
   const [activeTab, setActiveTab] = useState<'conversation' | 'codeContext'>('conversation');
+  const tabAnim = useRef(new Animated.Value(0)).current;
+
   // Expandable & Collapsible Chat History state
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyQueries, setHistoryQueries] = useState<QueryHistoryItem[]>([]);
+
+  // Restore persistent query history on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const stored = await SecureStore.getItemAsync(QUERY_HISTORY_STORAGE_KEY);
+        if (!cancelled && stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setHistoryQueries(parsed);
+          }
+        }
+      } catch {
+        // Fallback gracefully
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Toast / feedback message banner
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
       content:
-        "👋 Hi! I'm your SynergySphere AI Workspace assistant, grounded in the LectureToLife Programming Academy and your study packs. Ask about the lesson you're studying, paste code, or use quick actions!",
+        "👋 Hi! I'm your SynergySphere AI Workspace assistant, grounded in the Learning Hub and your study packs. Ask about the lesson you're studying, paste code, or use quick actions!",
     },
   ]);
   const [message, setMessage] = useState('');
@@ -123,6 +192,51 @@ export default function AIAssistantScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [lesson, setLesson] = useState<LessonPreview | null>(null);
+
+  // Debounced context for 60fps typing without recalculating regex loops synchronously
+  const [debouncedContext, setDebouncedContext] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedContext(context), 160);
+    return () => clearTimeout(t);
+  }, [context]);
+
+  const liveAnalysis = useMemo(() => analyzeCodeLocally(debouncedContext), [debouncedContext]);
+
+  const showToast = useCallback((text: string) => {
+    setToastMessage(text);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 2800);
+  }, []);
+
+  // Restore draft code if not opened from a lesson
+  useEffect(() => {
+    if (lessonParam) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const saved = await SecureStore.getItemAsync(DRAFT_CODE_KEY);
+        if (!cancelled && saved && !context) {
+          setContext(saved);
+          setContextEditedByUser(true);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lessonParam]);
+
+  // Debounce-save draft code to SecureStore
+  useEffect(() => {
+    if (!contextEditedByUser) return;
+    const t = setTimeout(() => {
+      SecureStore.setItemAsync(DRAFT_CODE_KEY, context).catch(() => {});
+    }, 600);
+    return () => clearTimeout(t);
+  }, [context, contextEditedByUser]);
 
   // Fetch lesson details when opened with ?lesson=<id>.
   useEffect(() => {
@@ -159,17 +273,17 @@ export default function AIAssistantScreen() {
     };
   }, [lessonParam]);
 
-  const liveAnalysis = useMemo(() => analyzeCodeLocally(context), [context]);
-
-  // Derived user questions for the expandable chat history
-  const userQuestions = useMemo(() => {
-    return messages
-      .filter((m) => m.role === 'user')
-      .map((m, index) => ({
-        index,
-        content: m.content,
-      }));
-  }, [messages]);
+  // Filtered queries for search within history
+  const filteredHistory = useMemo(() => {
+    if (!historySearch.trim()) return historyQueries;
+    const q = historySearch.toLowerCase();
+    return historyQueries.filter(
+      (item) =>
+        item.query.toLowerCase().includes(q) ||
+        (item.lessonTitle && item.lessonTitle.toLowerCase().includes(q)) ||
+        (item.responseSnippet && item.responseSnippet.toLowerCase().includes(q))
+    );
+  }, [historyQueries, historySearch]);
 
   const historyFromMessages = useCallback(
     (msgs: Message[]): Array<{ role: 'user' | 'assistant'; content: string }> => {
@@ -183,6 +297,37 @@ export default function AIAssistantScreen() {
     [],
   );
 
+  const handleSwitchTab = useCallback(
+    (newTab: 'conversation' | 'codeContext') => {
+      if (newTab === activeTab) return;
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setActiveTab(newTab);
+      Animated.spring(tabAnim, {
+        toValue: newTab === 'conversation' ? 0 : 1,
+        useNativeDriver: false,
+        bounciness: 4,
+        speed: 14,
+      }).start();
+    },
+    [activeTab, tabAnim],
+  );
+
+  const toggleHistory = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsHistoryExpanded((prev) => !prev);
+  }, []);
+
+  // Bi-directional code bridge: transfer code block from assistant markdown directly into editor
+  const applySnippetToContext = useCallback(
+    (snippet: string) => {
+      setContext(snippet);
+      setContextEditedByUser(true);
+      handleSwitchTab('codeContext');
+      showToast('Code transferred to Code Context editor! ✓');
+    },
+    [handleSwitchTab, showToast],
+  );
+
   async function send(value = message, forcedContext?: string) {
     if (!value.trim() || loading) return;
     const question = value.trim();
@@ -191,6 +336,22 @@ export default function AIAssistantScreen() {
     setMessage('');
     setLoading(true);
     setError('');
+
+    // Persist query into query history (saved across chats & sessions)
+    const queryId = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const newHistoryItem: QueryHistoryItem = {
+      id: queryId,
+      query: question,
+      timestamp: Date.now(),
+      lessonTitle: lesson?.title || undefined,
+    };
+    setHistoryQueries((prev) => {
+      const filtered = prev.filter((item) => item.query.trim().toLowerCase() !== question.toLowerCase());
+      const updated = [newHistoryItem, ...filtered].slice(0, 50);
+      SecureStore.setItemAsync(QUERY_HISTORY_STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+
     try {
       const contextToSend =
         forcedContext?.trim() || (contextEditedByUser && context.trim() ? context : undefined);
@@ -208,6 +369,16 @@ export default function AIAssistantScreen() {
           lessonTitle: response.grounding?.lessonTitle || undefined,
         },
       ]);
+
+      // Enrich history item with answer snippet preview
+      const snippet = response.response.slice(0, 95).replace(/[#*`\n]/g, ' ').trim();
+      setHistoryQueries((prev) => {
+        const updated = prev.map((item) =>
+          item.id === queryId ? { ...item, responseSnippet: snippet } : item
+        );
+        SecureStore.setItemAsync(QUERY_HISTORY_STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
+        return updated;
+      });
     } catch {
       // Local fallback so user can still continue learning offline
       const reply = `Analysis for: "${question}"\n\nCode Context Review:\n- Checked against standard best practices.\n- Time Complexity: ${liveAnalysis ? liveAnalysis[0]?.items[0] : 'O(1)'}\n- Space Complexity: ${liveAnalysis ? liveAnalysis[0]?.items[1] : 'O(1)'}\n\nTip: Test edge cases such as null/empty inputs and unexpected input types.`;
@@ -218,6 +389,14 @@ export default function AIAssistantScreen() {
           content: reply,
         },
       ]);
+      const snippet = reply.slice(0, 95).replace(/[#*`\n]/g, ' ').trim();
+      setHistoryQueries((prev) => {
+        const updated = prev.map((item) =>
+          item.id === queryId ? { ...item, responseSnippet: snippet } : item
+        );
+        SecureStore.setItemAsync(QUERY_HISTORY_STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
+        return updated;
+      });
     } finally {
       setLoading(false);
       setTimeout(() => {
@@ -235,7 +414,7 @@ export default function AIAssistantScreen() {
           content: 'Please paste code in the Code Context editor first to run this quick action!',
         },
       ]);
-      setActiveTab('codeContext');
+      handleSwitchTab('codeContext');
       return;
     }
     const prompts: Record<string, string> = {
@@ -244,12 +423,11 @@ export default function AIAssistantScreen() {
       Optimize: `Optimize this code for better performance and readability. Show the improved version:\n\n\`\`\`\n${context}\n\`\`\``,
       'Generate Tests': `Generate comprehensive unit tests for this code including edge cases:\n\n\`\`\`\n${context}\n\`\`\``,
     };
-    // Switch to Conversation tab so user immediately sees the query and answer stream
-    setActiveTab('conversation');
+    handleSwitchTab('conversation');
     send(prompts[action], context);
   }
 
-  // Fetch chat history on mount
+  // Fetch chat history on mount & merge with persistent queries
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -264,6 +442,32 @@ export default function AIAssistantScreen() {
               content: m.content,
             }))
           );
+
+          // Seed user questions from server into persistent history if absent
+          setHistoryQueries((prev) => {
+            const existingSet = new Set(prev.map((p) => p.query.trim().toLowerCase()));
+            const newItems: QueryHistoryItem[] = [];
+            history.forEach((m, idx) => {
+              if (m.role === 'user' && !existingSet.has(m.content.trim().toLowerCase())) {
+                existingSet.add(m.content.trim().toLowerCase());
+                const nextMsg = history[idx + 1];
+                const snippet =
+                  nextMsg && nextMsg.role === 'assistant'
+                    ? nextMsg.content.slice(0, 95).replace(/[#*`\n]/g, ' ').trim()
+                    : undefined;
+                newItems.push({
+                  id: `remote_${m.id || idx}_${Date.now()}`,
+                  query: m.content,
+                  timestamp: Date.now() - (history.length - idx) * 60000,
+                  responseSnippet: snippet,
+                });
+              }
+            });
+            if (newItems.length === 0) return prev;
+            const merged = [...newItems, ...prev].slice(0, 50);
+            SecureStore.setItemAsync(QUERY_HISTORY_STORAGE_KEY, JSON.stringify(merged)).catch(() => {});
+            return merged;
+          });
         }
       } catch {
         // Continue with default welcome message
@@ -274,28 +478,66 @@ export default function AIAssistantScreen() {
     };
   }, []);
 
-  async function clearChat() {
+  function startNewConversation() {
+    setMessages([
+      {
+        role: 'assistant',
+        content: lesson
+          ? `👋 Ready for a new discussion about **${lesson.title}**! How can I help you?`
+          : "👋 Starting a fresh workspace conversation! Ask about code, algorithms, or your studies.",
+      },
+    ]);
+    setMessage('');
+    // NOTE: historyQueries remains 100% preserved so previous questions never vanish!
+    showToast('New chat started • Past queries saved in History');
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }, 100);
+  }
+
+  function resetCurrentThread() {
+    setMessages([
+      {
+        role: 'assistant',
+        content: lesson
+          ? `Chat thread reset. Ask me anything about "${lesson.title}".`
+          : 'Chat thread reset. Ask any question or paste code in Code Context.',
+      },
+    ]);
+    showToast('Conversation reset • History retained');
+  }
+
+  function deleteHistoryItem(id: string) {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setHistoryQueries((prev) => {
+      const updated = prev.filter((item) => item.id !== id);
+      SecureStore.setItemAsync(QUERY_HISTORY_STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+    showToast('Query removed from history');
+  }
+
+  async function clearAllHistory() {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setHistoryQueries([]);
+    await SecureStore.deleteItemAsync(QUERY_HISTORY_STORAGE_KEY).catch(() => {});
     try {
       await api.delete('/ai/chat/history');
     } catch {
       // ignore
     }
-    setMessages([
-      {
-        role: 'assistant',
-        content: lesson
-          ? `Chat cleared! Ask me anything about "${lesson.title}".`
-          : 'Chat cleared! Ask about any programming concept or paste code for review.',
-      },
-    ]);
-    setIsHistoryExpanded(false);
+    showToast('Query history cleared ✓');
   }
 
   const isLight = theme === 'light';
   const primaryAccent = isLight ? '#1e6827' : colors.primary;
 
   return (
-    <Screen scrollViewRef={scrollViewRef}>
+    <Screen
+      scrollViewRef={scrollViewRef}
+      alwaysBounceVertical={true}
+      contentContainerStyle={styles.screenContentContainer}
+    >
       {/* ── Screen Header ── */}
       <View
         style={[
@@ -359,25 +601,26 @@ export default function AIAssistantScreen() {
           >
             {lesson
               ? `Grounded in ${lesson.subjectName} › ${lesson.moduleName} › ${lesson.title}`
-              : 'Grounded in LectureToLife Programming Academy and your study packs.'}
+              : 'Grounded in Learning Hub and your study packs.'}
           </Text>
         </View>
+      </View>
 
-        <Pressable
-          onPress={clearChat}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Clear chat history"
-          style={({ pressed }) => [
-            styles.clearButton,
-            { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
-            pressed && styles.pressed,
+      {/* ── Toast Notification Banner ── */}
+      {toastMessage ? (
+        <View
+          style={[
+            styles.toastBanner,
+            {
+              backgroundColor: isLight ? '#065F46' : '#047857',
+              borderColor: '#10B981',
+            },
           ]}
         >
-          <Ionicons name="trash-outline" size={15} color={colors.muted} />
-          <Text style={[styles.clearText, { color: colors.muted }]}>Clear</Text>
-        </Pressable>
-      </View>
+          <Ionicons name="checkmark-circle" size={15} color="#A7F3D0" />
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </View>
+      ) : null}
 
       {error ? <Notice>{error}</Notice> : null}
 
@@ -394,7 +637,7 @@ export default function AIAssistantScreen() {
         </Card>
       ) : null}
 
-      {/* ── Segmented Tab Bar: Conversation vs Code Context ── */}
+      {/* ── Segmented Tab Bar with Smooth Animated Sliding Indicator ── */}
       <View
         style={[
           styles.tabBar,
@@ -404,22 +647,28 @@ export default function AIAssistantScreen() {
           },
         ]}
       >
+        {/* Animated Sliding Indicator Pill */}
+        <Animated.View
+          style={[
+            styles.tabSlidingIndicator,
+            {
+              left: tabAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['1.5%', '50.5%'],
+              }),
+              backgroundColor: isLight ? '#FFFFFF' : 'rgba(145, 219, 94, 0.18)',
+              borderColor: isLight ? 'rgba(30, 104, 39, 0.28)' : 'rgba(145, 219, 94, 0.45)',
+              shadowColor: isLight ? '#000' : '#91db5e',
+            },
+          ]}
+        />
+
         <Pressable
           accessibilityRole="tab"
           accessibilityLabel="Conversation Tab"
           accessibilityState={{ selected: activeTab === 'conversation' }}
-          onPress={() => setActiveTab('conversation')}
-          style={[
-            styles.tabItem,
-            activeTab === 'conversation' && [
-              styles.tabItemActive,
-              {
-                backgroundColor: isLight ? '#FFFFFF' : 'rgba(145, 219, 94, 0.18)',
-                borderColor: isLight ? 'rgba(30, 104, 39, 0.28)' : 'rgba(145, 219, 94, 0.45)',
-                shadowColor: isLight ? '#000' : '#91db5e',
-              },
-            ],
-          ]}
+          onPress={() => handleSwitchTab('conversation')}
+          style={styles.tabItem}
         >
           <Ionicons
             name={activeTab === 'conversation' ? 'chatbubbles' : 'chatbubbles-outline'}
@@ -439,50 +688,38 @@ export default function AIAssistantScreen() {
           >
             Conversation
           </Text>
-          {userQuestions.length > 0 && (
-            <View
+          <View
+            style={[
+              styles.tabBadge,
+              {
+                backgroundColor:
+                  activeTab === 'conversation'
+                    ? isLight
+                      ? 'rgba(30, 104, 39, 0.12)'
+                      : 'rgba(145, 219, 94, 0.25)'
+                    : isLight
+                    ? 'rgba(0, 0, 0, 0.06)'
+                    : 'rgba(255, 255, 255, 0.08)',
+              },
+            ]}
+          >
+            <Text
               style={[
-                styles.tabBadge,
-                {
-                  backgroundColor:
-                    activeTab === 'conversation'
-                      ? isLight
-                        ? 'rgba(30, 104, 39, 0.12)'
-                        : 'rgba(145, 219, 94, 0.25)'
-                      : isLight
-                      ? 'rgba(0, 0, 0, 0.06)'
-                      : 'rgba(255, 255, 255, 0.08)',
-                },
+                styles.tabBadgeText,
+                { color: activeTab === 'conversation' ? primaryAccent : colors.muted },
               ]}
             >
-              <Text
-                style={[
-                  styles.tabBadgeText,
-                  { color: activeTab === 'conversation' ? primaryAccent : colors.muted },
-                ]}
-              >
-                {userQuestions.length}
-              </Text>
-            </View>
-          )}
+              {historyQueries.length}
+            </Text>
+          </View>
         </Pressable>
 
         <Pressable
           accessibilityRole="tab"
           accessibilityLabel="Code Context Tab"
           accessibilityState={{ selected: activeTab === 'codeContext' }}
-          onPress={() => setActiveTab('codeContext')}
-          style={[
-            styles.tabItem,
-            activeTab === 'codeContext' && [
-              styles.tabItemActive,
-              {
-                backgroundColor: isLight ? '#FFFFFF' : 'rgba(145, 219, 94, 0.18)',
-                borderColor: isLight ? 'rgba(30, 104, 39, 0.28)' : 'rgba(145, 219, 94, 0.45)',
-                shadowColor: isLight ? '#000' : '#91db5e',
-              },
-            ],
-          ]}
+          onPress={() => handleSwitchTab('codeContext')}
+          style={styles.tabItem}
         >
           <Ionicons
             name={activeTab === 'codeContext' ? 'code-slash' : 'code-slash-outline'}
@@ -518,92 +755,169 @@ export default function AIAssistantScreen() {
       ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'conversation' && (
         <>
-          {/* ── Expandable & Collapsible Chat History ── */}
-          <Card>
+          {/* ── Conversation Actions Toolbar (No header collision) ── */}
+          <View style={styles.conversationActionBar}>
             <Pressable
-              onPress={() => setIsHistoryExpanded((prev) => !prev)}
+              onPress={startNewConversation}
               hitSlop={6}
               accessibilityRole="button"
-              accessibilityLabel={isHistoryExpanded ? 'Collapse Chat History' : 'Expand Chat History'}
-              style={styles.historyHeaderRow}
+              accessibilityLabel="Start a new conversation"
+              style={({ pressed }) => [
+                styles.newChatBtn,
+                {
+                  backgroundColor: primaryAccent,
+                },
+                pressed && styles.pressed,
+              ]}
             >
-              <View style={styles.historyHeaderLeft}>
-                <View
-                  style={[
-                    styles.historyIconWrapper,
-                    {
-                      backgroundColor: isLight
-                        ? 'rgba(30, 104, 39, 0.1)'
-                        : 'rgba(145, 219, 94, 0.16)',
-                    },
-                  ]}
-                >
-                  <Ionicons name="time-outline" size={17} color={primaryAccent} />
-                </View>
-                <View style={styles.historyHeaderTextWrapper}>
-                  <View style={styles.historyTitleRow}>
-                    <Text
-                      style={[
-                        styles.historyTitle,
-                        { color: colors.text, fontSize: fontSize(14) },
-                      ]}
-                    >
-                      Chat History
-                    </Text>
-                    <View
-                      style={[
-                        styles.historyCountPill,
-                        {
-                          backgroundColor: isLight
-                            ? '#E8F5E9'
-                            : 'rgba(145, 219, 94, 0.2)',
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.historyCountPillText,
-                          { color: primaryAccent },
-                        ]}
-                      >
-                        {userQuestions.length}{' '}
-                        {userQuestions.length === 1 ? 'query' : 'queries'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.historySubtitle,
-                      { color: colors.muted, fontSize: fontSize(12) },
-                    ]}
-                  >
-                    {userQuestions.length === 0
-                      ? 'No past questions recorded yet'
-                      : isHistoryExpanded
-                      ? 'Tap to collapse history list'
-                      : `Recent: "${userQuestions[userQuestions.length - 1].content.slice(0, 36)}…"`}
-                  </Text>
-                </View>
+              <View style={styles.btnIconWrapper}>
+                <Ionicons name="add" size={16} color={isLight ? '#FFFFFF' : '#0B1510'} />
               </View>
-
-              <View style={styles.historyChevronWrapper}>
-                <Ionicons
-                  name={isHistoryExpanded ? 'chevron-up-circle' : 'chevron-down-circle'}
-                  size={22}
-                  color={primaryAccent}
-                />
-              </View>
+              <Text style={[styles.newChatBtnText, { color: isLight ? '#FFFFFF' : '#0B1510' }]}>
+                New Chat
+              </Text>
             </Pressable>
 
-            {isHistoryExpanded && (
+            <View style={styles.conversationActionRight}>
+              <Pressable
+                onPress={toggleHistory}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={isHistoryExpanded ? 'Collapse Chat History' : 'Expand Chat History'}
+                style={({ pressed }) => [
+                  styles.historyShortcutBtn,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: isHistoryExpanded ? primaryAccent : colors.border,
+                  },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={styles.btnIconWrapper}>
+                  <Ionicons
+                    name="time-outline"
+                    size={14}
+                    color={isHistoryExpanded ? primaryAccent : colors.muted}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.historyShortcutText,
+                    { color: isHistoryExpanded ? primaryAccent : colors.muted },
+                  ]}
+                >
+                  History ({historyQueries.length})
+                </Text>
+                <Ionicons
+                  name={isHistoryExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={12}
+                  color={isHistoryExpanded ? primaryAccent : colors.muted}
+                />
+              </Pressable>
+
+              <Pressable
+                onPress={resetCurrentThread}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="Reset active conversation"
+                style={({ pressed }) => [
+                  styles.resetThreadBtn,
+                  { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={styles.btnIconWrapper}>
+                  <Ionicons name="refresh-outline" size={13} color={colors.muted} />
+                </View>
+                <Text style={[styles.resetThreadText, { color: colors.muted }]}>Reset</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* ── Big Chat History Drawer (ONLY rendered when expanded via the mini history tab) ── */}
+          {isHistoryExpanded && (
+            <Card>
+              <View style={styles.historyHeaderRow}>
+                <View style={styles.historyHeaderLeft}>
+                  <View
+                    style={[
+                      styles.historyIconWrapper,
+                      {
+                        backgroundColor: isLight
+                          ? 'rgba(30, 104, 39, 0.1)'
+                          : 'rgba(145, 219, 94, 0.16)',
+                      },
+                    ]}
+                  >
+                    <Ionicons name="time-outline" size={17} color={primaryAccent} />
+                  </View>
+                  <View style={styles.historyHeaderTextWrapper}>
+                    <View style={styles.historyTitleRow}>
+                      <Text
+                        style={[
+                          styles.historyTitle,
+                          { color: colors.text, fontSize: fontSize(14) },
+                        ]}
+                      >
+                        Chat History
+                      </Text>
+                      <View
+                        style={[
+                          styles.historyCountPill,
+                          {
+                            backgroundColor: isLight
+                              ? '#E8F5E9'
+                              : 'rgba(145, 219, 94, 0.2)',
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.historyCountPillText,
+                            { color: primaryAccent },
+                          ]}
+                        >
+                          {historyQueries.length}{' '}
+                          {historyQueries.length === 1 ? 'query' : 'queries'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.historySubtitle,
+                        { color: colors.muted, fontSize: fontSize(12) },
+                      ]}
+                    >
+                      {historyQueries.length === 0
+                        ? 'No past questions saved yet'
+                        : `Recent: "${historyQueries[0].query.slice(0, 36)}…"`}
+                    </Text>
+                  </View>
+                </View>
+
+                <Pressable
+                  onPress={toggleHistory}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Collapse Chat History"
+                  style={styles.historyChevronWrapper}
+                >
+                  <Ionicons
+                    name="chevron-up-circle"
+                    size={22}
+                    color={primaryAccent}
+                  />
+                </Pressable>
+              </View>
+
               <View
                 style={[
                   styles.historyExpandedContent,
                   { borderTopColor: colors.border },
                 ]}
               >
-                {userQuestions.length === 0 ? (
+                {historyQueries.length === 0 ? (
                   <View style={styles.historyEmptyContainer}>
                     <Ionicons
                       name="chatbubbles-outline"
@@ -616,11 +930,36 @@ export default function AIAssistantScreen() {
                         { color: colors.muted, fontSize: fontSize(12) },
                       ]}
                     >
-                      Your past questions and discussion topics will appear here for easy review and reuse.
+                      Your past questions and discussion topics will appear here and stay saved across sessions.
                     </Text>
                   </View>
                 ) : (
                   <View style={styles.historyListContainer}>
+                    {/* Search bar inside history if multiple items */}
+                    {historyQueries.length > 2 && (
+                      <View
+                        style={[
+                          styles.historySearchWrapper,
+                          { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                        ]}
+                      >
+                        <Ionicons name="search" size={13} color={colors.muted} />
+                        <TextInput
+                          value={historySearch}
+                          onChangeText={setHistorySearch}
+                          placeholder="Filter past questions or topics…"
+                          placeholderTextColor={colors.muted}
+                          style={[styles.historySearchInput, { color: colors.text }]}
+                          autoCapitalize="none"
+                        />
+                        {historySearch.length > 0 && (
+                          <Pressable onPress={() => setHistorySearch('')} hitSlop={6}>
+                            <Ionicons name="close-circle" size={14} color={colors.muted} />
+                          </Pressable>
+                        )}
+                      </View>
+                    )}
+
                     <Text
                       style={[
                         styles.historyListHint,
@@ -629,23 +968,15 @@ export default function AIAssistantScreen() {
                     >
                       Tap any previous query to reload it into your message box:
                     </Text>
-                    {userQuestions.map((q, idx) => (
-                      <Pressable
-                        key={idx}
-                        onPress={() => {
-                          setMessage(q.content);
-                          setIsHistoryExpanded(false);
-                          setTimeout(() => {
-                            scrollViewRef.current?.scrollToEnd({ animated: true });
-                          }, 100);
-                        }}
-                        style={({ pressed }) => [
+                    {filteredHistory.map((q, idx) => (
+                      <View
+                        key={q.id || idx}
+                        style={[
                           styles.historyListItem,
                           {
                             backgroundColor: colors.surfaceElevated,
                             borderColor: colors.border,
                           },
-                          pressed && styles.pressed,
                         ]}
                       >
                         <View style={styles.historyListItemTop}>
@@ -661,35 +992,106 @@ export default function AIAssistantScreen() {
                                 { color: primaryAccent },
                               ]}
                             >
-                              Query #{idx + 1}
+                              Query #{historyQueries.length - idx}
                             </Text>
-                          </View>
-                          <View style={styles.historyReuseAction}>
                             <Text
                               style={[
-                                styles.historyReuseActionText,
-                                { color: primaryAccent },
+                                styles.historyTimestampText,
+                                { color: colors.muted },
                               ]}
                             >
-                              Load query ↵
+                              • {formatRelativeTime(q.timestamp)}
                             </Text>
+                            {q.lessonTitle && (
+                              <View
+                                style={[
+                                  styles.historyLessonTag,
+                                  { backgroundColor: isLight ? 'rgba(30,104,39,0.08)' : 'rgba(145,219,94,0.12)' },
+                                ]}
+                              >
+                                <Text
+                                  numberOfLines={1}
+                                  style={[styles.historyLessonTagText, { color: primaryAccent }]}
+                                >
+                                  {q.lessonTitle}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Pressable
+                              onPress={() => {
+                                setMessage(q.query);
+                                toggleHistory();
+                                setTimeout(() => {
+                                  scrollViewRef.current?.scrollToEnd({ animated: true });
+                                }, 100);
+                              }}
+                              hitSlop={6}
+                              style={styles.historyReuseAction}
+                            >
+                              <Text
+                                style={[
+                                  styles.historyReuseActionText,
+                                  { color: primaryAccent },
+                                ]}
+                              >
+                                Load ↵
+                              </Text>
+                            </Pressable>
+                            <Pressable
+                              onPress={() => deleteHistoryItem(q.id)}
+                              hitSlop={8}
+                              accessibilityLabel="Delete query from history"
+                              style={styles.historyItemDeleteBtn}
+                            >
+                              <Ionicons name="close" size={14} color={colors.muted} />
+                            </Pressable>
                           </View>
                         </View>
-                        <Text
-                          numberOfLines={2}
-                          style={[
-                            styles.historyListItemText,
-                            { color: colors.text, fontSize: fontSize(13) },
-                          ]}
+                        <Pressable
+                          onPress={() => {
+                            setMessage(q.query);
+                            toggleHistory();
+                            setTimeout(() => {
+                              scrollViewRef.current?.scrollToEnd({ animated: true });
+                            }, 100);
+                          }}
                         >
-                          {q.content}
-                        </Text>
-                      </Pressable>
+                          <Text
+                            numberOfLines={2}
+                            style={[
+                              styles.historyListItemText,
+                              { color: colors.text, fontSize: fontSize(13) },
+                            ]}
+                          >
+                            {q.query}
+                          </Text>
+                          {q.responseSnippet ? (
+                            <View
+                              style={[
+                                styles.historySnippetBox,
+                                {
+                                  backgroundColor: isLight ? '#FAFAFA' : 'rgba(0,0,0,0.2)',
+                                  borderColor: isLight ? '#E5E7EB' : 'rgba(255,255,255,0.06)',
+                                },
+                              ]}
+                            >
+                              <Text
+                                numberOfLines={1}
+                                style={[styles.historySnippetText, { color: colors.muted }]}
+                              >
+                                💬 {q.responseSnippet}…
+                              </Text>
+                            </View>
+                          ) : null}
+                        </Pressable>
+                      </View>
                     ))}
 
                     <View style={styles.historyActionButtonsRow}>
                       <Pressable
-                        onPress={clearChat}
+                        onPress={clearAllHistory}
                         hitSlop={6}
                         style={({ pressed }) => [
                           styles.historyClearBtn,
@@ -701,7 +1103,7 @@ export default function AIAssistantScreen() {
                       </Pressable>
 
                       <Pressable
-                        onPress={() => setIsHistoryExpanded(false)}
+                        onPress={toggleHistory}
                         hitSlop={6}
                         style={({ pressed }) => [
                           styles.historyCollapseBtn,
@@ -727,13 +1129,13 @@ export default function AIAssistantScreen() {
                   </View>
                 )}
               </View>
-            )}
-          </Card>
+            </Card>
+          )}
 
           {/* ── Active Code Attached Pill in Conversation ── */}
           {context.trim().length > 0 && (
             <Pressable
-              onPress={() => setActiveTab('codeContext')}
+              onPress={() => handleSwitchTab('codeContext')}
               style={({ pressed }) => [
                 styles.attachedCodeBanner,
                 {
@@ -765,7 +1167,7 @@ export default function AIAssistantScreen() {
                       { color: colors.muted, fontSize: fontSize(11) },
                     ]}
                   >
-                    {context.trim().split('\n').length} lines loaded • Tap to edit or inspect code
+                    {context.trim().split('\n').length} lines loaded • Tap to inspect or edit
                   </Text>
                 </View>
               </View>
@@ -791,11 +1193,14 @@ export default function AIAssistantScreen() {
                   pressed && styles.pressed,
                 ]}
               >
-                <Ionicons
-                  name="chatbubble-ellipses-outline"
-                  size={13}
-                  color={primaryAccent}
-                />
+                <View style={styles.chipIconWrapper}>
+                  <Ionicons
+                    name="chatbubble-ellipses-outline"
+                    size={13}
+                    color={primaryAccent}
+                    style={styles.chipIcon}
+                  />
+                </View>
                 <Text style={[styles.chipText, { color: colors.text }]}>{prompt}</Text>
               </Pressable>
             ))}
@@ -848,7 +1253,10 @@ export default function AIAssistantScreen() {
                 ) : null}
               </View>
               {item.role === 'assistant' ? (
-                <MarkdownView content={item.content} />
+                <MarkdownView
+                  content={item.content}
+                  onApplyCode={applySnippetToContext}
+                />
               ) : (
                 <Text style={[styles.msgBody, { color: colors.text }]}>{item.content}</Text>
               )}
@@ -905,7 +1313,8 @@ export default function AIAssistantScreen() {
               <Pressable
                 onPress={() => {
                   setContext('');
-                  setContextEditedByUser(false);
+                  setContextEditedByUser(true);
+                  showToast('Editor cleared');
                 }}
                 hitSlop={6}
                 style={({ pressed }) => [
@@ -930,7 +1339,7 @@ export default function AIAssistantScreen() {
                 </Text>
               </View>
               <Text style={[styles.editorHintText, { color: colors.muted }]}>
-                {context.trim().length} characters
+                {context.trim().length} characters • Auto-saved
               </Text>
             </View>
 
@@ -1034,7 +1443,7 @@ export default function AIAssistantScreen() {
 
           {/* ── Switch to Conversation Navigation Card ── */}
           <Pressable
-            onPress={() => setActiveTab('conversation')}
+            onPress={() => handleSwitchTab('conversation')}
             style={({ pressed }) => [
               styles.switchToConversationCard,
               {
@@ -1110,9 +1519,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    marginBottom: 12,
+    marginBottom: 8,
     minHeight: 88,
     width: '100%',
+    paddingRight: 52, // Clear floating burger menu icon at top-right
   },
   headerRowLarge: {
     alignItems: 'flex-start',
@@ -1162,22 +1572,130 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  clearButton: {
+  screenContentContainer: {
+    flexGrow: 1,
+    paddingBottom: 200,
+  },
+  conversationActionBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    gap: 8,
+    flexWrap: 'nowrap',
+  },
+  btnIconWrapper: {
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  newChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 9,
+    height: 34,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
+    flexShrink: 0,
+  },
+  newChatBtnText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  conversationActionRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+  },
+  historyShortcutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    marginTop: 4,
+    height: 34,
+    flexShrink: 0,
   },
-  clearText: {
+  historyShortcutText: {
     fontSize: 12,
+    fontWeight: '700',
+  },
+  resetThreadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 34,
+    flexShrink: 0,
+  },
+  resetThreadText: {
+    fontSize: 11.5,
     fontWeight: '600',
+  },
+  historyTimestampText: {
+    fontSize: 10.5,
+    fontWeight: '500',
+  },
+  historyLessonTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    maxWidth: 120,
+  },
+  historyLessonTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  historyItemDeleteBtn: {
+    padding: 3,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historySnippetBox: {
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  historySnippetText: {
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontStyle: 'italic',
   },
   pressed: {
     opacity: 0.7,
+  },
+  toastBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  toastText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
   },
   groundedRow: {
     flexDirection: 'row',
@@ -1197,30 +1715,35 @@ const styles = StyleSheet.create({
 
   /* ── Segmented Tab Bar ── */
   tabBar: {
+    position: 'relative',
     flexDirection: 'row',
     borderRadius: 12,
     borderWidth: 1,
-    padding: 4,
-    gap: 4,
+    padding: 3,
     marginVertical: 10,
+    height: 46,
+    alignItems: 'center',
+  },
+  tabSlidingIndicator: {
+    position: 'absolute',
+    top: 3,
+    bottom: 3,
+    width: '48%',
+    borderRadius: 9,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
   tabItem: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    height: '100%',
+    zIndex: 2,
     gap: 6,
-  },
-  tabItemActive: {
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   tabLabel: {
     fontSize: 13,
@@ -1310,6 +1833,21 @@ const styles = StyleSheet.create({
   },
   historyListContainer: {
     gap: 8,
+  },
+  historySearchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  historySearchInput: {
+    flex: 1,
+    fontSize: 12,
+    padding: 0,
   },
   historyListHint: {
     marginBottom: 2,
@@ -1538,15 +2076,30 @@ const styles = StyleSheet.create({
   chipsScroll: {
     gap: 8,
     paddingVertical: 4,
+    alignItems: 'center',
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1,
+    height: 34,
+    flexShrink: 0,
+  },
+  chipIconWrapper: {
+    width: 14,
+    height: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  chipIcon: {
+    width: 13,
+    height: 13,
+    textAlign: 'center',
   },
   chipText: {
     fontSize: 12,

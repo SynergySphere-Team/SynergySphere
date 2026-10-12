@@ -52,6 +52,8 @@ export interface ScreenProps {
   contentStyle?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
   scrollViewRef?: React.RefObject<ScrollView | null>;
+  alwaysBounceVertical?: boolean;
+  overScrollMode?: 'auto' | 'always' | 'never';
 }
 
 export function Screen({
@@ -73,6 +75,8 @@ export function Screen({
   contentStyle,
   contentContainerStyle,
   scrollViewRef,
+  alwaysBounceVertical = true,
+  overScrollMode = 'always',
 }: ScreenProps) {
   const { colors, theme } = useTheme();
   const { largerText } = useAccessibility();
@@ -417,8 +421,8 @@ export function Screen({
       nestedScrollEnabled
       showsVerticalScrollIndicator={false}
       bounces={true}
-      alwaysBounceVertical={false}
-      overScrollMode="never"
+      alwaysBounceVertical={alwaysBounceVertical}
+      overScrollMode={overScrollMode}
       refreshControl={refreshComponent}
     >
       {contentForScroll}
