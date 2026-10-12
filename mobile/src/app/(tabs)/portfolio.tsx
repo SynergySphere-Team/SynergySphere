@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   Alert,
   Image,
@@ -49,6 +50,7 @@ export default function PortfolioScreen() {
   const isLight = theme === 'light';
   const primaryAccent = isLight ? '#1e6827' : colors.primary;
   const { user } = useAuth();
+  const router = useRouter();
 
   const [items, setItems] = useState<PortfolioItem[]>([]);
   const [form, setForm] = useState({
@@ -309,6 +311,69 @@ useEffect(() => {
   }
 
   if (!loaded) return <Loading />;
+
+  if (user?.role === 'ADMIN') {
+    return (
+      <Screen>
+        <View style={styles.adminRestrictedContainer}>
+          <View style={[styles.adminRestrictedCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View
+              style={[
+                styles.adminRestrictedIconCircle,
+                {
+                  backgroundColor: isLight ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.18)',
+                  borderColor: isLight ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.4)',
+                },
+              ]}
+            >
+              <Image
+                source={require('../../../assets/images/prohibition-white-inside.png')}
+                style={styles.adminRestrictedIcon}
+                resizeMode="contain"
+              />
+            </View>
+
+            <Text style={[styles.adminRestrictedTitle, { color: colors.text }]}>
+              Career Portfolio Restricted
+            </Text>
+
+            <View
+              style={[
+                styles.adminRestrictedBadge,
+                {
+                  backgroundColor: isLight ? '#fee2e2' : 'rgba(239, 68, 68, 0.2)',
+                  borderColor: isLight ? '#fca5a5' : 'rgba(239, 68, 68, 0.4)',
+                },
+              ]}
+            >
+              <Text style={[styles.adminRestrictedBadgeText, { color: isLight ? '#b91c1c' : '#f87171' }]}>
+                ADMIN ACCOUNT
+              </Text>
+            </View>
+
+            <Text style={[styles.adminRestrictedDescription, { color: colors.muted }]}>
+              The Career Portfolio and Career Studio tools are exclusively available for students to build ATS resumes, showcase verified credentials, and demonstrate career readiness.
+              {'\n\n'}
+              Admin accounts do not participate in student portfolios. System moderation, telemetry, and approvals are managed in the Admin Portal.
+            </Text>
+
+            <View style={styles.adminRestrictedBtnGroup}>
+              <Button
+                title="Go to Admin Portal"
+                onPress={() => router.replace('/admin' as never)}
+              />
+              <View style={{ height: 10 }} />
+              <Button
+                title="Return to Home"
+                secondary
+                onPress={() => router.replace('/' as never)}
+              />
+            </View>
+          </View>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
   <Screen refreshing={refreshing} onRefresh={handleRefresh}>
@@ -1259,5 +1324,59 @@ projectActionBtn: {
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  adminRestrictedContainer: {
+    paddingVertical: 32,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adminRestrictedCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: 'center',
+  },
+  adminRestrictedIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  adminRestrictedIcon: {
+    width: 48,
+    height: 48,
+  },
+  adminRestrictedTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  adminRestrictedBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  adminRestrictedBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  adminRestrictedDescription: {
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  adminRestrictedBtnGroup: {
+    width: '100%',
   },
 });

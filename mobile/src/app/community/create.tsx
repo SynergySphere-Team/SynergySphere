@@ -20,6 +20,7 @@ import {
 } from '@/components/ui';
 import { api } from '@/services/api';
 import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 const PROJECT_CATEGORIES = [
   {
     value: 'OPEN_SOURCE',
@@ -181,6 +182,7 @@ export default function CreateCommunityProjectScreen() {
     colors,
     theme,
   } = useTheme();
+  const { user } = useAuth();
   const [
     creating,
     setCreating,
@@ -426,6 +428,58 @@ export default function CreateCommunityProjectScreen() {
       setCreating(false);
     }
   }
+
+  if (user?.role === 'ADMIN') {
+    return (
+      <Screen onBack={() => router.replace('/community?tab=initiatives' as never)}>
+        <View style={styles.adminBlockedContainer}>
+          <View style={[styles.adminBlockedCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View
+              style={[
+                styles.adminBlockedIconCircle,
+                {
+                  backgroundColor: theme === 'light' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.18)',
+                  borderColor: theme === 'light' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.4)',
+                },
+              ]}
+            >
+              <Ionicons name="ban-outline" size={44} color={theme === 'light' ? '#dc2626' : '#f87171'} />
+            </View>
+
+            <Text style={[styles.adminBlockedTitle, { color: colors.text }]}>
+              Project Creation Restricted
+            </Text>
+
+            <View
+              style={[
+                styles.adminBlockedBadge,
+                {
+                  backgroundColor: theme === 'light' ? '#fee2e2' : 'rgba(239, 68, 68, 0.2)',
+                  borderColor: theme === 'light' ? '#fca5a5' : 'rgba(239, 68, 68, 0.4)',
+                },
+              ]}
+            >
+              <Text style={[styles.adminBlockedBadgeText, { color: theme === 'light' ? '#b91c1c' : '#f87171' }]}>
+                ADMIN ACCOUNT
+              </Text>
+            </View>
+
+            <Text style={[styles.adminBlockedSubtitle, { color: colors.muted }]}>
+              Admin accounts cannot create community initiatives. Project initiatives and deliverables are reserved for student contributors and organization sponsors.
+            </Text>
+
+            <View style={{ marginTop: 24, width: '100%' }}>
+              <Button
+                title="Return to Community"
+                onPress={() => router.replace('/community?tab=initiatives' as never)}
+              />
+            </View>
+          </View>
+        </View>
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
       {/* BACK */}
@@ -1127,5 +1181,52 @@ const styles =
       lineHeight: 16,
       paddingHorizontal: 12,
       marginTop: -4,
+    },
+    adminBlockedContainer: {
+      paddingVertical: 32,
+      paddingHorizontal: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    adminBlockedCard: {
+      width: '100%',
+      maxWidth: 420,
+      borderRadius: 20,
+      borderWidth: 1,
+      padding: 24,
+      alignItems: 'center',
+    },
+    adminBlockedIconCircle: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 16,
+    },
+    adminBlockedTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+    adminBlockedBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 8,
+      borderWidth: 1,
+      marginBottom: 14,
+    },
+    adminBlockedBadgeText: {
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+    },
+    adminBlockedSubtitle: {
+      fontSize: 13,
+      lineHeight: 20,
+      textAlign: 'center',
+      marginBottom: 16,
     },
   });

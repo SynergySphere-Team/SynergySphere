@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CommunityChat } from '@/components/community/CommunityChat';
 import { api } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 import {
   Building2,
   Filter,
@@ -99,6 +100,7 @@ const CATEGORIES = [
 type TabType = 'projects' | 'chat';
 
 export default function CommunityPage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('chat');
   const [projects, setProjects] = useState<Project[]>([]);
   const [leaders, setLeaders] = useState<Leader[]>([]);
@@ -277,11 +279,19 @@ export default function CommunityPage() {
           {/* Projects toolbar */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <Button
-              onClick={() => setShowCreateModal(true)}
-              className="bg-primary font-bold text-black hover:bg-primary/90 shadow-[0_0_15px_rgba(163,230,53,0.2)]"
+              onClick={() => {
+                if (user?.role === 'ADMIN') {
+                  setError('Admin accounts cannot create projects.');
+                  return;
+                }
+                setShowCreateModal(true);
+              }}
+              disabled={user?.role === 'ADMIN'}
+              title={user?.role === 'ADMIN' ? 'Admin accounts cannot create projects' : undefined}
+              className={user?.role === 'ADMIN' ? 'opacity-50 cursor-not-allowed border border-red-500/30 text-red-400 bg-red-950/20' : 'bg-primary font-bold text-black hover:bg-primary/90 shadow-[0_0_15px_rgba(163,230,53,0.2)]'}
             >
               <Plus className="mr-1.5 h-4 w-4" />
-              Create Project
+              {user?.role === 'ADMIN' ? 'Create Project (Restricted)' : 'Create Project'}
             </Button>
             <Button variant="secondary" size="sm" onClick={() => setShowSearch((v) => !v)}>
               <Search className="h-4 w-4" />

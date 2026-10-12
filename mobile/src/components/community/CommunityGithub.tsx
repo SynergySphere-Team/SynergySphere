@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -15,6 +16,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Button, Card } from '@/components/ui';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 import { api } from '@/services/api';
 import { github } from '@/services/github';
 import type { GithubConnection, Project } from '@/types/api';
@@ -85,6 +87,7 @@ function statusLabel(status?: string | null) {
 }
 export function CommunityGithub() {
   const router = useRouter();
+  const { user } = useAuth();
   const { colors, theme } = useTheme();
   const { fontSize, largerText } = useAccessibility();
   const isDark = theme === 'dark';
@@ -295,21 +298,40 @@ const visibleOpportunities = useMemo(
               styles.actionChip,
               largerText && styles.actionChipLarge,
               {
-                backgroundColor: connection?.connected ? accentColor : colors.surface,
-                borderColor: connection?.connected ? accentColor : colors.border,
+                backgroundColor:
+                  user?.role === 'ADMIN'
+                    ? (theme === 'light' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.18)')
+                    : connection?.connected
+                    ? accentColor
+                    : colors.surface,
+                borderColor:
+                  user?.role === 'ADMIN'
+                    ? (theme === 'light' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.45)')
+                    : connection?.connected
+                    ? accentColor
+                    : colors.border,
               },
               pressed && styles.pressed,
             ]}
-            onPress={() =>
-              router.push
-                ('/project-wizard' as never)
-            }
+            onPress={() => {
+              if (user?.role === 'ADMIN') {
+                Alert.alert(
+                  'Project Creation Restricted',
+                  'Admin accounts cannot create community repository projects. Project initiatives are reserved for student contributors and organizations.',
+                  [{ text: 'OK' }]
+                );
+                return;
+              }
+              router.push('/project-wizard' as never);
+            }}
           >
             <Ionicons
-              name="add-circle-outline"
+              name={user?.role === 'ADMIN' ? 'ban-outline' : 'add-circle-outline'}
               size={largerText ? 18 : 16}
               color={
-                connection?.connected
+                user?.role === 'ADMIN'
+                  ? (theme === 'light' ? '#dc2626' : '#f87171')
+                  : connection?.connected
                   ? (theme === 'light' ? '#FFFFFF' : '#07180d')
                   : colors.text
               }
@@ -318,15 +340,18 @@ const visibleOpportunities = useMemo(
               style={[
                 styles.actionChipText,
                 {
-                  color: connection?.connected
-                    ? (theme === 'light' ? '#FFFFFF' : '#07180d')
-                    : colors.text,
+                  color:
+                    user?.role === 'ADMIN'
+                      ? (theme === 'light' ? '#dc2626' : '#f87171')
+                      : connection?.connected
+                      ? (theme === 'light' ? '#FFFFFF' : '#07180d')
+                      : colors.text,
                   fontWeight: '800',
                   fontSize: fontSize(13),
                 },
               ]}
             >
-              New Project
+              {user?.role === 'ADMIN' ? 'New Project (Restricted)' : 'New Project'}
             </Text>
           </Pressable>
         </View>

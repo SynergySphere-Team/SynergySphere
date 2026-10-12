@@ -56,6 +56,15 @@ router.get('/public/:userId', async (req, res) => {
 
 router.use(authenticate);
 
+// Restrict admin accounts from using career portfolio mutating actions and tools
+router.use((req: AuthRequest, res, next) => {
+  if (req.user?.role === 'ADMIN' && req.method !== 'GET') {
+    res.status(403).json({ error: 'Career portfolio tools are restricted for admin accounts.' });
+    return;
+  }
+  next();
+});
+
 // Unified authenticated Developer Profile endpoint
 router.get('/developer-profile', async (req: AuthRequest, res) => {
   try {

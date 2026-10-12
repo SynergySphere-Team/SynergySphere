@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen, Notice, BackButton } from '@/components/Screen';
 import { Field, Heading } from '@/components/ui';
 import { github } from '@/services/github';
 import { api } from '@/services/api';
 import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 
 type Wizard = {
   category: string;
@@ -73,7 +74,9 @@ const STARTER_ITEMS: { value: Wizard['starterTemplate']; label: string; desc: st
 export default function ProjectWizardScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { user } = useAuth();
   const isDark = theme === 'dark';
+  const isLight = !isDark;
 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<Wizard>(initial);
@@ -82,15 +85,79 @@ export default function ProjectWizardScreen() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
+    if (user?.role === 'ADMIN') return;
     github
       .connection()
       .then((value) => {
         if (!value.connected) router.replace('/github-connect?returnTo=/project-wizard' as never);
       })
       .catch(() => router.replace('/github-connect?returnTo=/project-wizard' as never));
-  }, [router]);
+  }, [router, user]);
+
+  if (user?.role === 'ADMIN') {
+    return (
+      <Screen onBack={() => router.replace('/community' as never)}>
+        <View style={styles.adminBlockedContainer}>
+          <View style={[styles.adminBlockedCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View
+              style={[
+                styles.adminBlockedIconCircle,
+                {
+                  backgroundColor: isLight ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.18)',
+                  borderColor: isLight ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.4)',
+                },
+              ]}
+            >
+              <Image
+                source={require('../../../assets/images/prohibition-white-inside.png')}
+                style={styles.adminBlockedIcon}
+                resizeMode="contain"
+              />
+            </View>
+
+            <Text style={[styles.adminBlockedTitle, { color: colors.text }]}>
+              Project Creation Restricted
+            </Text>
+
+            <View
+              style={[
+                styles.adminBlockedBadge,
+                {
+                  backgroundColor: isLight ? '#fee2e2' : 'rgba(239, 68, 68, 0.2)',
+                  borderColor: isLight ? '#fca5a5' : 'rgba(239, 68, 68, 0.4)',
+                },
+              ]}
+            >
+              <Text style={[styles.adminBlockedBadgeText, { color: isLight ? '#b91c1c' : '#f87171' }]}>
+                ADMIN ACCOUNT
+              </Text>
+            </View>
+
+            <Text style={[styles.adminBlockedSubtitle, { color: colors.muted }]}>
+              Admin accounts cannot create community repository projects. Project initiatives and code repositories are reserved for student contributors and organizations.
+            </Text>
+
+            <View style={{ marginTop: 24, width: '100%' }}>
+              <Pressable
+                onPress={() => router.replace('/community' as never)}
+                style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]}
+              >
+                <Text style={[styles.primaryActionBtnText, { color: isLight ? '#FFFFFF' : '#07180d' }]}>
+                  Return to Community
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Screen>
+    );
+  }
 
   async function create() {
+    if (user?.role === 'ADMIN') {
+      Alert.alert('Restricted', 'Admin accounts cannot create projects.');
+      return;
+    }
     setCreating(true);
     setError('');
     try {
@@ -667,6 +734,67 @@ const styles = StyleSheet.create({
   backNavText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  adminBlockedContainer: {
+    paddingVertical: 32,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adminBlockedCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: 'center',
+  },
+  adminBlockedIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  adminBlockedIcon: {
+    width: 48,
+    height: 48,
+  },
+  adminBlockedTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  adminBlockedBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  adminBlockedBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  adminBlockedSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  primaryActionBtn: {
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryActionBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
 

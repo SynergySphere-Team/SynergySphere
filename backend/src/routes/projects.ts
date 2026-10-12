@@ -1194,7 +1194,12 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
 });
 
 router.post('/', authenticate, validateBody(projectSchema), async (req: AuthRequest, res) => {
-  if (req.user!.role !== 'ORGANIZATION' && req.user!.role !== 'ADMIN' && req.user!.role !== 'STUDENT') {
+  if (req.user!.role === 'ADMIN') {
+    res.status(403).json({ error: 'Admin accounts cannot create projects.' });
+    return;
+  }
+
+  if (req.user!.role !== 'ORGANIZATION' && req.user!.role !== 'STUDENT') {
     res.status(403).json({ error: 'You do not have permission to create projects' });
     return;
   }

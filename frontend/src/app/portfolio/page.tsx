@@ -505,6 +505,39 @@ export default function PortfolioPage() {
     }
   }
 
+  if (user?.role === 'ADMIN') {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="max-w-md rounded-2xl border border-red-500/30 bg-red-950/20 p-8 shadow-xl">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-red-500/40 bg-red-500/10 text-red-400">
+              <Briefcase className="h-8 w-8" />
+            </div>
+            <span className="rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[11px] font-bold tracking-wider text-red-400">
+              ADMIN ACCOUNT DETECTED
+            </span>
+            <h2 className="mt-4 text-xl font-bold text-white">Career Portfolio Restricted</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Career Portfolio and Career Studio tools are exclusively available for students to build ATS resumes and showcase verified credentials. Admin accounts cannot use career portfolio tools.
+            </p>
+            <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
+              <Link href="/admin">
+                <Button className="bg-primary font-bold text-black hover:bg-primary/90">
+                  Open Admin Portal
+                </Button>
+              </Link>
+              <Link href="/dashboard">
+                <Button variant="outline" className="border-white/10 text-white">
+                  Return to Dashboard
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">

@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import {
+  Alert,
   Modal,
   Pressable,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
 
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 
 const destinations: {
   title: string;
@@ -34,6 +36,7 @@ export function WorkspaceMenu({
   onClose(): void;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
   const { colors, theme } = useTheme();
   const { fontSize, largerText, reduceMotion } = useAccessibility();
 
@@ -43,6 +46,14 @@ export function WorkspaceMenu({
     : colors.primary;
 
   function open(href: string) {
+    if (href === '/portfolio' && user?.role === 'ADMIN') {
+      Alert.alert(
+        'Career Portfolio Restricted',
+        'Career Portfolio and Career Studio tools are disabled on admin accounts.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     onClose();
     router.push(href as never);
   }
@@ -126,14 +137,16 @@ export function WorkspaceMenu({
                   styles.icon,
                   {
                     backgroundColor:
-                      colors.surfaceElevated,
+                      item.href === '/portfolio' && user?.role === 'ADMIN'
+                        ? (isLight ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.16)')
+                        : colors.surfaceElevated,
                   },
                 ]}
               >
                 <Ionicons
-                  name={item.icon}
+                  name={item.href === '/portfolio' && user?.role === 'ADMIN' ? 'lock-closed' : item.icon}
                   size={largerText ? 21 : 19}
-                  color={iconColor}
+                  color={item.href === '/portfolio' && user?.role === 'ADMIN' ? (isLight ? '#dc2626' : '#f87171') : iconColor}
                 />
               </View>
 
@@ -142,18 +155,21 @@ export function WorkspaceMenu({
                 style={[
                   styles.label,
                   {
-                    color: colors.text,
+                    color:
+                      item.href === '/portfolio' && user?.role === 'ADMIN'
+                        ? (isLight ? '#991b1b' : '#fca5a5')
+                        : colors.text,
                     fontSize: fontSize(16),
                   },
                 ]}
               >
-                {item.title}
+                {item.href === '/portfolio' && user?.role === 'ADMIN' ? 'Portfolio (Restricted)' : item.title}
               </Text>
 
               <Ionicons
-                name="chevron-forward"
+                name={item.href === '/portfolio' && user?.role === 'ADMIN' ? 'lock-closed' : 'chevron-forward'}
                 size={largerText ? 20 : 18}
-                color={colors.muted}
+                color={item.href === '/portfolio' && user?.role === 'ADMIN' ? (isLight ? '#dc2626' : '#f87171') : colors.muted}
               />
             </Pressable>
           ))}

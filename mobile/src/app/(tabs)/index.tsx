@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { AppState, Image, Pressable, StyleSheet, Text as RNText, Vibration, View, type TextProps } from 'react-native';
+import { Alert, AppState, Image, Pressable, StyleSheet, Text as RNText, Vibration, View, type TextProps } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Card } from '@/components/ui';
@@ -315,17 +315,33 @@ export default function HomeScreen() {
 
   const inProgressCount = activeTasks.filter((t) => t.status === 'IN_PROGRESS').length;
 
-  const workspaces: { title: string; description: string; route: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  const isAdmin = user?.role === 'ADMIN';
+
+  const workspaces: {
+    title: string;
+    description: string;
+    route: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    restricted?: boolean;
+  }[] = [
     { title: 'Learning Hub', description: 'Curriculum tracks, role paths & flashcards.', route: '/coding', icon: 'code-slash' },
     { title: 'AI Workspace', description: 'Staff Engineer tutor, review gym & chat.', route: '/ai-assistant', icon: 'sparkles' },
     { title: 'Lecture to Life', description: 'Upload slides & docs to create study materials.', route: '/lecture-to-life', icon: 'school' },
     { title: 'Interview Coach', description: '10+ question sessions & live rubrics.', route: '/interviews', icon: 'chatbubbles' },
     { title: 'Community & GitHub', description: 'Join open projects & contribute PRs.', route: '/community', icon: 'people' },
-    { title: 'Portfolio Evidence', description: 'Verified credentials & public share link.', route: '/portfolio', icon: 'briefcase' },
+    {
+      title: 'Portfolio Evidence',
+      description: isAdmin
+        ? 'Restricted for Admin · Student profiles only.'
+        : 'Verified credentials & public share link.',
+      route: '/portfolio',
+      icon: 'briefcase',
+      restricted: isAdmin,
+    },
     { title: 'Tasks & Productivity', description: 'Weekly deadlines & focus timer.', route: '/tasks', icon: 'checkbox' },
     { title: 'Settings & Security', description: 'Profile, notifications, theme & account.', route: '/settings', icon: 'settings' },
   ];
-  if (user?.role === 'ADMIN') {
+  if (isAdmin) {
     workspaces.push({
       title: 'Admin Portal',
       description: 'System approvals, moderation, database health & reports.',
@@ -708,31 +724,155 @@ export default function HomeScreen() {
       ) : null}
 
       {/* Workspaces / Navigation */}
-      <Text style={[styles.section, { color: colors.text }]}>Platform Workspaces</Text>
-      <Card>
-        {workspaces.map((workspace, index) => (
-          <Pressable
-            key={workspace.route}
-            accessibilityRole="button"
-            accessibilityLabel={`Open ${workspace.title}`}
-            onPress={() => router.push(workspace.route as never)}
-            style={({ pressed }) => [
-              styles.workspace,
-              index > 0 && [styles.workspaceDivider, { borderTopColor: colors.border }],
-              pressed && styles.workspacePressed,
+      <View style={styles.workspaceHeaderRow}>
+        <Text style={[styles.section, { color: colors.text, marginBottom: 0 }]}>Platform Workspaces</Text>
+        {isAdmin && (
+          <View
+            style={[
+              styles.adminHeaderBadge,
+              {
+                backgroundColor: isLight ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.16)',
+                borderColor: isLight ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.35)',
+              },
             ]}
           >
-            <View style={[styles.workspaceIcon, { backgroundColor: colors.surfaceElevated }]}>
-              <Ionicons name={workspace.icon} size={20} color={primaryAccent} />
+            <Image
+              source={require('../../../assets/images/prohibition-transparent.png')}
+              style={styles.adminHeaderBadgeIcon}
+              resizeMode="contain"
+            />
+            <Text style={[styles.adminHeaderBadgeText, { color: isLight ? '#b91c1c' : '#f87171' }]}>
+              ADMIN ACCOUNT
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {isAdmin && (
+        <View
+          style={[
+            styles.adminWorkspaceNotice,
+            {
+              backgroundColor: isLight ? 'rgba(254, 242, 242, 0.95)' : 'rgba(69, 10, 10, 0.35)',
+              borderColor: isLight ? 'rgba(252, 165, 165, 0.65)' : 'rgba(239, 68, 68, 0.35)',
+            },
+          ]}
+        >
+          <Image
+            source={require('../../../assets/images/prohibition-transparent.png')}
+            style={styles.adminBannerIcon}
+            resizeMode="contain"
+          />
+          <View style={styles.adminBannerTextWrap}>
+            <Text style={[styles.adminBannerTitle, { color: isLight ? '#991B1B' : '#FCA5A5' }]}>
+              Admin Restricted Mode
+            </Text>
+            <Text style={[styles.adminBannerSubtitle, { color: isLight ? '#7F1D1D' : '#F87171' }]}>
+              Project creation and career portfolio tools are restricted for admin accounts.
+            </Text>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.workspaceCardContainer}>
+        <Card style={isAdmin ? styles.adminCardInner : undefined}>
+          {isAdmin && (
+            <View style={styles.prohibitionWatermarkOverlay} pointerEvents="none">
+              <Image
+                source={require('../../../assets/images/prohibition-transparent.png')}
+                style={styles.prohibitionWatermarkImage}
+                resizeMode="contain"
+              />
             </View>
-            <View style={styles.workspaceBody}>
-              <Text style={[styles.workspaceTitle, { color: colors.text }]}>{workspace.title}</Text>
-              <Text style={[styles.workspaceDescription, { color: colors.muted }]}>{workspace.description}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={19} color={colors.muted} />
-          </Pressable>
-        ))}
-      </Card>
+          )}
+          {workspaces.map((workspace, index) => (
+            <Pressable
+              key={workspace.route}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${workspace.title}`}
+              onPress={() => {
+                if (workspace.restricted) {
+                  Alert.alert(
+                    'Career Portfolio Restricted',
+                    'Career Portfolio and Career Studio tools are designed for students building industry readiness. They are disabled on admin accounts.',
+                    [{ text: 'OK' }]
+                  );
+                  return;
+                }
+                router.push(workspace.route as never);
+              }}
+              style={({ pressed }) => [
+                styles.workspace,
+                index > 0 && [styles.workspaceDivider, { borderTopColor: colors.border }],
+                pressed && styles.workspacePressed,
+                workspace.restricted && styles.workspaceRestricted,
+              ]}
+            >
+              <View
+                style={[
+                  styles.workspaceIcon,
+                  {
+                    backgroundColor: workspace.restricted
+                      ? (isLight ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.16)')
+                      : colors.surfaceElevated,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={workspace.icon}
+                  size={20}
+                  color={workspace.restricted ? (isLight ? '#dc2626' : '#f87171') : primaryAccent}
+                />
+              </View>
+              <View style={styles.workspaceBody}>
+                <View style={styles.workspaceTitleRow}>
+                  <Text
+                    style={[
+                      styles.workspaceTitle,
+                      { color: workspace.restricted ? (isLight ? '#991b1b' : '#fca5a5') : colors.text },
+                    ]}
+                  >
+                    {workspace.title}
+                  </Text>
+                  {workspace.restricted && (
+                    <View
+                      style={[
+                        styles.restrictedPill,
+                        {
+                          backgroundColor: isLight ? '#fee2e2' : 'rgba(239, 68, 68, 0.2)',
+                          borderColor: isLight ? '#fca5a5' : 'rgba(239, 68, 68, 0.4)',
+                        },
+                      ]}
+                    >
+                      <Image
+                        source={require('../../../assets/images/prohibition-transparent.png')}
+                        style={styles.restrictedPillIcon}
+                        resizeMode="contain"
+                      />
+                      <Text style={[styles.restrictedPillText, { color: isLight ? '#b91c1c' : '#f87171' }]}>
+                        RESTRICTED
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text
+                  style={[
+                    styles.workspaceDescription,
+                    { color: workspace.restricted ? (isLight ? '#b91c1c' : '#fca5a5') : colors.muted },
+                  ]}
+                >
+                  {workspace.description}
+                </Text>
+              </View>
+              {workspace.restricted ? (
+                <Ionicons name="lock-closed" size={17} color={isLight ? '#dc2626' : '#f87171'} />
+              ) : (
+                <Ionicons name="chevron-forward" size={19} color={colors.muted} />
+              )}
+            </Pressable>
+          ))}
+        </Card>
+      </View>
 
       {/* Community Activity */}
       {communityActivity.length ? (
@@ -942,5 +1082,107 @@ const styles = StyleSheet.create({
   quickActionChipText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  workspaceHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    marginTop: 6,
+  },
+  adminHeaderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  adminHeaderBadgeIcon: {
+    width: 13,
+    height: 13,
+  },
+  adminHeaderBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  adminWorkspaceNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 10,
+    gap: 10,
+  },
+  adminBannerIcon: {
+    width: 24,
+    height: 24,
+  },
+  adminBannerTextWrap: {
+    flex: 1,
+  },
+  adminBannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  adminBannerSubtitle: {
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  workspaceCardContainer: {
+    position: 'relative',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  adminCardInner: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  prohibitionWatermarkOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 0,
+    pointerEvents: 'none',
+  },
+  prohibitionWatermarkImage: {
+    width: 260,
+    height: 260,
+    opacity: 0.05, // very very light shading!
+  },
+  workspaceRestricted: {
+    opacity: 0.85,
+  },
+  workspaceTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  restrictedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  restrictedPillIcon: {
+    width: 10,
+    height: 10,
+  },
+  restrictedPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
 });

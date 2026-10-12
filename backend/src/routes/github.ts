@@ -140,6 +140,10 @@ bodyRouter.put('/push-token', authenticate, validateBody(pushTokenSchema), async
 });
 
 bodyRouter.post('/projects', authenticate, validateBody(wizardSchema), async (req: AuthRequest, res) => {
+  if (req.user!.role === 'ADMIN') {
+    res.status(403).json({ error: 'Admin accounts cannot create projects.' });
+    return;
+  }
   let auth: { token: string; username: string };
   try { auth = await accessTokenForUser(req.user!.userId); } catch (error) { res.status(401).json({ error: error instanceof Error ? error.message : 'Connect GitHub first.', code: 'github_not_connected' }); return; }
   try {
