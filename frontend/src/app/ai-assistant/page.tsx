@@ -18,7 +18,10 @@ import {
   ChevronUp,
   Clock,
   Code2,
+  Copy,
+  ExternalLink,
   FileCode2,
+  KeyRound,
   Loader2,
   Search,
   Send,
@@ -90,28 +93,41 @@ export interface LearningHubSearchResultItem {
   score: number;
 }
 
+export interface CodeActionResult {
+  action: 'explain' | 'debug' | 'optimize' | 'test';
+  title: string;
+  output: string;
+  fromAi: boolean;
+  provider?: string;
+  timestamp: Date;
+}
+
 /* ─────────────────────────── quick action definitions ─────────────────────────── */
 
 const quickActions = [
   {
+    id: 'explain' as const,
     label: 'Explain',
     icon: Sparkles,
     prompt: (code: string) =>
       `Explain this code clearly and concisely, step by step:\n\n\`\`\`\n${code}\n\`\`\``,
   },
   {
+    id: 'debug' as const,
     label: 'Debug',
     icon: Bug,
     prompt: (code: string) =>
       `Find and fix any bugs or issues in this code. List each problem and show the corrected version:\n\n\`\`\`\n${code}\n\`\`\``,
   },
   {
+    id: 'optimize' as const,
     label: 'Optimize',
     icon: Zap,
     prompt: (code: string) =>
       `Optimize this code for better performance and readability. Show the improved version with an explanation of changes:\n\n\`\`\`\n${code}\n\`\`\``,
   },
   {
+    id: 'test' as const,
     label: 'Generate Tests',
     icon: TestTube,
     prompt: (code: string) =>
@@ -228,6 +244,67 @@ function AIAssistantInner() {
   const [activeTab, setActiveTab] = useState<'conversation' | 'codeContext' | 'split'>('conversation');
   // Expandable & Collapsible Chat History state
   const [historyExpanded, setHistoryExpanded] = useState(false);
+
+  // Code Action Output State (Rendered directly in Code Context)
+  const [codeActionResult, setCodeActionResult] = useState<CodeActionResult | null>(null);
+  const [codeActionLoading, setCodeActionLoading] = useState<'explain' | 'debug' | 'optimize' | 'test' | null>(null);
+  const [copiedCodeOutput, setCopiedCodeOutput] = useState(false);
+
+  // Gemini API Key State & Management
+  const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [hasServerKey, setHasServerKey] = useState(false);
+  const [keyModalOpen, setKeyModalOpen] = useState(false);
+  const [keyInput, setKeyInput] = useState('');
+  const [keyTesting, setKeyTesting] = useState(false);
+  const [keyTestFeedback, setKeyTestFeedback] = useState<{ valid: boolean; message: string; provider?: string } | null>(null);
+
+  // Load custom Gemini API key from localStorage and check backend key status
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('synergysphere_gemini_api_key') || '';
+      setGeminiApiKey(stored);
+      setKeyInput(stored);
+    }
+    api<{ hasEnvKey: boolean; provider?: string | null }>('/ai/key-status')
+      .then((res) => {
+        if (res?.hasEnvKey) setHasServerKey(true);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveApiKey = (keyToSave: string) => {
+    const trimmed = keyToSave.trim();
+    setGeminiApiKey(trimmed);
+    if (typeof window !== 'undefined') {
+      if (trimmed) {
+        localStorage.setItem('synergysphere_gemini_api_key', trimmed);
+      } else {
+        localStorage.removeItem('synergysphere_gemini_api_key');
+      }
+    }
+  };
+
+  const handleTestKey = async () => {
+    setKeyTesting(true);
+    setKeyTestFeedback(null);
+    try {
+      const res = await api<{ valid: boolean; provider: string; message: string }>('/ai/test-key', {
+        method: 'POST',
+        body: JSON.stringify({ apiKey: keyInput.trim() }),
+      });
+      setKeyTestFeedback(res);
+      if (res.valid) {
+        handleSaveApiKey(keyInput);
+      }
+    } catch (err: any) {
+      setKeyTestFeedback({
+        valid: false,
+        message: err.message || 'Verification failed. Please check network and API key.',
+      });
+    } finally {
+      setKeyTesting(false);
+    }
+  };
 
   // Derived user questions for the expandable chat history
   const userQuestions = useMemo(() => {
@@ -470,12 +547,14 @@ function AIAssistantInner() {
     const contextToSend =
       forcedContext?.trim() || (codeEditedByUser && codeContext.trim() ? codeContext : undefined);
 
+    const keyToSend = geminiApiKey.trim() || undefined;
     const payload = {
       message: text.trim(),
       context: contextToSend,
       ...(lesson ? { lessonId: lesson.id } : {}),
       ...(challenge ? { challengeId: challenge.id } : {}),
       history: historyFromMessages(baseMessages).slice(-20),
+      ...(keyToSend ? { apiKey: keyToSend } : {}),
     };
 
     let streamSuccess = false;
@@ -485,6 +564,7 @@ function AIAssistantInner() {
         headers: {
           'Content-Type': 'application/json',
           Accept: 'text/event-stream',
+          ...(keyToSend ? { 'x-ai-api-key': keyToSend } : {}),
         },
         body: JSON.stringify(payload),
       });
@@ -554,6 +634,7 @@ function AIAssistantInner() {
         const res = await api<ChatResponse>('/ai/chat', {
           method: 'POST',
           body: JSON.stringify(payload),
+          headers: keyToSend ? { 'x-ai-api-key': keyToSend } : undefined,
         });
         setMessages((prev) => [
           ...prev,
@@ -604,41 +685,81 @@ function AIAssistantInner() {
     };
   }, []);
 
-  function handleQuickAction(action: (typeof quickActions)[number]) {
+  async function handleQuickAction(action: (typeof quickActions)[number]) {
     if (!codeContext.trim()) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'Please paste some code in the Code Context editor first, then I can help!',
-          timestamp: new Date(),
-        },
-      ]);
-      setActiveTab('codeContext');
+      setCodeActionResult({
+        action: action.id,
+        title: action.label,
+        output: `⚠️ **No Code Detected in Editor**\n\nPlease paste or type some code in the **Code Context** editor above first, then click **${action.label}** to receive an instant AI response right here.`,
+        fromAi: false,
+        timestamp: new Date(),
+      });
       return;
     }
-    if (activeTab === 'codeContext') {
-      setActiveTab('conversation');
+
+    // Keep user in Code Context editor – do NOT switch to conversation page!
+    setCodeActionLoading(action.id);
+
+    try {
+      const keyToSend = geminiApiKey.trim() || undefined;
+      const res = await api<{
+        ok: boolean;
+        action: 'explain' | 'debug' | 'optimize' | 'test';
+        output: string;
+        fromAi: boolean;
+        provider?: string;
+      }>('/ai/code-action', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: action.id,
+          code: codeContext,
+          language: detectLanguage(codeContext),
+          lessonId: lesson?.id,
+          challengeId: challenge?.id,
+          apiKey: keyToSend,
+        }),
+        headers: keyToSend ? { 'x-ai-api-key': keyToSend } : undefined,
+      });
+
+      setCodeActionResult({
+        action: action.id,
+        title: action.label,
+        output: res.output,
+        fromAi: res.fromAi,
+        provider: res.provider || (res.fromAi ? 'Google Gemini' : undefined),
+        timestamp: new Date(),
+      });
+    } catch {
+      // Local fallback generator if backend/network fails
+      const fallback = generateLocalResponse(action.label, codeContext);
+      setCodeActionResult({
+        action: action.id,
+        title: action.label,
+        output: fallback,
+        fromAi: false,
+        timestamp: new Date(),
+      });
+    } finally {
+      setCodeActionLoading(null);
     }
-    sendMessage(action.prompt(codeContext), undefined, codeContext);
   }
 
   function handleClearCodeAndOutput() {
     setCodeContext('');
     setCodeEditedByUser(false);
     setAnalysis(null);
-    setMessages((prev) => {
-      if (prev.length <= 1) return prev;
-      const copy = [...prev];
-      if (copy.length > 1 && copy[copy.length - 1].role === 'assistant') {
-        copy.pop();
-        if (copy.length > 1 && copy[copy.length - 1].role === 'user') {
-          copy.pop();
-        }
-      }
-      return copy;
-    });
+    setCodeActionResult(null);
   }
+
+  const handleApplyExtractedCode = (output: string) => {
+    const match = output.match(/```(?:[a-zA-Z0-9_-]+)?\n([\s\S]*?)```/);
+    if (match && match[1]) {
+      setCodeContext(match[1].trim());
+      setCodeEditedByUser(true);
+    }
+  };
+
+  const hasCodeBlock = (output: string) => /```(?:[a-zA-Z0-9_-]+)?\n[\s\S]*?```/.test(output);
 
   async function clearChat() {
     try {
@@ -1141,6 +1262,31 @@ function AIAssistantInner() {
                 Code Context
               </CardTitle>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKeyInput(geminiApiKey);
+                    setKeyTestFeedback(null);
+                    setKeyModalOpen(true);
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
+                    geminiApiKey
+                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+                      : hasServerKey
+                        ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20'
+                        : 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/20'
+                  }`}
+                  title="Configure Google Gemini API Key for AI responses"
+                >
+                  <KeyRound className="h-3.5 w-3.5" />
+                  <span>
+                    {geminiApiKey
+                      ? 'Gemini Key: Active'
+                      : hasServerKey
+                        ? 'Server Gemini: Active'
+                        : 'Link Gemini Key'}
+                  </span>
+                </button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1160,31 +1306,38 @@ function AIAssistantInner() {
                 </span>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <textarea
                 value={codeContext}
                 onChange={(e) => {
                   setCodeContext(e.target.value);
                   setCodeEditedByUser(true);
                 }}
-                className="h-[430px] w-full resize-none rounded-lg border border-white/[0.08] bg-[#050a0d] p-4 font-mono text-sm leading-6 text-green-100 outline-none focus:ring-2 focus:ring-primary/30 overflow-y-auto"
+                className="h-[360px] w-full resize-none rounded-lg border border-white/[0.08] bg-[#050a0d] p-4 font-mono text-sm leading-6 text-green-100 outline-none focus:ring-2 focus:ring-primary/30 overflow-y-auto"
                 spellCheck={false}
                 placeholder="Paste your code here, then use the action buttons below…"
               />
               {/* Quick action buttons – all wired up */}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {quickActions.map((action) => {
                   const Icon = action.icon;
+                  const isThisLoading = codeActionLoading === action.id;
                   return (
                     <Button
                       key={action.label}
                       variant="secondary"
                       size="sm"
-                      disabled={loading}
+                      disabled={codeActionLoading !== null}
                       onClick={() => handleQuickAction(action)}
-                      className="gap-1.5"
+                      className={`gap-1.5 transition ${
+                        isThisLoading ? 'border-primary/50 bg-primary/20 text-white' : ''
+                      }`}
                     >
-                      <Icon className="h-3.5 w-3.5" />
+                      {isThisLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                      ) : (
+                        <Icon className="h-3.5 w-3.5" />
+                      )}
                       {action.label}
                     </Button>
                   );
@@ -1200,12 +1353,125 @@ function AIAssistantInner() {
                   Clear Code & Output
                 </Button>
               </div>
-              <p className="mt-2 text-[11px] text-muted-foreground/60">
+
+              {/* Loading Indicator for Code Action */}
+              {codeActionLoading && (
+                <div className="rounded-xl border border-primary/25 bg-primary/[0.05] p-4 animate-pulse">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-white">
+                        Gemini AI is analyzing your code…
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Generating {codeActionLoading === 'test' ? 'unit test suite' : codeActionLoading} analysis directly in this page.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* AI Code Action Output Section (Rendered directly in Code Context) */}
+              {codeActionResult && !codeActionLoading && (
+                <div className="rounded-xl border border-white/[0.1] bg-[#070e13] p-4 shadow-xl">
+                  {/* Result Header */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] pb-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/15 text-primary">
+                        <Sparkles className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="text-xs font-bold text-white uppercase tracking-wider">
+                        {codeActionResult.title}
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          codeActionResult.fromAi
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                        }`}
+                      >
+                        {codeActionResult.fromAi ? '⚡ Gemini AI Answer' : 'Offline Static Fallback'}
+                      </span>
+                      {!codeActionResult.fromAi && !geminiApiKey && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setKeyInput(geminiApiKey);
+                            setKeyTestFeedback(null);
+                            setKeyModalOpen(true);
+                          }}
+                          className="text-[10px] text-primary hover:underline font-medium ml-1"
+                        >
+                          Link Gemini Key →
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(codeActionResult.output);
+                          setCopiedCodeOutput(true);
+                          setTimeout(() => setCopiedCodeOutput(false), 2000);
+                        }}
+                        className="h-7 px-2 text-xs text-muted-foreground hover:text-white"
+                        title="Copy answer to clipboard"
+                      >
+                        {copiedCodeOutput ? (
+                          <>
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mr-1" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5 mr-1" />
+                            Copy
+                          </>
+                        )}
+                      </Button>
+
+                      {hasCodeBlock(codeActionResult.output) && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleApplyExtractedCode(codeActionResult.output)}
+                          className="h-7 px-2.5 text-xs text-primary bg-primary/10 hover:bg-primary/20 border border-primary/25"
+                          title="Apply the code snippet from this answer into the editor"
+                        >
+                          Apply to Editor
+                        </Button>
+                      )}
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCodeActionResult(null)}
+                        className="h-7 px-2 text-xs text-muted-foreground hover:text-rose-400"
+                        title="Dismiss this answer"
+                      >
+                        <X className="h-3.5 w-3.5 mr-1" />
+                        Dismiss
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Output content rendered in Markdown */}
+                  <div className="max-h-[500px] overflow-y-auto pr-2 scrollbar-thin text-sm leading-relaxed text-zinc-200">
+                    <MarkdownView content={codeActionResult.output} />
+                  </div>
+                </div>
+              )}
+
+              <p className="text-[11px] text-muted-foreground/60">
                 {lesson?.firstExampleCode
                   ? 'Pre-filled with the first example from this lesson — edit it or paste your own code.'
                   : challenge?.starterCode
                     ? 'Pre-filled with challenge starter code — edit it or ask for algorithmic hints!'
-                    : 'Paste code above and click a button, or type a question in the chat.'}
+                    : 'Paste code above and click a button. Answers are generated by Gemini AI directly on this page.'}
               </p>
             </CardContent>
           </Card>
@@ -1275,6 +1541,122 @@ function AIAssistantInner() {
           </Card>
         </div>
       </div>
+
+      {/* ── Gemini API Key Configuration Modal ── */}
+      {keyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-white/[0.12] bg-[#0c141a] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                  <KeyRound className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Google Gemini API Key</h3>
+                  <p className="text-[11px] text-muted-foreground">Powers live AI Workspace code actions</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setKeyModalOpen(false)}
+                className="rounded-lg p-1 text-muted-foreground hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Link your Gemini API key to receive instant AI answers for <strong>Explain</strong>, <strong>Debug</strong>, <strong>Optimize</strong>, and <strong>Generate Tests</strong> directly inside your Code Context editor.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold text-zinc-300">
+                API Key
+              </label>
+              <Input
+                type="password"
+                value={keyInput}
+                onChange={(e) => {
+                  setKeyInput(e.target.value);
+                  setKeyTestFeedback(null);
+                }}
+                placeholder="Paste your Gemini API key (AIzaSy...)"
+                className="font-mono text-xs bg-secondary/40 border-white/[0.1] h-9"
+              />
+            </div>
+
+            {keyTestFeedback && (
+              <div
+                className={`rounded-lg border p-3 text-xs flex items-start gap-2 ${
+                  keyTestFeedback.valid
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                    : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
+                }`}
+              >
+                {keyTestFeedback.valid ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+                ) : (
+                  <X className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
+                )}
+                <div className="min-w-0">
+                  <p className="font-semibold">
+                    {keyTestFeedback.valid ? 'Key Verified & Saved!' : 'Validation Failed'}
+                  </p>
+                  <p className="text-[11px] opacity-90 mt-0.5">{keyTestFeedback.message}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/[0.08]">
+              {geminiApiKey && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    handleSaveApiKey('');
+                    setKeyInput('');
+                    setKeyTestFeedback({ valid: false, message: 'Custom key cleared. Default environment settings active.' });
+                  }}
+                  className="text-xs text-rose-400 hover:text-rose-300 h-8 px-2"
+                >
+                  Clear Key
+                </Button>
+              )}
+              <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setKeyModalOpen(false)}
+                  className="text-xs h-8"
+                >
+                  Close
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleTestKey}
+                  disabled={keyTesting || !keyInput.trim()}
+                  className="text-xs h-8 gap-1.5 bg-primary text-black font-semibold hover:bg-primary/90"
+                >
+                  {keyTesting && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {keyTesting ? 'Testing…' : 'Test & Save'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-secondary/30 p-2.5 text-[11px] text-muted-foreground flex items-center justify-between">
+              <span>Don&apos;t have a key? Free tier on Google AI Studio</span>
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary hover:underline font-medium inline-flex items-center gap-1 shrink-0 ml-2"
+              >
+                Get API Key <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

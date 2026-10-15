@@ -84,8 +84,10 @@ export async function generateAiResponse(
   }
 
   // 1. Try Gemini first (free)
-  const geminiKey = (cleanCustomKey && !cleanCustomKey.startsWith('sk-') ? cleanCustomKey : process.env.GEMINI_API_KEY || '').trim();
-  if (geminiKey) {
+  const isDummyGeminiKey = (k: string) => !k || k.startsWith('AQ.') || (process.env.JWT_SECRET && k === process.env.JWT_SECRET.trim());
+  const envGeminiKey = isDummyGeminiKey(process.env.GEMINI_API_KEY || '') ? '' : (process.env.GEMINI_API_KEY || '').trim();
+  const geminiKey = (cleanCustomKey && !cleanCustomKey.startsWith('sk-') ? cleanCustomKey : envGeminiKey).trim();
+  if (geminiKey && !cleanCustomKey) {
     try {
       const result = await callGemini(geminiKey, systemPrompt, userMessage, priorTurns);
       if (result) return result;
@@ -102,7 +104,7 @@ export async function generateAiResponse(
         (process.env.ANTHROPIC_API_KEY?.startsWith('sk-') ? process.env.ANTHROPIC_API_KEY : '') ||
         ''
   ).trim();
-  if (openaiKey) {
+  if (openaiKey && !(cleanCustomKey && cleanCustomKey.startsWith('sk-'))) {
     try {
       const result = await callOpenAI(openaiKey, systemPrompt, userMessage, priorTurns);
       if (result) return result;
@@ -123,14 +125,16 @@ async function callGemini(
   userMessage: string,
   history: ChatTurn[] = [],
 ): Promise<string> {
+  const preferredModel = process.env.GEMINI_MODEL && process.env.GEMINI_MODEL !== 'gemini-3.5-flash-lite'
+    ? process.env.GEMINI_MODEL
+    : undefined;
   const models = [
-    process.env.GEMINI_MODEL,
+    preferredModel,
+    'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
     'gemini-1.5-flash-latest',
     'gemini-1.5-pro',
-    'gemini-2.5-flash',
-    'gemini-flash-latest',
   ].filter((model, index, all): model is string => Boolean(model) && all.indexOf(model) === index);
 
   let lastError = '';

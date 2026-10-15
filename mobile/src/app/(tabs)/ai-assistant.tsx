@@ -193,6 +193,15 @@ export default function AIAssistantScreen() {
   const [error, setError] = useState('');
   const [lesson, setLesson] = useState<LessonPreview | null>(null);
 
+  // In-page code context action result & loading state
+  const [codeActionResult, setCodeActionResult] = useState<{
+    action: string;
+    title: string;
+    output: string;
+    fromAi: boolean;
+  } | null>(null);
+  const [codeActionLoading, setCodeActionLoading] = useState<string | null>(null);
+
   // Debounced context for 60fps typing without recalculating regex loops synchronously
   const [debouncedContext, setDebouncedContext] = useState('');
   useEffect(() => {
@@ -405,26 +414,67 @@ export default function AIAssistantScreen() {
     }
   }
 
-  function handleQuickAction(action: 'Explain' | 'Debug' | 'Optimize' | 'Generate Tests') {
+  async function handleQuickAction(action: 'Explain' | 'Debug' | 'Optimize' | 'Generate Tests') {
     if (!context.trim()) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'Please paste code in the Code Context editor first to run this quick action!',
-        },
-      ]);
-      handleSwitchTab('codeContext');
+      showToast('Please paste code in the Code Context editor first!');
       return;
     }
-    const prompts: Record<string, string> = {
-      Explain: `Explain this code clearly and concisely, step by step:\n\n\`\`\`\n${context}\n\`\`\``,
-      Debug: `Find and fix any bugs or issues in this code. List each problem and show the corrected version:\n\n\`\`\`\n${context}\n\`\`\``,
-      Optimize: `Optimize this code for better performance and readability. Show the improved version:\n\n\`\`\`\n${context}\n\`\`\``,
-      'Generate Tests': `Generate comprehensive unit tests for this code including edge cases:\n\n\`\`\`\n${context}\n\`\`\``,
+
+    const actionKeyMap: Record<string, 'explain' | 'debug' | 'optimize' | 'test'> = {
+      Explain: 'explain',
+      Debug: 'debug',
+      Optimize: 'optimize',
+      'Generate Tests': 'test',
     };
-    handleSwitchTab('conversation');
-    send(prompts[action], context);
+    const actionKey = actionKeyMap[action] || 'explain';
+
+    // Keep user in Code Context tab – do NOT switch to conversation!
+    setCodeActionLoading(action);
+
+    try {
+      let storedKey = '';
+      try {
+        storedKey = (await SecureStore.getItemAsync('synergysphere_gemini_api_key')) || '';
+      } catch {}
+
+      const res = await api.post<{
+        ok: boolean;
+        action: string;
+        output: string;
+        fromAi: boolean;
+        provider?: string;
+      }>('/ai/code-action', {
+        action: actionKey,
+        code: context,
+        apiKey: storedKey || undefined,
+        lessonId: lesson?.id,
+      });
+
+      setCodeActionResult({
+        action: actionKey,
+        title: action,
+        output: res.output,
+        fromAi: res.fromAi,
+      });
+      showToast(`${action} completed! Answer posted below.`);
+    } catch {
+      // Local fallback
+      const fallbackMap: Record<string, string> = {
+        Explain: `### Code Explanation\n\n• **Lines Analyzed:** ${context.split('\n').length}\n• **Flow:** The code implements the core computational logic.\n\n*⚡ To get deep live AI explanations, connect a Gemini API key.*`,
+        Debug: `### Bug Inspection\n\n• Check for off-by-one errors in iterations\n• Verify null/undefined checks\n• Ensure variables are properly scoped\n\n*⚡ To get deep live AI debugging, connect a Gemini API key.*`,
+        Optimize: `### Optimization Suggestions\n\n• Reduce nested iteration loops (aim for O(N))\n• Use Map or Set for fast key/set lookups\n• Cache repeated calculations outside loops\n\n*⚡ To get deep live AI optimization, connect a Gemini API key.*`,
+        'Generate Tests': `### Generated Test Cases\n\n• Happy path: standard valid inputs\n• Boundary cases: empty strings, null, negative numbers\n• Stress test: large scale arrays\n\n*⚡ To get full auto-generated tests, connect a Gemini API key.*`,
+      };
+      setCodeActionResult({
+        action: actionKey,
+        title: action,
+        output: fallbackMap[action] || 'Analysis completed.',
+        fromAi: false,
+      });
+      showToast(`${action} output generated below.`);
+    } finally {
+      setCodeActionLoading(null);
+    }
   }
 
   // Fetch chat history on mount & merge with persistent queries
@@ -1371,12 +1421,12 @@ export default function AIAssistantScreen() {
                 { color: colors.muted, fontSize: fontSize(11) },
               ]}
             >
-              Run Instant Actions (switches to Conversation for explanations):
+              Run Instant Actions (answers appear below in this editor):
             </Text>
             <View style={styles.quickActionsGrid}>
               <Pressable
                 onPress={() => handleQuickAction('Explain')}
-                disabled={loading}
+                disabled={codeActionLoading !== null}
                 style={({ pressed }) => [
                   styles.quickActionBtn,
                   {
@@ -1393,7 +1443,7 @@ export default function AIAssistantScreen() {
               </Pressable>
               <Pressable
                 onPress={() => handleQuickAction('Debug')}
-                disabled={loading}
+                disabled={codeActionLoading !== null}
                 style={({ pressed }) => [
                   styles.quickActionBtn,
                   {
@@ -1408,7 +1458,7 @@ export default function AIAssistantScreen() {
               </Pressable>
               <Pressable
                 onPress={() => handleQuickAction('Optimize')}
-                disabled={loading}
+                disabled={codeActionLoading !== null}
                 style={({ pressed }) => [
                   styles.quickActionBtn,
                   {
@@ -1425,7 +1475,7 @@ export default function AIAssistantScreen() {
               </Pressable>
               <Pressable
                 onPress={() => handleQuickAction('Generate Tests')}
-                disabled={loading}
+                disabled={codeActionLoading !== null}
                 style={({ pressed }) => [
                   styles.quickActionBtn,
                   {
@@ -1439,6 +1489,76 @@ export default function AIAssistantScreen() {
                 <Text style={[styles.quickActionText, { color: colors.text }]}>Tests</Text>
               </Pressable>
             </View>
+
+            {/* Loading Indicator for Code Action */}
+            {codeActionLoading && (
+              <View
+                style={{
+                  marginTop: 14,
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: isLight ? '#f0fdf4' : '#052e16',
+                  borderWidth: 1,
+                  borderColor: '#10b981',
+                }}
+              >
+                <Text style={{ fontSize: fontSize(12), fontWeight: 'bold', color: primaryAccent }}>
+                  ⚡ Gemini AI is analyzing your code ({codeActionLoading})…
+                </Text>
+                <Text style={{ fontSize: fontSize(11), color: colors.muted, marginTop: 4 }}>
+                  Answers are generated and displayed directly on this page.
+                </Text>
+              </View>
+            )}
+
+            {/* AI Code Action Output Section (Rendered directly in Code Context) */}
+            {codeActionResult && !codeActionLoading && (
+              <View
+                style={{
+                  marginTop: 14,
+                  padding: 14,
+                  borderRadius: 10,
+                  backgroundColor: isLight ? '#f8fafc' : '#070e13',
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 10,
+                    paddingBottom: 8,
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.border,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <Ionicons name="sparkles" size={14} color={primaryAccent} />
+                    <Text style={{ fontSize: fontSize(12), fontWeight: 'bold', color: colors.text }}>
+                      {codeActionResult.title}
+                    </Text>
+                    <View
+                      style={{
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                        backgroundColor: codeActionResult.fromAi ? '#059669' : '#d97706',
+                      }}
+                    >
+                      <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#fff' }}>
+                        {codeActionResult.fromAi ? '⚡ Gemini AI' : 'Offline Static'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Pressable onPress={() => setCodeActionResult(null)} hitSlop={8}>
+                    <Ionicons name="close" size={16} color={colors.muted} />
+                  </Pressable>
+                </View>
+                <MarkdownView content={codeActionResult.output} />
+              </View>
+            )}
           </Card>
 
           {/* ── Switch to Conversation Navigation Card ── */}

@@ -417,10 +417,21 @@ router.post('/code-action', validateBody(codeActionSchema), async (req: AuthRequ
       action,
       output: response,
       fromAi,
+      provider: fromAi ? 'Google Gemini' : undefined,
     });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message || 'Code action failed' });
   }
+});
+
+// ── Check AI Key Status ──
+router.get('/key-status', async (req: AuthRequest, res) => {
+  const envKey = (process.env.GEMINI_API_KEY || '').trim();
+  const isDummy = !envKey || envKey.startsWith('AQ.') || envKey === process.env.JWT_SECRET;
+  res.json({
+    hasEnvKey: !isDummy,
+    provider: !isDummy ? 'Google Gemini' : null,
+  });
 });
 
 // ── Test & Validate AI API Key ──
