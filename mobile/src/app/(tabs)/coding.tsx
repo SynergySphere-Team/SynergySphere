@@ -600,10 +600,12 @@ export const BUILTIN_CHALLENGES: BuiltinChallenge[] = [
 ];
 
 export const BUILTIN_RESOURCES: LearningResource[] = [
+  // ── Algorithms & DSA (General) ──────────────────────────────────────────
   {
     id: 'algorithm-basics',
     title: 'Algorithm Basics & Asymptotic Notations',
     topic: 'Algorithms',
+    language: 'Algorithms',
     level: 'Beginner',
     minutes: 18,
     xpReward: 20,
@@ -626,6 +628,7 @@ export const BUILTIN_RESOURCES: LearningResource[] = [
     id: 'complexity-basics',
     title: 'Analyse Algorithm Efficiency & Time Complexity',
     topic: 'Algorithms',
+    language: 'Algorithms',
     level: 'Intermediate',
     minutes: 25,
     xpReward: 25,
@@ -648,6 +651,7 @@ export const BUILTIN_RESOURCES: LearningResource[] = [
     id: 'dsa-arrays-vs-linkedlists',
     title: 'Arrays vs Singly Linked Lists',
     topic: 'Data Structures',
+    language: 'Data Structures',
     level: 'Beginner',
     minutes: 22,
     xpReward: 25,
@@ -670,6 +674,7 @@ export const BUILTIN_RESOURCES: LearningResource[] = [
     id: 'dsa-stack-lifo',
     title: 'Stack Data Structure & Call Stack Architecture',
     topic: 'Data Structures',
+    language: 'Data Structures',
     level: 'Beginner',
     minutes: 20,
     xpReward: 20,
@@ -692,6 +697,7 @@ export const BUILTIN_RESOURCES: LearningResource[] = [
     id: 'dsa-hash-tables',
     title: 'Hash Tables & Collision Resolution Techniques',
     topic: 'Data Structures',
+    language: 'Data Structures',
     level: 'Intermediate',
     minutes: 28,
     xpReward: 30,
@@ -711,9 +717,35 @@ export const BUILTIN_RESOURCES: LearningResource[] = [
     completed: false,
   },
   {
+    id: 'algorithms-dynamic-programming',
+    title: 'Dynamic Programming: Memoization vs Tabulation',
+    topic: 'Algorithms',
+    language: 'Algorithms',
+    level: 'Intermediate',
+    minutes: 30,
+    xpReward: 30,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/tabulation-vs-memoization/',
+    outcome: 'Identify overlapping subproblems and optimal substructure, and implement top-down and bottom-up DP.',
+    notes: '• Dynamic Programming (DP) is an algorithmic optimization technique for problems with:\n  1. Overlapping Subproblems: The same subproblems are solved repeatedly.\n  2. Optimal Substructure: The optimal solution can be constructed from optimal solutions to subproblems.\n• Top-Down (Memoization): Uses recursion starting from the original problem down to base cases, caching results in a hash map or array to avoid recomputation.\n• Bottom-Up (Tabulation): Solves smaller subproblems first iteratively, storing values in an array/table and building up to the main answer without recursion stack overhead.',
+    question: 'What is the primary architectural difference between Memoization and Tabulation in Dynamic Programming?',
+    options: [
+      'Memoization is Top-Down (recursive with return caching); Tabulation is Bottom-Up (iterative table filling)',
+      'Memoization is exclusively used for graphs; Tabulation is exclusively used for sorting',
+      'Memoization avoids subproblems; Tabulation introduces duplicate subproblems',
+      'Tabulation relies on the recursion call stack; Memoization uses while-loops',
+    ],
+    answer: 0,
+    explanation: 'On GeeksforGeeks, Memoization is described as Top-Down because it starts with the overall problem and breaks it down recursively, storing answers in a lookup table. Tabulation is Bottom-Up because it starts with base cases and iteratively builds the solution table without recursion.',
+    completed: false,
+  },
+
+  // ── JavaScript ───────────────────────────────────────────────────────────
+  {
     id: 'javascript-event-loop',
     title: 'JavaScript Event Loop & Microtask Queues',
     topic: 'JavaScript',
+    language: 'JavaScript',
     level: 'Intermediate',
     minutes: 24,
     xpReward: 25,
@@ -733,9 +765,129 @@ export const BUILTIN_RESOURCES: LearningResource[] = [
     completed: false,
   },
   {
+    id: 'javascript-async-promises',
+    title: 'Promises, Async/Await & Error Propagation',
+    topic: 'JavaScript',
+    language: 'JavaScript',
+    level: 'Intermediate',
+    minutes: 22,
+    xpReward: 25,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/javascript-promises/',
+    outcome: 'Master Promise states, chaining, Promise.all vs Promise.allSettled, and async/await syntax.',
+    notes: '• A Promise represents the eventual completion or failure of an asynchronous operation and its resulting value.\n• Promise States: Pending, Fulfilled, Rejected.\n• Async/await is syntactic sugar over native Promises, pausing execution of the async function until the awaited promise settles.\n• Promise.all fails fast on any rejected promise, while Promise.allSettled waits for all promises to conclude regardless of errors.',
+    question: 'What distinguishes Promise.allSettled() from Promise.all() in modern JavaScript?',
+    options: [
+      'Promise.allSettled awaits all promises regardless of rejections; Promise.all rejects immediately on first error',
+      'Promise.allSettled executes synchronously while Promise.all executes asynchronously',
+      'Promise.allSettled can only accept numerical values in its array parameter',
+      'Promise.all cancels pending network requests automatically',
+    ],
+    answer: 0,
+    explanation: 'Promise.allSettled resolves only when all input promises have either fulfilled or rejected, returning an array of outcome objects. Promise.all rejects immediately upon encountering the first rejection.',
+    completed: false,
+  },
+  {
+    id: 'javascript-closures-scope',
+    title: 'Closures & Lexical Scoping in JavaScript',
+    topic: 'JavaScript',
+    language: 'JavaScript',
+    level: 'Beginner',
+    minutes: 20,
+    xpReward: 20,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/closure-in-javascript/',
+    outcome: 'Understand lexical scoping, outer variable retention, and memory encapsulation.',
+    notes: '• A closure is the combination of a function bundled together with references to its surrounding state (the lexical environment).\n• In JavaScript, closures are created every time a function is created, at function creation time.\n• Closures enable data privacy, factory functions, currying, and memoization patterns.',
+    question: 'Why does an inner function retain access to variables of an outer enclosing function even after the outer function has returned?',
+    options: [
+      'The inner function forms a closure containing references to its enclosing lexical environment',
+      'All variables declared in JavaScript are automatically promoted to global scope',
+      'The Garbage Collector duplicates all local variables into CPU registers',
+      'Functions in JavaScript are compiled into static C structures',
+    ],
+    answer: 0,
+    explanation: 'A closure preserves the reference to the lexical scope in which it was declared, preventing garbage collection of referenced variables while the inner function exists.',
+    completed: false,
+  },
+
+  // ── TypeScript ───────────────────────────────────────────────────────────
+  {
+    id: 'typescript-generics-constraints',
+    title: 'TypeScript Generics & Keyof Type Constraints',
+    topic: 'TypeScript',
+    language: 'TypeScript',
+    level: 'Intermediate',
+    minutes: 25,
+    xpReward: 30,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/typescript-generics/',
+    outcome: 'Write reusable, type-safe components and functions using type parameters and extends constraints.',
+    notes: '• Generics allow writing reusable code that works with a variety of types rather than a single concrete type.\n• Type Constraints: `function getProp<T, K extends keyof T>(obj: T, key: K): T[K]` restricts K to valid keys of T.\n• Generics preserve compile-time type fidelity without resorting to `any`.',
+    question: 'In TypeScript, what is the role of `<K extends keyof T>` in a generic function declaration?',
+    options: [
+      'It restricts parameter K to only be an existing property key of object type T',
+      'It dynamically generates all property values of object T at runtime',
+      'It forces object T to inherit from class K',
+      'It converts type T into an array of string keys',
+    ],
+    answer: 0,
+    explanation: 'The constraint `K extends keyof T` guarantees compile-time validation that argument K is strictly a known key of type T, providing full autocomplete and type safety.',
+    completed: false,
+  },
+  {
+    id: 'typescript-discriminated-unions',
+    title: 'Type Narrowing & Discriminated Unions',
+    topic: 'TypeScript',
+    language: 'TypeScript',
+    level: 'Intermediate',
+    minutes: 24,
+    xpReward: 25,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/typescript-discriminated-unions/',
+    outcome: 'Implement exhaustive pattern matching using literal discriminant properties and type guards.',
+    notes: '• Discriminated Unions (tagged unions) combine union types with a common literal field (the discriminator, e.g. `kind: "circle" | "square"`).\n• Inside `switch(shape.kind)`, TypeScript narrows the type of shape automatically.\n• Exhaustiveness checking can be enforced with the `never` type in the default branch.',
+    question: 'What is the primary benefit of using Discriminated Unions with a common literal tag property in TypeScript?',
+    options: [
+      'Enables the TypeScript compiler to automatically narrow types across conditional branches',
+      'Compresses the JavaScript bundle size by eliminating unused interface definitions',
+      'Converts TypeScript code into multi-threaded WebAssembly modules',
+      'Allows bypassing runtime exception handling entirely',
+    ],
+    answer: 0,
+    explanation: 'Discriminated unions enable flow-sensitive type narrowing. By checking the shared literal property (tag), TypeScript knows exactly which union member is being accessed.',
+    completed: false,
+  },
+  {
+    id: 'typescript-utility-types',
+    title: 'TypeScript Utility Types (Partial, Record, Pick, Omit)',
+    topic: 'TypeScript',
+    language: 'TypeScript',
+    level: 'Beginner',
+    minutes: 20,
+    xpReward: 20,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/typescript-utility-types/',
+    outcome: 'Transform types cleanly using built-in mapped and conditional type utilities.',
+    notes: '• Partial<T>: Constructs a type with all properties of T set to optional.\n• Required<T>: Constructs a type with all properties of T set to required.\n• Pick<T, K>: Constructs a type by picking the set of properties K from T.\n• Omit<T, K>: Constructs a type by picking all properties from T and then removing K.\n• Record<K, T>: Constructs an object type whose property keys are K and property values are T.',
+    question: 'Which TypeScript built-in utility type creates a new type containing only specified keys from an existing interface?',
+    options: [
+      'Pick<T, K>',
+      'Omit<T, K>',
+      'Partial<T>',
+      'Record<K, T>',
+    ],
+    answer: 0,
+    explanation: 'Pick<T, K> constructs a type by extracting the specified properties K from type T, while Omit<T, K> removes specified properties.',
+    completed: false,
+  },
+
+  // ── Python ───────────────────────────────────────────────────────────────
+  {
     id: 'python-memory-mutability',
     title: 'Python Memory Model & Object Mutability',
     topic: 'Python',
+    language: 'Python',
     level: 'Beginner',
     minutes: 20,
     xpReward: 20,
@@ -755,9 +907,35 @@ export const BUILTIN_RESOURCES: LearningResource[] = [
     completed: false,
   },
   {
+    id: 'python-generators-yield',
+    title: 'Python Generators & Memory-Efficient Iteration',
+    topic: 'Python',
+    language: 'Python',
+    level: 'Intermediate',
+    minutes: 25,
+    xpReward: 25,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/generators-in-python/',
+    outcome: 'Write lazy-evaluated generators using yield to process massive datasets in O(1) auxiliary memory.',
+    notes: '• A Generator function contains one or more `yield` statements.\n• Instead of returning a value and terminating, `yield` pauses function execution and saves its local state.\n• When `next()` is called, the generator resumes immediately after the yield statement.\n• Memory Benefit: Generates items on the fly (lazy evaluation) rather than allocating entire lists in memory.',
+    question: 'How do Python generators achieve significant memory savings compared to returning standard lists?',
+    options: [
+      'They yield items one-by-one via lazy evaluation without buffering entire sequences in RAM',
+      'They compress integers into binary bitfields during iteration',
+      'They delegate loop execution to GPU shaders',
+      'They compile python loops directly into machine bytecode',
+    ],
+    answer: 0,
+    explanation: 'Generators compute and produce values on demand (lazy evaluation). Only one element exists in memory at any given time, providing O(1) space complexity regardless of stream length.',
+    completed: false,
+  },
+
+  // ── SQL ──────────────────────────────────────────────────────────────────
+  {
     id: 'sql-acid-transactions',
     title: 'SQL ACID Properties & Transaction Management',
     topic: 'SQL',
+    language: 'SQL',
     level: 'Intermediate',
     minutes: 26,
     xpReward: 25,
@@ -777,9 +955,35 @@ export const BUILTIN_RESOURCES: LearningResource[] = [
     completed: false,
   },
   {
-    id: 'oop-polymorphism',
-    title: 'Object-Oriented Programming: Polymorphism & Overriding',
-    topic: 'OOP',
+    id: 'sql-btree-indexes',
+    title: 'SQL B-Tree Indexing & Query Execution Plans',
+    topic: 'SQL',
+    language: 'SQL',
+    level: 'Intermediate',
+    minutes: 25,
+    xpReward: 25,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/b-tree-indexing-in-databases/',
+    outcome: 'Understand how B-Tree indexes speed up lookups from O(N) sequential scans to O(log N) tree traversals.',
+    notes: '• A database index is a data structure (commonly B-Tree or B+Tree) that improves data retrieval speed.\n• Without an index, the database engine must execute a Full Table Scan (O(N)).\n• B-Tree maintains balanced keys in nodes, allowing range queries and equality lookups in O(log N) disk block reads.\n• Trade-offs: Indexes consume additional storage and incur write overhead on INSERT, UPDATE, and DELETE.',
+    question: 'What is the primary operational trade-off of adding multiple indexes to a high-throughput SQL table?',
+    options: [
+      'Faster SELECT query performance at the cost of additional write overhead on INSERT, UPDATE, and DELETE',
+      'Faster data insertion at the cost of slower SELECT queries',
+      'Increased probability of relational foreign key constraint violations',
+      'Inability to perform ACID transaction rollbacks',
+    ],
+    answer: 0,
+    explanation: 'Indexes accelerate SELECT search operations via B-Tree lookups, but every write operation (INSERT/UPDATE/DELETE) must also update the index tree, adding write latency.',
+    completed: false,
+  },
+
+  // ── Java ─────────────────────────────────────────────────────────────────
+  {
+    id: 'java-oop-polymorphism',
+    title: 'Java OOP: Polymorphism & Dynamic Method Dispatch',
+    topic: 'Java',
+    language: 'Java',
     level: 'Intermediate',
     minutes: 22,
     xpReward: 25,
@@ -799,28 +1003,228 @@ export const BUILTIN_RESOURCES: LearningResource[] = [
     completed: false,
   },
   {
-    id: 'algorithms-dynamic-programming',
-    title: 'Dynamic Programming: Memoization vs Tabulation',
-    topic: 'Algorithms',
+    id: 'java-jvm-memory-gc',
+    title: 'JVM Memory Architecture & Garbage Collection',
+    topic: 'Java',
+    language: 'Java',
     level: 'Intermediate',
-    minutes: 30,
+    minutes: 28,
     xpReward: 30,
     source: 'GeeksforGeeks',
-    url: 'https://www.geeksforgeeks.org/tabulation-vs-memoization/',
-    outcome: 'Identify overlapping subproblems and optimal substructure, and implement top-down and bottom-up DP.',
-    notes: '• Dynamic Programming (DP) is an algorithmic optimization technique for problems with:\n  1. Overlapping Subproblems: The same subproblems are solved repeatedly.\n  2. Optimal Substructure: The optimal solution can be constructed from optimal solutions to subproblems.\n• Top-Down (Memoization): Uses recursion starting from the original problem down to base cases, caching results in a hash map or array to avoid recomputation.\n• Bottom-Up (Tabulation): Solves smaller subproblems first iteratively, storing values in an array/table and building up to the main answer without recursion stack overhead.',
-    question: 'What is the primary architectural difference between Memoization and Tabulation in Dynamic Programming?',
+    url: 'https://www.geeksforgeeks.org/jvm-works-jvm-architecture/',
+    outcome: 'Differentiate between Java Heap and Stack memory, Eden space, and generational garbage collection.',
+    notes: '• Stack Memory: Stores primitive values and references to heap objects; allocated per thread with automatic cleanup on stack frame pop.\n• Heap Memory: Stores all object instances and class data; shared across threads.\n• Generational GC: Objects start in Young Generation (Eden, Survivor spaces). Long-lived objects are promoted to Tenured (Old) Generation.\n• Stop-The-World events pause application threads during major GC cycles.',
+    question: 'In Java JVM memory management, where are object instances allocated and managed by the Garbage Collector?',
     options: [
-      'Memoization is Top-Down (recursive with return caching); Tabulation is Bottom-Up (iterative table filling)',
-      'Memoization is exclusively used for graphs; Tabulation is exclusively used for sorting',
-      'Memoization avoids subproblems; Tabulation introduces duplicate subproblems',
-      'Tabulation relies on the recursion call stack; Memoization uses while-loops',
+      'In the Heap Memory',
+      'In the Thread Call Stack',
+      'In CPU L1 Cache registers',
+      'In the OS Kernel Swap space',
     ],
     answer: 0,
-    explanation: 'On GeeksforGeeks, Memoization is described as Top-Down because it starts with the overall problem and breaks it down recursively, storing answers in a lookup table. Tabulation is Bottom-Up because it starts with base cases and iteratively builds the solution table without recursion.',
+    explanation: 'In the JVM, all class object instances and arrays are allocated on the Heap. The Java Garbage Collector monitors and deallocates heap objects that are no longer reachable from GC roots.',
+    completed: false,
+  },
+
+  // ── C++ ──────────────────────────────────────────────────────────────────
+  {
+    id: 'cpp-pointers-raii',
+    title: 'C++ Pointers, References & RAII Memory Management',
+    topic: 'C++',
+    language: 'C++',
+    level: 'Intermediate',
+    minutes: 26,
+    xpReward: 25,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/pointers-in-c-and-c-addition-subtraction-increment-decrement/',
+    outcome: 'Master pointer arithmetic, memory addresses, and Resource Acquisition Is Initialization (RAII).',
+    notes: '• A pointer stores the memory address of another variable.\n• RAII (Resource Acquisition Is Initialization): Binds resource lifecycle (heap memory, sockets, file handles) to object lifetime.\n• Smart Pointers (C++11):\n  - std::unique_ptr: Exclusive ownership of heap resource.\n  - std::shared_ptr: Shared ownership via reference counting.\n• Destructors run automatically when objects go out of scope, guaranteeing leak-free cleanup.',
+    question: 'What is the core guarantee provided by the RAII idiom in modern C++?',
+    options: [
+      'Resources are acquired in the constructor and automatically released in the destructor when exiting scope',
+      'All variables are automatically converted into thread-safe atomic types',
+      'Memory leaks are detected and fixed by a runtime garbage collector thread',
+      'Pointer arithmetic is strictly converted into array indexing',
+    ],
+    answer: 0,
+    explanation: 'RAII ensures that resource management is tied to object lifetime: resources are acquired during construction and released in the destructor when the object leaves its lexical scope, preventing resource leaks even during exceptions.',
+    completed: false,
+  },
+
+  // ── C# ───────────────────────────────────────────────────────────────────
+  {
+    id: 'csharp-linq-queries',
+    title: 'C# LINQ: Query Syntax, Lambdas & Deferred Execution',
+    topic: 'C#',
+    language: 'C#',
+    level: 'Intermediate',
+    minutes: 24,
+    xpReward: 25,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/linq-in-c-sharp/',
+    outcome: 'Write declarative data transformations using LINQ extension methods and deferred execution pipelines.',
+    notes: '• LINQ (Language Integrated Query) provides uniform query syntax across collections, SQL, and XML.\n• Deferred Execution: An operation is not executed when it is defined; it executes only when enumerated (e.g. via foreach, .ToList(), .Count()).\n• Key Methods: Select (map), Where (filter), OrderBy (sort), GroupBy (aggregate), Aggregate (reduce).',
+    question: 'In C# LINQ, what does "Deferred Execution" mean when defining a query variable?',
+    options: [
+      'The query is not executed when constructed; evaluation occurs only when iterating or calling terminal methods like .ToList()',
+      'The query runs on a background thread pool worker after a 500ms delay',
+      'The query caches results indefinitely across application restarts',
+      'The compiler defers type checking until runtime execution',
+    ],
+    answer: 0,
+    explanation: 'Deferred execution means the query variable itself does not hold results; it stores query instructions. The actual filtering and projection execute when enumerating through the dataset.',
+    completed: false,
+  },
+
+  // ── HTML ─────────────────────────────────────────────────────────────────
+  {
+    id: 'html-semantic-structure',
+    title: 'Semantic HTML5 Architecture & Web Accessibility (ARIA)',
+    topic: 'HTML',
+    language: 'HTML',
+    level: 'Beginner',
+    minutes: 18,
+    xpReward: 20,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/html5-semantics/',
+    outcome: 'Structure accessible web pages using header, nav, main, section, article, and ARIA attributes.',
+    notes: '• Semantic HTML uses tags that convey the meaning of the content contained within them (e.g., `<article>`, `<section>`, `<nav>`, `<aside>`, `<header>`, `<footer>`).\n• Benefits:\n  - SEO: Search engine crawlers understand content structure and relevance.\n  - Accessibility (a11y): Screen readers navigate semantic landmarks efficiently.\n  - Maintainability: Clean, self-documenting document outlines.',
+    question: 'Why is using semantic elements like <main> and <nav> preferred over generic <div> containers in HTML5?',
+    options: [
+      'They provide clear structural landmarks for screen readers, search engines, and assistive devices',
+      'They automatically enable hardware-accelerated 3D rendering in web browsers',
+      'They increase network transfer speeds by compressing text payloads',
+      'They eliminate the need for CSS styling entirely',
+    ],
+    answer: 0,
+    explanation: 'Semantic elements provide meaningful information about the role of page regions to browsers, assistive technologies (screen readers), and search engine indexing bots.',
+    completed: false,
+  },
+
+  // ── CSS ──────────────────────────────────────────────────────────────────
+  {
+    id: 'css-flexbox-grid',
+    title: 'CSS Flexbox vs CSS Grid Layout Engines',
+    topic: 'CSS',
+    language: 'CSS',
+    level: 'Beginner',
+    minutes: 22,
+    xpReward: 20,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/difference-between-css-grid-and-css-flexbox/',
+    outcome: 'Choose appropriately between one-dimensional Flexbox and two-dimensional CSS Grid layouts.',
+    notes: '• Flexbox (Flexible Box Layout): One-dimensional layout model (row OR column). Ideal for distributing space and aligning items along a single axis.\n• CSS Grid: Two-dimensional layout system (rows AND columns simultaneously). Ideal for full-page layouts, grid matrices, and overlapping template areas.\n• Flexbox is content-first; CSS Grid is layout-first.',
+    question: 'What is the fundamental architectural difference between CSS Flexbox and CSS Grid?',
+    options: [
+      'Flexbox is a 1-dimensional layout engine (row or column); Grid is a 2-dimensional system (rows and columns)',
+      'Flexbox only works on mobile browsers; Grid is exclusively for desktop displays',
+      'Grid requires JavaScript to calculate pixel positions; Flexbox is native CSS',
+      'Flexbox cannot align items vertically along the cross axis',
+    ],
+    answer: 0,
+    explanation: 'Flexbox is designed for one-dimensional layouts (dealing with either a row or a column at a time), whereas CSS Grid is designed for two-dimensional layouts handling both rows and columns simultaneously.',
+    completed: false,
+  },
+
+  // ── React ────────────────────────────────────────────────────────────────
+  {
+    id: 'react-hooks-lifecycle',
+    title: 'React Hooks Architecture: State, Effects & Dependencies',
+    topic: 'React',
+    language: 'React',
+    level: 'Intermediate',
+    minutes: 25,
+    xpReward: 25,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/reactjs-hooks/',
+    outcome: 'Master useState, useEffect cleanup phases, dependency arrays, and preventing stale closures.',
+    notes: '• Hooks allow using state and lifecycle features without writing ES6 class components.\n• Rules of Hooks: Only call hooks at the top level (never in loops, conditions, or nested functions); only call from React functions.\n• useEffect Lifecycle:\n  - `[]`: Runs once after mount.\n  - `[dep]`: Runs when `dep` changes.\n  - Cleanup function returned runs before component unmount or before the effect re-executes.',
+    question: 'In a React useEffect hook, when does the returned cleanup function execute?',
+    options: [
+      'Before the component unmounts and prior to the effect re-running due to dependency updates',
+      'Immediately before the JSX DOM elements are parsed',
+      'Only if an unhandled JavaScript exception occurs during rendering',
+      'Every time any global browser window event triggers',
+    ],
+    answer: 0,
+    explanation: 'The cleanup function returned by useEffect runs when the component unmounts and also immediately before re-running the effect on subsequent renders when dependencies change.',
+    completed: false,
+  },
+
+  // ── Node.js ──────────────────────────────────────────────────────────────
+  {
+    id: 'nodejs-event-driven-io',
+    title: 'Node.js Non-Blocking I/O & Libuv Thread Pool',
+    topic: 'Node.js',
+    language: 'Node.js',
+    level: 'Intermediate',
+    minutes: 26,
+    xpReward: 25,
+    source: 'GeeksforGeeks',
+    url: 'https://www.geeksforgeeks.org/node-js-event-driven-architecture/',
+    outcome: 'Trace how asynchronous I/O, OS kernel polling (epoll/kqueue), and libuv thread pool prevent blocking.',
+    notes: '• Node.js operates on a single-threaded Event Loop backed by libuv.\n• Non-blocking System I/O: Network sockets utilize OS-level multiplexing (epoll on Linux, kqueue on macOS, IOCP on Windows).\n• Libuv Thread Pool: Handles CPU-intensive tasks (file system I/O, crypto, dns.lookup) across worker threads (default 4 threads).\n• Golden Rule: Never block the main Event Loop thread with expensive synchronous computations.',
+    question: 'In Node.js, what component handles asynchronous file system operations and crypto hashing without blocking the main event thread?',
+    options: [
+      'The Libuv worker thread pool',
+      'The Chrome V8 garbage collector',
+      'The client browser JavaScript engine',
+      'The operating system virtual memory pager',
+    ],
+    answer: 0,
+    explanation: 'Libuv provides a multi-threaded pool (UV_THREADPOOL_SIZE, default 4 threads) to offload synchronous file system operations, compression, and cryptographic functions away from the single-threaded event loop.',
     completed: false,
   },
 ];
+
+export function isResourceMatchingLanguage(resource: LearningResource, selectedLanguage: string): boolean {
+  if (selectedLanguage === 'All') return true;
+  const sel = selectedLanguage.toLowerCase();
+  
+  if (resource.language) {
+    if (resource.language.toLowerCase() === sel) return true;
+  }
+  
+  const topic = (resource.topic || '').toLowerCase();
+  const title = (resource.title || '').toLowerCase();
+  const id = (resource.id || '').toLowerCase();
+
+  if (sel === 'javascript') {
+    return topic === 'javascript' || id.startsWith('js-') || id.startsWith('javascript-') || title.includes('javascript');
+  }
+  if (sel === 'typescript') {
+    return topic === 'typescript' || id.startsWith('ts-') || id.startsWith('typescript-') || title.includes('typescript');
+  }
+  if (sel === 'python') {
+    return topic === 'python' || id.startsWith('py-') || id.startsWith('python-') || title.includes('python');
+  }
+  if (sel === 'sql') {
+    return topic === 'sql' || id.startsWith('sql-') || title.includes('sql');
+  }
+  if (sel === 'java') {
+    return topic === 'java' || id.startsWith('java-') || title.includes('java');
+  }
+  if (sel === 'c++') {
+    return topic === 'c++' || id.startsWith('cpp-') || id.startsWith('c++-') || title.includes('c++');
+  }
+  if (sel === 'c#') {
+    return topic === 'c#' || id.startsWith('cs-') || id.startsWith('csharp-') || title.includes('c#');
+  }
+  if (sel === 'html') {
+    return topic === 'html' || id.startsWith('html-') || title.includes('html');
+  }
+  if (sel === 'css') {
+    return topic === 'css' || id.startsWith('css-') || title.includes('css');
+  }
+  if (sel === 'react') {
+    return topic === 'react' || id.startsWith('react-') || title.includes('react');
+  }
+  if (sel === 'node.js') {
+    return topic === 'node.js' || topic === 'node' || id.startsWith('node-') || title.includes('node');
+  }
+
+  return topic === sel;
+}
 
 export interface RealtimeHintAnalysis {
   statusBadge: string;
@@ -1339,6 +1743,10 @@ export default function CodingScreen() {
     const diffMatch = selectedDifficulty === 'ALL' || ch.difficulty.toUpperCase() === selectedDifficulty;
     return langMatch && diffMatch;
   });
+
+  const filteredResources = resources.filter((resource) =>
+    isResourceMatchingLanguage(resource, selectedLanguage)
+  );
 
   // Automatically keep selectedChallenge in sync with active language & difficulty filters
   useEffect(() => {
@@ -2088,10 +2496,11 @@ export default function CodingScreen() {
           ) : null}
 
           {/* Curated GeeksforGeeks Tutorials & Checks */}
-          {resources.length ? (
-            <>
-              <Text style={[styles.section, { color: colors.text }]}>Curated Tutorials & Knowledge Checks</Text>
-              {resources.map((resource) => {
+          <Text style={[styles.section, { color: colors.text }]}>
+            Curated Tutorials & Knowledge Checks{selectedLanguage !== 'All' ? ` (${selectedLanguage})` : ''}
+          </Text>
+          {filteredResources.length ? (
+            filteredResources.map((resource) => {
                 const answer = answers[resource.id];
                 const isChecked = checked[resource.id];
                 const correct = answer === resource.answer;
@@ -2282,9 +2691,31 @@ export default function CodingScreen() {
                     )}
                   </Card>
                 );
-              })}
-            </>
-          ) : null}
+              })
+          ) : (
+            <Card style={styles.emptyFilterCard}>
+              <Ionicons name="book-outline" size={28} color={colors.muted} />
+              <Text style={[styles.emptyFilterTitle, { color: colors.text }]}>
+                No curated tutorials found for {selectedLanguage}
+              </Text>
+              <Text style={[styles.emptyFilterSub, { color: colors.muted }]}>
+                Switch back to "All" to browse all fundamental algorithms, data structures, and programming languages.
+              </Text>
+              <Pressable
+                onPress={() => setSelectedLanguage('All')}
+                style={({ pressed }) => [
+                  styles.filterChip,
+                  styles.filterChipActive,
+                  { backgroundColor: primaryAccent, alignSelf: 'center', marginTop: 10 },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.filterChipText, { color: '#ffffff' }]}>
+                  Show All Tutorials
+                </Text>
+              </Pressable>
+            </Card>
+          )}
         </>
       ) : null}
 

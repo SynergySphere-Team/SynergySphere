@@ -153,6 +153,7 @@ export interface LearningResource {
   id: string;
   title: string;
   topic: string;
+  language?: string;
   level: string;
   minutes: number;
   xpReward: number;

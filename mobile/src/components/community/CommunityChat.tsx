@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 
@@ -40,6 +41,10 @@ type CommunityMessage = {
   createdAt: string;
   firstName?: string | null;
   lastName?: string | null;
+  replyToId?: string | null;
+  replyToBody?: string | null;
+  replyToFirstName?: string | null;
+  replyToLastName?: string | null;
 };
 
 type FeedPost = {
@@ -271,6 +276,15 @@ function LiveChat() {
     useState('');
 
   const [
+    replyTo,
+    setReplyTo,
+  ] =
+    useState<CommunityMessage | null>(null);
+
+  const inputRef =
+    useRef<TextInput>(null);
+
+  const [
     error,
     setError,
   ] =
@@ -415,10 +429,12 @@ function LiveChat() {
   useEffect(() => {
     if (!activeChannel) {
       setMessages([]);
+      setReplyTo(null);
       return;
     }
 
     setDraft('');
+    setReplyTo(null);
 
     loadMessages(
       activeChannel,
@@ -482,6 +498,7 @@ function LiveChat() {
             `/community-chat/channels/${activeChannel.id}/messages`,
             {
               body,
+              replyToId: replyTo?.id,
             },
           );
 
@@ -502,6 +519,7 @@ function LiveChat() {
             activeChannel,
           );
         }
+        setReplyTo(null);
       }
 
       setDraft('');
@@ -954,6 +972,52 @@ function LiveChat() {
                         },
                       ]}
                     >
+                      {Boolean(message.replyToId && message.replyToBody) && (
+                        <View
+                          style={[
+                            styles.quotedReplyBox,
+                            {
+                              backgroundColor:
+                                theme === 'light'
+                                  ? 'rgba(0,0,0,0.04)'
+                                  : 'rgba(255,255,255,0.06)',
+                              borderLeftColor:
+                                accentColor,
+                            },
+                          ]}
+                        >
+                          <View style={styles.quotedReplyHeader}>
+                            <Ionicons
+                              name="return-down-forward"
+                              size={11}
+                              color={accentColor}
+                              style={{ marginRight: 4 }}
+                            />
+                            <Text
+                              style={[
+                                styles.quotedReplyAuthor,
+                                { color: accentColor },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {displayName(
+                                message.replyToFirstName,
+                                message.replyToLastName,
+                              )}
+                            </Text>
+                          </View>
+                          <Text
+                            style={[
+                              styles.quotedReplyBody,
+                              { color: colors.muted },
+                            ]}
+                            numberOfLines={2}
+                          >
+                            {message.replyToBody}
+                          </Text>
+                        </View>
+                      )}
+
                       <Text
                         style={[
                           styles.messageText,
@@ -968,6 +1032,37 @@ function LiveChat() {
                         }
                       </Text>
                     </View>
+
+                    <Pressable
+                      onPress={() => {
+                        setReplyTo(message);
+                        inputRef.current?.focus();
+                      }}
+                      hitSlop={8}
+                      style={styles.messageReplyAction}
+                      accessibilityLabel={`Reply to ${
+                        mine
+                          ? 'yourself'
+                          : displayName(
+                              message.firstName,
+                              message.lastName,
+                            )
+                      }`}
+                    >
+                      <Ionicons
+                        name="return-down-forward-outline"
+                        size={13}
+                        color={colors.muted}
+                      />
+                      <Text
+                        style={[
+                          styles.messageReplyActionText,
+                          { color: colors.muted },
+                        ]}
+                      >
+                        Reply
+                      </Text>
+                    </Pressable>
                   </View>
                 );
               },
@@ -975,6 +1070,71 @@ function LiveChat() {
           </ScrollView>
         )}
       </View>
+
+      {replyTo ? (
+        <View
+          style={[
+            styles.replyBanner,
+            {
+              backgroundColor:
+                colors.surfaceElevated,
+              borderTopColor:
+                colors.border,
+              borderLeftColor:
+                accentColor,
+            },
+          ]}
+        >
+          <Ionicons
+            name="return-down-forward"
+            size={16}
+            color={accentColor}
+            style={{ marginRight: 8 }}
+          />
+          <View style={{ flex: 1 }}>
+            <Text
+              style={[
+                styles.replyBannerAuthor,
+                { color: colors.text },
+              ]}
+            >
+              Replying to{' '}
+              <Text
+                style={{
+                  fontWeight: '700',
+                  color: accentColor,
+                }}
+              >
+                {displayName(
+                  replyTo.firstName,
+                  replyTo.lastName,
+                )}
+              </Text>
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.replyBannerBody,
+                { color: colors.muted },
+              ]}
+            >
+              {replyTo.body}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => setReplyTo(null)}
+            hitSlop={8}
+            style={styles.replyBannerClose}
+            accessibilityLabel="Cancel reply"
+          >
+            <Ionicons
+              name="close-circle"
+              size={18}
+              color={colors.muted}
+            />
+          </Pressable>
+        </View>
+      ) : null}
 
       <View
         style={[
@@ -986,6 +1146,7 @@ function LiveChat() {
         ]}
       >
         <TextInput
+          ref={inputRef}
           value={draft}
           onChangeText={
             setDraft
@@ -1991,6 +2152,32 @@ function CommunityPosts() {
                               comment.body
                             }
                           </Text>
+
+                          <Pressable
+                            onPress={() => {
+                              const authorName = comment.firstName || 'member';
+                              setCommentDrafts((prev) => ({
+                                ...prev,
+                                [post.id]: `@${authorName} ${prev[post.id] || ''}`,
+                              }));
+                            }}
+                            hitSlop={6}
+                            style={styles.commentReplyBtn}
+                          >
+                            <Ionicons
+                              name="return-down-forward"
+                              size={12}
+                              color={accentColor}
+                            />
+                            <Text
+                              style={[
+                                styles.commentReplyText,
+                                { color: accentColor },
+                              ]}
+                            >
+                              Reply
+                            </Text>
+                          </Pressable>
                         </View>
                       </View>
                     ),
@@ -2503,6 +2690,68 @@ const styles = StyleSheet.create({
       paddingVertical: 8,
     },
 
+    quotedReplyBox: {
+      borderLeftWidth: 3,
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      marginBottom: 6,
+      maxWidth: '100%',
+    },
+
+    quotedReplyHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 2,
+    },
+
+    quotedReplyAuthor: {
+      fontSize: 10,
+      fontWeight: '800',
+    },
+
+    quotedReplyBody: {
+      fontSize: 11,
+      fontStyle: 'italic',
+    },
+
+    messageReplyAction: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      paddingVertical: 2,
+      paddingHorizontal: 4,
+    },
+
+    messageReplyActionText: {
+      fontSize: 10,
+      fontWeight: '700',
+    },
+
+    replyBanner: {
+      borderTopWidth: 1,
+      borderLeftWidth: 3,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      gap: 6,
+    },
+
+    replyBannerAuthor: {
+      fontSize: 11,
+      fontWeight: '600',
+    },
+
+    replyBannerBody: {
+      fontSize: 10,
+      fontStyle: 'italic',
+    },
+
+    replyBannerClose: {
+      padding: 4,
+    },
+
     messageText: {
       fontSize: 13,
       lineHeight: 18,
@@ -2651,6 +2900,19 @@ const styles = StyleSheet.create({
       borderRadius: 11,
       padding: 8,
       gap: 2,
+    },
+
+    commentReplyBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      paddingTop: 3,
+      alignSelf: 'flex-start',
+    },
+
+    commentReplyText: {
+      fontSize: 10,
+      fontWeight: '700',
     },
 
     commentComposer: {
