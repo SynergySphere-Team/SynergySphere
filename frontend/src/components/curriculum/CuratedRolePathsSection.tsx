@@ -221,7 +221,7 @@ export function CuratedRolePathsSection({
     } catch {
       // ignore
     }
-    setGoalToast(`🎯 Set "${pathTitle}" as your active career focus goal!`);
+    setGoalToast(`Set "${pathTitle}" as your active career focus goal.`);
     setTimeout(() => setGoalToast(null), 4000);
   };
 
@@ -282,7 +282,7 @@ export function CuratedRolePathsSection({
       );
 
       if (res.xpEarned > 0) {
-        setXpBanner(`🎉 Step Completed! You earned +${res.xpEarned} XP.`);
+        setXpBanner(`Step Completed! You earned +${res.xpEarned} XP.`);
       }
     } catch {
       // ignore
@@ -299,7 +299,7 @@ export function CuratedRolePathsSection({
     } else {
       // Completed entire roadmap!
       setActiveLessonId(null);
-      setGoalToast(`🏆 Incredible! You have completed all lessons in ${selectedPath.title}!`);
+      setGoalToast(`Incredible! You have completed all lessons in ${selectedPath.title}!`);
     }
   };
 
@@ -581,7 +581,7 @@ export function CuratedRolePathsSection({
                   className="gap-2 text-xs font-bold bg-primary text-black hover:bg-primary/90 shadow-md shadow-primary/20"
                 >
                   <CheckCircle2 className="h-4 w-4" />
-                  {hasNext ? 'Complete & Continue to Next Step in Roadmap →' : 'Complete Final Roadmap Lesson 🎉'}
+                  {hasNext ? 'Complete & Continue to Next Step in Roadmap →' : 'Complete Final Roadmap Lesson'}
                 </Button>
               </div>
 
@@ -719,7 +719,7 @@ export function CuratedRolePathsSection({
               </div>
             ) : (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-center text-xs font-bold text-emerald-300">
-                🎉 All {selectedPath.totalLessons} lessons in this curated career path completed!
+                All {selectedPath.totalLessons} lessons in this curated career path completed!
               </div>
             )}
           </CardContent>

@@ -470,40 +470,112 @@ function AIAssistantInner() {
     const contextToSend =
       forcedContext?.trim() || (codeEditedByUser && codeContext.trim() ? codeContext : undefined);
 
+    const payload = {
+      message: text.trim(),
+      context: contextToSend,
+      ...(lesson ? { lessonId: lesson.id } : {}),
+      ...(challenge ? { challengeId: challenge.id } : {}),
+      history: historyFromMessages(baseMessages).slice(-20),
+    };
+
+    let streamSuccess = false;
     try {
-      const res = await api<ChatResponse>('/ai/chat', {
+      const response = await fetch('/api/ai/chat/stream', {
         method: 'POST',
-        body: JSON.stringify({
-          message: text.trim(),
-          context: contextToSend,
-          // Pin the grounded lesson or challenge on every request so follow-ups stay in context.
-          ...(lesson ? { lessonId: lesson.id } : {}),
-          ...(challenge ? { challengeId: challenge.id } : {}),
-          history: historyFromMessages(baseMessages).slice(-20),
-        }),
-      });
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: res.response,
-          timestamp: new Date(),
-          lessonTitle: res.grounding?.lessonTitle || undefined,
-          subjectName: res.grounding?.subjectName || undefined,
-          moduleName: res.grounding?.moduleName || undefined,
-          challengeTitle: res.grounding?.challengeTitle || undefined,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
         },
-      ]);
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok && response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = '';
+        let groundingMeta: ChatResponse['grounding'] | undefined;
+
+        // Add blank assistant placeholder
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: '', timestamp: new Date() },
+        ]);
+
+        let done = false;
+        while (!done) {
+          const { value, done: readerDone } = await reader.read();
+          if (readerDone) break;
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const parsed = JSON.parse(line.slice(6));
+                if (parsed.type === 'meta') {
+                  groundingMeta = parsed.grounding;
+                } else if (parsed.type === 'token') {
+                  accumulated += parsed.token;
+                  setMessages((prev) => {
+                    const copy = [...prev];
+                    const last = copy[copy.length - 1];
+                    if (last && last.role === 'assistant') {
+                      copy[copy.length - 1] = {
+                        ...last,
+                        content: accumulated,
+                        lessonTitle: groundingMeta?.lessonTitle || last.lessonTitle,
+                        subjectName: groundingMeta?.subjectName || last.subjectName,
+                        moduleName: groundingMeta?.moduleName || last.moduleName,
+                        challengeTitle: groundingMeta?.challengeTitle || last.challengeTitle,
+                      };
+                    }
+                    return copy;
+                  });
+                } else if (parsed.type === 'done') {
+                  done = true;
+                  streamSuccess = true;
+                }
+              } catch {
+                // Ignore partial JSON
+              }
+            }
+          }
+        }
+        if (accumulated.trim()) {
+          streamSuccess = true;
+        }
+      }
     } catch {
-      // Fallback: generate a helpful local response
-      const fallback = generateLocalResponse(text, codeContext);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: fallback, timestamp: new Date() },
-      ]);
-    } finally {
-      setLoading(false);
+      streamSuccess = false;
     }
+
+    if (!streamSuccess) {
+      try {
+        const res = await api<ChatResponse>('/ai/chat', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: res.response,
+            timestamp: new Date(),
+            lessonTitle: res.grounding?.lessonTitle || undefined,
+            subjectName: res.grounding?.subjectName || undefined,
+            moduleName: res.grounding?.moduleName || undefined,
+            challengeTitle: res.grounding?.challengeTitle || undefined,
+          },
+        ]);
+      } catch {
+        const fallback = generateLocalResponse(text, codeContext);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: fallback, timestamp: new Date() },
+        ]);
+      }
+    }
+    setLoading(false);
   }
 
   // Fetch persistent chat history on mount

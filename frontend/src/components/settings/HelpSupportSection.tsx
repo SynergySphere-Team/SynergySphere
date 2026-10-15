@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -83,6 +85,8 @@ const CATEGORIES = [
 ] as const;
 
 export function HelpSupportSection() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [tickets, setTickets] = useState<UserTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -151,6 +155,11 @@ export function HelpSupportSection() {
   async function handleSubmitTicket(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+
+    if (isAdmin) {
+      setFormError('Administrators cannot report support issues.');
+      return;
+    }
 
     if (formSubject.trim().length < 3) {
       setFormError('Subject must be at least 3 characters.');
@@ -275,20 +284,36 @@ export function HelpSupportSection() {
                 Need assistance with SynergySphere?
               </CardTitle>
               <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-xl">
-                Have a question or encountered a technical issue? Check our Frequently Asked Questions below or report an issue directly to our support team.
+                Have a question or encountered a technical issue? Check our Frequently Asked Questions below{isAdmin ? '.' : ' or report an issue directly to our support team.'}
               </p>
+              {isAdmin && (
+                <div className="mt-2 text-xs text-primary/90 font-medium">
+                  Signed in as Administrator. Support tickets and issue queues are managed in the Admin Portal.
+                </div>
+              )}
             </div>
             <div className="flex shrink-0">
-              <Button
-                onClick={() => {
-                  setIsModalOpen(true);
-                  setFormError(null);
-                }}
-                className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all font-semibold"
-              >
-                <PlusCircle className="h-4 w-4" />
-                Report an Issue
-              </Button>
+              {isAdmin ? (
+                <Link href="/admin/tickets">
+                  <Button
+                    className="gap-2 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/40 font-semibold"
+                  >
+                    <LifeBuoy className="h-4 w-4" />
+                    Admin Support Desk
+                  </Button>
+                </Link>
+              ) : (
+                <Button
+                  onClick={() => {
+                    setIsModalOpen(true);
+                    setFormError(null);
+                  }}
+                  className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all font-semibold"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  Report an Issue
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>

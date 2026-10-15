@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
+import { createHash } from 'node:crypto';
 import { newId, query, queryOne } from '../lib/db.js';
 import { AuthRequest, verifyToken, AUTH_COOKIE_NAME } from '../middleware/auth.js';
 import { awardXp } from '../services/gamification.js';
@@ -1294,6 +1295,152 @@ router.post('/flashcards/review', async (req: AuthRequest, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Failed to record flashcard review' });
   }
+});
+
+// ── Track Completion Certificates ──
+router.get('/certificates/verify/:hash', async (req, res) => {
+  try {
+    const { hash } = req.params;
+    const cert = await queryOne<{
+      id: string;
+      certificateNumber: string;
+      studentName: string;
+      trackId: string;
+      trackTitle: string;
+      completedLessons: number;
+      totalLessons: number;
+      issuedAt: string;
+      verificationHash: string;
+    }>(
+      `SELECT "id", "certificateNumber", "studentName", "trackId", "trackTitle",
+              "completedLessons", "totalLessons", "issuedAt", "verificationHash"
+       FROM "TrackCertificate"
+       WHERE "verificationHash" = $1`,
+      [hash],
+    );
+
+    if (!cert) {
+      res.status(404).json({ verified: false, error: 'Certificate verification not found or invalid.' });
+      return;
+    }
+
+    res.json({
+      verified: true,
+      certificate: cert,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to verify certificate.' });
+  }
+});
+
+router.get('/certificates/me', async (req: AuthRequest, res) => {
+  if (!req.user?.userId) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+  try {
+    const certs = await query(
+      `SELECT "id", "certificateNumber", "studentName", "trackId", "trackTitle",
+              "completedLessons", "totalLessons", "issuedAt", "verificationHash"
+       FROM "TrackCertificate"
+       WHERE "userId" = $1
+       ORDER BY "issuedAt" DESC`,
+      [req.user.userId],
+    );
+    res.json(certs);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch certificates.' });
+  }
+});
+
+router.post('/tracks/:techId/certificate', async (req: AuthRequest, res) => {
+  if (!req.user?.userId) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+
+  const techId = String(req.params.techId || '').toLowerCase();
+  const subject = w3schoolsProgrammingDomain.subjects.find((s) => s.id === techId);
+  const techMeta = technologiesCatalog.find((t) => t.id === techId);
+
+  if (!subject && !techMeta) {
+    res.status(404).json({ error: 'Curriculum track not found.' });
+    return;
+  }
+
+  const trackTitle = techMeta?.name || subject?.name || techId;
+  const techLessons = subject ? subject.modules.flatMap((m) => m.lessons) : [];
+  const totalLessons = techLessons.length || techMeta?.totalLessons || 1;
+
+  const completedSet = await getUserCompletions(req.user.userId);
+  const completedLessons = techLessons.filter((l) => completedSet.has(l.id)).length;
+
+  const user = await queryOne<{ firstName: string; lastName: string }>(
+    `SELECT "firstName", "lastName" FROM "User" WHERE "id" = $1`,
+    [req.user.userId],
+  );
+  const studentName = user ? `${user.firstName} ${user.lastName}`.trim() : 'SynergySphere Scholar';
+
+  const existing = await queryOne<{
+    id: string;
+    certificateNumber: string;
+    verificationHash: string;
+    issuedAt: string;
+  }>(
+    `SELECT "id", "certificateNumber", "verificationHash", "issuedAt"
+     FROM "TrackCertificate"
+     WHERE "userId" = $1 AND "trackId" = $2`,
+    [req.user.userId, techId],
+  );
+
+  if (existing) {
+    res.json({
+      issued: false,
+      alreadyIssued: true,
+      certificate: {
+        ...existing,
+        studentName,
+        trackId: techId,
+        trackTitle,
+        completedLessons,
+        totalLessons,
+      },
+    });
+    return;
+  }
+
+  const certNumber = `CERT-SS-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+  const verificationHash = createHash('sha256')
+    .update(`${certNumber}:${req.user.userId}:${techId}:${Date.now()}`)
+    .digest('hex');
+
+  const newCert = await queryOne(
+    `INSERT INTO "TrackCertificate" (
+       "id", "certificateNumber", "userId", "trackId", "trackTitle",
+       "studentName", "completedLessons", "totalLessons", "verificationHash"
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING *`,
+    [
+      newId(),
+      certNumber,
+      req.user.userId,
+      techId,
+      trackTitle,
+      studentName,
+      completedLessons,
+      totalLessons,
+      verificationHash,
+    ],
+  );
+
+  await awardXp(req.user.userId, 100, `Earned track certificate for ${trackTitle}`);
+
+  res.status(201).json({
+    issued: true,
+    alreadyIssued: false,
+    certificate: newCert,
+  });
 });
 
 export default router;

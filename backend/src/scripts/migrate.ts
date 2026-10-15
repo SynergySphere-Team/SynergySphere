@@ -16,9 +16,50 @@ export async function runMigrations() {
     return;
   }
 
+  // 1. Ensure migrations tracking table exists
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "schema_migrations" (
+      "id" SERIAL PRIMARY KEY,
+      "filename" TEXT NOT NULL UNIQUE,
+      "appliedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // 2. Fetch already applied migration files
+  const appliedRows = await pool.query<{ filename: string }>(
+    'SELECT "filename" FROM "schema_migrations"',
+  );
+  const appliedSet = new Set(appliedRows.rows.map((r) => r.filename));
+
+  let appliedCount = 0;
   for (const file of files) {
+    if (appliedSet.has(file)) {
+      continue;
+    }
+
     const sql = await readFile(resolve(migrationsDir, file), 'utf8');
-    await pool.query(sql);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(sql);
+      await client.query(
+        'INSERT INTO "schema_migrations" ("filename") VALUES ($1) ON CONFLICT DO NOTHING',
+        [file],
+      );
+      await client.query('COMMIT');
+      appliedCount++;
+      console.log(`[Migration] Applied ${file}`);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error(`[Migration] Failed applying ${file}:`, err);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  if (appliedCount > 0) {
+    console.log(`[Migration] Successfully applied ${appliedCount} new migration(s).`);
   }
 }
 

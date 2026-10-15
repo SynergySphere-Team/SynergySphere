@@ -75,6 +75,33 @@ describe('1. Server-Side Challenge Judge Integrity', () => {
     const result = await judgeSql(badQuery, 'SQL: Top Students');
     assert.equal(result.passed, false, 'Wrong SQL query selecting wrong rows must fail');
   });
+
+  it('evaluates real Python execution for Reverse a String in Python', async () => {
+    const challenge = {
+      id: 'py-reverse-string',
+      title: 'Reverse a String in Python',
+      language: 'Python',
+      solution: 'def reverse_string(s):\n    return s[::-1]',
+    };
+    const code = 'def reverse_string(s):\n    return s[::-1]';
+    const result = await judgeChallengeSubmission(challenge, code);
+    assert.equal(result.passed, true, 'Valid Python code should pass authoritative test cases');
+    assert.equal(result.language, 'Python', 'Language must be tagged as Python');
+    assert.ok(result.runtimeMs !== undefined && result.runtimeMs >= 0, 'Should measure execution time');
+  });
+
+  it('evaluates real Java execution using javac and java runtime', async () => {
+    const challenge = {
+      id: 'java-syntax',
+      title: 'Java Hello World',
+      language: 'Java',
+      solution: 'public class Solution { public static void main(String[] args) { System.out.println("Hello"); } }',
+    };
+    const code = 'public class Solution { public static void main(String[] args) { System.out.println("Hello from Java!"); } }';
+    const result = await judgeChallengeSubmission(challenge, code);
+    assert.equal(result.passed, true, 'Java compilation and execution must pass');
+    assert.equal(result.language, 'Java', 'Language must be Java');
+  });
 });
 
 describe('2. Unified Developer Profile (Spine)', () => {

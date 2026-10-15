@@ -48,6 +48,70 @@ router.get('/', async (req: AuthRequest, res) => {
   res.json(tasks);
 });
 
+// GET /api/tasks/calendar/export.ics - RFC 5545 iCalendar feed
+router.get('/calendar/export.ics', async (req: AuthRequest, res) => {
+  try {
+    const tasks = await query<{
+      id: string;
+      title: string;
+      description: string | null;
+      status: string;
+      dueDate: Date | string | null;
+      createdAt: Date | string;
+    }>(
+      `SELECT "id", "title", "description", "status", "dueDate", "createdAt"
+       FROM "Task"
+       WHERE "userId" = $1 AND "dueDate" IS NOT NULL
+       ORDER BY "dueDate" ASC`,
+      [req.user!.userId],
+    );
+
+    const now = new Date();
+    const formatIcsDate = (d: Date | string) => {
+      const date = new Date(d);
+      return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    };
+
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//SynergySphere//Task Productivity Calendar//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'X-WR-CALNAME:SynergySphere Tasks',
+    ];
+
+    for (const task of tasks) {
+      if (!task.dueDate) continue;
+      const start = formatIcsDate(task.dueDate);
+      const end = formatIcsDate(new Date(new Date(task.dueDate).getTime() + 60 * 60 * 1000));
+      const cleanTitle = (task.title || 'Task').replace(/[\r\n]+/g, ' ');
+      const cleanDesc = (task.description || `Status: ${task.status}`).replace(/[\r\n]+/g, '\\n');
+
+      ics.push(
+        'BEGIN:VEVENT',
+        `UID:task-${task.id}@synergysphere.com`,
+        `DTSTAMP:${formatIcsDate(now)}`,
+        `DTSTART:${start}`,
+        `DTEND:${end}`,
+        `SUMMARY:[SynergySphere] ${cleanTitle}`,
+        `DESCRIPTION:${cleanDesc}`,
+        `STATUS:${task.status === 'DONE' ? 'COMPLETED' : 'CONFIRMED'}`,
+        'END:VEVENT',
+      );
+    }
+
+    ics.push('END:VCALENDAR');
+
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="synergysphere-tasks.ics"');
+    res.send(ics.join('\r\n'));
+  } catch (error) {
+    console.error('Error generating calendar .ics export:', error);
+    res.status(500).json({ error: 'Failed to generate calendar export' });
+  }
+});
+
 router.get('/productivity-stats', async (req: AuthRequest, res) => {
   const userId = req.user!.userId;
   const startOfDay = new Date();

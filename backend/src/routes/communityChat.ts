@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { newId, query, queryOne, nullable } from '../lib/db.js';
 import { authenticate, type AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
+import { broadcastToChannel, broadcastNotification } from '../services/realtime.js';
 
 const router = Router();
 
@@ -117,7 +118,18 @@ router.post('/channels/:channelId/messages', authenticate, validateBody(messageS
         `${actorName} replied to your message in #${channel.name}.`,
       ],
     );
+
+    broadcastNotification(repliedTo.userId, {
+      title: 'New Community reply',
+      message: `${actorName} replied to your message in #${channel.name}.`,
+      type: 'reply',
+      link: '/community',
+    });
   }
+
+  // Broadcast new message in real-time to active WebSocket subscribers
+  const targetChannelId = Array.isArray(channelId) ? channelId[0] : channelId;
+  broadcastToChannel(targetChannelId, { type: 'new_message', channelId: targetChannelId, message });
 
   res.status(201).json(message);
 });

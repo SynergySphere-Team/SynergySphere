@@ -152,6 +152,8 @@ function ChatView({ channel, currentUserId }: { channel: Channel; currentUserId:
   const bottomRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const wsRef = useRef<WebSocket | null>(null);
+
   const fetchMessages = useCallback(async () => {
     try {
       const data = await api<ChatMessage[]>(`/community-chat/channels/${channel.id}/messages`);
@@ -166,9 +168,44 @@ function ChatView({ channel, currentUserId }: { channel: Channel; currentUserId:
     setReplyTo(null);
     setInput('');
     fetchMessages();
-    intervalRef.current = setInterval(fetchMessages, 4000);
+
+    // Real-time WebSocket connection
+    let socket: WebSocket | null = null;
+    try {
+      const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+      const wsPort = '4001';
+      socket = new WebSocket(`${wsProtocol}//${wsHost}:${wsPort}/ws`);
+      wsRef.current = socket;
+
+      socket.onopen = () => {
+        socket?.send(JSON.stringify({ type: 'subscribe', channelId: channel.id }));
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'new_message' && data.channelId === channel.id && data.message) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === data.message.id)) return prev;
+              return [...prev, data.message];
+            });
+          }
+        } catch {
+          // ignore
+        }
+      };
+    } catch {
+      // fallback to polling
+    }
+
+    // Polling fallback as resilience safety net
+    intervalRef.current = setInterval(fetchMessages, 6000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (socket) {
+        socket.close();
+      }
     };
   }, [channel.id, fetchMessages]);
 

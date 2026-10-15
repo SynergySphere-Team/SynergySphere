@@ -263,7 +263,7 @@ export function WebCurriculumSection() {
       );
       setActiveLesson((prev) => (prev ? { ...prev, completed: res.completed } : null));
       if (res.xpEarned > 0) {
-        setXpBanner(`🎉 You earned +${res.xpEarned} XP for completing this lesson!`);
+        setXpBanner(`You earned +${res.xpEarned} XP for completing this lesson.`);
       }
       // Refresh current technology progress counts
       loadTechDetail(activeTechId);

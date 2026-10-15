@@ -2003,6 +2003,39 @@ export default function CodingScreen() {
                   </View>
                 ) : null}
 
+                {/* Mobile Keyboard Coding Accessory Symbols Bar */}
+                <View style={{ marginBottom: 8 }}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
+                    {['{', '}', '(', ')', '[', ']', ';', '=>', '=', '!=', '<', '>', ':', '"', "'", 'tab', 'return', 'function', 'def', 'const', 'let'].map((sym) => (
+                      <Pressable
+                        key={sym}
+                        onPress={() => {
+                          if (sym === 'tab') {
+                            setCode((prev) => prev + '  ');
+                          } else {
+                            setCode((prev) => prev + sym);
+                          }
+                        }}
+                        style={({ pressed }) => [
+                          {
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 6,
+                            backgroundColor: isLight ? '#E5E7EB' : '#141d24',
+                            borderWidth: 1,
+                            borderColor: isLight ? '#D1D5DB' : '#23303b',
+                          },
+                          pressed && { opacity: 0.6 },
+                        ]}
+                      >
+                        <Text style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: '700', color: primaryAccent }}>
+                          {sym}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+
                 {/* Code Editor */}
                 <TextInput
                   value={code}

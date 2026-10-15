@@ -33,6 +33,7 @@ import communityChatRoutes from './routes/communityChat.js';
 import settingsRoutes from './routes/settings.js';
 import { pool } from './lib/db.js';
 import { runMigrations } from './scripts/migrate.js';
+import { initRealtime } from './services/realtime.js';
 
 export const app = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -198,6 +199,7 @@ async function checkDatabaseConnection(): Promise<boolean> {
 
 const server = app.listen(PORT, HOST, () => {
   console.log(`SynergySphere API running on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT} (bound to ${HOST}:${PORT})`);
+  initRealtime(server);
   void checkDatabaseConnection();
 });
 

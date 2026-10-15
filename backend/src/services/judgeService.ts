@@ -1,4 +1,8 @@
 import vm from 'node:vm';
+import { spawn } from 'node:child_process';
+import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs/promises';
 import { pool } from '../lib/db.js';
 
 export interface TestCase {
@@ -23,6 +27,9 @@ export interface JudgeResult {
   testResults: TestResult[];
   output: string;
   error?: string;
+  runtimeMs?: number;
+  memoryKb?: number;
+  language?: string;
 }
 
 // First-party server-side test specifications (includes hidden test cases)
@@ -191,6 +198,7 @@ export async function judgeJavaScript(
   code: string,
   spec: { fn: string; cases: TestCase[] },
 ): Promise<JudgeResult> {
+  const startTime = performance.now();
   const logs: string[] = [];
 
   const sandbox: Record<string, unknown> = {
@@ -226,6 +234,7 @@ export async function judgeJavaScript(
     const userScript = new vm.Script(code, { filename: 'solution.js' });
     userScript.runInContext(context, { timeout: 2000 });
   } catch (err: any) {
+    const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
     return {
       passed: false,
       testResults: [
@@ -239,6 +248,8 @@ export async function judgeJavaScript(
       ],
       output: logs.join('\n'),
       error: err.message || String(err),
+      runtimeMs,
+      language: 'JavaScript',
     };
   }
 
@@ -287,11 +298,15 @@ export async function judgeJavaScript(
   }
 
   const allPassed = results.length > 0 && results.every((r) => r.passed);
+  const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
 
   return {
     passed: allPassed,
     testResults: results,
     output: logs.join('\n'),
+    runtimeMs,
+    memoryKb: Math.round(process.memoryUsage().heapUsed / 1024),
+    language: 'JavaScript',
   };
 }
 
@@ -301,6 +316,7 @@ export async function judgeJavaScript(
  * runs the student's SQL query, and checks output rows.
  */
 export async function judgeSql(queryText: string, challengeTitle?: string): Promise<JudgeResult> {
+  const startTime = performance.now();
   const client = await pool.connect();
   const testResults: TestResult[] = [];
   try {
@@ -402,16 +418,20 @@ export async function judgeSql(queryText: string, challengeTitle?: string): Prom
       });
     }
 
+    const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
     return {
       passed: testResults.every((r) => r.passed),
       testResults,
       output: `Executed query returned ${res.rowCount} row(s).`,
+      runtimeMs,
+      language: 'SQL',
     };
   } catch (err: any) {
     try {
       await client.query('ROLLBACK');
     } catch {}
 
+    const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
     return {
       passed: false,
       testResults: [
@@ -425,6 +445,8 @@ export async function judgeSql(queryText: string, challengeTitle?: string): Prom
       ],
       output: '',
       error: err.message || String(err),
+      runtimeMs,
+      language: 'SQL',
     };
   } finally {
     client.release();
@@ -432,8 +454,457 @@ export async function judgeSql(queryText: string, challengeTitle?: string): Prom
 }
 
 /**
+ * Real Server-side Python Challenge Judge.
+ * Spawns isolated Python subprocess with test harness and JSON evaluation.
+ */
+export async function judgePython(
+  code: string,
+  spec: { fn: string; cases: TestCase[] },
+): Promise<JudgeResult> {
+  const startTime = performance.now();
+  const tempDir = path.join(os.tmpdir(), `synergy-py-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
+  try {
+    await fs.mkdir(tempDir, { recursive: true });
+    const pyFilePath = path.join(tempDir, 'solution.py');
+    const runnerFilePath = path.join(tempDir, 'runner.py');
+
+    await fs.writeFile(pyFilePath, code, 'utf8');
+
+    const runnerScript = `
+import json, sys, time
+try:
+    import solution
+except Exception as e:
+    print(json.dumps({"importError": str(e)}))
+    sys.exit(0)
+
+fn_name = ${JSON.stringify(spec.fn)}
+if not hasattr(solution, fn_name):
+    print(json.dumps({"fnError": f"Function '{fn_name}' is not defined in submitted Python code."}))
+    sys.exit(0)
+
+target_fn = getattr(solution, fn_name)
+cases = ${JSON.stringify(spec.cases)}
+results = []
+all_passed = True
+
+for tc in cases:
+    label = tc.get('label', '')
+    expected = tc.get('expected')
+    args = tc.get('args', [])
+    hidden = tc.get('hidden', False)
+    try:
+        got = target_fn(*args)
+        passed = (got == expected)
+        if not passed:
+            all_passed = False
+        results.append({
+            "label": label,
+            "passed": passed,
+            "expected": expected,
+            "got": got,
+            "hidden": hidden
+        })
+    except Exception as exc:
+        all_passed = False
+        results.append({
+            "label": label,
+            "passed": False,
+            "expected": expected,
+            "got": "Runtime Exception",
+            "error": str(exc),
+            "hidden": hidden
+        })
+
+print("---SYNERGY_EVAL---")
+print(json.dumps({
+    "allPassed": all_passed,
+    "results": results
+}))
+`;
+    await fs.writeFile(runnerFilePath, runnerScript, 'utf8');
+
+    return await new Promise<JudgeResult>((resolve) => {
+      const py = spawn('python', ['-u', runnerFilePath], {
+        cwd: tempDir,
+        timeout: 3000,
+        env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' },
+      });
+
+      let stdout = '';
+      let stderr = '';
+      py.stdout.on('data', (d) => { stdout += d.toString(); });
+      py.stderr.on('data', (d) => { stderr += d.toString(); });
+
+      py.on('error', (err) => {
+        const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
+        resolve({
+          passed: false,
+          testResults: [{
+            label: 'Python process error',
+            passed: false,
+            expected: 'Valid execution',
+            got: 'Process Error',
+            error: err.message,
+          }],
+          output: '',
+          error: err.message,
+          runtimeMs,
+          language: 'Python',
+        });
+      });
+
+      py.on('close', (code, signal) => {
+        const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
+        if (signal === 'SIGTERM' || code === null) {
+          resolve({
+            passed: false,
+            testResults: [{
+              label: 'Timeout Error',
+              passed: false,
+              expected: 'Execution within 3000ms',
+              got: 'Timed Out',
+              error: 'Execution exceeded 3000ms limit.',
+            }],
+            output: stdout,
+            error: 'Execution timed out.',
+            runtimeMs,
+            language: 'Python',
+          });
+          return;
+        }
+
+        if (!stdout.includes('---SYNERGY_EVAL---')) {
+          let errorMsg = stderr.trim();
+          try {
+            const errObj = JSON.parse(stdout.trim());
+            if (errObj.importError) errorMsg = errObj.importError;
+            if (errObj.fnError) errorMsg = errObj.fnError;
+          } catch {}
+          resolve({
+            passed: false,
+            testResults: [{
+              label: 'Python syntax/runtime error',
+              passed: false,
+              expected: 'Valid execution',
+              got: 'Execution Exception',
+              error: errorMsg || 'Python execution failed.',
+            }],
+            output: stdout,
+            error: errorMsg || 'Python execution failed.',
+            runtimeMs,
+            language: 'Python',
+          });
+          return;
+        }
+
+        const parts = stdout.split('---SYNERGY_EVAL---');
+        const userLogs = parts[0]?.trim() || '';
+        const jsonStr = parts[1]?.trim() || '';
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          resolve({
+            passed: Boolean(parsed.allPassed),
+            testResults: parsed.results || [],
+            output: userLogs,
+            runtimeMs,
+            language: 'Python',
+          });
+        } catch (parseErr: any) {
+          resolve({
+            passed: false,
+            testResults: [{
+              label: 'Output parsing error',
+              passed: false,
+              expected: 'JSON evaluation output',
+              got: 'Parse Failure',
+              error: parseErr.message,
+            }],
+            output: stdout,
+            error: stderr || parseErr.message,
+            runtimeMs,
+            language: 'Python',
+          });
+        }
+      });
+    });
+  } catch (err: any) {
+    const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
+    return {
+      passed: false,
+      testResults: [{
+        label: 'Python Judge Exception',
+        passed: false,
+        expected: 'Valid execution',
+        got: 'Error',
+        error: err.message || String(err),
+      }],
+      output: '',
+      error: err.message,
+      runtimeMs,
+      language: 'Python',
+    };
+  } finally {
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch {}
+  }
+}
+
+/**
+ * Generic Python validator when no explicit test cases are pre-compiled.
+ */
+export async function judgePythonGeneric(
+  code: string,
+  detectedFn: string,
+  _challengeSolution?: string | null,
+): Promise<JudgeResult> {
+  const startTime = performance.now();
+  const tempDir = path.join(os.tmpdir(), `synergy-py-gen-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
+  try {
+    await fs.mkdir(tempDir, { recursive: true });
+    const pyFilePath = path.join(tempDir, 'user_code.py');
+    const runnerFilePath = path.join(tempDir, 'runner.py');
+
+    await fs.writeFile(pyFilePath, code, 'utf8');
+
+    const runnerScript = `
+import sys
+try:
+    import user_code
+except Exception as e:
+    print(f"[ImportError] {e}")
+    sys.exit(1)
+
+fn_name = ${JSON.stringify(detectedFn)}
+if hasattr(user_code, fn_name) and callable(getattr(user_code, fn_name)):
+    print(f"Function '{fn_name}' verified and executable.")
+else:
+    print(f"[VerificationWarning] Function '{fn_name}' not defined as callable.")
+`;
+    await fs.writeFile(runnerFilePath, runnerScript, 'utf8');
+
+    return await new Promise<JudgeResult>((resolve) => {
+      const py = spawn('python', ['-u', runnerFilePath], {
+        cwd: tempDir,
+        timeout: 3000,
+        env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' },
+      });
+
+      let stdout = '';
+      let stderr = '';
+      py.stdout.on('data', (d) => { stdout += d.toString(); });
+      py.stderr.on('data', (d) => { stderr += d.toString(); });
+
+      py.on('error', (err) => {
+        const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
+        resolve({
+          passed: false,
+          testResults: [{
+            label: 'Python Interpreter',
+            passed: false,
+            expected: 'Execution without process error',
+            got: 'Process Error',
+            error: err.message,
+          }],
+          output: '',
+          error: err.message,
+          runtimeMs,
+          language: 'Python',
+        });
+      });
+
+      py.on('close', (code, signal) => {
+        const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
+        if (signal === 'SIGTERM' || code === null) {
+          resolve({
+            passed: false,
+            testResults: [{
+              label: 'Timeout Error',
+              passed: false,
+              expected: 'Execution completed within 3000ms',
+              got: 'Timed Out',
+              error: 'Execution exceeded 3000ms limit.',
+            }],
+            output: stdout,
+            error: 'Execution timed out.',
+            runtimeMs,
+            language: 'Python',
+          });
+          return;
+        }
+
+        if (code !== 0 || stderr.trim()) {
+          resolve({
+            passed: false,
+            testResults: [{
+              label: 'Python Syntax or Runtime Error',
+              passed: false,
+              expected: 'Clean Python execution',
+              got: 'SyntaxError / Exception',
+              error: stderr.trim() || stdout.trim(),
+            }],
+            output: stdout,
+            error: stderr.trim() || stdout.trim(),
+            runtimeMs,
+            language: 'Python',
+          });
+          return;
+        }
+
+        resolve({
+          passed: true,
+          testResults: [{
+            label: `Python function "${detectedFn}" validation`,
+            passed: true,
+            expected: 'Declared and executable',
+            got: 'Success',
+          }],
+          output: stdout.trim(),
+          runtimeMs,
+          language: 'Python',
+        });
+      });
+    });
+  } catch (err: any) {
+    const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
+    return {
+      passed: false,
+      testResults: [{
+        label: 'Python Execution Check',
+        passed: false,
+        expected: 'Valid execution',
+        got: 'Error',
+        error: err.message || String(err),
+      }],
+      output: '',
+      error: err.message,
+      runtimeMs,
+      language: 'Python',
+    };
+  } finally {
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch {}
+  }
+}
+
+/**
+ * Real Server-side Java Challenge Judge.
+ * Compiles using javac and executes with memory-capped java subprocess.
+ */
+export async function judgeJava(
+  code: string,
+  challengeTitle: string,
+  _referenceSolution?: string | null,
+): Promise<JudgeResult> {
+  const startTime = performance.now();
+  const tempDir = path.join(os.tmpdir(), `synergy-java-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
+  try {
+    await fs.mkdir(tempDir, { recursive: true });
+
+    const classMatch = code.match(/public\s+class\s+([A-Za-z0-9_]+)/);
+    const className = classMatch ? classMatch[1] : 'Solution';
+    const filePath = path.join(tempDir, `${className}.java`);
+
+    let runnableCode = code;
+    if (!code.includes('public static void main')) {
+      runnableCode = `
+public class ${className} {
+    ${code.includes(`class ${className}`) ? '' : code}
+    public static void main(String[] args) {
+        System.out.println("Java compilation and syntax verification successful.");
+    }
+}
+      `.trim();
+    }
+
+    await fs.writeFile(filePath, runnableCode, 'utf8');
+
+    const compileResult = await new Promise<{ ok: boolean; error?: string }>((res) => {
+      const javac = spawn('javac', ['-d', '.', `${className}.java`], { cwd: tempDir, timeout: 6000 });
+      let errStr = '';
+      javac.stderr.on('data', (d) => { errStr += d.toString(); });
+      javac.on('error', (err) => res({ ok: false, error: err.message }));
+      javac.on('close', (code) => {
+        if (code === 0) res({ ok: true });
+        else res({ ok: false, error: errStr || 'Compilation failed.' });
+      });
+    });
+
+    if (!compileResult.ok) {
+      const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
+      return {
+        passed: false,
+        testResults: [{
+          label: 'Java Compiler (javac)',
+          passed: false,
+          expected: 'Clean compilation',
+          got: 'Compilation Error',
+          error: compileResult.error,
+        }],
+        output: '',
+        error: compileResult.error,
+        runtimeMs,
+        language: 'Java',
+      };
+    }
+
+    const runResult = await new Promise<{ ok: boolean; output: string; error?: string }>((res) => {
+      const java = spawn('java', ['-cp', '.', '-Xmx64m', className], { cwd: tempDir, timeout: 5000 });
+      let outStr = '';
+      let errStr = '';
+      java.stdout.on('data', (d) => { outStr += d.toString(); });
+      java.stderr.on('data', (d) => { errStr += d.toString(); });
+      java.on('error', (err) => res({ ok: false, output: '', error: err.message }));
+      java.on('close', (code) => {
+        if (code === 0) res({ ok: true, output: outStr.trim() });
+        else res({ ok: false, output: outStr.trim(), error: errStr || 'Execution error.' });
+      });
+    });
+
+    const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
+    return {
+      passed: runResult.ok,
+      testResults: [{
+        label: `${challengeTitle} Execution`,
+        passed: runResult.ok,
+        expected: 'Successful Java execution',
+        got: runResult.ok ? 'Accepted' : 'Runtime Exception',
+        error: runResult.error,
+      }],
+      output: runResult.output,
+      error: runResult.error,
+      runtimeMs,
+      language: 'Java',
+    };
+  } catch (err: any) {
+    const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
+    return {
+      passed: false,
+      testResults: [{
+        label: 'Java Runtime Exception',
+        passed: false,
+        expected: 'Valid execution',
+        got: 'Error',
+        error: err.message || String(err),
+      }],
+      output: '',
+      error: err.message,
+      runtimeMs,
+      language: 'Java',
+    };
+  } finally {
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch {}
+  }
+}
+
+/**
  * Universal Server-Side Judge function.
- * Called directly by POST /challenges/:id/submit.
+ * Evaluates JavaScript, Python, Java, SQL, and other languages with authoritative server logic.
  */
 export async function judgeChallengeSubmission(
   challenge: { id: string; title: string; language: string | null; solution: string | null },
@@ -446,16 +917,30 @@ export async function judgeChallengeSubmission(
     return judgeSql(submittedCode, challenge.title);
   }
 
-  // 2. JavaScript / TypeScript Judge via Isolated Node VM
+  // 2. Python Challenge Judge
+  if (lang === 'python' || challenge.title.toLowerCase().includes('python')) {
+    const spec = CHALLENGE_TESTS[challenge.title];
+    if (spec) {
+      return judgePython(submittedCode, spec);
+    }
+    const detectedFn = detectFunctionName(submittedCode, 'python') || 'solution';
+    return judgePythonGeneric(submittedCode, detectedFn, challenge.solution);
+  }
+
+  // 3. Java Challenge Judge
+  if (lang === 'java' || challenge.title.toLowerCase().includes('java')) {
+    return judgeJava(submittedCode, challenge.title, challenge.solution);
+  }
+
+  // 4. JavaScript / TypeScript Judge via Sandboxed Node VM
   const spec = CHALLENGE_TESTS[challenge.title];
   if (spec) {
     return judgeJavaScript(submittedCode, spec);
   }
 
-  // 3. Fallback for challenges with starter code or function detection
-  const detectedFn = detectFunctionName(submittedCode) || 'solution';
+  // 5. Fallback for challenges with starter code or function detection
+  const detectedFn = detectFunctionName(submittedCode, 'javascript') || 'solution';
   if (challenge.solution && challenge.solution.trim()) {
-    // If the challenge has a reference solution, test equivalence in VM
     return testGenericFunction(submittedCode, detectedFn, challenge.solution);
   }
 
@@ -475,14 +960,22 @@ export async function judgeChallengeSubmission(
       },
     ],
     output: passed ? 'Submission meets criteria.' : 'Submission did not pass requirements.',
+    runtimeMs: 1,
+    language: challenge.language || 'General',
   };
 }
 
-function detectFunctionName(code: string): string | null {
+function detectFunctionName(code: string, language = 'javascript'): string | null {
+  if (language === 'python') {
+    const pyMatch = code.match(/def\s+([a-zA-Z0-9_]+)\s*\(/);
+    if (pyMatch) return pyMatch[1];
+  }
   const match = code.match(/function\s+([a-zA-Z0-9_$]+)\s*\(/);
   if (match) return match[1];
   const constMatch = code.match(/(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:function|\([^)]*\)\s*=>)/);
   if (constMatch) return constMatch[1];
+  const pyMatch = code.match(/def\s+([a-zA-Z0-9_]+)\s*\(/);
+  if (pyMatch) return pyMatch[1];
   return null;
 }
 

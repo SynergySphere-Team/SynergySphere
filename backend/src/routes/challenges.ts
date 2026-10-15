@@ -63,6 +63,9 @@ router.post('/:id/test', authenticate, validateBody(attemptSchema), async (req: 
     testResults: judgeResult.testResults,
     output: judgeResult.output,
     error: judgeResult.error,
+    runtimeMs: judgeResult.runtimeMs ?? 1,
+    memoryKb: judgeResult.memoryKb,
+    language: judgeResult.language || challenge.language || 'General',
   });
 });
 
@@ -117,6 +120,9 @@ router.post('/:id/submit', authenticate, validateBody(attemptSchema), async (req
     testResults: judgeResult.testResults,
     output: judgeResult.output,
     error: judgeResult.error,
+    runtimeMs: judgeResult.runtimeMs ?? 1,
+    memoryKb: judgeResult.memoryKb,
+    language: judgeResult.language || challenge.language || 'General',
   });
 });
 

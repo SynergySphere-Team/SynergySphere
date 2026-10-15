@@ -205,6 +205,140 @@ router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => 
   });
 });
 
+// ── SSE Token Streaming Chat Endpoint ──
+router.post('/chat/stream', validateBody(chatSchema), async (req: AuthRequest, res) => {
+  const { message, context, lessonId, challengeId, uploadId, apiKey } = req.body;
+  const customKey = apiKey || (req.headers['x-ai-api-key'] as string | undefined);
+  const history: ChatTurn[] = Array.isArray(req.body.history) ? req.body.history.slice(-20) : [];
+
+  const bundle = await buildGroundingBundle({
+    userId: req.user!.userId,
+    message,
+    lessonId,
+    challengeId,
+    uploadId,
+  });
+
+  const ref = bundle.reference;
+  const groundedLabel = ref.lessonTitle
+    ? `${ref.subjectName ?? ''} › ${ref.moduleName ?? ''} › ${ref.lessonTitle}`
+    : ref.challengeTitle
+      ? `Learning Hub Coding Challenge: "${ref.challengeTitle}" (${ref.subjectName ?? ''})`
+      : ref.uploadFileName
+        ? `study pack "${ref.uploadFileName}"`
+        : null;
+
+  const isExplicitItem = Boolean(lessonId || challengeId || uploadId);
+  const systemPrompt = [
+    'You are SynergySphere AI Workspace, an expert, supportive, and highly capable software engineering assistant and tutor grounded in the LectureToLife Learning Hub (Programming Academy & Coding Challenges).',
+    'Your goal is to provide deep, practical, accurate, and educational answers: explain programming concepts clearly, debug errors with root-cause analysis, provide optimized and idiomatic code snippets, and answer technical questions thoroughly.',
+    '',
+    bundle.hasContext && isExplicitItem
+      ? [
+          'CURRENT STUDY LESSON / CHALLENGE / PACK CONTEXT:',
+          bundle.contextBlock,
+          '',
+          'GUIDELINES:',
+          `- The student is currently studying or working on "${groundedLabel}". Align your explanation and terminology with this context.`,
+          '- Directly, specifically, and thoroughly answer the student\'s question or resolve their code issue.',
+          '- If working on a coding challenge, guide the student with algorithmic intuition, edge cases, and hints without dumping the complete solution immediately unless they explicitly request it.',
+          '- Provide clear explanations, modern best practices, and fresh tailored code examples.',
+        ].join('\n')
+      : bundle.hasContext
+        ? [
+            'REFERENCE LEARNING HUB CONTEXT (Curriculum / Challenges from SynergySphere):',
+            bundle.contextBlock,
+            '',
+            'GUIDELINES:',
+            '- Directly and thoroughly answer the student\'s question using your full programming expertise and clear code examples.',
+            '- Focus 100% on solving and explaining the user\'s specific question, code, or debug request.',
+            '- You may naturally connect to the reference Learning Hub material if relevant, citing lessons or challenges.',
+          ].join('\n')
+        : [
+            'GUIDELINES:',
+            '- Provide clear, idiomatic, accurate programming solutions with explanations and code examples.',
+            '- Format code snippets with proper markdown language tags.',
+          ].join('\n'),
+  ].join('\n');
+
+  const askingAboutCode =
+    /```/.test(message) ||
+    /\b(this code|the code|my code|the snippet|code context|walk through|debug|optimi[sz]e|generate tests|unit test)\b/i.test(
+      message,
+    );
+  const prompt =
+    context && askingAboutCode
+      ? `[USER CODE IN EDITOR]:\n\`\`\`\n${context.slice(0, 8000)}\n\`\`\`\n\n[USER QUESTION]:\n${message}`
+      : message;
+
+  const historySummary = history
+    .slice(-4)
+    .map((turn) => `${turn.role === 'user' ? 'Student' : 'Tutor'}: ${turn.content.slice(0, 200)}`)
+    .join('\n');
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  // Send initial grounding meta chunk
+  res.write(`data: ${JSON.stringify({
+    type: 'meta',
+    grounding: {
+      source: bundle.source,
+      lessonId: ref.lessonId ?? null,
+      lessonTitle: ref.lessonTitle ?? null,
+      subjectName: ref.subjectName ?? null,
+      moduleName: ref.moduleName ?? null,
+      challengeId: ref.challengeId ?? null,
+      challengeTitle: ref.challengeTitle ?? null,
+    },
+  })}\n\n`);
+
+  try {
+    const fullText = await generateAiResponse(
+      systemPrompt,
+      prompt,
+      history,
+      () => buildGroundedFallback(message, bundle, historySummary, context),
+      customKey,
+    );
+
+    // Stream tokens in natural semantic chunks
+    const words = fullText.split(/(\s+)/);
+    let buffer = '';
+    for (let i = 0; i < words.length; i++) {
+      buffer += words[i];
+      if (i % 6 === 0 || i === words.length - 1) {
+        res.write(`data: ${JSON.stringify({ type: 'token', token: buffer })}\n\n`);
+        buffer = '';
+        await new Promise((r) => setTimeout(r, 12));
+      }
+    }
+
+    // Persist to database in background
+    query(
+      `INSERT INTO "AiChatMessage" ("id", "userId", "role", "content", "metadata")
+       VALUES ($1, $2, 'user', $3, $4), ($5, $2, 'assistant', $6, $7)`,
+      [
+        newId(),
+        req.user!.userId,
+        message,
+        JSON.stringify({ lessonId, challengeId, uploadId }),
+        newId(),
+        fullText,
+        JSON.stringify({ grounding: bundle.source }),
+      ],
+    ).catch((err) => console.error('Error saving streaming chat message:', err));
+
+    res.write(`data: ${JSON.stringify({ type: 'done', fullResponse: fullText })}\n\n`);
+    res.end();
+  } catch (err: any) {
+    res.write(`data: ${JSON.stringify({ type: 'error', error: err.message || 'Streaming failed' })}\n\n`);
+    res.end();
+  }
+});
+
 // ── Direct Code Actions (Explain, Tests, Optimize, Debug) underneath Code Context ──
 const codeActionSchema = z.object({
   action: z.enum(['explain', 'test', 'optimize', 'debug']),

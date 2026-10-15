@@ -80,11 +80,11 @@ export function LessonViewer({
       }
       if (res.xpEarned > 0 || res.completed) {
         if (isRoadmapMode && nextRoadmapLesson) {
-          setXpBanner(`🎉 Task complete${res.xpEarned > 0 ? ` (+${res.xpEarned} XP)` : ''}! Next task in roadmap: "${nextRoadmapLesson.title}" (${nextRoadmapLesson.phase}).`);
+          setXpBanner(`Task complete${res.xpEarned > 0 ? ` (+${res.xpEarned} XP)` : ''}! Next task in roadmap: "${nextRoadmapLesson.title}" (${nextRoadmapLesson.phase}).`);
         } else if (isRoadmapMode && !nextRoadmapLesson) {
-          setXpBanner(`🏆 Incredible! You completed all tasks in the ${rolePath?.title} roadmap!`);
+          setXpBanner(`Incredible! You completed all tasks in the ${rolePath?.title} roadmap!`);
         } else {
-          setXpBanner(`🎉 Awesome! You earned +${res.xpEarned} XP for completing this lesson.`);
+          setXpBanner(`Awesome! You earned +${res.xpEarned} XP for completing this lesson.`);
         }
       }
     } catch {

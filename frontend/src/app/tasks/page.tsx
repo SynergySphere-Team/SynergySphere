@@ -10,6 +10,7 @@ import Link from 'next/link';
 import {
   BookOpen,
   CheckCircle2,
+  Calendar,
   Clock,
   Coffee,
   ExternalLink,
@@ -612,7 +613,15 @@ export default function TasksPage() {
             Plan deep work sprints, set custom break intervals, pause when interrupted, and boost completed achievements to your Career Portfolio.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href="/api/tasks/calendar/export.ics"
+            download="synergysphere-tasks.ics"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10 transition"
+          >
+            <Calendar className="h-4 w-4 text-primary" />
+            <span>Export Calendar (.ics)</span>
+          </a>
           <Button onClick={() => setShowForm(!showForm)} className="bg-primary text-black hover:bg-primary/90">
             {showForm ? <X className="h-4 w-4 mr-1.5" /> : <Plus className="h-4 w-4 mr-1.5" />}
             {showForm ? 'Close Form' : 'Add New Task'}

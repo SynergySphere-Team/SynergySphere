@@ -29,6 +29,10 @@ const createTicketSchema = z.object({
 // POST /api/settings/tickets
 router.post('/tickets', validateBody(createTicketSchema), async (req: AuthRequest, res) => {
   try {
+    if (req.user?.role === 'ADMIN') {
+      res.status(403).json({ error: 'Administrators cannot report support issues.' });
+      return;
+    }
     const userId = req.user!.userId;
     const { category, title, subject, description, attachmentName, attachmentUrl } = req.body;
     const finalTitle = (title || subject || '').trim();
