@@ -11,7 +11,7 @@ const router = Router();
 
 router.get('/', authenticate, async (_req, res) => {
   const challenges = await query(
-    `SELECT "id", "title", "difficulty", "description", "language", "starterCode", "xpReward", "createdAt"
+    `SELECT "id", "title", "difficulty", "description", "language", "starterCode", "solution", "xpReward", "createdAt"
      FROM "Challenge"
      ORDER BY "difficulty" ASC, "title" ASC
      LIMIT 100`,
@@ -21,7 +21,7 @@ router.get('/', authenticate, async (_req, res) => {
 
 router.get('/:id', authenticate, async (req, res) => {
   const challenge = await queryOne(
-    `SELECT "id", "title", "difficulty", "description", "language", "starterCode", "xpReward", "createdAt"
+    `SELECT "id", "title", "difficulty", "description", "language", "starterCode", "solution", "xpReward", "createdAt"
      FROM "Challenge"
      WHERE "id" = $1`,
     [paramId(req)],
@@ -31,6 +31,24 @@ router.get('/:id', authenticate, async (req, res) => {
     return;
   }
   res.json(challenge);
+});
+
+router.get('/:id/solution', authenticate, async (req: AuthRequest, res) => {
+  const challenge = await queryOne<{
+    id: string;
+    title: string;
+    solution: string | null;
+  }>(
+    `SELECT "id", "title", "solution"
+     FROM "Challenge"
+     WHERE "id" = $1`,
+    [paramId(req)],
+  );
+  if (!challenge) {
+    res.status(404).json({ error: 'Challenge not found' });
+    return;
+  }
+  res.json({ solution: challenge.solution });
 });
 
 const attemptSchema = z.object({
@@ -66,6 +84,7 @@ router.post('/:id/test', authenticate, validateBody(attemptSchema), async (req: 
     runtimeMs: judgeResult.runtimeMs ?? 1,
     memoryKb: judgeResult.memoryKb,
     language: judgeResult.language || challenge.language || 'General',
+    solution: challenge.solution,
   });
 });
 
@@ -123,6 +142,7 @@ router.post('/:id/submit', authenticate, validateBody(attemptSchema), async (req
     runtimeMs: judgeResult.runtimeMs ?? 1,
     memoryKb: judgeResult.memoryKb,
     language: judgeResult.language || challenge.language || 'General',
+    solution: challenge.solution,
   });
 });
 

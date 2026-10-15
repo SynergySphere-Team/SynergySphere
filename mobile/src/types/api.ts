@@ -142,6 +142,7 @@ export interface Challenge {
   description: string;
   language: string | null;
   starterCode?: string | null;
+  solution?: string | null;
   hint?: string;
   approach?: string;
   timeComplexity?: string;
