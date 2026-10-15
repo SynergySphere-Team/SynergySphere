@@ -394,16 +394,20 @@ router.post('/code-action', validateBody(codeActionSchema), async (req: AuthRequ
       systemPrompt,
       userPrompt,
       [],
-      () => {
+      (reason?: string) => {
+        const note = reason
+          ? `\n\n*Note: Running in offline fallback mode (${reason}). Please check your Gemini API key in the AI Workspace settings.*`
+          : `\n\n*Note: Running in offline fallback mode. Configure an active AI API key in the AI Assistant for deep live model reasoning.*`;
+
         // Fallback generator
         if (action === 'explain') {
-          return `### Code Explanation & Structural Walkthrough\n\n- **Detected Language:** ${language || 'Auto-detected'}\n- **Line Count:** ${code.split('\n').length} lines\n\n#### Flow Analysis\n1. **Input & Variable Scope:** The code initializes state variables and control structures.\n2. **Algorithmic Execution:** Iterates over data structures to perform necessary transformations.\n3. **Return & Side Effects:** Produces computed outputs while keeping state predictable.\n\n*Note: Running in offline fallback mode. Configure an active AI API key in the AI Assistant for deep live model reasoning.*`;
+          return `### Code Explanation & Structural Walkthrough\n\n- **Detected Language:** ${language || 'Auto-detected'}\n- **Line Count:** ${code.split('\n').length} lines\n\n#### Flow Analysis\n1. **Input & Variable Scope:** The code initializes state variables and control structures.\n2. **Algorithmic Execution:** Iterates over data structures to perform necessary transformations.\n3. **Return & Side Effects:** Produces computed outputs while keeping state predictable.${note}`;
         } else if (action === 'test') {
-          return `### Generated Unit Test Suite\n\n\`\`\`javascript\n// Automated Edge-Case Test Harness\ndescribe('Code Verification', () => {\n  test('happy path - should handle typical valid inputs', () => {\n    // Verify primary functionality\n    expect(true).toBe(true);\n  });\n\n  test('boundary condition - empty / zero / null inputs', () => {\n    // Verify boundary robustness\n    expect(true).toBe(true);\n  });\n\n  test('performance and stress limits', () => {\n    // Verify execution within time limits\n    expect(true).toBe(true);\n  });\n});\n\`\`\``;
+          return `### Generated Unit Test Suite\n\n\`\`\`javascript\n// Automated Edge-Case Test Harness\ndescribe('Code Verification', () => {\n  test('happy path - should handle typical valid inputs', () => {\n    // Verify primary functionality\n    expect(true).toBe(true);\n  });\n\n  test('boundary condition - empty / zero / null inputs', () => {\n    // Verify boundary robustness\n    expect(true).toBe(true);\n  });\n\n  test('performance and stress limits', () => {\n    // Verify execution within time limits\n    expect(true).toBe(true);\n  });\n});\n\`\`\`${note}`;
         } else if (action === 'optimize') {
-          return `### Optimization & Performance Analysis\n\n- **Time Complexity:** Review loops for unnecessary duplicate iterations (prefer O(N) over O(N²)).\n- **Space Efficiency:** Use Map or Set for O(1) membership queries.\n- **Clean Code:** Use early returns to minimize nested indentation.\n\n\`\`\`\n// Recommended Optimization Pattern\n// Cache computed variables outside loops and handle base cases early\n\`\`\``;
+          return `### Optimization & Performance Analysis\n\n- **Time Complexity:** Review loops for unnecessary duplicate iterations (prefer O(N) over O(N²)).\n- **Space Efficiency:** Use Map or Set for O(1) membership queries.\n- **Clean Code:** Use early returns to minimize nested indentation.\n\n\`\`\`\n// Recommended Optimization Pattern\n// Cache computed variables outside loops and handle base cases early\n\`\`\`${note}`;
         } else {
-          return `### Static Bug & Risk Inspection\n\n- Verify all variable boundaries and null checks.\n- Ensure array indexes are strictly bounded (avoid off-by-one errors).\n- Check error handling in async blocks or exception traps.`;
+          return `### Static Bug & Risk Inspection\n\n- Verify all variable boundaries and null checks.\n- Ensure array indexes are strictly bounded (avoid off-by-one errors).\n- Check error handling in async blocks or exception traps.${note}`;
         }
       },
       customKey,

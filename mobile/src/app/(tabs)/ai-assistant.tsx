@@ -11,6 +11,7 @@ import {
   UIManager,
   View,
   Image,
+  Modal,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
@@ -202,6 +203,36 @@ export default function AIAssistantScreen() {
   } | null>(null);
   const [codeActionLoading, setCodeActionLoading] = useState<string | null>(null);
 
+  // Gemini API Key management
+  const [geminiKeyModalVisible, setGeminiKeyModalVisible] = useState(false);
+  const [geminiKeyInput, setGeminiKeyInput] = useState('');
+  const [geminiKeyTesting, setGeminiKeyTesting] = useState(false);
+  const [geminiKeyFeedback, setGeminiKeyFeedback] = useState<{ valid: boolean; message: string } | null>(null);
+  const [hasLinkedKey, setHasLinkedKey] = useState(false);
+  const [hasServerKey, setHasServerKey] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const stored = await SecureStore.getItemAsync('synergysphere_gemini_api_key');
+        if (!cancelled && stored) {
+          setHasLinkedKey(true);
+          setGeminiKeyInput(stored);
+        }
+      } catch {}
+      try {
+        const status = await api.get<{ hasEnvKey: boolean }>('/ai/key-status');
+        if (!cancelled && status?.hasEnvKey) {
+          setHasServerKey(true);
+        }
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Debounced context for 60fps typing without recalculating regex loops synchronously
   const [debouncedContext, setDebouncedContext] = useState('');
   useEffect(() => {
@@ -217,6 +248,50 @@ export default function AIAssistantScreen() {
       setToastMessage(null);
     }, 2800);
   }, []);
+
+  const handleTestAndSaveKey = useCallback(async () => {
+    const key = geminiKeyInput.trim();
+    if (!key) {
+      setGeminiKeyFeedback({ valid: false, message: 'Please enter a Gemini API key.' });
+      return;
+    }
+    setGeminiKeyTesting(true);
+    setGeminiKeyFeedback(null);
+    try {
+      const res = await api.post<{ valid: boolean; message?: string }>('/ai/test-key', { apiKey: key });
+      if (res.valid) {
+        await SecureStore.setItemAsync('synergysphere_gemini_api_key', key);
+        setHasLinkedKey(true);
+        setGeminiKeyFeedback({ valid: true, message: '✓ Gemini API key is valid and linked!' });
+        showToast('Gemini API key linked successfully!');
+        setTimeout(() => {
+          setGeminiKeyModalVisible(false);
+          setGeminiKeyFeedback(null);
+        }, 1200);
+      } else {
+        setGeminiKeyFeedback({ valid: false, message: res.message || 'Key rejected by Google Gemini.' });
+      }
+    } catch (err: any) {
+      setGeminiKeyFeedback({
+        valid: false,
+        message: err?.response?.data?.message || err?.message || 'Could not validate key. Please check your network.',
+      });
+    } finally {
+      setGeminiKeyTesting(false);
+    }
+  }, [geminiKeyInput, showToast]);
+
+  const handleRemoveKey = useCallback(async () => {
+    try {
+      await SecureStore.deleteItemAsync('synergysphere_gemini_api_key');
+      setHasLinkedKey(false);
+      setGeminiKeyInput('');
+      setGeminiKeyFeedback(null);
+      showToast('Gemini API key removed.');
+    } catch {
+      showToast('Failed to remove key.');
+    }
+  }, [showToast]);
 
   // Restore draft code if not opened from a lesson
   useEffect(() => {
@@ -364,11 +439,17 @@ export default function AIAssistantScreen() {
     try {
       const contextToSend =
         forcedContext?.trim() || (contextEditedByUser && context.trim() ? context : undefined);
+      let storedKey = '';
+      try {
+        storedKey = (await SecureStore.getItemAsync('synergysphere_gemini_api_key')) || '';
+      } catch {}
+
       const response = await api.post<{ response: string; grounding?: Grounding }>('/ai/chat', {
         message: question,
         ...(contextToSend ? { context: contextToSend } : {}),
         ...(lesson ? { lessonId: lesson.id } : {}),
         history: historyFromMessages(baseMessages).slice(-20),
+        ...(storedKey ? { apiKey: storedKey } : {}),
       });
       setMessages((current) => [
         ...current,
@@ -686,6 +767,77 @@ export default function AIAssistantScreen() {
           </View>
         </Card>
       ) : null}
+
+      {/* ── Gemini Key Status & Configuration Banner ── */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          borderRadius: 10,
+          backgroundColor:
+            hasLinkedKey || hasServerKey
+              ? isLight
+                ? 'rgba(5, 150, 105, 0.08)'
+                : 'rgba(5, 150, 105, 0.18)'
+              : isLight
+              ? 'rgba(217, 119, 6, 0.08)'
+              : 'rgba(217, 119, 6, 0.18)',
+          borderWidth: 1,
+          borderColor: hasLinkedKey || hasServerKey ? '#10b981' : '#f59e0b',
+          marginBottom: 10,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+          <Ionicons
+            name={hasLinkedKey || hasServerKey ? 'sparkles' : 'key-outline'}
+            size={14}
+            color={hasLinkedKey || hasServerKey ? '#10b981' : '#d97706'}
+          />
+          <Text
+            style={{
+              fontSize: fontSize(11.5),
+              fontWeight: '600',
+              color: colors.text,
+              flex: 1,
+            }}
+          >
+            {hasLinkedKey
+              ? 'Gemini AI Active (Custom Key)'
+              : hasServerKey
+              ? 'Gemini AI Active (Server)'
+              : 'Offline Mode • Link Gemini Key'}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => {
+            setGeminiKeyFeedback(null);
+            setGeminiKeyModalVisible(true);
+          }}
+          hitSlop={8}
+          style={({ pressed }) => [
+            {
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 6,
+              backgroundColor: hasLinkedKey || hasServerKey ? primaryAccent : '#d97706',
+            },
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text
+            style={{
+              fontSize: fontSize(11),
+              fontWeight: 'bold',
+              color: isLight ? '#FFFFFF' : '#0B1510',
+            }}
+          >
+            {hasLinkedKey ? 'Manage' : 'Link Key'}
+          </Text>
+        </Pressable>
+      </View>
 
       {/* ── Segmented Tab Bar with Smooth Animated Sliding Indicator ── */}
       <View
@@ -1359,25 +1511,63 @@ export default function AIAssistantScreen() {
             <Text style={[styles.section, { color: colors.text, marginTop: 4 }]}>
               Code Context Editor
             </Text>
-            {context.trim().length > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Pressable
                 onPress={() => {
-                  setContext('');
-                  setContextEditedByUser(true);
-                  showToast('Editor cleared');
+                  setGeminiKeyFeedback(null);
+                  setGeminiKeyModalVisible(true);
                 }}
                 hitSlop={6}
                 style={({ pressed }) => [
-                  styles.clearCodeSnippetBtn,
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 6,
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: hasLinkedKey || hasServerKey ? '#10b981' : '#d97706',
+                    borderWidth: 1,
+                  },
                   pressed && styles.pressed,
                 ]}
               >
-                <Ionicons name="trash-outline" size={12} color={colors.muted} />
-                <Text style={[styles.clearCodeSnippetText, { color: colors.muted }]}>
-                  Clear Editor
+                <Ionicons
+                  name={hasLinkedKey || hasServerKey ? 'sparkles' : 'key-outline'}
+                  size={12}
+                  color={hasLinkedKey || hasServerKey ? '#10b981' : '#d97706'}
+                />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '600',
+                    color: hasLinkedKey || hasServerKey ? '#10b981' : '#d97706',
+                  }}
+                >
+                  {hasLinkedKey ? 'Gemini Key' : hasServerKey ? 'Gemini Live' : 'Link Key'}
                 </Text>
               </Pressable>
-            )}
+              {context.trim().length > 0 && (
+                <Pressable
+                  onPress={() => {
+                    setContext('');
+                    setContextEditedByUser(true);
+                    showToast('Editor cleared');
+                  }}
+                  hitSlop={6}
+                  style={({ pressed }) => [
+                    styles.clearCodeSnippetBtn,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Ionicons name="trash-outline" size={12} color={colors.muted} />
+                  <Text style={[styles.clearCodeSnippetText, { color: colors.muted }]}>
+                    Clear Editor
+                  </Text>
+                </Pressable>
+              )}
+            </View>
           </View>
 
           <Card>
@@ -1556,6 +1746,36 @@ export default function AIAssistantScreen() {
                     <Ionicons name="close" size={16} color={colors.muted} />
                   </Pressable>
                 </View>
+                {!codeActionResult.fromAi && (
+                  <Pressable
+                    onPress={() => {
+                      setGeminiKeyFeedback(null);
+                      setGeminiKeyModalVisible(true);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                      marginBottom: 12,
+                      padding: 10,
+                      borderRadius: 8,
+                      backgroundColor: isLight ? '#fef3c7' : 'rgba(217, 119, 6, 0.15)',
+                      borderColor: '#f59e0b',
+                      borderWidth: 1,
+                    }}
+                  >
+                    <Ionicons name="alert-circle" size={16} color="#d97706" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: fontSize(11.5), fontWeight: '600', color: isLight ? '#92400e' : '#fef3c7' }}>
+                        Running in offline static mode
+                      </Text>
+                      <Text style={{ fontSize: fontSize(10.5), color: isLight ? '#b45309' : '#fde68a' }}>
+                        Tap here to link your Google Gemini API key for deep live model reasoning.
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={14} color="#d97706" />
+                  </Pressable>
+                )}
                 <MarkdownView content={codeActionResult.output} />
               </View>
             )}
@@ -1630,6 +1850,162 @@ export default function AIAssistantScreen() {
           ) : null}
         </>
       )}
+      {/* ── Gemini Key Setup Modal ── */}
+      <Modal
+        visible={geminiKeyModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGeminiKeyModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 440,
+              borderRadius: 16,
+              backgroundColor: isLight ? '#FFFFFF' : '#0B1510',
+              borderColor: colors.border,
+              borderWidth: 1,
+              padding: 20,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.3,
+              shadowRadius: 20,
+              elevation: 10,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 14,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="sparkles" size={18} color={primaryAccent} />
+                <Text
+                  style={{
+                    fontSize: fontSize(16),
+                    fontWeight: 'bold',
+                    color: colors.text,
+                  }}
+                >
+                  Configure Gemini AI
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setGeminiKeyModalVisible(false)}
+                hitSlop={8}
+              >
+                <Ionicons name="close" size={20} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            <Text
+              style={{
+                fontSize: fontSize(12),
+                color: colors.muted,
+                lineHeight: 18,
+                marginBottom: 14,
+              }}
+            >
+              Link your Google Gemini API key (starts with{' '}
+              <Text style={{ fontWeight: 'bold', color: primaryAccent }}>AIzaSy…</Text>) to receive
+              live model responses for Explain, Debug, Optimize, Tests, and Conversation.
+            </Text>
+
+            <TextInput
+              value={geminiKeyInput}
+              onChangeText={setGeminiKeyInput}
+              placeholder="Paste your Gemini API key (AIzaSy...)"
+              placeholderTextColor={colors.muted}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={{
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                fontSize: fontSize(13),
+                color: colors.text,
+                backgroundColor: colors.surfaceElevated,
+                marginBottom: 12,
+              }}
+            />
+
+            {geminiKeyFeedback && (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: 10,
+                  borderRadius: 8,
+                  backgroundColor: geminiKeyFeedback.valid
+                    ? isLight
+                      ? '#dcfce7'
+                      : '#052e16'
+                    : isLight
+                    ? '#fee2e2'
+                    : '#450a0a',
+                  borderColor: geminiKeyFeedback.valid ? '#22c55e' : '#ef4444',
+                  borderWidth: 1,
+                  marginBottom: 14,
+                }}
+              >
+                <Ionicons
+                  name={geminiKeyFeedback.valid ? 'checkmark-circle' : 'alert-circle'}
+                  size={16}
+                  color={geminiKeyFeedback.valid ? '#16a34a' : '#dc2626'}
+                />
+                <Text
+                  style={{
+                    fontSize: fontSize(11.5),
+                    color: geminiKeyFeedback.valid ? '#16a34a' : '#dc2626',
+                    flex: 1,
+                  }}
+                >
+                  {geminiKeyFeedback.message}
+                </Text>
+              </View>
+            )}
+
+            <View style={{ gap: 8, marginTop: 4 }}>
+              <Button
+                title={geminiKeyTesting ? 'Testing & Verifying…' : 'Test & Save Key'}
+                onPress={handleTestAndSaveKey}
+                disabled={geminiKeyTesting || !geminiKeyInput.trim()}
+              />
+
+              {hasLinkedKey && (
+                <Pressable
+                  onPress={handleRemoveKey}
+                  hitSlop={6}
+                  style={{
+                    alignItems: 'center',
+                    paddingVertical: 8,
+                  }}
+                >
+                  <Text style={{ fontSize: fontSize(12), color: '#ef4444', fontWeight: '600' }}>
+                    Remove Linked Key
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }

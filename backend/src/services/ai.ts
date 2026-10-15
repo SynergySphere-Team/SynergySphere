@@ -56,13 +56,14 @@ export async function generateAiResponse(
   systemPrompt: string,
   userMessage: string,
   history: ChatTurn[] = [],
-  offlineFallback: () => string = () => fallbackResponse(systemPrompt, userMessage),
+  offlineFallback: (failureReason?: string) => string = () => fallbackResponse(systemPrompt, userMessage),
   customApiKey?: string,
 ): Promise<string> {
   refreshEnv();
   const priorTurns = usableHistory(history);
 
   const cleanCustomKey = (customApiKey || '').trim();
+  let lastFailureReason: string | undefined;
 
   // If user provided a custom key, prioritize it based on prefix
   if (cleanCustomKey) {
@@ -70,14 +71,16 @@ export async function generateAiResponse(
       try {
         const result = await callOpenAI(cleanCustomKey, systemPrompt, userMessage, priorTurns);
         if (result) return result;
-      } catch (err) {
+      } catch (err: any) {
+        lastFailureReason = err?.message || 'Custom OpenAI request failed';
         console.error('Custom OpenAI API error:', err);
       }
     } else {
       try {
         const result = await callGemini(cleanCustomKey, systemPrompt, userMessage, priorTurns);
         if (result) return result;
-      } catch (err) {
+      } catch (err: any) {
+        lastFailureReason = err?.message || 'Custom Gemini request failed';
         console.error('Custom Gemini API error:', err);
       }
     }
@@ -91,7 +94,8 @@ export async function generateAiResponse(
     try {
       const result = await callGemini(geminiKey, systemPrompt, userMessage, priorTurns);
       if (result) return result;
-    } catch (err) {
+    } catch (err: any) {
+      lastFailureReason = err?.message || 'Gemini API request failed';
       console.error('Gemini API error:', err);
     }
   }
@@ -108,13 +112,14 @@ export async function generateAiResponse(
     try {
       const result = await callOpenAI(openaiKey, systemPrompt, userMessage, priorTurns);
       if (result) return result;
-    } catch (err) {
+    } catch (err: any) {
+      lastFailureReason = err?.message || 'OpenAI API request failed';
       console.error('OpenAI API error:', err);
     }
   }
 
   // 3. Intelligent fallback — grounded callers inject their own synthesizer
-  return offlineFallback();
+  return offlineFallback(lastFailureReason);
 }
 
 /* ─────────────────────────── Gemini ─────────────────────────── */
