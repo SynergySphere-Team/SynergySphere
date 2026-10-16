@@ -33,6 +33,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     streak: number;
     stats: { unreadNotifications: number };
   } | null>(null);
+  const [liveNotification, setLiveNotification] = useState<{
+    id: string;
+    title: string;
+    message: string;
+  } | null>(null);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,11 +52,56 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   }, [user, loading, router]);
 
   useEffect(() => {
-    if (user) {
-      api<{ streak: number; stats: { unreadNotifications: number } }>('/dashboard/stats')
-        .then(setDashboardData)
-        .catch(() => null);
+    if (!user) return;
+    api<{ streak: number; stats: { unreadNotifications: number } }>('/dashboard/stats')
+      .then(setDashboardData)
+      .catch(() => null);
+
+    // Connect to /ws for real-time push notifications
+    const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host =
+      process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.startsWith('http')
+        ? process.env.NEXT_PUBLIC_API_URL.replace(/^http/, 'ws').replace(/\/api\/?$/, '')
+        : `${protocol}//${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:4000`;
+
+    let ws: WebSocket | null = null;
+    try {
+      ws = new WebSocket(`${host}/ws`);
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(String(event.data || '{}'));
+          if (msg.type === 'notification' && msg.notification) {
+            setLiveNotification({
+              id: msg.notification.id || String(Date.now()),
+              title: msg.notification.title || 'New Notification',
+              message: msg.notification.message || '',
+            });
+            setDashboardData((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    stats: {
+                      ...prev.stats,
+                      unreadNotifications: (prev.stats?.unreadNotifications || 0) + 1,
+                    },
+                  }
+                : prev
+            );
+            setTimeout(() => setLiveNotification(null), 5000);
+          }
+        } catch {
+          // ignore
+        }
+      };
+    } catch {
+      // ignore if ws unavailable
     }
+
+    return () => {
+      try {
+        ws?.close();
+      } catch {}
+    };
   }, [user]);
 
   // Debounced search
@@ -103,8 +153,17 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="dashboard-grid flex min-h-screen items-center justify-center bg-background">
-        <div className="h-9 w-9 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="dashboard-grid min-h-screen bg-background p-6 space-y-6">
+        <div className="h-14 w-full animate-pulse rounded-xl bg-white/[0.05]" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-28 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.04]" />
+          ))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="h-64 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.04]" />
+          <div className="h-64 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.04]" />
+        </div>
       </div>
     );
   }
@@ -301,6 +360,24 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <Sparkles className="hidden h-4 w-4 text-primary/70 xl:block" />
           </div>
         </header>
+        {liveNotification && (
+          <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-primary/40 bg-primary/15 px-4 py-2.5 text-xs shadow-lg">
+            <div className="flex items-center gap-2 min-w-0">
+              <Bell className="h-4 w-4 text-primary shrink-0" />
+              <div className="truncate">
+                <span className="font-bold text-white">{liveNotification.title}: </span>
+                <span className="text-gray-200">{liveNotification.message}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLiveNotification(null)}
+              className="text-muted-foreground hover:text-white shrink-0"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
         <main className="min-h-[calc(100vh-65px)] p-4 sm:p-5 xl:p-6">{children}</main>
       </div>
     </div>

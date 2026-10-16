@@ -367,8 +367,245 @@ describe('6. Productivity Center Task Enhancements & Career Boost', () => {
   });
 });
 
+describe('7. Sections 2, 3 & 4 Implementations + Removal of GitHub Commit Coach', () => {
+  it('verifies timezone-safe computeConsecutiveStreak logic across local/UTC boundaries', async () => {
+    const { computeConsecutiveStreak } = await import('../services/portfolioService.js');
+    const today = new Date();
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+
+    const streak3 = computeConsecutiveStreak([today, yesterday, twoDaysAgo], 'UTC');
+    assert.equal(streak3, 3, 'Three consecutive days ending today must yield streak = 3');
+
+    const brokenStreak = computeConsecutiveStreak([
+      new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+      new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+    ], 'UTC');
+    assert.equal(brokenStreak, 0, 'Activity older than yesterday must yield active streak = 0');
+  });
+
+  it('runs end-to-end HTTP + WebSocket verification for Challenges, Multi-Thread AI, SRS SM-2, Live Code Rooms, Notifications, and removed GitHub AI Coach', async () => {
+    const http = await import('node:http');
+    const WebSocket = (await import('ws')).default;
+    const express = (await import('express')).default;
+    const { signToken, AUTH_COOKIE_NAME } = await import('../middleware/auth.js');
+    const { initRealtime, broadcastNotification } = await import('../services/realtime.js');
+    const challengeRoutes = (await import('../routes/challenges.js')).default;
+    const aiRoutes = (await import('../routes/ai.js')).default;
+    const githubRoutes = (await import('../routes/github.js')).default;
+    const { runMigrations } = await import('../scripts/migrate.js');
+
+    await runMigrations();
+
+    const user = await queryOne<{ id: string; email: string; role: string }>(
+      `SELECT "id", "email", "role" FROM "User" WHERE "email" = 'student@synergysphere.com' LIMIT 1`,
+    );
+    assert.ok(user, 'Demo student user must exist');
+
+    const token = signToken({ userId: user.id, email: user.email, role: user.role });
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
+
+    const testApp = express();
+    testApp.use(express.json());
+    testApp.use('/api/challenges', challengeRoutes);
+    testApp.use('/api/ai', aiRoutes);
+    testApp.use('/api/github', githubRoutes);
+
+    const server = http.createServer(testApp);
+    initRealtime(server);
+
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+    const addr = server.address() as { port: number };
+    const baseUrl = `http://127.0.0.1:${addr.port}`;
+
+    try {
+      // 1. Verify Automated GitHub Commit / PR Coach endpoint is removed (404)
+      const ghCoachRes = await fetch(`${baseUrl}/api/github/ai-review`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ commitTitle: 'feat: test' }),
+      });
+      assert.equal(ghCoachRes.status, 404, 'POST /api/github/ai-review must return 404 Not Found after removal');
+
+      // 2. Verify GET /api/challenges strips solution field
+      const challengesRes = await fetch(`${baseUrl}/api/challenges`, { headers });
+      assert.equal(challengesRes.status, 200);
+      const challengesList = (await challengesRes.json()) as Array<Record<string, unknown>>;
+      assert.ok(Array.isArray(challengesList) && challengesList.length > 0, 'Challenges list must not be empty');
+      for (const ch of challengesList) {
+        assert.equal(ch.solution, undefined, `Challenge ${ch.id} must not leak solution field in list endpoint`);
+      }
+
+      // 3. Verify POST /api/challenges/:id/test executes custom test cases without saving submission
+      const targetChallenge = challengesList[0];
+      const customTestRes = await fetch(`${baseUrl}/api/challenges/${targetChallenge.id}/test`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          code: 'function solution(x) { return x; }',
+          language: 'JavaScript',
+          customInputs: ['"SynergySphere"'],
+        }),
+      });
+      assert.equal(customTestRes.status, 200, 'Custom test endpoint must return 200');
+      const customTestBody = (await customTestRes.json()) as { customMode?: boolean; testResults?: unknown[] };
+      assert.equal(customTestBody.customMode, true, 'Response must indicate customMode: true');
+      assert.ok(Array.isArray(customTestBody.testResults), 'Response must include testResults array');
+
+      // 4. Verify Multi-Thread AI Chat CRUD (POST /threads, GET /threads, GET /chat/history, DELETE /threads/:id)
+      const createThreadRes = await fetch(`${baseUrl}/api/ai/threads`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ title: 'Integration Test Thread', lessonId: 'java-1' }),
+      });
+      assert.equal(createThreadRes.status, 201, 'Creating AI thread must return 201');
+      const createdThread = (await createThreadRes.json()) as { id: string; title: string; contextType: string; contextId: string };
+      assert.ok(createdThread.id, 'Created thread must have an id');
+      assert.equal(createdThread.title, 'Integration Test Thread');
+      assert.equal(createdThread.contextType, 'lesson');
+      assert.equal(createdThread.contextId, 'java-1');
+
+      const listThreadsRes = await fetch(`${baseUrl}/api/ai/threads`, { headers });
+      assert.equal(listThreadsRes.status, 200);
+      const threads = (await listThreadsRes.json()) as Array<{ id: string }>;
+      assert.ok(threads.some((t) => t.id === createdThread.id), 'Created thread must appear in GET /api/ai/threads');
+
+      const threadHistoryRes = await fetch(`${baseUrl}/api/ai/chat/history?threadId=${createdThread.id}`, { headers });
+      assert.equal(threadHistoryRes.status, 200);
+      const threadHistory = (await threadHistoryRes.json()) as unknown[];
+      assert.ok(Array.isArray(threadHistory), 'Thread history must be an array');
+
+      const delThreadRes = await fetch(`${baseUrl}/api/ai/threads/${createdThread.id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      assert.equal(delThreadRes.status, 200, 'Deleting AI thread must return 200');
+
+      // 5. Verify Spaced Repetition (SRS) SM-2 Deck & Review (both Study Pack front/back upsert and cardId review)
+      const reviewByFrontRes = await fetch(`${baseUrl}/api/ai/srs/review`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          front: 'What is the time complexity of binary search?',
+          back: 'O(log n)',
+          quality: 4,
+        }),
+      });
+      assert.equal(reviewByFrontRes.status, 200, 'SRS review via front/back must succeed');
+      const reviewByFrontBody = (await reviewByFrontRes.json()) as {
+        card: { id: string; intervalDays: number; repetitions: number };
+        xpAwarded: number;
+      };
+      assert.equal(reviewByFrontBody.xpAwarded, 5, 'SRS review must award 5 XP');
+      assert.equal(reviewByFrontBody.card.intervalDays, 1, 'First Good review must schedule 1 day interval');
+
+      // Force card due now to test GET /api/ai/srs/due and review by cardId
+      await query(
+        `UPDATE "FlashcardReview" SET "nextReviewAt" = NOW() - INTERVAL '1 minute' WHERE "id" = $1`,
+        [reviewByFrontBody.card.id],
+      );
+
+      const srsDueRes = await fetch(`${baseUrl}/api/ai/srs/due`, { headers });
+      assert.equal(srsDueRes.status, 200);
+      const srsDueBody = (await srsDueRes.json()) as {
+        cards: Array<{ id: string }>;
+        dueCards: Array<{ id: string }>;
+        dueCount: number;
+        totalCount: number;
+      };
+      assert.ok(Array.isArray(srsDueBody.cards), 'GET /api/ai/srs/due must return top-level cards array');
+      assert.ok(srsDueBody.cards.some((c) => c.id === reviewByFrontBody.card.id), 'Due card must appear in srsDueBody.cards');
+
+      const reviewByIdRes = await fetch(`${baseUrl}/api/ai/srs/review`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          cardId: reviewByFrontBody.card.id,
+          quality: 5,
+        }),
+      });
+      assert.equal(reviewByIdRes.status, 200, 'SRS review by cardId must succeed');
+      const reviewByIdBody = (await reviewByIdRes.json()) as { nextIntervalDays: number };
+      assert.ok(reviewByIdBody.nextIntervalDays >= 3, 'Second Easy review must advance interval to >= 3 days');
+
+      // Clean up test SRS card
+      await query(`DELETE FROM "FlashcardReview" WHERE "id" = $1`, [reviewByFrontBody.card.id]);
+
+      // 6. Verify Real-Time WebSocket Collaborative Code Room + Cookie/Query Auth + Live Push Notification
+      const wsUrl = `ws://127.0.0.1:${addr.port}/ws`;
+      const WsClient = WebSocket as unknown as new (
+        url: string,
+        opts?: Record<string, unknown>,
+      ) => InstanceType<typeof WebSocket>;
+      const clientA = new WsClient(`${wsUrl}?token=${encodeURIComponent(token)}`);
+      const clientB = new WsClient(wsUrl, {
+        headers: { Cookie: `${AUTH_COOKIE_NAME}=${encodeURIComponent(token)}` },
+      });
+
+      const waitForOpen = (ws: InstanceType<typeof WebSocket>) =>
+        new Promise<void>((resolve, reject) => {
+          ws.once('open', () => resolve());
+          ws.once('error', reject);
+        });
+
+      await Promise.all([waitForOpen(clientA), waitForOpen(clientB)]);
+
+      const codeSyncPromise = new Promise<{ code?: string; roomId?: string }>((resolve) => {
+        clientB.on('message', (raw) => {
+          const msg = JSON.parse(raw.toString());
+          if (msg.type === 'code_sync') resolve(msg);
+        });
+      });
+
+      const notifPromise = new Promise<{ notification?: { title?: string } }>((resolve) => {
+        clientB.on('message', (raw) => {
+          const msg = JSON.parse(raw.toString());
+          if (msg.type === 'notification') resolve(msg);
+        });
+      });
+
+      clientA.send(JSON.stringify({ type: 'join_code_room', roomId: 'TEST42', userName: 'Alice' }));
+      clientB.send(JSON.stringify({ type: 'join_code_room', roomId: 'TEST42', userName: 'Bob' }));
+
+      await new Promise((r) => setTimeout(r, 80));
+
+      clientA.send(
+        JSON.stringify({
+          type: 'code_sync',
+          roomId: 'TEST42',
+          code: 'const synced = 42;',
+          language: 'JavaScript',
+        }),
+      );
+
+      const syncedMsg = await codeSyncPromise;
+      assert.equal(syncedMsg.roomId, 'TEST42');
+      assert.equal(syncedMsg.code, 'const synced = 42;', 'Client B must receive live code_sync from Client A');
+
+      broadcastNotification(user.id, {
+        id: 'notif-live-1',
+        title: 'Live Push Verification',
+        message: 'Real-time WebSocket notification works!',
+        type: 'achievement',
+      });
+
+      const notifMsg = await notifPromise;
+      assert.equal(notifMsg.notification?.title, 'Live Push Verification', 'Cookie-authenticated WebSocket must receive live notification');
+
+      clientA.close();
+      clientB.close();
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+});
+
 after(async () => {
   await pool.end();
 });
+
 
 

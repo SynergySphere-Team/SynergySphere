@@ -5,6 +5,7 @@ import { paramId } from '../lib/params.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { awardXp } from '../services/gamification.js';
+import { broadcastNotification } from '../services/realtime.js';
 
 const router = Router();
 router.use(authenticate);
@@ -247,9 +248,10 @@ router.post('/focus-session', validateBody(focusSchema), async (req: AuthRequest
 
   // Notify user that their focus session has ended
   const taskDetail = taskTitle ? ` on "${taskTitle}"` : '';
-  await queryOne(
+  const focusNotif = await queryOne(
     `INSERT INTO "Notification" ("id", "userId", "title", "message", "type", "link")
-     VALUES ($1, $2, $3, $4, $5, $6)`,
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING *`,
     [
       newId(),
       req.user!.userId,
@@ -259,6 +261,9 @@ router.post('/focus-session', validateBody(focusSchema), async (req: AuthRequest
       '/tasks',
     ],
   );
+  if (focusNotif) {
+    broadcastNotification(req.user!.userId, focusNotif);
+  }
 
   res.status(201).json(session);
 });
@@ -303,9 +308,10 @@ router.post('/', validateBody(taskSchema), async (req: AuthRequest, res) => {
 
   if (taskStatus === 'DONE' && task) {
     await awardXp(req.user!.userId, 10, 'Completed task: ' + title);
-    await queryOne(
+    const doneNotif = await queryOne(
       `INSERT INTO "Notification" ("id", "userId", "title", "message", "type", "link")
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
       [
         newId(),
         req.user!.userId,
@@ -315,6 +321,9 @@ router.post('/', validateBody(taskSchema), async (req: AuthRequest, res) => {
         '/tasks',
       ],
     );
+    if (doneNotif) {
+      broadcastNotification(req.user!.userId, doneNotif);
+    }
   }
 
   res.status(201).json(task);
@@ -363,9 +372,10 @@ router.patch('/:id', validateBody(taskSchema.partial()), async (req: AuthRequest
 
   if (task && existing.status !== 'DONE' && task.status === 'DONE') {
     await awardXp(req.user!.userId, 10, 'Completed task: ' + task.title);
-    await queryOne(
+    const doneNotif = await queryOne(
       `INSERT INTO "Notification" ("id", "userId", "title", "message", "type", "link")
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
       [
         newId(),
         req.user!.userId,
@@ -375,6 +385,9 @@ router.patch('/:id', validateBody(taskSchema.partial()), async (req: AuthRequest
         '/tasks',
       ],
     );
+    if (doneNotif) {
+      broadcastNotification(req.user!.userId, doneNotif);
+    }
   }
 
   if (req.body.wellnessCheckIn) {

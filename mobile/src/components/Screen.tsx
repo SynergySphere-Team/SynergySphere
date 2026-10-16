@@ -30,6 +30,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { BackButton } from '@/components/BackButton';
+import { getOfflineStatus, subscribeOfflineStatus } from '@/services/api';
 
 export { BackButton };
 
@@ -88,11 +89,20 @@ export function Screen({
   const activeScrollRef = scrollViewRef || internalScrollRef;
 
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isOffline, setIsOffline] = useState(() => getOfflineStatus());
+  const [queuedOfflineOps, setQueuedOfflineOps] = useState(0);
 
   // Animated values for smooth swipe-to-back transitions
   const screenWidth = Dimensions.get('window').width;
   const translateX = useSharedValue(0);
   const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    return subscribeOfflineStatus((offline, queuedCount) => {
+      setIsOffline(offline);
+      setQueuedOfflineOps(queuedCount);
+    });
+  }, []);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -362,6 +372,14 @@ export function Screen({
     </View>
   ) : null;
 
+  const renderOfflineBanner = isOffline ? (
+    <View style={[styles.offlineBanner, { backgroundColor: theme === 'light' ? '#FEF3C7' : '#3F2D0C', borderColor: '#F59E0B' }]}>
+      <Text style={[styles.offlineBannerText, { color: theme === 'light' ? '#92400E' : '#FCD34D' }]}>
+        ⚡ Offline Mode — Showing cached content{queuedOfflineOps > 0 ? ` (${queuedOfflineOps} change${queuedOfflineOps === 1 ? '' : 's'} queued to sync)` : ''}
+      </Text>
+    </View>
+  ) : null;
+
   const contentForScroll = (
     <View
       style={[
@@ -370,6 +388,7 @@ export function Screen({
       ]}
     >
       {renderTopNav}
+      {renderOfflineBanner}
       {children}
     </View>
   );
@@ -387,6 +406,7 @@ export function Screen({
       ]}
     >
       {renderTopNav}
+      {renderOfflineBanner}
       {children}
     </View>
   );
@@ -463,15 +483,43 @@ export function Screen({
   );
 }
 
+export function SkeletonCard({ height = 96 }: { height?: number }) {
+  const { colors, theme } = useTheme();
+  const baseBg = theme === 'light' ? '#E2E8F0' : colors.surfaceElevated;
+  const lineBg = theme === 'light' ? '#CBD5E1' : colors.border;
+
+  return (
+    <View
+      style={[
+        styles.skeletonCard,
+        {
+          height,
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+        },
+      ]}
+    >
+      <View style={[styles.skeletonLine, { width: '42%', height: 12, backgroundColor: baseBg }]} />
+      <View style={[styles.skeletonLine, { width: '78%', height: 16, marginTop: 10, backgroundColor: lineBg }]} />
+      <View style={[styles.skeletonLine, { width: '60%', height: 10, marginTop: 10, backgroundColor: baseBg }]} />
+    </View>
+  );
+}
+
 export function Loading() {
   const { colors, theme } = useTheme();
 
   return (
-    <View style={[styles.center, { backgroundColor: colors.background }]}>
+    <View style={[styles.center, { backgroundColor: colors.background, paddingHorizontal: 18 }]}>
       <ActivityIndicator
         color={theme === 'light' ? '#00875A' : colors.primary}
         size="large"
       />
+      <View style={styles.skeletonStack}>
+        <SkeletonCard height={92} />
+        <SkeletonCard height={110} />
+        <SkeletonCard height={92} />
+      </View>
     </View>
   );
 }
@@ -569,10 +617,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  offlineBanner: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  offlineBannerText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  skeletonStack: {
+    width: '100%',
+    maxWidth: 520,
+    marginTop: 20,
+    gap: 12,
+    opacity: 0.72,
+  },
+  skeletonCard: {
+    width: '100%',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    justifyContent: 'center',
+  },
+  skeletonLine: {
+    borderRadius: 6,
   },
   notice: {
     padding: 12,

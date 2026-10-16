@@ -231,6 +231,8 @@ function AIAssistantInner() {
       timestamp: new Date(),
     },
   ]);
+  const [threads, setThreads] = useState<Array<{ id: string; title: string; updatedAt: string }>>([]);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [codeContext, setCodeContext] = useState('');
   const [codeEditedByUser, setCodeEditedByUser] = useState(false);
@@ -550,12 +552,23 @@ function AIAssistantInner() {
     const keyToSend = geminiApiKey.trim() || undefined;
     const payload = {
       message: text.trim(),
+      ...(activeThreadId ? { threadId: activeThreadId } : {}),
       context: contextToSend,
       ...(lesson ? { lessonId: lesson.id } : {}),
       ...(challenge ? { challengeId: challenge.id } : {}),
       history: historyFromMessages(baseMessages).slice(-20),
       ...(keyToSend ? { apiKey: keyToSend } : {}),
     };
+
+    if (activeThreadId) {
+      setThreads((prev) =>
+        prev.map((t) =>
+          t.id === activeThreadId && (t.title === 'New Chat Thread' || t.title === 'Untitled Thread')
+            ? { ...t, title: text.trim().slice(0, 44) }
+            : t
+        )
+      );
+    }
 
     let streamSuccess = false;
     try {
@@ -659,22 +672,58 @@ function AIAssistantInner() {
     setLoading(false);
   }
 
-  // Fetch persistent chat history on mount
+  // Load saved threads on mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        const list = await api<Array<{ id: string; title: string; updatedAt: string }>>('/ai/threads');
+        if (!cancelled && Array.isArray(list)) {
+          setThreads(list);
+          if (list.length > 0 && !activeThreadId) {
+            setActiveThreadId(list[0].id);
+          }
+        }
+      } catch {
+        // ignore if offline
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Fetch persistent chat history on mount / activeThreadId change
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const querySuffix = activeThreadId ? `?threadId=${encodeURIComponent(activeThreadId)}` : '';
         const history = await api<
           Array<{ id: string; role: 'user' | 'assistant'; content: string; createdAt: string }>
-        >('/ai/chat/history');
-        if (!cancelled && Array.isArray(history) && history.length > 0) {
-          setMessages(
-            history.map((m) => ({
-              role: m.role,
-              content: m.content,
-              timestamp: new Date(m.createdAt),
-            }))
-          );
+        >(`/ai/chat/history${querySuffix}`);
+        if (!cancelled && Array.isArray(history)) {
+          if (history.length > 0) {
+            setMessages(
+              history.map((m) => ({
+                role: m.role,
+                content: m.content,
+                timestamp: new Date(m.createdAt),
+              }))
+            );
+          } else if (activeThreadId) {
+            setMessages([
+              {
+                role: 'assistant',
+                content: lesson
+                  ? `👋 Ready to discuss "${lesson.title}" in this thread!`
+                  : challenge
+                    ? `👋 Ready to work on "${challenge.title}" in this thread!`
+                    : "👋 New conversation thread started! Ask any question or paste code for analysis.",
+                timestamp: new Date(),
+              },
+            ]);
+          }
         }
       } catch {
         // Fall back to the default welcome message if offline or not logged in
@@ -683,7 +732,7 @@ function AIAssistantInner() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activeThreadId]);
 
   async function handleQuickAction(action: (typeof quickActions)[number]) {
     if (!codeContext.trim()) {
@@ -761,9 +810,55 @@ function AIAssistantInner() {
 
   const hasCodeBlock = (output: string) => /```(?:[a-zA-Z0-9_-]+)?\n[\s\S]*?```/.test(output);
 
+  async function startNewThread() {
+    try {
+      const created = await api<{ id: string; title: string; updatedAt: string }>('/ai/threads', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: lesson ? lesson.title : challenge ? challenge.title : 'New Chat Thread',
+          lessonId: lesson?.id,
+        }),
+      });
+      if (created?.id) {
+        setThreads((prev) => [created, ...prev.filter((t) => t.id !== created.id)]);
+        setActiveThreadId(created.id);
+      }
+    } catch {
+      setActiveThreadId(null);
+    }
+    setMessages([
+      {
+        role: 'assistant',
+        content: lesson
+          ? `New thread started! Ask me anything about "${lesson.title}" — I'll stay grounded in that lesson.`
+          : challenge
+            ? `New thread started! Ready to work on the "${challenge.title}" challenge.`
+            : 'New thread started! Ask about any Learning Hub lesson or challenge, paste code, or use search above.',
+        timestamp: new Date(),
+      },
+    ]);
+  }
+
+  async function deleteThread(threadId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    try {
+      await api(`/ai/threads/${threadId}`, { method: 'DELETE' });
+    } catch {
+      // ignore
+    }
+    setThreads((prev) => {
+      const remaining = prev.filter((t) => t.id !== threadId);
+      if (activeThreadId === threadId) {
+        setActiveThreadId(remaining[0]?.id || null);
+      }
+      return remaining;
+    });
+  }
+
   async function clearChat() {
     try {
-      await api('/ai/chat/history', { method: 'DELETE' });
+      const suffix = activeThreadId ? `?threadId=${encodeURIComponent(activeThreadId)}` : '';
+      await api(`/ai/chat/history${suffix}`, { method: 'DELETE' });
     } catch {
       // ignore
     }
@@ -788,7 +883,7 @@ function AIAssistantInner() {
   return (
     <DashboardLayout>
       {/* Header */}
-      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
             AI Workspace
@@ -804,11 +899,50 @@ function AIAssistantInner() {
                 : 'Grounded in Learning Hub (1,000+ programming lessons & 60 interactive challenges).'}
           </p>
         </div>
-        <Button variant="secondary" size="sm" onClick={clearChat} className="gap-2">
-          <Wand2 className="h-4 w-4" />
-          New Chat
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="default" size="sm" onClick={startNewThread} className="gap-1.5">
+            <Wand2 className="h-3.5 w-3.5" />
+            + New Thread
+          </Button>
+          <Button variant="secondary" size="sm" onClick={clearChat} className="gap-1.5">
+            <Trash2 className="h-3.5 w-3.5" />
+            Clear Thread
+          </Button>
+        </div>
       </div>
+
+      {/* Saved Multi-Thread Selector Bar */}
+      {threads.length > 0 && (
+        <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground shrink-0">
+            Threads:
+          </span>
+          {threads.map((t) => {
+            const isSelected = activeThreadId === t.id;
+            return (
+              <div
+                key={t.id}
+                onClick={() => setActiveThreadId(t.id)}
+                className={`group flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-xs transition shrink-0 ${
+                  isSelected
+                    ? 'border-primary/50 bg-primary/15 text-primary font-semibold'
+                    : 'border-white/10 bg-secondary/30 text-muted-foreground hover:border-white/25 hover:text-white'
+                }`}
+              >
+                <span className="max-w-[180px] truncate">{t.title || 'Untitled Thread'}</span>
+                <button
+                  type="button"
+                  onClick={(e) => deleteThread(t.id, e)}
+                  className="rounded-full p-0.5 text-muted-foreground/70 hover:bg-white/10 hover:text-red-400"
+                  title="Delete thread"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Search & Grounding Bar */}
       <div ref={searchContainerRef} className="relative mb-4 space-y-2">

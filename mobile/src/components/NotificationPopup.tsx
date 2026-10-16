@@ -11,7 +11,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { api } from '@/services/api';
+import { api, authStorage, getWsUrl } from '@/services/api';
 
 type AppNotification = {
   id: string;
@@ -38,12 +38,14 @@ export default function NotificationPopup() {
     let active = true;
     let initialized = false;
     let checking = false;
+    let wsConnected = false;
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     const knownIds = new Set<string>();
 
     async function checkNotifications() {
       if (checking) return;
-
       checking = true;
 
       try {
@@ -80,16 +82,71 @@ export default function NotificationPopup() {
       }
     }
 
-    void checkNotifications();
+    async function connectWs() {
+      if (!active) return;
+      try {
+        const token = await authStorage.getToken();
+        if (!token || !active) return;
 
-    const interval = setInterval(
-      () => void checkNotifications(),
-      20000
-    );
+        const wsUrl = getWsUrl();
+        const socket = new WebSocket(wsUrl);
+        ws = socket;
+
+        socket.onopen = () => {
+          wsConnected = true;
+          socket.send(JSON.stringify({ type: 'auth', token }));
+        };
+
+        socket.onmessage = (event) => {
+          if (!active) return;
+          try {
+            const payload = JSON.parse(String(event.data));
+            if (payload?.type === 'notification' && payload.notification) {
+              const notif = payload.notification as AppNotification;
+              if (notif.id && !knownIds.has(notif.id)) {
+                knownIds.add(notif.id);
+                setPopup(notif);
+              }
+            }
+          } catch {
+            // ignore non-json message
+          }
+        };
+
+        socket.onclose = () => {
+          wsConnected = false;
+          if (active) {
+            reconnectTimer = setTimeout(() => void connectWs(), 8000);
+          }
+        };
+
+        socket.onerror = () => {
+          wsConnected = false;
+        };
+      } catch {
+        wsConnected = false;
+      }
+    }
+
+    void checkNotifications();
+    void connectWs();
+
+    // Only poll as a lightweight fallback when WebSocket is disconnected
+    const interval = setInterval(() => {
+      if (!wsConnected) {
+        void checkNotifications();
+      }
+    }, 45000);
 
     return () => {
       active = false;
       clearInterval(interval);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      try {
+        ws?.close();
+      } catch {
+        // ignore
+      }
     };
   }, [user?.id]);
 

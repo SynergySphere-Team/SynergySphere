@@ -50,22 +50,169 @@ router.post('/transcribe', validateBody(transcribeSchema), async (req: AuthReque
   }
 });
 
+// ── Multi-Thread AI Chat Management ──
+router.get('/threads', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    let threads = await query<{
+      id: string;
+      title: string;
+      pinned: boolean;
+      contextType: string | null;
+      contextId: string | null;
+      createdAt: string;
+      updatedAt: string;
+      messageCount: number;
+    }>(
+      `SELECT t."id", t."title", t."pinned", t."contextType", t."contextId", t."createdAt", t."updatedAt",
+              COUNT(m."id")::int AS "messageCount"
+       FROM "AiChatThread" t
+       LEFT JOIN "AiChatMessage" m ON m."threadId" = t."id"
+       WHERE t."userId" = $1
+       GROUP BY t."id"
+       ORDER BY t."pinned" DESC, t."updatedAt" DESC
+       LIMIT 50`,
+      [userId],
+    );
+
+    if (threads.length === 0) {
+      const defaultId = newId();
+      await queryOne(
+        `INSERT INTO "AiChatThread" ("id", "userId", "title", "pinned")
+         VALUES ($1, $2, 'General Workspace', TRUE)
+         RETURNING *`,
+        [defaultId, userId],
+      );
+      await query(
+        `UPDATE "AiChatMessage" SET "threadId" = $1 WHERE "userId" = $2 AND "threadId" IS NULL`,
+        [defaultId, userId],
+      );
+      threads = await query(
+        `SELECT t."id", t."title", t."pinned", t."contextType", t."contextId", t."createdAt", t."updatedAt",
+                COUNT(m."id")::int AS "messageCount"
+         FROM "AiChatThread" t
+         LEFT JOIN "AiChatMessage" m ON m."threadId" = t."id"
+         WHERE t."userId" = $1
+         GROUP BY t."id"
+         ORDER BY t."pinned" DESC, t."updatedAt" DESC`,
+        [userId],
+      );
+    }
+
+    res.json(threads);
+  } catch (error) {
+    console.error('Error fetching AI threads:', error);
+    res.status(500).json({ error: 'Failed to fetch threads' });
+  }
+});
+
+const createThreadSchema = z.object({
+  title: z.string().min(1).max(120).optional(),
+  contextType: z.string().max(50).optional().nullable(),
+  contextId: z.string().max(255).optional().nullable(),
+  lessonId: z.string().max(255).optional().nullable(),
+});
+
+router.post('/threads', validateBody(createThreadSchema), async (req: AuthRequest, res) => {
+  try {
+    const contextType = req.body.contextType || (req.body.lessonId ? 'lesson' : null);
+    const contextId = req.body.contextId || req.body.lessonId || null;
+    const thread = await queryOne(
+      `INSERT INTO "AiChatThread" ("id", "userId", "title", "contextType", "contextId")
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [
+        newId(),
+        req.user!.userId,
+        (req.body.title || 'New Conversation').trim(),
+        contextType,
+        contextId,
+      ],
+    );
+    res.status(201).json({ ...thread, messageCount: 0 });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create thread' });
+  }
+});
+
+const updateThreadSchema = z.object({
+  title: z.string().min(1).max(120).optional(),
+  pinned: z.boolean().optional(),
+});
+
+router.patch('/threads/:id', validateBody(updateThreadSchema), async (req: AuthRequest, res) => {
+  try {
+    const threadId = paramId(req);
+    const existing = await queryOne<{ id: string; title: string; pinned: boolean }>(
+      `SELECT "id", "title", "pinned" FROM "AiChatThread" WHERE "id" = $1 AND "userId" = $2`,
+      [threadId, req.user!.userId],
+    );
+    if (!existing) {
+      res.status(404).json({ error: 'Thread not found' });
+      return;
+    }
+    const updated = await queryOne(
+      `UPDATE "AiChatThread"
+       SET "title" = $1, "pinned" = $2, "updatedAt" = NOW()
+       WHERE "id" = $3 AND "userId" = $4
+       RETURNING *`,
+      [
+        req.body.title !== undefined ? req.body.title.trim() : existing.title,
+        req.body.pinned !== undefined ? req.body.pinned : existing.pinned,
+        threadId,
+        req.user!.userId,
+      ],
+    );
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update thread' });
+  }
+});
+
+router.delete('/threads/:id', async (req: AuthRequest, res) => {
+  try {
+    const threadId = paramId(req);
+    await query(`DELETE FROM "AiChatMessage" WHERE "threadId" = $1 AND "userId" = $2`, [threadId, req.user!.userId]);
+    await query(`DELETE FROM "AiChatThread" WHERE "id" = $1 AND "userId" = $2`, [threadId, req.user!.userId]);
+    res.json({ message: 'Thread deleted', id: threadId });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete thread' });
+  }
+});
+
 // ── Persistent Chat Thread History ──
 router.get('/chat/history', async (req: AuthRequest, res) => {
   try {
-    const messages = await query<{
-      id: string;
-      role: 'user' | 'assistant';
-      content: string;
-      createdAt: Date;
-    }>(
-      `SELECT "id", "role", "content", "createdAt"
-       FROM "AiChatMessage"
-       WHERE "userId" = $1
-       ORDER BY "createdAt" ASC
-       LIMIT 50`,
-      [req.user!.userId],
-    );
+    const threadId = typeof req.query.threadId === 'string' && req.query.threadId.trim() ? req.query.threadId.trim() : null;
+    const messages = threadId
+      ? await query<{
+          id: string;
+          role: 'user' | 'assistant';
+          content: string;
+          threadId: string | null;
+          createdAt: Date;
+        }>(
+          `SELECT "id", "role", "content", "threadId", "createdAt"
+           FROM "AiChatMessage"
+           WHERE "userId" = $1 AND "threadId" = $2
+           ORDER BY "createdAt" ASC
+           LIMIT 80`,
+          [req.user!.userId, threadId],
+        )
+      : await query<{
+          id: string;
+          role: 'user' | 'assistant';
+          content: string;
+          threadId: string | null;
+          createdAt: Date;
+        }>(
+          `SELECT "id", "role", "content", "threadId", "createdAt"
+           FROM "AiChatMessage"
+           WHERE "userId" = $1
+           ORDER BY "createdAt" ASC
+           LIMIT 50`,
+          [req.user!.userId],
+        );
     res.json(messages);
   } catch (error) {
     console.error('Error fetching chat history:', error);
@@ -75,7 +222,12 @@ router.get('/chat/history', async (req: AuthRequest, res) => {
 
 router.delete('/chat/history', async (req: AuthRequest, res) => {
   try {
-    await query(`DELETE FROM "AiChatMessage" WHERE "userId" = $1`, [req.user!.userId]);
+    const threadId = typeof req.query.threadId === 'string' && req.query.threadId.trim() ? req.query.threadId.trim() : null;
+    if (threadId) {
+      await query(`DELETE FROM "AiChatMessage" WHERE "userId" = $1 AND "threadId" = $2`, [req.user!.userId, threadId]);
+    } else {
+      await query(`DELETE FROM "AiChatMessage" WHERE "userId" = $1`, [req.user!.userId]);
+    }
     res.json({ message: 'Chat history cleared' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to clear chat history' });
@@ -89,6 +241,7 @@ const chatTurnSchema = z.object({
 
 const chatSchema = z.object({
   message: z.string().min(1).max(4000),
+  threadId: z.string().min(1).max(255).optional(),
   context: z.string().max(12000).optional(),
   lessonId: z.string().min(1).max(255).optional(),
   challengeId: z.string().min(1).max(255).optional(),
@@ -97,8 +250,43 @@ const chatSchema = z.object({
   history: z.array(chatTurnSchema).max(20).optional(),
 });
 
+async function persistChatMessages(params: {
+  userId: string;
+  threadId?: string;
+  userMessage: string;
+  assistantMessage: string;
+  userMeta: Record<string, unknown>;
+  assistantMeta: Record<string, unknown>;
+}) {
+  const { userId, threadId, userMessage, assistantMessage, userMeta, assistantMeta } = params;
+  await query(
+    `INSERT INTO "AiChatMessage" ("id", "userId", "threadId", "role", "content", "metadata")
+     VALUES ($1, $2, $3, 'user', $4, $5), ($6, $2, $3, 'assistant', $7, $8)`,
+    [
+      newId(),
+      userId,
+      threadId || null,
+      userMessage,
+      JSON.stringify(userMeta),
+      newId(),
+      assistantMessage,
+      JSON.stringify(assistantMeta),
+    ],
+  );
+  if (threadId) {
+    const autoTitle = userMessage.replace(/\s+/g, ' ').trim().slice(0, 52);
+    await query(
+      `UPDATE "AiChatThread"
+       SET "updatedAt" = NOW(),
+           "title" = CASE WHEN "title" = 'New Conversation' AND $3 <> '' THEN $3 ELSE "title" END
+       WHERE "id" = $1 AND "userId" = $2`,
+      [threadId, userId, autoTitle],
+    );
+  }
+}
+
 router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => {
-  const { message, context, lessonId, challengeId, uploadId, apiKey } = req.body;
+  const { message, threadId, context, lessonId, challengeId, uploadId, apiKey } = req.body;
   const customKey = apiKey || (req.headers['x-ai-api-key'] as string | undefined);
   const history: ChatTurn[] = Array.isArray(req.body.history) ? req.body.history.slice(-20) : [];
 
@@ -177,22 +365,18 @@ router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => 
   );
 
   // Persist chat turns in DB in background
-  query(
-    `INSERT INTO "AiChatMessage" ("id", "userId", "role", "content", "metadata")
-     VALUES ($1, $2, 'user', $3, $4), ($5, $2, 'assistant', $6, $7)`,
-    [
-      newId(),
-      req.user!.userId,
-      message,
-      JSON.stringify({ lessonId, challengeId, uploadId }),
-      newId(),
-      response,
-      JSON.stringify({ grounding: bundle.source }),
-    ],
-  ).catch((err) => console.error('Error saving chat message:', err));
+  persistChatMessages({
+    userId: req.user!.userId,
+    threadId,
+    userMessage: message,
+    assistantMessage: response,
+    userMeta: { lessonId, challengeId, uploadId },
+    assistantMeta: { grounding: bundle.source },
+  }).catch((err) => console.error('Error saving chat message:', err));
 
   res.json({
     response,
+    threadId: threadId ?? null,
     grounding: {
       source: bundle.source,
       lessonId: ref.lessonId ?? null,
@@ -207,7 +391,7 @@ router.post('/chat', validateBody(chatSchema), async (req: AuthRequest, res) => 
 
 // ── SSE Token Streaming Chat Endpoint ──
 router.post('/chat/stream', validateBody(chatSchema), async (req: AuthRequest, res) => {
-  const { message, context, lessonId, challengeId, uploadId, apiKey } = req.body;
+  const { message, threadId, context, lessonId, challengeId, uploadId, apiKey } = req.body;
   const customKey = apiKey || (req.headers['x-ai-api-key'] as string | undefined);
   const history: ChatTurn[] = Array.isArray(req.body.history) ? req.body.history.slice(-20) : [];
 
@@ -317,21 +501,16 @@ router.post('/chat/stream', validateBody(chatSchema), async (req: AuthRequest, r
     }
 
     // Persist to database in background
-    query(
-      `INSERT INTO "AiChatMessage" ("id", "userId", "role", "content", "metadata")
-       VALUES ($1, $2, 'user', $3, $4), ($5, $2, 'assistant', $6, $7)`,
-      [
-        newId(),
-        req.user!.userId,
-        message,
-        JSON.stringify({ lessonId, challengeId, uploadId }),
-        newId(),
-        fullText,
-        JSON.stringify({ grounding: bundle.source }),
-      ],
-    ).catch((err) => console.error('Error saving streaming chat message:', err));
+    persistChatMessages({
+      userId: req.user!.userId,
+      threadId,
+      userMessage: message,
+      assistantMessage: fullText,
+      userMeta: { lessonId, challengeId, uploadId },
+      assistantMeta: { grounding: bundle.source },
+    }).catch((err) => console.error('Error saving streaming chat message:', err));
 
-    res.write(`data: ${JSON.stringify({ type: 'done', fullResponse: fullText })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'done', fullResponse: fullText, threadId: threadId ?? null })}\n\n`);
     res.end();
   } catch (err: any) {
     res.write(`data: ${JSON.stringify({ type: 'error', error: err.message || 'Streaming failed' })}\n\n`);
@@ -952,6 +1131,12 @@ router.post('/lecture-to-life', validateBody(lectureSchema), async (req: AuthReq
     ],
   );
 
+  if (upload && (upload as any).id && Array.isArray(materials.flashcards)) {
+    syncFlashcardsToSrs(req.user!.userId, (upload as any).id, fileName, materials.flashcards).catch((err) =>
+      console.error('SRS sync error:', err),
+    );
+  }
+
   await awardXp(req.user!.userId, 30, 'Lecture converted to study materials');
   res.status(201).json(upload);
 });
@@ -998,6 +1183,12 @@ router.post('/lecture-to-life/:id/regenerate', async (req: AuthRequest, res) => 
     ],
   );
 
+  if (Array.isArray(materials.flashcards)) {
+    syncFlashcardsToSrs(req.user!.userId, existing.id, existing.fileName, materials.flashcards).catch((err) =>
+      console.error('SRS sync error:', err),
+    );
+  }
+
   res.json(upload);
 });
 
@@ -1023,16 +1214,19 @@ router.get('/lecture-to-life', async (req: AuthRequest, res) => {
 });
 
 router.delete('/lecture-to-life', async (req: AuthRequest, res) => {
+  await query('DELETE FROM "FlashcardReview" WHERE "userId" = $1', [req.user!.userId]);
   await query('DELETE FROM "LectureUpload" WHERE "userId" = $1', [req.user!.userId]);
   res.json({ message: 'All saved lecture sessions cleared.' });
 });
 
 router.delete('/lecture-to-life/:id', async (req: AuthRequest, res) => {
+  const uploadId = paramId(req);
+  await query('DELETE FROM "FlashcardReview" WHERE "uploadId" = $1 AND "userId" = $2', [uploadId, req.user!.userId]);
   const deleted = await queryOne<{ id: string }>(
     `DELETE FROM "LectureUpload"
      WHERE "id" = $1 AND "userId" = $2
      RETURNING "id"`,
-    [paramId(req), req.user!.userId],
+    [uploadId, req.user!.userId],
   );
   if (!deleted) {
     res.status(404).json({ error: 'Session not found' });
@@ -1041,5 +1235,260 @@ router.delete('/lecture-to-life/:id', async (req: AuthRequest, res) => {
   res.json({ message: 'Lecture session deleted.', id: deleted.id });
 });
 
+// ── Spaced Repetition (SRS) SM-2 Flashcard Review Engine ──
+
+async function syncFlashcardsToSrs(
+  userId: string,
+  uploadId: string,
+  deckTitle: string,
+  flashcards: Array<{ front?: string; back?: string; question?: string; answer?: string }>,
+): Promise<number> {
+  let added = 0;
+  for (let i = 0; i < flashcards.length; i++) {
+    const raw = flashcards[i];
+    const front = (raw.front || raw.question || '').trim();
+    const back = (raw.back || raw.answer || '').trim();
+    if (!front || !back) continue;
+    const cardKey = `${uploadId}:${i}`;
+    await query(
+      `INSERT INTO "FlashcardReview" ("id", "userId", "uploadId", "cardKey", "front", "back", "deckTitle")
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT ("userId", "cardKey") DO UPDATE
+         SET "front" = EXCLUDED."front",
+             "back" = EXCLUDED."back",
+             "deckTitle" = EXCLUDED."deckTitle"`,
+      [newId(), userId, uploadId, cardKey, front, back, deckTitle || 'Study Pack'],
+    );
+    added++;
+  }
+  return added;
+}
+
+router.get('/srs/due', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const uploadFilter = typeof req.query.uploadId === 'string' && req.query.uploadId.trim() ? req.query.uploadId.trim() : null;
+
+    // Backfill any existing LectureUpload flashcards not yet in FlashcardReview
+    const uploads = await query<{ id: string; fileName: string; flashcards: unknown }>(
+      `SELECT "id", "fileName", "flashcards"
+       FROM "LectureUpload"
+       WHERE "userId" = $1
+       ORDER BY "createdAt" DESC
+       LIMIT 20`,
+      [userId],
+    );
+    for (const u of uploads) {
+      let cards: any[] = [];
+      if (Array.isArray(u.flashcards)) {
+        cards = u.flashcards;
+      } else if (typeof u.flashcards === 'string') {
+        try {
+          const parsed = JSON.parse(u.flashcards);
+          if (Array.isArray(parsed)) cards = parsed;
+        } catch {
+          // ignore
+        }
+      }
+      if (cards.length > 0) {
+        await syncFlashcardsToSrs(userId, u.id, u.fileName, cards);
+      }
+    }
+
+    const allCards = uploadFilter
+      ? await query<{
+          id: string;
+          uploadId: string | null;
+          cardKey: string;
+          front: string;
+          back: string;
+          deckTitle: string;
+          easeFactor: number;
+          intervalDays: number;
+          repetitions: number;
+          nextReviewAt: string;
+          lastReviewedAt: string | null;
+        }>(
+          `SELECT "id", "uploadId", "cardKey", "front", "back", "deckTitle",
+                  "easeFactor", "intervalDays", "repetitions", "nextReviewAt", "lastReviewedAt"
+           FROM "FlashcardReview"
+           WHERE "userId" = $1 AND "uploadId" = $2
+           ORDER BY "nextReviewAt" ASC`,
+          [userId, uploadFilter],
+        )
+      : await query<{
+          id: string;
+          uploadId: string | null;
+          cardKey: string;
+          front: string;
+          back: string;
+          deckTitle: string;
+          easeFactor: number;
+          intervalDays: number;
+          repetitions: number;
+          nextReviewAt: string;
+          lastReviewedAt: string | null;
+        }>(
+          `SELECT "id", "uploadId", "cardKey", "front", "back", "deckTitle",
+                  "easeFactor", "intervalDays", "repetitions", "nextReviewAt", "lastReviewedAt"
+           FROM "FlashcardReview"
+           WHERE "userId" = $1
+           ORDER BY "nextReviewAt" ASC`,
+          [userId],
+        );
+
+    const nowMs = Date.now();
+    const dueCards = allCards.filter((c) => new Date(c.nextReviewAt).getTime() <= nowMs);
+    const masteredCount = allCards.filter((c) => c.intervalDays >= 7 || c.repetitions >= 3).length;
+    const avgEase =
+      allCards.length > 0
+        ? Number((allCards.reduce((sum, c) => sum + Number(c.easeFactor || 2.5), 0) / allCards.length).toFixed(2))
+        : 2.5;
+
+    res.json({
+      cards: dueCards,
+      dueCards,
+      allCards,
+      dueCount: dueCards.length,
+      totalCount: allCards.length,
+      stats: {
+        dueCount: dueCards.length,
+        totalCards: allCards.length,
+        masteredCount,
+        averageEase: avgEase,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching SRS due cards:', error);
+    res.status(500).json({ error: 'Failed to load Spaced Repetition deck' });
+  }
+});
+
+const srsReviewSchema = z.object({
+  cardId: z.string().min(1).optional(),
+  lectureId: z.string().optional().nullable(),
+  front: z.string().optional(),
+  back: z.string().optional(),
+  quality: z.number().int().min(0).max(5), // 1 = Again, 3 = Hard, 4 = Good, 5 = Easy
+});
+
+router.post('/srs/review', validateBody(srsReviewSchema), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { cardId, lectureId, front, back, quality } = req.body;
+
+    let card = cardId
+      ? await queryOne<{
+          id: string;
+          easeFactor: number;
+          intervalDays: number;
+          repetitions: number;
+        }>(
+          `SELECT "id", "easeFactor", "intervalDays", "repetitions"
+           FROM "FlashcardReview"
+           WHERE "id" = $1 AND "userId" = $2`,
+          [cardId, userId],
+        )
+      : null;
+
+    if (!card && front) {
+      const trimmedFront = front.trim();
+      const trimmedBack = (back || '').trim();
+      card = await queryOne<{
+        id: string;
+        easeFactor: number;
+        intervalDays: number;
+        repetitions: number;
+      }>(
+        `SELECT "id", "easeFactor", "intervalDays", "repetitions"
+         FROM "FlashcardReview"
+         WHERE "userId" = $1 AND "front" = $2
+         ORDER BY "createdAt" DESC
+         LIMIT 1`,
+        [userId, trimmedFront],
+      );
+
+      if (!card) {
+        const cardKey = `${lectureId || 'pack'}:${trimmedFront.slice(0, 80)}`;
+        card = await queryOne<{
+          id: string;
+          easeFactor: number;
+          intervalDays: number;
+          repetitions: number;
+        }>(
+          `INSERT INTO "FlashcardReview" ("id", "userId", "uploadId", "cardKey", "front", "back", "deckTitle")
+           VALUES ($1, $2, $3, $4, $5, $6, 'Study Pack')
+           ON CONFLICT ("userId", "cardKey") DO UPDATE
+             SET "front" = EXCLUDED."front",
+                 "back" = EXCLUDED."back"
+           RETURNING "id", "easeFactor", "intervalDays", "repetitions"`,
+          [newId(), userId, lectureId || null, cardKey, trimmedFront, trimmedBack || 'Flashcard Answer'],
+        );
+      }
+    }
+
+    if (!card) {
+      res.status(404).json({ error: 'Flashcard not found in SRS deck' });
+      return;
+    }
+
+    // SuperMemo SM-2 algorithm
+    let repetitions = Number(card.repetitions) || 0;
+    let intervalDays = Number(card.intervalDays) || 0;
+    let easeFactor = Number(card.easeFactor) || 2.5;
+
+    if (quality < 3) {
+      repetitions = 0;
+      intervalDays = 0; // Review again in same session / within 10 minutes
+    } else {
+      if (repetitions === 0) {
+        intervalDays = 1;
+      } else if (repetitions === 1) {
+        intervalDays = 3;
+      } else {
+        intervalDays = Math.max(1, Math.round(intervalDays * easeFactor));
+      }
+      if (quality === 5) {
+        intervalDays = Math.max(intervalDays + 1, Math.round(intervalDays * 1.3));
+      }
+      repetitions += 1;
+    }
+
+    easeFactor = Math.max(
+      1.3,
+      Number((easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))).toFixed(2)),
+    );
+
+    const nextReviewAt =
+      intervalDays === 0
+        ? new Date(Date.now() + 10 * 60 * 1000) // 10 minutes if "Again"
+        : new Date(Date.now() + intervalDays * 24 * 60 * 60 * 1000);
+
+    const updated = await queryOne(
+      `UPDATE "FlashcardReview"
+       SET "easeFactor" = $1,
+           "intervalDays" = $2,
+           "repetitions" = $3,
+           "nextReviewAt" = $4,
+           "lastReviewedAt" = NOW()
+       WHERE "id" = $5 AND "userId" = $6
+       RETURNING *`,
+      [easeFactor, intervalDays, repetitions, nextReviewAt, card.id, userId],
+    );
+
+    await awardXp(userId, 5, 'Reviewed flashcard with Spaced Repetition (SM-2)');
+
+    res.json({
+      card: updated,
+      xpAwarded: 5,
+      nextIntervalDays: intervalDays,
+    });
+  } catch (error) {
+    console.error('Error recording SRS review:', error);
+    res.status(500).json({ error: 'Failed to record flashcard review' });
+  }
+});
+
 export default router;
+
 

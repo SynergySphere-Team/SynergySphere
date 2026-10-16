@@ -51,17 +51,96 @@ export default function LectureToLifeScreen() {
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Spaced Repetition (SM-2) Review State
+  const [srsDueCards, setSrsDueCards] = useState<
+    Array<{
+      id: string;
+      front: string;
+      back: string;
+      easeFactor: number;
+      intervalDays: number;
+      repetitions: number;
+      lectureId?: string;
+    }>
+  >([]);
+  const [srsTotalCount, setSrsTotalCount] = useState(0);
+  const [srsFlippedId, setSrsFlippedId] = useState<string | null>(null);
+  const [srsReviewing, setSrsReviewing] = useState(false);
+  const [srsToast, setSrsToast] = useState<string | null>(null);
+
+  const loadSrsDue = useCallback(async () => {
+    try {
+      const res = await api.get<{
+        dueCount: number;
+        totalCount: number;
+        cards: Array<{
+          id: string;
+          front: string;
+          back: string;
+          easeFactor: number;
+          intervalDays: number;
+          repetitions: number;
+          lectureId?: string;
+        }>;
+      }>('/ai/srs/due');
+      if (res && Array.isArray(res.cards)) {
+        setSrsDueCards(res.cards);
+        setSrsTotalCount(res.totalCount || res.cards.length);
+      }
+    } catch {
+      // ignore if offline
+    }
+  }, []);
+
+  const handleSrsReview = useCallback(
+    async (
+      card: { id?: string; front: string; back: string; lectureId?: string },
+      quality: 1 | 3 | 4 | 5
+    ) => {
+      if (srsReviewing) return;
+      setSrsReviewing(true);
+      try {
+        const res = await api.post<{
+          xpAwarded: number;
+          card: { intervalDays: number; easeFactor: number };
+        }>('/ai/srs/review', {
+          cardId: card.id,
+          front: card.front,
+          back: card.back,
+          lectureId: card.lectureId || selected?.id,
+          quality,
+        });
+        if (card.id) {
+          setSrsDueCards((prev) => prev.filter((c) => c.id !== card.id));
+          setSrsFlippedId(null);
+        }
+        const nextDays = res?.card?.intervalDays ?? 1;
+        const xpMsg = res?.xpAwarded ? ` • +${res.xpAwarded} XP!` : '';
+        setSrsToast(`Scheduled next review in ${nextDays} day${nextDays === 1 ? '' : 's'}${xpMsg}`);
+        setTimeout(() => setSrsToast(null), 3200);
+        loadSrsDue();
+      } catch {
+        setSrsToast('Saved review locally');
+        setTimeout(() => setSrsToast(null), 2500);
+      } finally {
+        setSrsReviewing(false);
+      }
+    },
+    [srsReviewing, selected?.id, loadSrsDue]
+  );
+
   const load = useCallback(async () => {
     try {
       const data = await api.get<LectureUpload[]>('/ai/lecture-to-life');
       setUploads(data);
       setSelected((current) => current || data[0] || null);
+      loadSrsDue();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load study materials.');
     } finally {
       setLoaded(true);
     }
-  }, []);
+  }, [loadSrsDue]);
 
   async function clearAllPacks() {
     if (Platform.OS === 'web') {
@@ -233,6 +312,7 @@ export default function LectureToLifeScreen() {
       setContent('');
       setSelectedDocName(null);
       setSelectedDocType(null);
+      loadSrsDue();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create study materials.');
     } finally {
@@ -324,6 +404,99 @@ export default function LectureToLifeScreen() {
       </View>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
+      {srsToast ? <Notice tone="success">{srsToast}</Notice> : null}
+
+      {/* Spaced Repetition (SM-2) Active Recall Queue */}
+      {srsDueCards.length > 0 && (
+        <>
+          <View style={styles.sectionHeaderRowBetween}>
+            <View style={styles.sectionTitleWithIcon}>
+              <Ionicons name="flame" size={18} color="#F59E0B" />
+              <Text style={[styles.sectionHeading, { color: colors.text }]}>
+                Due for Review ({srsDueCards.length})
+              </Text>
+            </View>
+            <View
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 999,
+                backgroundColor: isLight ? '#FEF3C7' : 'rgba(245, 158, 11, 0.18)',
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#D97706' }}>
+                SM-2 Spaced Repetition • +5 XP
+              </Text>
+            </View>
+          </View>
+          <Card>
+            {(() => {
+              const currentCard = srsDueCards[0];
+              const isCardFlipped = srsFlippedId === currentCard.id;
+              return (
+                <View style={{ gap: 10 }}>
+                  <Pressable
+                    onPress={() => setSrsFlippedId(isCardFlipped ? null : currentCard.id)}
+                    style={[
+                      styles.flashcard,
+                      {
+                        backgroundColor: isCardFlipped
+                          ? isLight
+                            ? '#E2F5DA'
+                            : colors.primaryDark
+                          : colors.surfaceElevated,
+                        borderColor: isCardFlipped ? brandGreen : colors.border,
+                      },
+                    ]}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={[styles.flashcardLabel, { color: brandGreen }]}>
+                        {isCardFlipped ? 'ANSWER' : 'DUE FLASHCARD'}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: colors.muted, fontWeight: '600' }}>
+                        Interval: {currentCard.intervalDays}d • EF: {Number(currentCard.easeFactor || 2.5).toFixed(2)}
+                      </Text>
+                    </View>
+                    <Text style={[styles.flashcardText, { color: colors.text }]}>
+                      {isCardFlipped ? currentCard.back : currentCard.front}
+                    </Text>
+                    <Text style={[styles.flashcardHint, { color: colors.muted }]}>
+                      {isCardFlipped ? 'Rate your recall below to schedule next review' : 'Tap to reveal answer'}
+                    </Text>
+                  </Pressable>
+                  {isCardFlipped && (
+                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                      {[
+                        { label: 'Again (1d)', quality: 1 as const, bg: '#FEE2E2', text: '#DC2626' },
+                        { label: 'Hard', quality: 3 as const, bg: '#FEF3C7', text: '#D97706' },
+                        { label: 'Good (+5 XP)', quality: 4 as const, bg: '#D1FAE5', text: '#059669' },
+                        { label: 'Easy (+5 XP)', quality: 5 as const, bg: '#DBEAFE', text: '#2563EB' },
+                      ].map((btn) => (
+                        <Pressable
+                          key={btn.quality}
+                          disabled={srsReviewing}
+                          onPress={() => handleSrsReview(currentCard, btn.quality)}
+                          style={{
+                            flex: 1,
+                            minWidth: 74,
+                            paddingVertical: 9,
+                            paddingHorizontal: 8,
+                            borderRadius: 10,
+                            backgroundColor: btn.bg,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{ fontSize: 11.5, fontWeight: '800', color: btn.text }}>{btn.label}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
+          </Card>
+        </>
+      )}
 
       {/* Upload and Input Section */}
       <View style={styles.sectionHeaderRow}>
@@ -518,30 +691,63 @@ export default function LectureToLifeScreen() {
                 {flashcards.map((card, index) => {
                   const isFlipped = flipped === index;
                   return (
-                    <Pressable
-                      key={index}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Flip flashcard ${index + 1}`}
-                      onPress={() => setFlipped(isFlipped ? null : index)}
-                      style={({ pressed }) => [
-                        styles.flashcard,
-                        {
-                          backgroundColor: isFlipped ? (isLight ? '#E2F5DA' : colors.primaryDark) : colors.surfaceElevated,
-                          borderColor: isFlipped ? brandGreen : colors.border,
-                        },
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <Text style={[styles.flashcardLabel, { color: brandGreen }]}>
-                        {isFlipped ? 'ANSWER' : `CARD ${index + 1}`}
-                      </Text>
-                      <Text style={[styles.flashcardText, { color: colors.text }]}>
-                        {isFlipped ? card.back : card.front}
-                      </Text>
-                      <Text style={[styles.flashcardHint, { color: colors.muted }]}>
-                        {isFlipped ? 'Tap to see the question' : 'Tap to reveal answer'}
-                      </Text>
-                    </Pressable>
+                    <View key={index} style={{ gap: 8 }}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Flip flashcard ${index + 1}`}
+                        onPress={() => setFlipped(isFlipped ? null : index)}
+                        style={({ pressed }) => [
+                          styles.flashcard,
+                          {
+                            backgroundColor: isFlipped ? (isLight ? '#E2F5DA' : colors.primaryDark) : colors.surfaceElevated,
+                            borderColor: isFlipped ? brandGreen : colors.border,
+                          },
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text style={[styles.flashcardLabel, { color: brandGreen }]}>
+                          {isFlipped ? 'ANSWER' : `CARD ${index + 1}`}
+                        </Text>
+                        <Text style={[styles.flashcardText, { color: colors.text }]}>
+                          {isFlipped ? card.back : card.front}
+                        </Text>
+                        <Text style={[styles.flashcardHint, { color: colors.muted }]}>
+                          {isFlipped ? 'Tap to see the question • Rate recall below' : 'Tap to reveal answer'}
+                        </Text>
+                      </Pressable>
+                      {isFlipped && (
+                        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
+                          {[
+                            { label: 'Again', quality: 1 as const, bg: '#FEE2E2', text: '#DC2626' },
+                            { label: 'Hard', quality: 3 as const, bg: '#FEF3C7', text: '#D97706' },
+                            { label: 'Good (+5 XP)', quality: 4 as const, bg: '#D1FAE5', text: '#059669' },
+                            { label: 'Easy (+5 XP)', quality: 5 as const, bg: '#DBEAFE', text: '#2563EB' },
+                          ].map((btn) => (
+                            <Pressable
+                              key={btn.quality}
+                              disabled={srsReviewing}
+                              onPress={() =>
+                                handleSrsReview(
+                                  { front: card.front, back: card.back, lectureId: selected?.id },
+                                  btn.quality
+                                )
+                              }
+                              style={{
+                                flex: 1,
+                                minWidth: 68,
+                                paddingVertical: 7,
+                                paddingHorizontal: 6,
+                                borderRadius: 8,
+                                backgroundColor: btn.bg,
+                                alignItems: 'center',
+                              }}
+                            >
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: btn.text }}>{btn.label}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      )}
+                    </View>
                   );
                 })}
               </Card>

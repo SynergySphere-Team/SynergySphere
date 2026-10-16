@@ -86,6 +86,68 @@ export interface ProfileSignalData {
   };
 }
 
+/**
+ * Timezone-safe consecutive day streak calculation using Intl.DateTimeFormat('en-CA').
+ * Returns 0 if no activity occurred today or yesterday in the specified timezone.
+ */
+export function computeConsecutiveStreak(dates: Array<Date | string>, timeZone = 'UTC'): number {
+  if (!dates || dates.length === 0) return 0;
+
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  } catch {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'UTC',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  }
+
+  const toDateStr = (d: Date | string): string => {
+    if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.trim())) {
+      return d.trim();
+    }
+    const parsed = d instanceof Date ? d : new Date(d);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return formatter.format(parsed);
+  };
+
+  const activeSet = new Set<string>();
+  for (const d of dates) {
+    const str = toDateStr(d);
+    if (str) activeSet.add(str);
+  }
+  if (activeSet.size === 0) return 0;
+
+  const now = new Date();
+  const todayStr = formatter.format(now);
+  const yesterdayStr = formatter.format(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+
+  let cursorStr = activeSet.has(todayStr) ? todayStr : activeSet.has(yesterdayStr) ? yesterdayStr : null;
+  if (!cursorStr) return 0;
+
+  let streak = 0;
+  let cursorUtcMs = Date.parse(`${cursorStr}T12:00:00Z`);
+  while (true) {
+    const dayKey = new Date(cursorUtcMs).toISOString().slice(0, 10);
+    if (activeSet.has(dayKey)) {
+      streak++;
+      cursorUtcMs -= 24 * 60 * 60 * 1000;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}
+
 export async function getProfileSignals(userId: string): Promise<ProfileSignalData> {
   // 1. Fetch completed lessons from LectureLessonProgress
   const completedRows = await query<{ lessonId: string }>(

@@ -187,6 +187,8 @@ export default function AIAssistantScreen() {
         "👋 Hi! I'm your SynergySphere AI Workspace assistant, grounded in the Learning Hub and your study packs. Ask about the lesson you're studying, paste code, or use quick actions!",
     },
   ]);
+  const [threads, setThreads] = useState<Array<{ id: string; title: string; updatedAt: string }>>([]);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [context, setContext] = useState('');
   const [contextEditedByUser, setContextEditedByUser] = useState(false);
@@ -446,11 +448,21 @@ export default function AIAssistantScreen() {
 
       const response = await api.post<{ response: string; grounding?: Grounding }>('/ai/chat', {
         message: question,
+        ...(activeThreadId ? { threadId: activeThreadId } : {}),
         ...(contextToSend ? { context: contextToSend } : {}),
         ...(lesson ? { lessonId: lesson.id } : {}),
         history: historyFromMessages(baseMessages).slice(-20),
         ...(storedKey ? { apiKey: storedKey } : {}),
       });
+      if (activeThreadId) {
+        setThreads((prev) =>
+          prev.map((t) =>
+            t.id === activeThreadId && (t.title === 'New Chat Thread' || t.title === 'Untitled Thread')
+              ? { ...t, title: question.slice(0, 44) }
+              : t
+          )
+        );
+      }
       setMessages((current) => [
         ...current,
         {
@@ -558,47 +570,80 @@ export default function AIAssistantScreen() {
     }
   }
 
-  // Fetch chat history on mount & merge with persistent queries
+  // Load threads on mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const history = await api.get<Array<{ id: string; role: 'user' | 'assistant'; content: string }>>(
-          '/ai/chat/history'
-        );
-        if (!cancelled && Array.isArray(history) && history.length > 0) {
-          setMessages(
-            history.map((m) => ({
-              role: m.role,
-              content: m.content,
-            }))
-          );
+        const list = await api.get<Array<{ id: string; title: string; updatedAt: string }>>('/ai/threads');
+        if (!cancelled && Array.isArray(list)) {
+          setThreads(list);
+          if (list.length > 0 && !activeThreadId) {
+            setActiveThreadId(list[0].id);
+          }
+        }
+      } catch {
+        // ignore if offline
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-          // Seed user questions from server into persistent history if absent
-          setHistoryQueries((prev) => {
-            const existingSet = new Set(prev.map((p) => p.query.trim().toLowerCase()));
-            const newItems: QueryHistoryItem[] = [];
-            history.forEach((m, idx) => {
-              if (m.role === 'user' && !existingSet.has(m.content.trim().toLowerCase())) {
-                existingSet.add(m.content.trim().toLowerCase());
-                const nextMsg = history[idx + 1];
-                const snippet =
-                  nextMsg && nextMsg.role === 'assistant'
-                    ? nextMsg.content.slice(0, 95).replace(/[#*`\n]/g, ' ').trim()
-                    : undefined;
-                newItems.push({
-                  id: `remote_${m.id || idx}_${Date.now()}`,
-                  query: m.content,
-                  timestamp: Date.now() - (history.length - idx) * 60000,
-                  responseSnippet: snippet,
-                });
-              }
+  // Fetch chat history on mount / thread change & merge with persistent queries
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const querySuffix = activeThreadId ? `?threadId=${encodeURIComponent(activeThreadId)}` : '';
+        const history = await api.get<Array<{ id: string; role: 'user' | 'assistant'; content: string }>>(
+          `/ai/chat/history${querySuffix}`
+        );
+        if (!cancelled && Array.isArray(history)) {
+          if (history.length > 0) {
+            setMessages(
+              history.map((m) => ({
+                role: m.role,
+                content: m.content,
+              }))
+            );
+
+            // Seed user questions from server into persistent history if absent
+            setHistoryQueries((prev) => {
+              const existingSet = new Set(prev.map((p) => p.query.trim().toLowerCase()));
+              const newItems: QueryHistoryItem[] = [];
+              history.forEach((m, idx) => {
+                if (m.role === 'user' && !existingSet.has(m.content.trim().toLowerCase())) {
+                  existingSet.add(m.content.trim().toLowerCase());
+                  const nextMsg = history[idx + 1];
+                  const snippet =
+                    nextMsg && nextMsg.role === 'assistant'
+                      ? nextMsg.content.slice(0, 95).replace(/[#*`\n]/g, ' ').trim()
+                      : undefined;
+                  newItems.push({
+                    id: `remote_${m.id || idx}_${Date.now()}`,
+                    query: m.content,
+                    timestamp: Date.now() - (history.length - idx) * 60000,
+                    responseSnippet: snippet,
+                  });
+                }
+              });
+              if (newItems.length === 0) return prev;
+              const merged = [...newItems, ...prev].slice(0, 50);
+              SecureStore.setItemAsync(QUERY_HISTORY_STORAGE_KEY, JSON.stringify(merged)).catch(() => {});
+              return merged;
             });
-            if (newItems.length === 0) return prev;
-            const merged = [...newItems, ...prev].slice(0, 50);
-            SecureStore.setItemAsync(QUERY_HISTORY_STORAGE_KEY, JSON.stringify(merged)).catch(() => {});
-            return merged;
-          });
+          } else if (activeThreadId) {
+            setMessages([
+              {
+                role: 'assistant',
+                content: lesson
+                  ? `👋 Ready for a discussion about **${lesson.title}**! How can I help you?`
+                  : "👋 Starting a fresh workspace conversation! Ask about code, algorithms, or your studies.",
+              },
+            ]);
+          }
         }
       } catch {
         // Continue with default welcome message
@@ -607,9 +652,9 @@ export default function AIAssistantScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activeThreadId]);
 
-  function startNewConversation() {
+  async function startNewConversation() {
     setMessages([
       {
         role: 'assistant',
@@ -619,11 +664,39 @@ export default function AIAssistantScreen() {
       },
     ]);
     setMessage('');
+    try {
+      const created = await api.post<{ id: string; title: string; updatedAt: string }>('/ai/threads', {
+        title: lesson ? `${lesson.title}` : 'New Chat Thread',
+        lessonId: lesson?.id,
+      });
+      if (created?.id) {
+        setThreads((prev) => [created, ...prev.filter((t) => t.id !== created.id)]);
+        setActiveThreadId(created.id);
+      }
+    } catch {
+      setActiveThreadId(null);
+    }
     // NOTE: historyQueries remains 100% preserved so previous questions never vanish!
-    showToast('New chat started • Past queries saved in History');
+    showToast('New thread created • Past queries saved in History');
     setTimeout(() => {
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }, 100);
+  }
+
+  async function deleteThread(threadId: string) {
+    try {
+      await api.delete(`/ai/threads/${threadId}`);
+    } catch {
+      // ignore
+    }
+    setThreads((prev) => {
+      const remaining = prev.filter((t) => t.id !== threadId);
+      if (activeThreadId === threadId) {
+        setActiveThreadId(remaining[0]?.id || null);
+      }
+      return remaining;
+    });
+    showToast('Thread deleted');
   }
 
   function resetCurrentThread() {
@@ -1035,6 +1108,69 @@ export default function AIAssistantScreen() {
               </Pressable>
             </View>
           </View>
+
+          {/* ── Multi-Thread Selector Chips ── */}
+          {threads.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingVertical: 4, marginBottom: 8 }}
+            >
+              {threads.map((t) => {
+                const isSelected = activeThreadId === t.id;
+                return (
+                  <View
+                    key={t.id}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: isSelected ? primaryAccent : colors.border,
+                      backgroundColor: isSelected
+                        ? isLight
+                          ? '#E8F5E9'
+                          : 'rgba(145, 219, 94, 0.16)'
+                        : colors.surfaceElevated,
+                      paddingLeft: 12,
+                      paddingRight: 8,
+                      paddingVertical: 5,
+                      gap: 6,
+                    }}
+                  >
+                    <Pressable
+                      onPress={() => setActiveThreadId(t.id)}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                    >
+                      <Ionicons
+                        name="chatbubble-ellipses-outline"
+                        size={12}
+                        color={isSelected ? primaryAccent : colors.muted}
+                      />
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          maxWidth: 150,
+                          fontSize: 12,
+                          fontWeight: isSelected ? '700' : '600',
+                          color: isSelected ? (isLight ? '#1e6827' : '#91db5e') : colors.text,
+                        }}
+                      >
+                        {t.title || 'Untitled Thread'}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() => deleteThread(t.id)}
+                      accessibilityLabel={`Delete thread ${t.title}`}
+                    >
+                      <Ionicons name="close-circle" size={14} color={colors.muted} />
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
 
           {/* ── Big Chat History Drawer (ONLY rendered when expanded via the mini history tab) ── */}
           {isHistoryExpanded && (

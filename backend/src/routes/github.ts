@@ -7,6 +7,7 @@ import { awardXp } from '../services/gamification.js';
 import { accessTokenForUser, beginDeviceAuthorization, githubConnection, githubRequest, GithubError, isValidWebhookSignature, pollDeviceAuthorization, revokeGithubConnection, saveGithubToken } from '../services/github.js';
 import { decryptSecret, encryptSecret } from '../services/crypto.js';
 import { generateCommunityProject, type WizardInput } from '../services/projectGeneration.js';
+import { broadcastNotification } from '../services/realtime.js';
 
 const router = Router();
 const bodyRouter = Router();
@@ -29,10 +30,13 @@ async function addActivity(projectId: string, event: { id?: string; type: string
 
 async function notifyUsers(userIds: string[], title: string, message: string, type: string) {
   const ids = [...new Set(userIds)];
-  await Promise.all(ids.map((userId) => queryOne(
-    `INSERT INTO "Notification" ("id", "userId", "title", "message", "type") VALUES ($1, $2, $3, $4, $5) RETURNING "id"`,
+  const created = await Promise.all(ids.map((userId) => queryOne(
+    `INSERT INTO "Notification" ("id", "userId", "title", "message", "type") VALUES ($1, $2, $3, $4, $5) RETURNING *`,
     [newId(), userId, title, message, type],
   )));
+  for (let i = 0; i < ids.length; i++) {
+    if (created[i]) broadcastNotification(ids[i], created[i]);
+  }
   const tokens = await query<{ token: string }>(`SELECT "token" FROM "PushToken" WHERE "userId" = ANY($1::text[])`, [ids]);
   if (tokens.length) {
     void fetch('https://exp.host/--/api/v2/push/send', {

@@ -110,9 +110,28 @@ export function getCandidateApiUrls(): string[] {
   return [...new Set(candidates.filter(Boolean))];
 }
 
+import {
+  enqueueOfflineMutation,
+  flushOfflineQueue,
+  getOfflineQueue,
+  getOfflineStatus,
+  isCacheableGetPath,
+  loadCachedResponse,
+  saveCachedResponse,
+  setOfflineStatus,
+  subscribeOfflineStatus,
+} from './offlineCache';
+
+export { getOfflineStatus, subscribeOfflineStatus, getOfflineQueue };
+
 export function getApiUrl(): string {
   const candidates = getCandidateApiUrls();
   return candidates[0] || 'http://localhost:4000/api';
+}
+
+export function getWsUrl(): string {
+  const apiUrl = getApiUrl();
+  return apiUrl.replace(/^http/i, 'ws').replace(/\/api\/?$/, '/ws');
 }
 
 export class ApiError extends Error {
@@ -134,6 +153,7 @@ async function getToken(): Promise<string | null> {
 
 const REQUEST_TIMEOUT_MS = 10_000;
 const FALLBACK_TIMEOUT_MS = 3_000;
+let isFlushingQueue = false;
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const candidateUrls = getCandidateApiUrls();
@@ -141,10 +161,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError('API URL is not configured. Set EXPO_PUBLIC_API_URL in mobile/.env.');
   }
 
+  const method = (options.method || 'GET').toUpperCase();
   const token = await getToken();
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'X-SynergySphere-Client': 'mobile',
+    'X-Tz-Offset': String(new Date().getTimezoneOffset()),
     ...(options.headers as Record<string, string> | undefined),
   };
   if (options.body) headers['Content-Type'] = 'application/json';
@@ -183,6 +205,33 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!response) {
+    // Offline fallback for cacheable GET routes
+    if (method === 'GET' && isCacheableGetPath(path)) {
+      const cached = await loadCachedResponse<T>(path);
+      if (cached !== null) {
+        const q = await getOfflineQueue();
+        setOfflineStatus(true, q.length);
+        return cached;
+      }
+    }
+
+    // Offline queue for task status updates and focus sessions
+    if (
+      (method === 'PATCH' && path.startsWith('/tasks/')) ||
+      (method === 'POST' && path === '/tasks/focus-session')
+    ) {
+      let parsedBody: unknown;
+      try {
+        parsedBody = typeof options.body === 'string' ? JSON.parse(options.body) : undefined;
+      } catch {
+        parsedBody = undefined;
+      }
+      await enqueueOfflineMutation(method as 'PATCH' | 'POST', path, parsedBody);
+      const q = await getOfflineQueue();
+      setOfflineStatus(true, q.length);
+      return ({ ...(typeof parsedBody === 'object' && parsedBody ? parsedBody : {}), offlineQueued: true } as unknown) as T;
+    }
+
     const triedUrl = successfulBaseUrl || candidateUrls[0];
     if (lastError?.name === 'AbortError') {
       throw new ApiError(
@@ -209,6 +258,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
     const message = body.error || defaultMessages[response.status] || 'Request failed.';
     throw new ApiError(message, response.status, body.details);
+  }
+
+  // Connection succeeded — mark online, cache GET responses, and flush any queued offline mutations
+  setOfflineStatus(false, 0);
+  if (method === 'GET' && isCacheableGetPath(path)) {
+    void saveCachedResponse(path, body);
+  }
+  if (!isFlushingQueue) {
+    isFlushingQueue = true;
+    void flushOfflineQueue((qPath, qOpts) => request(qPath, qOpts)).finally(() => {
+      isFlushingQueue = false;
+    });
   }
 
   return body as T;

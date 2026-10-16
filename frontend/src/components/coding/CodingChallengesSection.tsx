@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/utils';
+import { LiveCodeRoomBar } from './LiveCodeRoomBar';
 import {
   AlertCircle,
   BookOpen,
@@ -1756,6 +1757,12 @@ export function CodingChallengesSection({ showHeading = true }: CodingChallenges
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
+              <LiveCodeRoomBar
+                challengeId={selected.id}
+                language={selected.language}
+                code={code}
+                onRemoteCodeChange={(nextCode) => setCode(nextCode)}
+              />
               <div className="relative">
                 <textarea
                   ref={textareaRef}

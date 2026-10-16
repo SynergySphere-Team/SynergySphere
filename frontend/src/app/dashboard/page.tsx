@@ -18,13 +18,29 @@ import {
   CheckCircle2,
   Code2,
   Flame,
+  GitBranch,
   Layers,
   Mic,
+  Pause,
+  Play,
+  RotateCcw,
   Sparkles,
   Target,
+  Timer,
   TrendingUp,
   Zap,
 } from 'lucide-react';
+
+interface GithubFeedItem {
+  id: string;
+  type: 'commit' | 'pr';
+  user: string;
+  action: string;
+  message?: string;
+  repo: string;
+  time: string;
+  url?: string;
+}
 
 interface DashboardStatsResponse {
   user: { firstName: string; lastName: string; xp: number; level: number };
@@ -93,11 +109,50 @@ function getTimeOfDayGreeting(): string {
 export default function DashboardPage() {
   const { user } = useAuth();
   const [data, setData] = useState<DashboardStatsResponse | null>(null);
+  const [githubFeed, setGithubFeed] = useState<GithubFeedItem[]>([]);
+
+  // Focus Sprint (Pomodoro) Timer state (Parity with Mobile)
+  const [focusDurationMins, setFocusDurationMins] = useState<number>(25);
+  const [focusSecondsLeft, setFocusSecondsLeft] = useState<number>(25 * 60);
+  const [focusRunning, setFocusRunning] = useState(false);
+  const [focusNotice, setFocusNotice] = useState<string | null>(null);
+
   useEffect(() => {
     api<DashboardStatsResponse>('/dashboard/stats')
       .then(setData)
       .catch(() => setData(null));
+    api<GithubFeedItem[]>('/github/feed')
+      .then((items) => setGithubFeed(Array.isArray(items) ? items.slice(0, 6) : []))
+      .catch(() => setGithubFeed([]));
   }, []);
+
+  useEffect(() => {
+    if (!focusRunning) return;
+    const interval = setInterval(() => {
+      setFocusSecondsLeft((prev) => {
+        if (prev <= 1) {
+          setFocusRunning(false);
+          api('/tasks/focus-session', {
+            method: 'POST',
+            body: JSON.stringify({ durationMinutes: focusDurationMins }),
+          })
+            .then(() => {
+              setFocusNotice(`🎉 ${focusDurationMins}-min Focus Sprint completed! +15 XP awarded.`);
+              api<DashboardStatsResponse>('/dashboard/stats').then(setData).catch(() => {});
+            })
+            .catch(() => {
+              setFocusNotice(`🎉 ${focusDurationMins}-min Focus Sprint completed!`);
+            });
+          return focusDurationMins * 60;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [focusRunning, focusDurationMins]);
+
+  const focusMins = String(Math.floor(focusSecondsLeft / 60)).padStart(2, '0');
+  const focusSecs = String(focusSecondsLeft % 60).padStart(2, '0');
 
   const greeting = getTimeOfDayGreeting();
   const name = user?.firstName || 'Developer';
@@ -413,6 +468,117 @@ export default function DashboardPage() {
                 description="Your task board is clear. Plan your study sessions and engineering milestones in Productivity."
                 action={{ label: 'Create a Task', href: '/tasks' }}
               />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Focus Sprint Timer & GitHub Community Activity + AI Commit Coach */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+        {/* Focus Sprint (Pomodoro) Timer */}
+        <Card className="border-white/[0.08] bg-[#071015]/90">
+          <CardHeader className="flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2 text-white">
+              <Timer className="h-4 w-4 text-primary" />
+              Focus Sprint (Pomodoro)
+            </CardTitle>
+            <span className="rounded bg-primary/10 px-2 py-0.5 text-[11px] font-mono text-primary font-bold">
+              +15 XP / Sprint
+            </span>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-center gap-2">
+              {[15, 25, 45].map((mins) => (
+                <button
+                  key={mins}
+                  type="button"
+                  disabled={focusRunning}
+                  onClick={() => {
+                    setFocusDurationMins(mins);
+                    setFocusSecondsLeft(mins * 60);
+                    setFocusNotice(null);
+                  }}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                    focusDurationMins === mins
+                      ? 'bg-primary text-primary-foreground'
+                      : 'border border-white/10 bg-black/30 text-muted-foreground hover:text-white'
+                  }`}
+                >
+                  {mins}m Sprint
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-col items-center justify-center rounded-xl border border-white/[0.07] bg-black/35 py-6">
+              <span className="font-mono text-4xl font-extrabold tracking-wider text-white">
+                {focusMins}:{focusSecs}
+              </span>
+              <span className="mt-1 text-xs text-muted-foreground">
+                {focusRunning ? 'Deep work in progress…' : 'Ready to start your focus sprint'}
+              </span>
+            </div>
+            {focusNotice && (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 font-medium">
+                {focusNotice}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                className="flex-1 gap-1.5"
+                onClick={() => setFocusRunning((prev) => !prev)}
+              >
+                {focusRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                {focusRunning ? 'Pause Sprint' : 'Start Focus Sprint'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setFocusRunning(false);
+                  setFocusSecondsLeft(focusDurationMins * 60);
+                }}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* GitHub Community Activity */}
+        <Card className="border-white/[0.08] bg-[#071015]/90">
+          <CardHeader className="flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2 text-white">
+              <GitBranch className="h-4 w-4 text-primary" />
+              GitHub &amp; Community Activity
+            </CardTitle>
+            <Link href="/settings" className="text-xs text-primary hover:underline">
+              Connect GitHub →
+            </Link>
+          </CardHeader>
+          <CardContent className="space-y-2.5">
+            {githubFeed.length > 0 ? (
+              githubFeed.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.07] bg-black/25 p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white">{item.user}</span>
+                      <span className="text-[11px] text-muted-foreground">{item.action}</span>
+                      <span className="ml-auto text-[10px] font-mono text-muted-foreground">{item.time}</span>
+                    </div>
+                    <p className="truncate text-xs text-primary font-mono mt-0.5">{item.repo}</p>
+                    {item.message && (
+                      <p className="truncate text-xs text-muted-foreground mt-0.5">&ldquo;{item.message}&rdquo;</p>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-lg border border-white/[0.07] bg-black/25 p-4 text-xs text-muted-foreground">
+                No recent GitHub activity found. Link your GitHub account in Settings to view live repository events.
+              </div>
             )}
           </CardContent>
         </Card>

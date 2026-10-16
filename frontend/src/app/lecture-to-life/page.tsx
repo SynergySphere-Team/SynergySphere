@@ -69,8 +69,82 @@ export default function LectureToLifePage() {
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number | null>>({});
+  const [flippedCardIndex, setFlippedCardIndex] = useState<number | null>(null);
+  const [srsDueCards, setSrsDueCards] = useState<
+    Array<{
+      id: string;
+      front: string;
+      back: string;
+      easeFactor: number;
+      intervalDays: number;
+      repetitions: number;
+      lectureId?: string;
+    }>
+  >([]);
+  const [srsFlippedId, setSrsFlippedId] = useState<string | null>(null);
+  const [srsReviewing, setSrsReviewing] = useState(false);
+  const [srsNotice, setSrsNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
+
+  const loadSrsDue = useCallback(async () => {
+    try {
+      const res = await api<{
+        dueCount: number;
+        totalCount: number;
+        cards: Array<{
+          id: string;
+          front: string;
+          back: string;
+          easeFactor: number;
+          intervalDays: number;
+          repetitions: number;
+          lectureId?: string;
+        }>;
+      }>('/ai/srs/due');
+      if (res && Array.isArray(res.cards)) {
+        setSrsDueCards(res.cards);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  async function handleSrsReview(
+    card: { id?: string; front: string; back: string; lectureId?: string },
+    quality: 1 | 3 | 4 | 5
+  ) {
+    if (srsReviewing) return;
+    setSrsReviewing(true);
+    try {
+      const res = await api<{
+        xpAwarded: number;
+        card: { intervalDays: number; easeFactor: number };
+      }>('/ai/srs/review', {
+        method: 'POST',
+        body: JSON.stringify({
+          cardId: card.id,
+          front: card.front,
+          back: card.back,
+          lectureId: card.lectureId || selected?.id,
+          quality,
+        }),
+      });
+      if (card.id) {
+        setSrsDueCards((prev) => prev.filter((c) => c.id !== card.id));
+        setSrsFlippedId(null);
+      }
+      const nextDays = res?.card?.intervalDays ?? 1;
+      const xpText = res?.xpAwarded ? ` (+${res.xpAwarded} XP)` : '';
+      setSrsNotice(`Scheduled next review in ${nextDays} day${nextDays === 1 ? '' : 's'}${xpText}`);
+      setTimeout(() => setSrsNotice(null), 3500);
+      loadSrsDue();
+    } catch {
+      // ignore
+    } finally {
+      setSrsReviewing(false);
+    }
+  }
 
   const loadUploads = useCallback(async () => {
     try {
@@ -80,10 +154,11 @@ export default function LectureToLifePage() {
         if (prev && items.some((item) => item.id === prev.id)) return prev;
         return items[0] || null;
       });
+      loadSrsDue();
     } catch {
       setError('Could not load saved lecture packs from the backend.');
     }
-  }, []);
+  }, [loadSrsDue]);
 
   async function clearAllSessions() {
     if (!confirm('Are you sure you want to clear all saved lecture sessions? This cannot be undone.')) return;
@@ -190,6 +265,7 @@ export default function LectureToLifePage() {
       setContent('');
       setFileName('');
       setFileType('text');
+      loadSrsDue();
     } catch {
       setError('Could not generate this study pack. Please check the backend or AI configuration and try again.');
     } finally {
@@ -208,6 +284,7 @@ export default function LectureToLifePage() {
       });
       setUploads((prev) => prev.map((item) => (item.id === upload.id ? upload : item)));
       setSelected(upload);
+      loadSrsDue();
     } catch {
       setError('Could not regenerate materials. The original lecture content may not be saved.');
     } finally {
@@ -262,6 +339,72 @@ export default function LectureToLifePage() {
         <>
           {error && (
             <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+          )}
+          {srsNotice && (
+            <div className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-semibold text-emerald-300">
+              ✓ {srsNotice}
+            </div>
+          )}
+
+          {/* Spaced Repetition (SM-2) Due Queue */}
+          {srsDueCards.length > 0 && (
+            <Card className="mb-5 border-amber-500/30 bg-amber-500/5">
+              <CardHeader className="flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-bold text-amber-300 flex items-center gap-2">
+                  <Layers3 className="h-4 w-4 text-amber-400" />
+                  Due for Active Recall ({srsDueCards.length} Flashcards)
+                </CardTitle>
+                <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-mono font-bold text-amber-300">
+                  SM-2 Spaced Repetition • +5 XP
+                </span>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(() => {
+                  const currentCard = srsDueCards[0];
+                  const isFlipped = srsFlippedId === currentCard.id;
+                  return (
+                    <div className="space-y-3">
+                      <div
+                        onClick={() => setSrsFlippedId(isFlipped ? null : currentCard.id)}
+                        className="cursor-pointer rounded-xl border border-white/10 bg-black/40 p-4 transition hover:border-amber-400/40"
+                      >
+                        <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground mb-1.5">
+                          <span className="font-bold text-amber-300">
+                            {isFlipped ? 'ANSWER' : 'QUESTION (CLICK TO REVEAL)'}
+                          </span>
+                          <span>
+                            Interval: {currentCard.intervalDays}d • EF: {Number(currentCard.easeFactor || 2.5).toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-sm font-semibold text-white">
+                          {isFlipped ? currentCard.back : currentCard.front}
+                        </p>
+                      </div>
+                      {isFlipped && (
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { label: 'Again (1d)', quality: 1 as const, cls: 'border-red-500/40 bg-red-500/15 text-red-300' },
+                            { label: 'Hard', quality: 3 as const, cls: 'border-amber-500/40 bg-amber-500/15 text-amber-300' },
+                            { label: 'Good (+5 XP)', quality: 4 as const, cls: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' },
+                            { label: 'Easy (+5 XP)', quality: 5 as const, cls: 'border-blue-500/40 bg-blue-500/15 text-blue-300' },
+                          ].map((btn) => (
+                            <button
+                              key={btn.quality}
+                              type="button"
+                              disabled={srsReviewing}
+                              onClick={() => handleSrsReview(currentCard, btn.quality)}
+                              className={`flex-1 rounded-lg border px-3 py-2 text-xs font-bold transition hover:opacity-90 ${btn.cls}`}
+                            >
+                              {btn.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
           )}
 
           <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
@@ -459,15 +602,45 @@ export default function LectureToLifePage() {
                       {flashcards.length === 0 ? (
                         <p className="text-sm text-muted-foreground">No flashcards generated for this lecture.</p>
                       ) : (
-                        flashcards.map((card) => (
-                          <div key={card.front} className="rounded-lg border border-white/[0.07] bg-secondary/40 p-4">
-                            <p className="flex items-start gap-2 text-sm font-semibold text-white">
-                              <Layers3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                              {card.front}
-                            </p>
-                            <p className="mt-2 text-xs leading-5 text-muted-foreground">{card.back}</p>
-                          </div>
-                        ))
+                        flashcards.map((card, idx) => {
+                          const isFlipped = flippedCardIndex === idx;
+                          return (
+                            <div
+                              key={card.front}
+                              onClick={() => setFlippedCardIndex(isFlipped ? null : idx)}
+                              className="cursor-pointer rounded-lg border border-white/[0.07] bg-secondary/40 p-4 transition hover:border-primary/40 space-y-3"
+                            >
+                              <p className="flex items-start gap-2 text-sm font-semibold text-white">
+                                <Layers3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                                {card.front}
+                              </p>
+                              <p className="text-xs leading-5 text-muted-foreground">{card.back}</p>
+                              <div className="flex flex-wrap gap-1.5 pt-1" onClick={(e) => e.stopPropagation()}>
+                                {[
+                                  { label: 'Again', quality: 1 as const, cls: 'border-red-500/30 bg-red-500/10 text-red-300' },
+                                  { label: 'Hard', quality: 3 as const, cls: 'border-amber-500/30 bg-amber-500/10 text-amber-300' },
+                                  { label: 'Good (+5 XP)', quality: 4 as const, cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' },
+                                  { label: 'Easy (+5 XP)', quality: 5 as const, cls: 'border-blue-500/30 bg-blue-500/10 text-blue-300' },
+                                ].map((btn) => (
+                                  <button
+                                    key={btn.quality}
+                                    type="button"
+                                    disabled={srsReviewing}
+                                    onClick={() =>
+                                      handleSrsReview(
+                                        { front: card.front, back: card.back, lectureId: selected.id },
+                                        btn.quality
+                                      )
+                                    }
+                                    className={`rounded border px-2 py-1 text-[10px] font-bold transition hover:opacity-90 ${btn.cls}`}
+                                  >
+                                    {btn.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   )}

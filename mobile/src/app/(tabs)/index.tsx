@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Alert, AppState, Image, Pressable, StyleSheet, Text as RNText, Vibration, View, type TextProps } from 'react-native';
+import { Alert, AppState, Image, Modal, Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, Vibration, View, type TextProps } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Card } from '@/components/ui';
@@ -877,23 +877,29 @@ export default function HomeScreen() {
       {/* Community Activity */}
       {communityActivity.length ? (
         <>
-          <Text style={[styles.section, { color: colors.text }]}>Community Activity</Text>
+          <Text style={[styles.section, { color: colors.text, marginTop: 14 }]}>GitHub & Community Activity</Text>
           <Card>
             {communityActivity.slice(0, 4).map((event, index) => (
               <View
                 key={event.id}
-                style={[styles.feedItem, index > 0 && [styles.workspaceDivider, { borderTopColor: colors.border }]]}
+                style={[
+                  styles.feedItem,
+                  index > 0 && [styles.workspaceDivider, { borderTopColor: colors.border }],
+                ]}
               >
                 <Text style={[styles.feedTitle, { color: colors.text }]}>
                   {event.actorLogin ? `${event.actorLogin} · ` : ''}
                   {event.title}
                 </Text>
-                <Text style={[styles.workspaceDescription, { color: colors.muted }]}>{event.summary || event.type}</Text>
+                <Text style={[styles.workspaceDescription, { color: colors.muted }]}>
+                  {event.summary || event.type}
+                </Text>
               </View>
             ))}
           </Card>
         </>
       ) : null}
+
       <WorkspaceMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </Screen>
   );

@@ -66,6 +66,7 @@ export async function api<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const headers: Record<string, string> = {
+    'X-Tz-Offset': String(new Date().getTimezoneOffset()),
     ...(options.headers as Record<string, string>),
   };
   if (options.body && !(options.body instanceof FormData)) {

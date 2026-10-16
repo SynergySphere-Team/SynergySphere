@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query, queryOne } from '../lib/db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
-import { getProfileSignals } from '../services/portfolioService.js';
+import { getProfileSignals, computeConsecutiveStreak } from '../services/portfolioService.js';
 import { w3schoolsProgrammingDomain } from '../data/w3schoolsCurriculumData.js';
 import { getInterviewHomeStats } from '../services/interviewService.js';
 
@@ -147,10 +147,10 @@ router.get('/search', async (req: AuthRequest, res) => {
 
 export default router;
 
-async function calculateUserStreak(userId: string): Promise<number> {
+async function calculateUserStreak(userId: string, timeZone = 'UTC'): Promise<number> {
   try {
-    const rows = await query<{ active_date: string }>(
-      `SELECT DISTINCT TO_CHAR("occurredAt", 'YYYY-MM-DD') AS active_date
+    const rows = await query<{ occurredAt: string | Date }>(
+      `SELECT "occurredAt"
        FROM (
          SELECT "createdAt" AS "occurredAt" FROM "Task" WHERE "userId" = $1 AND "status" = 'DONE'
          UNION ALL
@@ -160,39 +160,14 @@ async function calculateUserStreak(userId: string): Promise<number> {
          UNION ALL
          SELECT "completedAt" AS "occurredAt" FROM "FocusSession" WHERE "userId" = $1
        ) activity
-       ORDER BY active_date DESC
-       LIMIT 90`,
+       ORDER BY "occurredAt" DESC
+       LIMIT 365`,
       [userId],
     );
 
     if (rows.length === 0) return 1;
-
-    const dates = new Set(rows.map((r) => r.active_date));
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().slice(0, 10);
-
-    let checkDate = dates.has(todayStr) ? now : dates.has(yesterdayStr) ? yesterday : null;
-    if (!checkDate) {
-      return 1;
-    }
-
-    let currentStreak = 0;
-    const cursor = new Date(checkDate);
-    while (true) {
-      const dateStr = cursor.toISOString().slice(0, 10);
-      if (dates.has(dateStr)) {
-        currentStreak++;
-        cursor.setDate(cursor.getDate() - 1);
-      } else {
-        break;
-      }
-    }
-
-    return Math.max(currentStreak, 1);
+    const computed = computeConsecutiveStreak(rows.map((r) => r.occurredAt), timeZone);
+    return Math.max(computed, 1);
   } catch {
     return 1;
   }

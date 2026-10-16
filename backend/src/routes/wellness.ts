@@ -4,6 +4,7 @@ import { newId, nullable, query, queryOne } from '../lib/db.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { awardBadgeDirectly, awardXp } from '../services/gamification.js';
+import { broadcastNotification } from '../services/realtime.js';
 
 const router = Router();
 router.use(authenticate);
@@ -21,7 +22,57 @@ const wellnessSchema = z.object({
   waterIntake: z.number().min(0).max(30).optional().nullable(),
   tags: z.array(z.string()).optional().nullable(),
   gratitude: z.string().optional().nullable(),
+  tzOffsetMinutes: z.number().min(-840).max(840).optional(),
 });
+
+function resolveTzOffsetMinutes(req: AuthRequest): number {
+  const fromBody = typeof req.body?.tzOffsetMinutes === 'number' ? req.body.tzOffsetMinutes : undefined;
+  if (fromBody !== undefined && Number.isFinite(fromBody)) return fromBody;
+  const fromQuery = req.query?.tzOffsetMinutes ? Number(req.query.tzOffsetMinutes) : undefined;
+  if (fromQuery !== undefined && Number.isFinite(fromQuery)) return fromQuery;
+  const fromHeader = req.headers['x-tz-offset'] ? Number(req.headers['x-tz-offset']) : undefined;
+  if (fromHeader !== undefined && Number.isFinite(fromHeader)) return fromHeader;
+  return new Date().getTimezoneOffset();
+}
+
+function toLocalDateStr(dateInput: Date | string, tzOffsetMinutes: number): string {
+  const d = typeof dateInput === 'string' ? new Date(dateInput) : new Date(dateInput.getTime());
+  // JS getTimezoneOffset() is (UTC - Local) in minutes, so Local = UTC - tzOffsetMinutes
+  const localMs = d.getTime() - tzOffsetMinutes * 60_000;
+  return new Date(localMs).toISOString().split('T')[0];
+}
+
+function shiftDateStr(dateStr: string, deltaDays: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const utc = Date.UTC(y, m - 1, d + deltaDays);
+  return new Date(utc).toISOString().split('T')[0];
+}
+
+function computeConsecutiveStreak(datesDesc: string[], todayStr: string, includeTodayIfMissing: boolean): number {
+  const uniqueDates = Array.from(new Set(datesDesc)).sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
+  if (includeTodayIfMissing && !uniqueDates.includes(todayStr)) {
+    uniqueDates.unshift(todayStr);
+  }
+  if (uniqueDates.length === 0) return 0;
+
+  const yesterdayStr = shiftDateStr(todayStr, -1);
+  const mostRecent = uniqueDates[0];
+  if (mostRecent !== todayStr && mostRecent !== yesterdayStr) {
+    return 0;
+  }
+
+  let streak = 1;
+  let expected = shiftDateStr(mostRecent, -1);
+  for (let i = 1; i < uniqueDates.length; i++) {
+    if (uniqueDates[i] === expected) {
+      streak++;
+      expected = shiftDateStr(expected, -1);
+    } else if (uniqueDates[i] < expected) {
+      break;
+    }
+  }
+  return streak;
+}
 
 router.get('/', async (req: AuthRequest, res) => {
   const entries = await query(
@@ -40,6 +91,9 @@ router.get('/', async (req: AuthRequest, res) => {
 
 router.post('/', validateBody(wellnessSchema), async (req: AuthRequest, res) => {
   const userId = req.user!.userId;
+  const tzOffset = resolveTzOffsetMinutes(req);
+  const todayStr = toLocalDateStr(new Date(), tzOffset);
+
   let taskTitle = req.body.taskTitle || null;
   let taskStatus = req.body.taskStatus || null;
   let taskXpAwarded = 0;
@@ -62,44 +116,19 @@ router.post('/', validateBody(wellnessSchema), async (req: AuthRequest, res) => 
     }
   }
 
-  // 1. Check if user already logged a check-in today
-  const todayEntry = await queryOne<{ count: string }>(
-    `SELECT count(*)::text as count FROM "Wellness" WHERE "userId" = $1 AND "date"::date = CURRENT_DATE`,
-    [userId],
-  );
-  const isFirstToday = parseInt(todayEntry?.count || '0', 10) === 0;
-
-  // 2. Calculate consecutive streak
-  const pastDates = await query<{ checkin_date: string }>(
-    `SELECT DISTINCT "date"::date as checkin_date
+  // Fetch recent timestamps and compute local date keys safely
+  const recentRows = await query<{ date: string }>(
+    `SELECT "date"
      FROM "Wellness"
-     WHERE "userId" = $1 AND "date"::date < CURRENT_DATE
-     ORDER BY checkin_date DESC
-     LIMIT 45`,
+     WHERE "userId" = $1
+     ORDER BY "date" DESC
+     LIMIT 120`,
     [userId],
   );
 
-  let streak = 1;
-  if (pastDates.length > 0) {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-    const firstPastDate = new Date(pastDates[0].checkin_date).toISOString().split('T')[0];
-    if (firstPastDate === yesterdayStr) {
-      let expectedDate = new Date(yesterday);
-      for (const row of pastDates) {
-        const rowDateStr = new Date(row.checkin_date).toISOString().split('T')[0];
-        const expStr = expectedDate.toISOString().split('T')[0];
-        if (rowDateStr === expStr) {
-          streak++;
-          expectedDate.setDate(expectedDate.getDate() - 1);
-        } else {
-          break;
-        }
-      }
-    }
-  }
+  const localDatesDesc = recentRows.map((r) => toLocalDateStr(r.date, tzOffset));
+  const isFirstToday = !localDatesDesc.includes(todayStr);
+  const streak = Math.max(1, computeConsecutiveStreak(localDatesDesc, todayStr, true));
 
   let baseCheckinXp = 0;
   let streakBonusXp = 0;
@@ -154,7 +183,7 @@ router.post('/', validateBody(wellnessSchema), async (req: AuthRequest, res) => 
       nullable(req.body.gratitude),
     ],
   );
-    // Notify the user about their first daily wellness check-in.
+  // Notify the user about their first daily wellness check-in.
   if (entry && isFirstToday) {
     const isMilestone = [3, 7, 14].includes(streak);
 
@@ -166,11 +195,11 @@ router.post('/', validateBody(wellnessSchema), async (req: AuthRequest, res) => 
       ? `You've maintained your wellness check-in streak for ${streak} days. Keep it going!`
       : 'Your daily wellness check-in is complete. Thank you for taking time for yourself!';
 
-    await queryOne(
+    const notif = await queryOne(
       `INSERT INTO "Notification"
        ("id", "userId", "title", "message", "type", "link")
        VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING "id"`,
+       RETURNING *`,
       [
         newId(),
         userId,
@@ -180,6 +209,9 @@ router.post('/', validateBody(wellnessSchema), async (req: AuthRequest, res) => 
         '/wellness',
       ],
     );
+    if (notif) {
+      broadcastNotification(userId, notif);
+    }
   }
   res.status(201).json({
     ...entry,
@@ -217,39 +249,11 @@ router.get('/insights', async (req: AuthRequest, res) => {
     [req.user!.userId],
   );
 
-  // Calculate Streak
-  const pastDates = await query<{ checkin_date: string }>(
-    `SELECT DISTINCT "date"::date as checkin_date
-     FROM "Wellness"
-     WHERE "userId" = $1
-     ORDER BY checkin_date DESC
-     LIMIT 45`,
-    [req.user!.userId],
-  );
+  const tzOffset = resolveTzOffsetMinutes(req);
+  const todayStr = toLocalDateStr(new Date(), tzOffset);
+  const localDatesDesc = entries.map((e) => toLocalDateStr(e.date, tzOffset));
+  const currentStreak = computeConsecutiveStreak(localDatesDesc, todayStr, false);
 
-  let currentStreak = 0;
-  if (pastDates.length > 0) {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-    const mostRecentDateStr = new Date(pastDates[0].checkin_date).toISOString().split('T')[0];
-    if (mostRecentDateStr === todayStr || mostRecentDateStr === yesterdayStr) {
-      currentStreak = 1;
-      let expectedDate = new Date(mostRecentDateStr === todayStr ? yesterday : new Date(yesterday.getTime() - 86400000));
-      for (let i = 1; i < pastDates.length; i++) {
-        const rowDateStr = new Date(pastDates[i].checkin_date).toISOString().split('T')[0];
-        const expStr = expectedDate.toISOString().split('T')[0];
-        if (rowDateStr === expStr) {
-          currentStreak++;
-          expectedDate.setDate(expectedDate.getDate() - 1);
-        } else {
-          break;
-        }
-      }
-    }
-  }
 
   if (entries.length === 0) {
     res.json({
