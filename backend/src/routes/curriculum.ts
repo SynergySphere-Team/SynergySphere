@@ -1375,6 +1375,15 @@ router.post('/tracks/:techId/certificate', async (req: AuthRequest, res) => {
   const completedSet = await getUserCompletions(req.user.userId);
   const completedLessons = techLessons.filter((l) => completedSet.has(l.id)).length;
 
+  if (completedLessons < totalLessons || totalLessons === 0) {
+    res.status(400).json({
+      error: `Track incomplete: you have completed ${completedLessons} of ${totalLessons} required lessons. Complete all lessons before claiming your certificate.`,
+      completedLessons,
+      totalLessons,
+    });
+    return;
+  }
+
   const user = await queryOne<{ firstName: string; lastName: string }>(
     `SELECT "firstName", "lastName" FROM "User" WHERE "id" = $1`,
     [req.user.userId],

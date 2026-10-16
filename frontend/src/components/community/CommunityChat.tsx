@@ -174,8 +174,10 @@ function ChatView({ channel, currentUserId }: { channel: Channel; currentUserId:
     try {
       const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-      const wsPort = '4001';
-      socket = new WebSocket(`${wsProtocol}//${wsHost}:${wsPort}/ws`);
+      const isLocal = wsHost === 'localhost' || wsHost === '127.0.0.1';
+      const defaultWsUrl = isLocal ? `${wsProtocol}//${wsHost}:4000/ws` : `${wsProtocol}//${wsHost}/ws`;
+      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || defaultWsUrl;
+      socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 
       socket.onopen = () => {

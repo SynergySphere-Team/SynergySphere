@@ -317,6 +317,31 @@ export async function judgeJavaScript(
  */
 export async function judgeSql(queryText: string, challengeTitle?: string): Promise<JudgeResult> {
   const startTime = performance.now();
+  const lowerQuery = queryText.toLowerCase().trim();
+  const disallowedPatterns = [
+    /;\s*\S/,
+    /\b(drop|alter|truncate|insert|update|delete|create|grant|revoke|vacuum|copy|comment|set|call|do)\b/i,
+    /\b("user"|pg_|information_schema)\b/i,
+  ];
+  for (const pattern of disallowedPatterns) {
+    if (pattern.test(lowerQuery)) {
+      return {
+        passed: false,
+        testResults: [{
+          label: 'SQL Security Validation',
+          passed: false,
+          expected: 'Read-only SELECT query on challenge tables',
+          got: 'Restricted SQL statement',
+          error: 'Only read-only SELECT queries on challenge tables are permitted.',
+        }],
+        output: '',
+        error: 'Query rejected: disallowed SQL syntax or table access.',
+        runtimeMs: 1,
+        language: 'SQL',
+      };
+    }
+  }
+
   const client = await pool.connect();
   const testResults: TestResult[] = [];
   try {
@@ -525,10 +550,18 @@ print(json.dumps({
     await fs.writeFile(runnerFilePath, runnerScript, 'utf8');
 
     return await new Promise<JudgeResult>((resolve) => {
+      const sanitizedEnv: NodeJS.ProcessEnv = {
+        PATH: process.env.PATH || '',
+        SYSTEMROOT: process.env.SYSTEMROOT || '',
+        WINDIR: process.env.WINDIR || '',
+        TMP: tempDir,
+        TEMP: tempDir,
+        PYTHONDONTWRITEBYTECODE: '1',
+      };
       const py = spawn('python', ['-u', runnerFilePath], {
         cwd: tempDir,
         timeout: 3000,
-        env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' },
+        env: sanitizedEnv,
       });
 
       let stdout = '';

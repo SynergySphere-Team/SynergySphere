@@ -1,0 +1,74 @@
+name: Build Unsigned iOS IPA ($0 Free Sideloading)
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'Production Backend API URL (e.g. https://synergysphere-api.onrender.com/api)'
+        required: true
+        default: 'https://synergysphere-api.onrender.com/api'
+
+jobs:
+  build-unsigned-ipa:
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          npm install --workspace=mobile
+
+      - name: Prebuild native iOS project via Expo
+        working-directory: ./mobile
+        env:
+          EXPO_PUBLIC_API_URL: ${{ github.event.inputs.api_url }}
+          EXPO_NO_TELEMETRY: 1
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Install CocoaPods
+        working-directory: ./mobile/ios
+        run: pod install
+
+      - name: Build Release .app without Apple Paid Code Signing
+        working-directory: ./mobile/ios
+        env:
+          EXPO_PUBLIC_API_URL: ${{ github.event.inputs.api_url }}
+        run: |
+          WORKSPACE=$(ls -d *.xcworkspace | head -n 1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            clean build
+
+      - name: Package .app into Unsigned SynergySphere.ipa
+        working-directory: ./mobile/ios
+        run: |
+          mkdir -p Payload
+          APP_PATH=$(find build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
+          cp -r "$APP_PATH" Payload/
+          zip -r9 SynergySphere-unsigned.ipa Payload
+
+      - name: Upload SynergySphere-unsigned.ipa Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SynergySphere-iOS-IPA
+          path: mobile/ios/SynergySphere-unsigned.ipa
+          retention-days: 30

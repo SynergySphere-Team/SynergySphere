@@ -256,7 +256,7 @@ export default function AdminScreen() {
 
   // Trigger loading when activeTab changes
   useEffect(() => {
-    if (user?.role !== 'ADMIN') {
+    if (!['ADMIN', 'SUPERADMIN', 'MODERATOR'].includes(user?.role?.toUpperCase() ?? '')) {
       setLoaded(true);
       return;
     }
@@ -568,7 +568,7 @@ export default function AdminScreen() {
   };
 
   if (!loaded) return <Loading />;
-  if (user?.role !== 'ADMIN') {
+  if (!['ADMIN', 'SUPERADMIN', 'MODERATOR'].includes(user?.role?.toUpperCase() ?? '')) {
     return (
       <Screen>
         <Heading>Admin Portal</Heading>

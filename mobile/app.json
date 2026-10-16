@@ -9,9 +9,14 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.developer-malawaubi.synergysphere",
+      "bundleIdentifier": "com.synergysphere.app",
+      "buildNumber": "1",
+      "supportsTablet": true,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "SynergySphere needs access to your photo library so you can upload a profile picture and project attachments.",
+        "NSCameraUsageDescription": "SynergySphere needs access to your camera so you can take a profile picture.",
+        "NSMicrophoneUsageDescription": "SynergySphere uses your microphone for voice responses during mock interview practice."
       }
     },
     "android": {
@@ -22,7 +27,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.synergysphere.app"
+      "package": "com.synergysphere.app",
+      "versionCode": 1
     },
     "web": {
       "output": "static",

@@ -28,6 +28,7 @@
     "nodemailer": "^10.0.16",
     "pdfreader": "^3.0.8",
     "pg": "^8.22.0",
+    "ws": "^8.22.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -36,6 +37,7 @@
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.5",
+    "@types/ws": "^8.18.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }

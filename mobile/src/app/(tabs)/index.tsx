@@ -315,7 +315,7 @@ export default function HomeScreen() {
 
   const inProgressCount = activeTasks.filter((t) => t.status === 'IN_PROGRESS').length;
 
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = ['ADMIN', 'SUPERADMIN', 'MODERATOR'].includes(user?.role?.toUpperCase() ?? '');
 
   const workspaces: {
     title: string;

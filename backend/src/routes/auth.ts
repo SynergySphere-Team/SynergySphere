@@ -290,8 +290,9 @@ router.post('/forgot-password', validateBody(forgotPasswordSchema), async (req, 
         ? 'Password reset token generated. Note: SMTP email service is not configured in backend/.env, so the email could not be delivered to your inbox.'
         : 'A password reset link has been sent to your email address.',
       emailDelivered: !emailResult.simulated,
-      resetToken,
-      resetUrl: emailResult.resetUrl,
+      ...(process.env.NODE_ENV !== 'production' && emailResult.simulated
+        ? { resetToken, resetUrl: emailResult.resetUrl }
+        : {}),
     });
   } catch (error) {
     console.error('Forgot password error:', error);
