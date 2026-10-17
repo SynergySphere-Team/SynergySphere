@@ -1399,7 +1399,6 @@ router.delete('/lecture-to-life/:id', async (req: AuthRequest, res) => {
      RETURNING "id"`,
     [uploadId, req.user!.userId],
   );
-  // Also clean up any orphaned FlashcardReview rows that no longer belong to a saved study pack
   await query(
     `DELETE FROM "FlashcardReview"
      WHERE "userId" = $1
@@ -1452,11 +1451,12 @@ router.get('/srs/due', async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
     const uploadFilter = typeof req.query.uploadId === 'string' && req.query.uploadId.trim() ? req.query.uploadId.trim() : null;
 
-    // Remove any orphaned flashcards whose study pack has been cleared or deleted
+    // Remove any orphaned flashcards whose linked study pack no longer exists
     await query(
       `DELETE FROM "FlashcardReview"
        WHERE "userId" = $1
-         AND ("uploadId" IS NULL OR "uploadId" NOT IN (SELECT "id" FROM "LectureUpload" WHERE "userId" = $1))`,
+         AND "uploadId" IS NOT NULL
+         AND "uploadId" NOT IN (SELECT "id" FROM "LectureUpload" WHERE "userId" = $1)`,
       [userId],
     );
 
@@ -1478,7 +1478,6 @@ router.get('/srs/due', async (req: AuthRequest, res) => {
           const parsed = JSON.parse(u.flashcards);
           if (Array.isArray(parsed)) cards = parsed;
         } catch {
-          // ignore
         }
       }
       if (cards.length > 0) {

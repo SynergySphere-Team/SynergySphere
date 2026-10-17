@@ -72,7 +72,6 @@ export function initRealtime(server: Server): WebSocketServer {
       codeRooms: new Set(),
     };
 
-    // Attempt immediate authentication via ?token= query param or httpOnly cookie
     try {
       const urlObj = req?.url ? new URL(req.url, 'http://localhost') : null;
       const queryToken = urlObj?.searchParams.get('token');
@@ -82,12 +81,10 @@ export function initRealtime(server: Server): WebSocketServer {
         client.user = verifyToken(initialToken);
       }
     } catch {
-      // ignore invalid initial token; client can still authenticate via message
     }
 
     clients.add(client);
 
-    // Send welcome heartbeat
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(
         JSON.stringify({
@@ -240,7 +237,6 @@ export function initRealtime(server: Server): WebSocketServer {
           });
         }
       } catch {
-        // ignore malformed message
       }
     });
 
@@ -271,11 +267,11 @@ export function initRealtime(server: Server): WebSocketServer {
         try {
           (client.ws as any).ping?.();
         } catch {
-          // ignore
         }
       }
     }
   }, 25_000);
+  heartbeatInterval.unref?.();
 
   wss.on('close', () => clearInterval(heartbeatInterval));
 
