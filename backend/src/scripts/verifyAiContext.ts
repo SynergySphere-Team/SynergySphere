@@ -84,8 +84,8 @@ async function main() {
     !outside.hasContext && outside.source === 'none',
   );
   check(
-    'canned API-key fallback only when nothing matched',
-    outsideAnswer.includes('add GEMINI_API_KEY') && outsideAnswer.length > 50,
+    'fallback answer is clean and never displays API key errors',
+    !outsideAnswer.includes('GEMINI_API_KEY') && !outsideAnswer.includes('OPENAI_API_KEY') && outsideAnswer.length > 50,
   );
 
   // 4. Starter code prefill comes from the lesson example, not the generic Java loop.

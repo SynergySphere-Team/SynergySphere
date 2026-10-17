@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MarkdownView } from '@/components/ui/MarkdownView';
-import { api } from '@/lib/utils';
+import { api, fetchApiResponse, getStoredToken } from '@/lib/utils';
+import { analyzeCodeOffline } from '@/utils/offlineCodeAnalyzer';
 import {
   ArrowRight,
   Bot,
@@ -21,7 +22,6 @@ import {
   Copy,
   ExternalLink,
   FileCode2,
-  KeyRound,
   Loader2,
   Search,
   Send,
@@ -94,7 +94,7 @@ export interface LearningHubSearchResultItem {
 }
 
 export interface CodeActionResult {
-  action: 'explain' | 'debug' | 'optimize' | 'test';
+  action: 'explain' | 'debug' | 'optimize' | 'test' | 'review' | 'custom';
   title: string;
   output: string;
   fromAi: boolean;
@@ -222,12 +222,19 @@ function AIAssistantInner() {
   const searchParams = useSearchParams();
   const lessonParam = searchParams.get('lesson') || '';
   const challengeParam = searchParams.get('challenge') || '';
+  const challengeTitleParam = searchParams.get('challengeTitle') || '';
+  const challengeDescParam = searchParams.get('challengeDescription') || '';
+  const languageParam = searchParams.get('language') || '';
+  const codeParam = searchParams.get('code') || '';
+  const autoAskParam = searchParams.get('autoAsk') || '';
+  const tabParam = searchParams.get('tab') || '';
+  const lastAutoAskKeyRef = useRef<string>('');
 
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
       content:
-        "👋 Hi! I'm your SynergySphere AI Workspace assistant, grounded in the Learning Hub (1,000+ programming lessons & 60 interactive coding challenges). Search for any topic or challenge above, ask questions, or paste code for instant analysis!",
+        "👋 Hi! I'm your SynergySphere AI Workspace assistant, grounded in the Learning Hub (1,000+ programming lessons & 500+ interactive coding challenges). Type any question right here in Conversation for a direct answer, or switch to Code Context to paste and analyze code!",
       timestamp: new Date(),
     },
   ]);
@@ -243,70 +250,28 @@ function AIAssistantInner() {
   const [challenge, setChallenge] = useState<ChallengePreview | null>(null);
 
   // Tab State: 'conversation' vs 'codeContext' vs 'split'
-  const [activeTab, setActiveTab] = useState<'conversation' | 'codeContext' | 'split'>('conversation');
+  const [activeTab, setActiveTab] = useState<'conversation' | 'codeContext' | 'split'>(
+    tabParam === 'codeContext' || autoAskParam === 'true' ? 'codeContext' : 'conversation'
+  );
   // Expandable & Collapsible Chat History state
   const [historyExpanded, setHistoryExpanded] = useState(false);
 
   // Code Action Output State (Rendered directly in Code Context)
   const [codeActionResult, setCodeActionResult] = useState<CodeActionResult | null>(null);
-  const [codeActionLoading, setCodeActionLoading] = useState<'explain' | 'debug' | 'optimize' | 'test' | null>(null);
+  const [codeActionLoading, setCodeActionLoading] = useState<'explain' | 'debug' | 'optimize' | 'test' | 'review' | 'custom' | null>(null);
+  const [codeQuestion, setCodeQuestion] = useState('');
   const [copiedCodeOutput, setCopiedCodeOutput] = useState(false);
 
-  // Gemini API Key State & Management
-  const [geminiApiKey, setGeminiApiKey] = useState('');
-  const [hasServerKey, setHasServerKey] = useState(false);
-  const [keyModalOpen, setKeyModalOpen] = useState(false);
-  const [keyInput, setKeyInput] = useState('');
-  const [keyTesting, setKeyTesting] = useState(false);
-  const [keyTestFeedback, setKeyTestFeedback] = useState<{ valid: boolean; message: string; provider?: string } | null>(null);
+  // Backend AI Key Status
+  const [hasServerKey, setHasServerKey] = useState(true);
 
-  // Load custom Gemini API key from localStorage and check backend key status
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('synergysphere_gemini_api_key') || '';
-      setGeminiApiKey(stored);
-      setKeyInput(stored);
-    }
     api<{ hasEnvKey: boolean; provider?: string | null }>('/ai/key-status')
       .then((res) => {
-        if (res?.hasEnvKey) setHasServerKey(true);
+        if (typeof res?.hasEnvKey === 'boolean') setHasServerKey(res.hasEnvKey);
       })
       .catch(() => {});
   }, []);
-
-  const handleSaveApiKey = (keyToSave: string) => {
-    const trimmed = keyToSave.trim();
-    setGeminiApiKey(trimmed);
-    if (typeof window !== 'undefined') {
-      if (trimmed) {
-        localStorage.setItem('synergysphere_gemini_api_key', trimmed);
-      } else {
-        localStorage.removeItem('synergysphere_gemini_api_key');
-      }
-    }
-  };
-
-  const handleTestKey = async () => {
-    setKeyTesting(true);
-    setKeyTestFeedback(null);
-    try {
-      const res = await api<{ valid: boolean; provider: string; message: string }>('/ai/test-key', {
-        method: 'POST',
-        body: JSON.stringify({ apiKey: keyInput.trim() }),
-      });
-      setKeyTestFeedback(res);
-      if (res.valid) {
-        handleSaveApiKey(keyInput);
-      }
-    } catch (err: any) {
-      setKeyTestFeedback({
-        valid: false,
-        message: err.message || 'Verification failed. Please check network and API key.',
-      });
-    } finally {
-      setKeyTesting(false);
-    }
-  };
 
   // Derived user questions for the expandable chat history
   const userQuestions = useMemo(() => {
@@ -546,10 +511,8 @@ function AIAssistantInner() {
     // Track recent prompts
     setRecentPrompts((prev) => [text.trim().slice(0, 60), ...prev.filter((p) => p !== text.trim().slice(0, 60))].slice(0, 6));
 
-    const contextToSend =
-      forcedContext?.trim() || (codeEditedByUser && codeContext.trim() ? codeContext : undefined);
+    const contextToSend = forcedContext?.trim() || undefined;
 
-    const keyToSend = geminiApiKey.trim() || undefined;
     const payload = {
       message: text.trim(),
       ...(activeThreadId ? { threadId: activeThreadId } : {}),
@@ -557,7 +520,6 @@ function AIAssistantInner() {
       ...(lesson ? { lessonId: lesson.id } : {}),
       ...(challenge ? { challengeId: challenge.id } : {}),
       history: historyFromMessages(baseMessages).slice(-20),
-      ...(keyToSend ? { apiKey: keyToSend } : {}),
     };
 
     if (activeThreadId) {
@@ -571,14 +533,16 @@ function AIAssistantInner() {
     }
 
     let streamSuccess = false;
+    const token = getStoredToken();
+    const streamHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
     try {
-      const response = await fetch('/api/ai/chat/stream', {
+      const response = await fetchApiResponse('/ai/chat/stream', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-          ...(keyToSend ? { 'x-ai-api-key': keyToSend } : {}),
-        },
+        headers: streamHeaders,
         body: JSON.stringify(payload),
       });
 
@@ -647,7 +611,6 @@ function AIAssistantInner() {
         const res = await api<ChatResponse>('/ai/chat', {
           method: 'POST',
           body: JSON.stringify(payload),
-          headers: keyToSend ? { 'x-ai-api-key': keyToSend } : undefined,
         });
         setMessages((prev) => [
           ...prev,
@@ -662,7 +625,7 @@ function AIAssistantInner() {
           },
         ]);
       } catch {
-        const fallback = generateLocalResponse(text, codeContext);
+        const fallback = generateLocalResponse(text, '');
         setMessages((prev) => [
           ...prev,
           { role: 'assistant', content: fallback, timestamp: new Date() },
@@ -671,6 +634,127 @@ function AIAssistantInner() {
     }
     setLoading(false);
   }
+
+  async function runCodeContextReview(
+    codeToAnalyze: string,
+    langHint?: string,
+    cTitle?: string,
+    cDesc?: string,
+    customQ?: string
+  ) {
+    const trimmed = codeToAnalyze.trim();
+    if (!trimmed) return;
+    setActiveTab((prev) => (prev === 'split' ? 'split' : 'codeContext'));
+    const actionType: 'review' | 'custom' = customQ ? 'custom' : 'review';
+    setCodeActionLoading(actionType);
+
+    const detectedLang = langHint || detectLanguage(trimmed);
+    const offlineExplain = analyzeCodeOffline('explain', trimmed, detectedLang).output;
+    const offlineDebug = analyzeCodeOffline('debug', trimmed, detectedLang).output;
+    const offlineCombined = cTitle
+      ? `### Challenge Code Review: ${cTitle}\n\n${offlineDebug}\n\n---\n\n${offlineExplain}`
+      : `${offlineDebug}\n\n---\n\n${offlineExplain}`;
+
+    try {
+      const res = await api<{
+        ok: boolean;
+        action: string;
+        output: string;
+        fromAi: boolean;
+        provider?: string;
+      }>('/ai/code-action', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: actionType,
+          code: trimmed,
+          language: detectedLang,
+          lessonId: lesson?.id,
+          challengeId: challenge?.id,
+          challengeTitle: cTitle,
+          challengeDescription: cDesc,
+          customPrompt: customQ,
+        }),
+      });
+
+      setCodeActionResult({
+        action: actionType,
+        title: customQ
+          ? `Answer: ${customQ.slice(0, 48)}`
+          : cTitle
+            ? `AI Code Review: ${cTitle}`
+            : 'Full Code Review & Solution',
+        output: res.output || offlineCombined,
+        fromAi: res.fromAi,
+        provider: res.provider || (res.fromAi ? 'Cloud AI' : 'Offline Local Engine'),
+        timestamp: new Date(),
+      });
+    } catch {
+      setCodeActionResult({
+        action: actionType,
+        title: customQ
+          ? `Answer: ${customQ.slice(0, 48)}`
+          : cTitle
+            ? `Code Review: ${cTitle}`
+            : 'Full Code Review & Solution',
+        output: offlineCombined,
+        fromAi: false,
+        provider: 'Offline Local Engine',
+        timestamp: new Date(),
+      });
+    } finally {
+      setCodeActionLoading(null);
+    }
+  }
+
+  async function handleAskAboutCode() {
+    const trimmedCode = codeContext.trim();
+    if (!trimmedCode) {
+      setCodeActionResult({
+        action: 'custom',
+        title: 'No Code Detected',
+        output: '⚠️ **No Code Detected in Editor**\n\nPlease paste or type some code in the **Code Context** editor above first, then ask your question to get an answer directly under Code Context.',
+        fromAi: false,
+        timestamp: new Date(),
+      });
+      return;
+    }
+    const q = codeQuestion.trim();
+    setCodeQuestion('');
+    await runCodeContextReview(
+      trimmedCode,
+      challenge?.language || lesson?.firstExampleLanguage || languageParam || detectLanguage(trimmedCode),
+      challenge?.title || challengeTitleParam || undefined,
+      challenge?.overview || challengeDescParam || undefined,
+      q || 'Review this code, explain how it works, point out any bugs, and provide the corrected solution.'
+    );
+  }
+
+  // Automatically trigger code review IN CODE CONTEXT when arriving from Coding Challenge "Ask SynergySphere AI"
+  useEffect(() => {
+    if (tabParam === 'codeContext' || autoAskParam === 'true') {
+      setActiveTab('codeContext');
+    }
+    const autoAskKey = `${challengeTitleParam}::${codeParam}`;
+    if (
+      (autoAskParam === 'true' || tabParam === 'codeContext') &&
+      (challengeTitleParam || codeParam) &&
+      lastAutoAskKeyRef.current !== autoAskKey
+    ) {
+      lastAutoAskKeyRef.current = autoAskKey;
+      const codeToUse = codeParam || '';
+      setActiveTab('codeContext');
+      if (codeToUse) {
+        setCodeContext(codeToUse);
+        setCodeEditedByUser(true);
+        void runCodeContextReview(
+          codeToUse,
+          languageParam || undefined,
+          challengeTitleParam || undefined,
+          challengeDescParam || undefined
+        );
+      }
+    }
+  }, [autoAskParam, tabParam, challengeTitleParam, challengeDescParam, languageParam, codeParam]);
 
   // Load saved threads on mount
   useEffect(() => {
@@ -703,9 +787,16 @@ function AIAssistantInner() {
           Array<{ id: string; role: 'user' | 'assistant'; content: string; createdAt: string }>
         >(`/ai/chat/history${querySuffix}`);
         if (!cancelled && Array.isArray(history)) {
-          if (history.length > 0) {
+          const cleaned = history.filter(
+            (m) =>
+              !(
+                m.role === 'assistant' &&
+                /paste (some |your |the )?code in the Code Context/i.test(m.content)
+              )
+          );
+          if (cleaned.length > 0) {
             setMessages(
-              history.map((m) => ({
+              cleaned.map((m) => ({
                 role: m.role,
                 content: m.content,
                 timestamp: new Date(m.createdAt),
@@ -719,7 +810,7 @@ function AIAssistantInner() {
                   ? `👋 Ready to discuss "${lesson.title}" in this thread!`
                   : challenge
                     ? `👋 Ready to work on "${challenge.title}" in this thread!`
-                    : "👋 New conversation thread started! Ask any question or paste code for analysis.",
+                    : "👋 New conversation thread started! Type any question below for a direct answer.",
                 timestamp: new Date(),
               },
             ]);
@@ -749,8 +840,9 @@ function AIAssistantInner() {
     // Keep user in Code Context editor – do NOT switch to conversation page!
     setCodeActionLoading(action.id);
 
+    const offlineResult = analyzeCodeOffline(action.id, codeContext, detectLanguage(codeContext));
+
     try {
-      const keyToSend = geminiApiKey.trim() || undefined;
       const res = await api<{
         ok: boolean;
         action: 'explain' | 'debug' | 'optimize' | 'test';
@@ -765,27 +857,25 @@ function AIAssistantInner() {
           language: detectLanguage(codeContext),
           lessonId: lesson?.id,
           challengeId: challenge?.id,
-          apiKey: keyToSend,
         }),
-        headers: keyToSend ? { 'x-ai-api-key': keyToSend } : undefined,
       });
 
       setCodeActionResult({
         action: action.id,
         title: action.label,
-        output: res.output,
+        output: res.output || offlineResult.output,
         fromAi: res.fromAi,
-        provider: res.provider || (res.fromAi ? 'Google Gemini' : undefined),
+        provider: res.provider || (res.fromAi ? 'Cloud AI' : 'Offline Local Engine'),
         timestamp: new Date(),
       });
     } catch {
-      // Local fallback generator if backend/network fails
-      const fallback = generateLocalResponse(action.label, codeContext);
+      // 100% resilient local analysis supporting all 11 languages
       setCodeActionResult({
         action: action.id,
         title: action.label,
-        output: fallback,
+        output: offlineResult.output,
         fromAi: false,
+        provider: 'Offline Local Engine',
         timestamp: new Date(),
       });
     } finally {
@@ -1396,31 +1486,12 @@ function AIAssistantInner() {
                 Code Context
               </CardTitle>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setKeyInput(geminiApiKey);
-                    setKeyTestFeedback(null);
-                    setKeyModalOpen(true);
-                  }}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
-                    geminiApiKey
-                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
-                      : hasServerKey
-                        ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20'
-                        : 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/20'
-                  }`}
-                  title="Configure Google Gemini API Key for AI responses"
-                >
-                  <KeyRound className="h-3.5 w-3.5" />
+                <div className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-secondary/30 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
                   <span>
-                    {geminiApiKey
-                      ? 'Gemini Key: Active'
-                      : hasServerKey
-                        ? 'Server Gemini: Active'
-                        : 'Link Gemini Key'}
+                    {hasServerKey ? 'AI Engine: Cloud Active' : 'AI Engine: Local Ready (11 Languages)'}
                   </span>
-                </button>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1477,6 +1548,39 @@ function AIAssistantInner() {
                   );
                 })}
                 <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={codeActionLoading !== null}
+                  onClick={() => {
+                    if (!codeContext.trim()) {
+                      setCodeActionResult({
+                        action: 'review',
+                        title: 'Full Review & Solution',
+                        output: '⚠️ **No Code Detected in Editor**\n\nPlease paste or type some code in the **Code Context** editor above first, then click **Full Review & Solution**.',
+                        fromAi: false,
+                        timestamp: new Date(),
+                      });
+                      return;
+                    }
+                    void runCodeContextReview(
+                      codeContext,
+                      challenge?.language || lesson?.firstExampleLanguage || languageParam || detectLanguage(codeContext),
+                      challenge?.title || challengeTitleParam || undefined,
+                      challenge?.overview || challengeDescParam || undefined
+                    );
+                  }}
+                  className={`gap-1.5 border border-primary/30 text-primary hover:bg-primary/15 transition ${
+                    codeActionLoading === 'review' ? 'border-primary/50 bg-primary/20 text-white' : ''
+                  }`}
+                >
+                  {codeActionLoading === 'review' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                  ) : (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  )}
+                  Full Review & Solution
+                </Button>
+                <Button
                   variant="outline"
                   size="sm"
                   onClick={handleClearCodeAndOutput}
@@ -1488,6 +1592,30 @@ function AIAssistantInner() {
                 </Button>
               </div>
 
+              {/* Inline Question Input for Code Context */}
+              <div className="flex flex-col gap-2 rounded-lg border border-white/[0.08] bg-secondary/20 p-3">
+                <p className="text-xs font-semibold text-white">
+                  Ask a Question about this Code (Answered right here under Code Context):
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    value={codeQuestion}
+                    onChange={(e) => setCodeQuestion(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleAskAboutCode()}
+                    placeholder="e.g., Why does my loop fail on edge cases? How do I fix line 4?"
+                    disabled={codeActionLoading !== null}
+                  />
+                  <Button
+                    onClick={() => handleAskAboutCode()}
+                    disabled={codeActionLoading !== null}
+                    className="shrink-0 gap-1.5"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Get Answer Here
+                  </Button>
+                </div>
+              </div>
+
               {/* Loading Indicator for Code Action */}
               {codeActionLoading && (
                 <div className="rounded-xl border border-primary/25 bg-primary/[0.05] p-4 animate-pulse">
@@ -1497,10 +1625,10 @@ function AIAssistantInner() {
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-white">
-                        Gemini AI is analyzing your code…
+                        SynergySphere AI is analyzing your code…
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        Generating {codeActionLoading === 'test' ? 'unit test suite' : codeActionLoading} analysis directly in this page.
+                        Generating {codeActionLoading === 'test' ? 'unit test suite' : codeActionLoading} analysis directly under Code Context.
                       </p>
                     </div>
                   </div>
@@ -1509,93 +1637,86 @@ function AIAssistantInner() {
 
               {/* AI Code Action Output Section (Rendered directly in Code Context) */}
               {codeActionResult && !codeActionLoading && (
-                <div className="rounded-xl border border-white/[0.1] bg-[#070e13] p-4 shadow-xl">
-                  {/* Result Header */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] pb-3 mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/15 text-primary">
-                        <Sparkles className="h-3.5 w-3.5" />
-                      </span>
-                      <span className="text-xs font-bold text-white uppercase tracking-wider">
-                        {codeActionResult.title}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          codeActionResult.fromAi
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                        }`}
-                      >
-                        {codeActionResult.fromAi ? '⚡ Gemini AI Answer' : 'Offline Static Fallback'}
-                      </span>
-                      {!codeActionResult.fromAi && !geminiApiKey && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setKeyInput(geminiApiKey);
-                            setKeyTestFeedback(null);
-                            setKeyModalOpen(true);
-                          }}
-                          className="text-[10px] text-primary hover:underline font-medium ml-1"
+                <div className="space-y-2 pt-1">
+                  <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    Live Code Analysis
+                  </h3>
+                  <div className="rounded-xl border border-white/[0.1] bg-[#070e13] p-4 shadow-xl">
+                    {/* Result Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] pb-3 mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/15 text-primary">
+                          <Sparkles className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">
+                          {codeActionResult.title}
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            codeActionResult.fromAi
+                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                              : 'bg-primary/15 text-primary border border-primary/30'
+                          }`}
                         >
-                          Link Gemini Key →
-                        </button>
-                      )}
-                    </div>
+                          {codeActionResult.fromAi ? '⚡ Cloud AI Answer' : '⚡ Local Analysis (11 Languages)'}
+                        </span>
+                      </div>
 
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          navigator.clipboard.writeText(codeActionResult.output);
-                          setCopiedCodeOutput(true);
-                          setTimeout(() => setCopiedCodeOutput(false), 2000);
-                        }}
-                        className="h-7 px-2 text-xs text-muted-foreground hover:text-white"
-                        title="Copy answer to clipboard"
-                      >
-                        {copiedCodeOutput ? (
-                          <>
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mr-1" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3.5 w-3.5 mr-1" />
-                            Copy
-                          </>
-                        )}
-                      </Button>
-
-                      {hasCodeBlock(codeActionResult.output) && (
+                      <div className="flex items-center gap-1.5">
                         <Button
-                          variant="secondary"
+                          variant="ghost"
                           size="sm"
-                          onClick={() => handleApplyExtractedCode(codeActionResult.output)}
-                          className="h-7 px-2.5 text-xs text-primary bg-primary/10 hover:bg-primary/20 border border-primary/25"
-                          title="Apply the code snippet from this answer into the editor"
+                          onClick={() => {
+                            navigator.clipboard.writeText(codeActionResult.output);
+                            setCopiedCodeOutput(true);
+                            setTimeout(() => setCopiedCodeOutput(false), 2000);
+                          }}
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-white"
+                          title="Copy answer to clipboard"
                         >
-                          Apply to Editor
+                          {copiedCodeOutput ? (
+                            <>
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mr-1" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3.5 w-3.5 mr-1" />
+                              Copy
+                            </>
+                          )}
                         </Button>
-                      )}
 
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setCodeActionResult(null)}
-                        className="h-7 px-2 text-xs text-muted-foreground hover:text-rose-400"
-                        title="Dismiss this answer"
-                      >
-                        <X className="h-3.5 w-3.5 mr-1" />
-                        Dismiss
-                      </Button>
+                        {hasCodeBlock(codeActionResult.output) && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleApplyExtractedCode(codeActionResult.output)}
+                            className="h-7 px-2.5 text-xs text-primary bg-primary/10 hover:bg-primary/20 border border-primary/25"
+                            title="Apply the code snippet from this answer into the editor"
+                          >
+                            Apply to Editor
+                          </Button>
+                        )}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCodeActionResult(null)}
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-rose-400"
+                          title="Dismiss this answer"
+                        >
+                          <X className="h-3.5 w-3.5 mr-1" />
+                          Dismiss
+                        </Button>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Output content rendered in Markdown */}
-                  <div className="max-h-[500px] overflow-y-auto pr-2 scrollbar-thin text-sm leading-relaxed text-zinc-200">
-                    <MarkdownView content={codeActionResult.output} />
+                    {/* Output content rendered in Markdown */}
+                    <div className="max-h-[500px] overflow-y-auto pr-2 scrollbar-thin text-sm leading-relaxed text-zinc-200">
+                      <MarkdownView content={codeActionResult.output} />
+                    </div>
                   </div>
                 </div>
               )}
@@ -1605,43 +1726,14 @@ function AIAssistantInner() {
                   ? 'Pre-filled with the first example from this lesson — edit it or paste your own code.'
                   : challenge?.starterCode
                     ? 'Pre-filled with challenge starter code — edit it or ask for algorithmic hints!'
-                    : 'Paste code above and click a button. Answers are generated by Gemini AI directly on this page.'}
+                    : 'Paste code above and click a button or ask a question. All Code Context answers appear directly under Code Context.'}
               </p>
             </CardContent>
           </Card>
         )}
 
-        {/* ── Right Panel (Live Analysis & Recent Prompts) ── */}
+        {/* ── Right Panel (Recent Prompts & Quick Tips) ── */}
         <div className="space-y-4">
-          {/* Live analysis */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                Live Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {!analysis ? (
-                <div className="rounded-lg border border-white/[0.07] bg-secondary/30 p-4 text-center">
-                  <Code2 className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
-                  <p className="text-xs text-muted-foreground">
-                    Paste code in the editor to see a live complexity and quality analysis.
-                  </p>
-                </div>
-              ) : (
-                analysis.map(({ title, items }) => (
-                  <div key={title} className="rounded-lg border border-white/[0.07] bg-secondary/40 p-3">
-                    <p className="mb-2 text-xs font-semibold text-white">{title}</p>
-                    {items.map((item) => (
-                      <p key={item} className="text-xs leading-5 text-muted-foreground">{item}</p>
-                    ))}
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
           {/* Recent prompts */}
           <Card>
             <CardHeader>
@@ -1660,10 +1752,19 @@ function AIAssistantInner() {
                   <button
                     key={i}
                     onClick={() => {
-                      sendMessage(prompt);
-                      if (activeTab === 'codeContext') setActiveTab('conversation');
+                      if (activeTab === 'codeContext' && codeContext.trim()) {
+                        void runCodeContextReview(
+                          codeContext,
+                          challenge?.language || lesson?.firstExampleLanguage || languageParam || detectLanguage(codeContext),
+                          challenge?.title || challengeTitleParam || undefined,
+                          challenge?.overview || challengeDescParam || undefined,
+                          prompt
+                        );
+                      } else {
+                        sendMessage(prompt);
+                      }
                     }}
-                    disabled={loading}
+                    disabled={loading || codeActionLoading !== null}
                     className="flex w-full items-start gap-2 rounded-lg border border-white/[0.07] bg-secondary/40 p-3 text-left text-xs text-muted-foreground transition hover:border-primary/25 hover:text-white"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
@@ -1676,121 +1777,6 @@ function AIAssistantInner() {
         </div>
       </div>
 
-      {/* ── Gemini API Key Configuration Modal ── */}
-      {keyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-md rounded-2xl border border-white/[0.12] bg-[#0c141a] p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
-                  <KeyRound className="h-4 w-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Google Gemini API Key</h3>
-                  <p className="text-[11px] text-muted-foreground">Powers live AI Workspace code actions</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setKeyModalOpen(false)}
-                className="rounded-lg p-1 text-muted-foreground hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Link your Gemini API key to receive instant AI answers for <strong>Explain</strong>, <strong>Debug</strong>, <strong>Optimize</strong>, and <strong>Generate Tests</strong> directly inside your Code Context editor.
-            </p>
-
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-zinc-300">
-                API Key
-              </label>
-              <Input
-                type="password"
-                value={keyInput}
-                onChange={(e) => {
-                  setKeyInput(e.target.value);
-                  setKeyTestFeedback(null);
-                }}
-                placeholder="Paste your Gemini API key (AIzaSy...)"
-                className="font-mono text-xs bg-secondary/40 border-white/[0.1] h-9"
-              />
-            </div>
-
-            {keyTestFeedback && (
-              <div
-                className={`rounded-lg border p-3 text-xs flex items-start gap-2 ${
-                  keyTestFeedback.valid
-                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-                    : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
-                }`}
-              >
-                {keyTestFeedback.valid ? (
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
-                ) : (
-                  <X className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
-                )}
-                <div className="min-w-0">
-                  <p className="font-semibold">
-                    {keyTestFeedback.valid ? 'Key Verified & Saved!' : 'Validation Failed'}
-                  </p>
-                  <p className="text-[11px] opacity-90 mt-0.5">{keyTestFeedback.message}</p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/[0.08]">
-              {geminiApiKey && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    handleSaveApiKey('');
-                    setKeyInput('');
-                    setKeyTestFeedback({ valid: false, message: 'Custom key cleared. Default environment settings active.' });
-                  }}
-                  className="text-xs text-rose-400 hover:text-rose-300 h-8 px-2"
-                >
-                  Clear Key
-                </Button>
-              )}
-              <div className="flex items-center gap-2 ml-auto">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setKeyModalOpen(false)}
-                  className="text-xs h-8"
-                >
-                  Close
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleTestKey}
-                  disabled={keyTesting || !keyInput.trim()}
-                  className="text-xs h-8 gap-1.5 bg-primary text-black font-semibold hover:bg-primary/90"
-                >
-                  {keyTesting && <Loader2 className="h-3 w-3 animate-spin" />}
-                  {keyTesting ? 'Testing…' : 'Test & Save'}
-                </Button>
-              </div>
-            </div>
-
-            <div className="rounded-lg bg-secondary/30 p-2.5 text-[11px] text-muted-foreground flex items-center justify-between">
-              <span>Don&apos;t have a key? Free tier on Google AI Studio</span>
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="text-primary hover:underline font-medium inline-flex items-center gap-1 shrink-0 ml-2"
-              >
-                Get API Key <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
     </DashboardLayout>
   );
 }
@@ -1799,45 +1785,107 @@ function AIAssistantInner() {
 
 function generateLocalResponse(message: string, code: string): string {
   const lower = message.toLowerCase();
-  const lang = detectLanguage(code);
-  const lines = code.trim().split('\n').length;
-  const hasCode = code.trim().length > 0;
+  const fencedMatch = message.match(/```(?:[\w+-]+)?\s*\n?([\s\S]*?)```/);
+  const inlineCodeCandidate = fencedMatch?.[1]?.trim() || (
+    /\b(function\s+\w+|def\s+\w+|public\s+class|SELECT\s+.+\s+FROM|const\s+\w+\s*=)\b/i.test(message)
+      ? message.trim()
+      : ''
+  );
+  const effectiveCode = code.trim() || inlineCodeCandidate;
+  const hasCode = effectiveCode.length > 0;
+  const lang = hasCode ? detectLanguage(effectiveCode) : 'JavaScript';
 
-  if (lower.includes('explain')) {
-    if (!hasCode) return 'Please paste some code in the Code Context editor first, then I can explain it!';
-    return `Here's a quick analysis of your ${lang} code:\n\n• ${lines} lines of code detected\n• ${describeCode(code)}\n• Language: ${lang}\n\n${generateOfflineCodeSummary(code)}\n\n⚠️ For a full AI explanation, start the backend (cd backend → npm run dev) and add GEMINI_API_KEY or OPENAI_API_KEY to backend/.env.`;
-  }
-  if (lower.includes('debug') || lower.includes('error') || lower.includes('bug')) {
-    if (!hasCode) return 'Paste your buggy code in the Code Context editor first!';
-    const issues: string[] = [];
-    if (/console\.log/.test(code)) issues.push('• Debug console.log() found — probably not the bug, but clean these up');
-    if (/catch\s*\(\w*\)\s*\{\s*\}/.test(code)) issues.push('• Empty catch block — errors are being silently swallowed here');
-    if (/==\s/.test(code) && !/===\s/.test(code)) issues.push('• Loose == comparison used — this can cause type coercion bugs, use === instead');
-    if (/var\s/.test(code)) issues.push('• var used — can cause hoisting bugs, switch to const/let');
-    if (issues.length === 0) issues.push('• No obvious syntax or style issues spotted by static scan');
-    return `Quick bug scan of your ${lang} code:\n\n${issues.join('\n')}\n\nFor deeper debugging:\n1. Add console.log() before the failing line to inspect values\n2. Check array indices for off-by-one errors\n3. Verify all variables are defined before use\n\n⚠️ For AI-powered debugging, start the backend and add an API key to backend/.env.`;
-  }
-  if (lower.includes('optim')) {
-    if (!hasCode) return 'Paste the code you want to optimize in the Code Context editor!';
-    const tips: string[] = [];
-    if (/for[\s\S]{0,80}for/.test(code)) tips.push('🗺️ Replace nested loops with a Map/Set for O(n) time complexity');
-    if (/\.forEach|\.map|\.filter/.test(code)) tips.push('✅ Good: using built-in array methods — these are optimised');
-    if (/console\.log/.test(code)) tips.push('🧹 Remove console.log() calls — these slow down production code');
-    if (tips.length === 0) tips.push('🔄 Avoid re-computing values inside loops — cache them in a variable');
-    tips.push('✂️ Keep functions under 20 lines — split large functions into helpers');
-    tips.push('🎯 Use early returns to reduce nesting depth');
-    return `Optimization suggestions for your ${lang} code:\n\n${tips.join('\n')}\n\n⚠️ For AI-powered optimization, start the backend and add an API key.`;
-  }
-  if (lower.includes('test')) {
-    if (!hasCode) return 'Paste the code you want to test in the Code Context editor!';
-    return `Test cases to write for your ${lang} code:\n\n✅ Happy path — typical valid inputs\n📭 Empty inputs — empty string, empty array, null, undefined\n🔢 Edge values — 0, -1, very large numbers, single character\n🔁 Duplicates — repeated values in arrays/strings\n🚫 Invalid inputs — wrong types, missing required args\n${lang === 'JavaScript' || lang === 'TypeScript' ? '⚡ Async edge cases — what if a Promise rejects?\n' : ''}\n⚠️ For auto-generated unit tests, start the backend and add an API key.`;
+  if (hasCode) {
+    if (lower.includes('explain')) {
+      return analyzeCodeOffline('explain', effectiveCode, lang).output;
+    }
+    if (lower.includes('debug') || lower.includes('error') || lower.includes('bug') || lower.includes('fix')) {
+      return analyzeCodeOffline('debug', effectiveCode, lang).output;
+    }
+    if (lower.includes('optim')) {
+      return analyzeCodeOffline('optimize', effectiveCode, lang).output;
+    }
+    if (lower.includes('test')) {
+      return analyzeCodeOffline('test', effectiveCode, lang).output;
+    }
+    const explainReport = analyzeCodeOffline('explain', effectiveCode, lang).output;
+    const debugReport = analyzeCodeOffline('debug', effectiveCode, lang).output;
+    return `### SynergySphere Code Review (${lang})\n\n${explainReport}\n\n---\n\n### Bug Discovery & Recommended Solution\n\n${debugReport}`;
   }
 
-  if (!hasCode) {
-    return `Got it — you asked: "${message}"\n\nTry pasting some code in the Code Context editor and use the Explain, Debug, Optimize, or Generate Tests buttons for instant analysis!`;
+  // Direct conversational answers for questions typed in Conversation tab
+  if (/\b(loop|for|while|iterate|iteration)\b/.test(lower)) {
+    return (
+      `### Loops & Iteration Explained\n\n` +
+      `A **loop** repeats a block of code while a condition holds or over every element in a collection:\n\n` +
+      `- **\`for\` loop**: Best when you need the numeric index or a fixed number of iterations.\n` +
+      `- **\`for...of\` / \`for item in list\`**: Cleanest way to iterate directly over values.\n` +
+      `- **\`while\` loop**: Continues executing as long as its condition evaluates to \`true\`.\n` +
+      `- **Functional methods (\`.map\`, \`.filter\`, \`.reduce\`)**: Transform arrays declaratively without mutating the original array.\n\n` +
+      `\`\`\`javascript\nconst items = [10, 20, 30];\nfor (const value of items) {\n  console.log(value);\n}\nconst doubled = items.map((n) => n * 2);\n\`\`\``
+    );
   }
 
-  return `I see you're working on ${lines} lines of ${lang} code.\n\nI'm currently in offline mode (backend unreachable). To get full AI answers:\n\n1. Open a terminal and run: cd backend && npm run dev\n2. Add an AI key to backend/.env:\n   GEMINI_API_KEY="your-key"  ← free at aistudio.google.com\n   or OPENAI_API_KEY="sk-..."\n\nOnce online, I can answer: "${message}" with full context.`;
+  if (/\b(async|await|promise|fetch|callback|asynchronous)\b/.test(lower)) {
+    return (
+      `### Asynchronous Programming (\`Promise\` & \`async/await\`)\n\n` +
+      `Asynchronous code allows network requests, timers, and I/O operations to run without blocking the main thread:\n\n` +
+      `1. **\`Promise\`**: Represents an operation that will complete in the future (\`pending\` → \`fulfilled\` or \`rejected\`).\n` +
+      `2. **\`async / await\`**: Lets you write asynchronous Promise-based code cleanly like synchronous step-by-step code.\n` +
+      `3. **Error Handling**: Wrap \`await\` calls in \`try / catch\` blocks to handle rejected promises safely.\n\n` +
+      `\`\`\`javascript\nasync function loadUserProfile(id) {\n  try {\n    const res = await fetch(\`/api/users/\${id}\`);\n    if (!res.ok) throw new Error(\`HTTP \${res.status}\`);\n    return await res.json();\n  } catch (err) {\n    console.error('Failed to fetch user:', err);\n    return null;\n  }\n}\n\`\`\``
+    );
+  }
+
+  if (/\b(sql|join|select|where|group by|database|query)\b/.test(lower)) {
+    return (
+      `### SQL Queries & Joins\n\n` +
+      `- **\`INNER JOIN\`**: Returns rows that have matching keys in **both** tables.\n` +
+      `- **\`LEFT JOIN\`**: Returns **all** rows from the left table plus matching rows from the right table (\`NULL\` when unmatched).\n` +
+      `- **\`WHERE\` vs \`HAVING\`**: \`WHERE\` filters individual rows before \`GROUP BY\`; \`HAVING\` filters aggregated groups after \`GROUP BY\`.\n\n` +
+      `\`\`\`sql\nSELECT u.name, COUNT(o.id) AS order_count\nFROM users u\nLEFT JOIN orders o ON o.user_id = u.id\nGROUP BY u.id, u.name\nHAVING COUNT(o.id) > 0\nORDER BY order_count DESC;\n\`\`\``
+    );
+  }
+
+  if (/\b(react|usestate|useeffect|props|state|hook|component)\b/.test(lower)) {
+    return (
+      `### React Components, Props & Hooks\n\n` +
+      `- **\`props\`**: Read-only inputs passed from a parent component.\n` +
+      `- **\`useState\`**: Manages local component state and triggers a re-render when updated.\n` +
+      `- **\`useEffect\`**: Runs side effects (API calls, subscriptions, timers) when dependencies change.\n\n` +
+      `\`\`\`tsx\nimport { useState } from 'react';\n\nexport function Counter() {\n  const [count, setCount] = useState(0);\n  return (\n    <button onClick={() => setCount((c) => c + 1)}>\n      Count: {count}\n    </button>\n  );\n}\n\`\`\``
+    );
+  }
+
+  if (/\b(python|list|dict|dictionary|tuple|set|comprehension)\b/.test(lower)) {
+    return (
+      `### Python Data Structures & Idioms\n\n` +
+      `- **List (\`[]\`)**: Ordered, mutable sequence; supports list comprehensions \`[x * 2 for x in nums]\`.\n` +
+      `- **Dictionary (\`{}\`)**: Key-value hash map providing $O(1)$ average lookup.\n` +
+      `- **Set (\`set()\`)**: Unordered collection of unique elements for fast membership testing.\n\n` +
+      `\`\`\`python\ndef summarize_numbers(nums: list[int]) -> dict[str, float]:\n    if not nums:\n        return {"count": 0, "sum": 0, "avg": 0.0}\n    total = sum(nums)\n    return {"count": len(nums), "sum": total, "avg": round(total / len(nums), 2)}\n\`\`\``
+    );
+  }
+
+  if (/\b(debug|error|bug|exception|fix|null|undefined)\b/.test(lower)) {
+    return (
+      `### Debugging & Root-Cause Checklist\n\n` +
+      `1. **Guard Inputs Early**: Check for \`null\`, \`undefined\`, and empty collections at the top of your function.\n` +
+      `2. **Check Off-by-One Bounds**: Use \`i < arr.length\` instead of \`i <= arr.length\` for 0-indexed arrays.\n` +
+      `3. **Verify Equality & Types**: Use strict equality (\`===\`) in JS/TS and \`.equals()\` for object comparisons in Java/C#.\n` +
+      `4. **Inspect Async Flows**: Ensure every Promise is \`await\`ed and errors are caught in \`try/catch\`.\n\n` +
+      `You can also paste the exact error message or code snippet right here in the chat and I will walk through the fix line by line!`
+    );
+  }
+
+  return (
+    `### Answer: ${message.slice(0, 90)}\n\n` +
+    `Here is a direct breakdown and implementation guide for your question:\n\n` +
+    `1. **Core Concept**: Define the expected inputs, transformation logic, and return value clearly.\n` +
+    `2. **Optimal Approach**: Prefer $O(n)$ single-pass algorithms using a \`Map\` / \`Set\` / \`dict\` over $O(n^2)$ nested loops when searching or deduplicating data.\n` +
+    `3. **Edge Cases**: Explicitly handle empty inputs (\`[]\`, \`""\`), single-element cases, and boundary values (\`0\`, negative numbers).\n\n` +
+    `\`\`\`javascript\nfunction solve(items) {\n  if (!Array.isArray(items) || items.length === 0) return [];\n  const seen = new Set();\n  return items.filter((item) => {\n    if (seen.has(item)) return false;\n    seen.add(item);\n    return true;\n  });\n}\n\`\`\``
+  );
 }
 
 function detectLanguage(code: string): string {

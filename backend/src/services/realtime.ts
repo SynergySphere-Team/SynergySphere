@@ -1,9 +1,9 @@
-import WebSocket from 'ws';
+import WebSocket, { WebSocketServer as WsServer } from 'ws';
 import type { Server, IncomingMessage } from 'node:http';
 import { verifyToken, AUTH_COOKIE_NAME, type AuthPayload } from '../middleware/auth.js';
 
 export type WebSocketClient = WebSocket;
-export type WebSocketServer = InstanceType<typeof WebSocket.Server>;
+export type WebSocketServer = InstanceType<typeof WsServer>;
 
 export interface ClientConnection {
   ws: WebSocketClient;
@@ -62,7 +62,8 @@ function broadcastToCodeRoom(roomId: string, message: unknown, excludeClient?: C
 }
 
 export function initRealtime(server: Server): WebSocketServer {
-  wss = new WebSocket.Server({ server, path: '/ws' });
+  const ServerCtor = WsServer || (WebSocket as any).WebSocketServer || (WebSocket as any).Server;
+  wss = new ServerCtor({ server, path: '/ws' }) as WebSocketServer;
 
   wss.on('connection', (ws: WebSocketClient, req?: IncomingMessage) => {
     const client: ClientConnection = {
@@ -263,6 +264,20 @@ export function initRealtime(server: Server): WebSocketServer {
     ws.on('close', cleanupClient);
     ws.on('error', cleanupClient);
   });
+
+  const heartbeatInterval = setInterval(() => {
+    for (const client of clients) {
+      if (client.ws.readyState === WebSocket.OPEN) {
+        try {
+          (client.ws as any).ping?.();
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, 25_000);
+
+  wss.on('close', () => clearInterval(heartbeatInterval));
 
   return wss;
 }

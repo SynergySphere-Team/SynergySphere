@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState, Component, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,20 +19,112 @@ import { Button, Card, Field } from '@/components/ui';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
+import { saveCachedResponse } from '@/services/offlineCache';
 import type { LectureUpload } from '@/types/api';
 
-const asArray = <T,>(value: T[] | string | null | undefined): T[] =>
-  Array.isArray(value)
-    ? value
-    : (() => {
-        try {
-          return JSON.parse(value || '[]');
-        } catch {
-          return [];
-        }
-      })();
+const safeStr = (v: unknown): string => {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (typeof v === 'object') {
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return '';
+    }
+  }
+  return '';
+};
+
+const SAMPLE_LECTURES = [
+  {
+    title: 'Data Structures & Algorithms: Balanced Trees & Hash Maps',
+    content: `Data Structures & Algorithms: Balanced Trees & Hash Maps\n\nKey Concepts:\n- Binary Search Trees (BST): A node-based binary tree data structure where each node has at most two children. The left subtree contains only nodes with keys less than the parent's key, and the right subtree contains only nodes with keys greater.\n- Self-Balancing Trees (AVL & Red-Black Trees): Ensure O(log n) time complexity for search, insert, and delete operations by maintaining tree height balance through rotations.\n- Hash Tables: Implement associative arrays using a hash function to map keys to bucket indices. Average case time complexity for lookups, insertions, and deletions is O(1).\n- Collision Resolution Techniques: Chaining (linked lists at each bucket) and Open Addressing (Linear Probing, Quadratic Probing, Double Hashing).\n- Big-O Complexity Comparisons: Array lookup is O(1) by index, O(n) by value. Hash Table lookup is O(1) average, O(n) worst-case. BST lookup is O(log n) balanced, O(n) degenerate.`,
+  },
+  {
+    title: 'Modern Web Architecture: Event Loop & Microservices',
+    content: `Modern Web Architecture: Event Loop & Microservices\n\nKey Concepts:\n- Node.js Event Loop: Single-threaded event loop driven by libuv with distinct execution phases: Timers, Pending Callbacks, Idle/Prepare, Poll, Check (setImmediate), and Close callbacks.\n- Microtasks vs Macrotasks: process.nextTick and Promise microtasks execute immediately after the current operation and before the next phase of the event loop.\n- Microservices Architecture: Decentralized software architecture where independently deployable services communicate over HTTP/REST, gRPC, or asynchronous message queues (RabbitMQ, Kafka).\n- Database Sharding & Replication: Horizontal partitioning across multiple database instances to scale read and write throughput while maintaining high availability.\n- Caching Strategies: Cache-aside, Read-Through, Write-Through, and Write-Back patterns utilizing distributed in-memory caches like Redis.`,
+  },
+];
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  fallbackColor?: string;
+  onReset?: () => void;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class LectureErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('LectureToLife render exception caught by ErrorBoundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' }}>
+          <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
+          <Text style={{ fontSize: 18, fontWeight: '700', color: this.props.fallbackColor || '#111827', marginTop: 12, textAlign: 'center' }}>
+            Study Pack Display Notice
+          </Text>
+          <Text style={{ fontSize: 13, color: '#6b7280', marginVertical: 8, textAlign: 'center' }}>
+            {this.state.error?.message || 'A display issue occurred while rendering this study pack.'}
+          </Text>
+          <Pressable
+            onPress={() => {
+              this.setState({ hasError: false, error: null });
+              this.props.onReset?.();
+            }}
+            style={{
+              marginTop: 12,
+              paddingVertical: 10,
+              paddingHorizontal: 20,
+              backgroundColor: '#10b981',
+              borderRadius: 8,
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Refresh View</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const asArray = <T,>(value: unknown): T[] => {
+  if (Array.isArray(value)) return value as T[];
+  if (!value) return [];
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, T>);
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed as T[];
+      if (parsed && typeof parsed === 'object') return Object.values(parsed) as T[];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
 
 export default function LectureToLifeScreen() {
+  const router = useRouter();
   const { colors, theme } = useTheme();
   const { fontSize, largerText } = useAccessibility();
 
@@ -75,6 +168,7 @@ export default function LectureToLifeScreen() {
         totalCount: number;
         cards: Array<{
           id: string;
+          uploadId?: string | null;
           front: string;
           back: string;
           easeFactor: number;
@@ -132,9 +226,21 @@ export default function LectureToLifeScreen() {
   const load = useCallback(async () => {
     try {
       const data = await api.get<LectureUpload[]>('/ai/lecture-to-life');
-      setUploads(data);
-      setSelected((current) => current || data[0] || null);
-      loadSrsDue();
+      const list = Array.isArray(data) ? data : [];
+      setUploads(list);
+      setSelected((current) => {
+        if (list.length === 0) return null;
+        if (current && list.some((item) => item.id === current.id)) return current;
+        return list[0] || null;
+      });
+      if (list.length === 0) {
+        setSrsDueCards([]);
+        setSrsTotalCount(0);
+        setSrsFlippedId(null);
+        await saveCachedResponse('/ai/srs/due', { dueCount: 0, totalCount: 0, cards: [] });
+      } else {
+        loadSrsDue();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load study materials.');
     } finally {
@@ -144,14 +250,14 @@ export default function LectureToLifeScreen() {
 
   async function clearAllPacks() {
     if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && !window.confirm('Are you sure you want to clear all saved study packs? This cannot be undone.')) {
+      if (typeof window !== 'undefined' && !window.confirm('Are you sure you want to clear all saved study packs and due flashcards? This cannot be undone.')) {
         return;
       }
       doClearAllPacks();
     } else {
       Alert.alert(
-        'Clear Saved Study Packs',
-        'Are you sure you want to delete all saved study sessions? This cannot be undone.',
+        'Clear Saved Study Packs & Flashcards',
+        'Are you sure you want to delete all saved study packs and due flashcards? This cannot be undone.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Clear All', style: 'destructive', onPress: doClearAllPacks },
@@ -164,9 +270,16 @@ export default function LectureToLifeScreen() {
     setClearing(true);
     setError('');
     try {
-      await api.delete('/ai/lecture-to-life');
+      // Immediately clear both Saved Study Packs and Due for Review flashcards + offline cache
       setUploads([]);
       setSelected(null);
+      setSrsDueCards([]);
+      setSrsTotalCount(0);
+      setSrsFlippedId(null);
+      await saveCachedResponse('/ai/lecture-to-life', []);
+      await saveCachedResponse('/ai/srs/due', { dueCount: 0, totalCount: 0, cards: [] });
+      await api.delete('/ai/lecture-to-life').catch(() => {});
+      await api.delete('/ai/srs/due').catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not clear saved study materials.');
     } finally {
@@ -177,14 +290,28 @@ export default function LectureToLifeScreen() {
   async function deletePack(id: string) {
     setError('');
     try {
-      await api.delete(`/ai/lecture-to-life/${id}`);
+      let remainingCount = 0;
       setUploads((current) => {
         const remaining = current.filter((item) => item.id !== id);
+        remainingCount = remaining.length;
         if (selected?.id === id) {
           setSelected(remaining[0] || null);
         }
+        saveCachedResponse('/ai/lecture-to-life', remaining).catch(() => {});
         return remaining;
       });
+      setSrsDueCards((prev) => {
+        if (remainingCount === 0) {
+          setSrsTotalCount(0);
+          setSrsFlippedId(null);
+          saveCachedResponse('/ai/srs/due', { dueCount: 0, totalCount: 0, cards: [] }).catch(() => {});
+          return [];
+        }
+        const filtered = prev.filter((c: any) => c.uploadId !== id && c.lectureId !== id && !String(c.cardKey || '').startsWith(`${id}:`));
+        saveCachedResponse('/ai/srs/due', { dueCount: filtered.length, totalCount: filtered.length, cards: filtered }).catch(() => {});
+        return filtered;
+      });
+      await api.delete(`/ai/lecture-to-life/${id}`).catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not delete study pack.');
     }
@@ -339,7 +466,8 @@ export default function LectureToLifeScreen() {
   const score = quizSubmitted ? quiz.reduce((total, item, index) => total + Number(answers[index] === item.answer), 0) : null;
 
   return (
-    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
+    <LectureErrorBoundary fallbackColor={colors.text} onReset={load}>
+      <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       {/* LECTURE TO LIFE HEADER */}
       <View
         style={[
@@ -416,17 +544,34 @@ export default function LectureToLifeScreen() {
                 Due for Review ({srsDueCards.length})
               </Text>
             </View>
-            <View
-              style={{
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-                borderRadius: 999,
-                backgroundColor: isLight ? '#FEF3C7' : 'rgba(245, 158, 11, 0.18)',
-              }}
-            >
-              <Text style={{ fontSize: 11, fontWeight: '800', color: '#D97706' }}>
-                SM-2 Spaced Repetition • +5 XP
-              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 999,
+                  backgroundColor: isLight ? '#FEF3C7' : 'rgba(245, 158, 11, 0.18)',
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#D97706' }}>
+                  SM-2 • +5 XP
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear all due flashcards and saved study packs"
+                onPress={clearAllPacks}
+                disabled={clearing}
+                style={({ pressed }) => [
+                  styles.clearAllBtn,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons name="trash-outline" size={14} color={colors.danger || '#ef4444'} />
+                <Text style={[styles.clearAllBtnText, { color: colors.danger || '#ef4444' }]}>
+                  {clearing ? 'Clearing…' : 'Clear'}
+                </Text>
+              </Pressable>
             </View>
           </View>
           <Card>
@@ -563,6 +708,48 @@ export default function LectureToLifeScreen() {
           </View>
         </View>
 
+        {/* Quick Sample Lecture 'Use' Buttons */}
+        <View style={styles.sampleLecturesRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Use sample algorithms lecture"
+            onPress={() => {
+              setName(SAMPLE_LECTURES[0].title);
+              setContent(SAMPLE_LECTURES[0].content);
+              setSelectedDocName('Sample: Algorithms Lecture');
+              setSelectedDocType('Computer Science');
+              setError('');
+            }}
+            style={({ pressed }) => [
+              styles.sampleBtn,
+              { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)', borderColor: brandGreen },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Ionicons name="sparkles" size={13} color={brandGreen} />
+            <Text style={[styles.sampleBtnText, { color: brandGreen }]}>Use Sample: Algorithms</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Use sample architecture lecture"
+            onPress={() => {
+              setName(SAMPLE_LECTURES[1].title);
+              setContent(SAMPLE_LECTURES[1].content);
+              setSelectedDocName('Sample: Architecture Lecture');
+              setSelectedDocType('Software Engineering');
+              setError('');
+            }}
+            style={({ pressed }) => [
+              styles.sampleBtn,
+              { backgroundColor: isLight ? '#E0F2FE' : 'rgba(2, 132, 199, 0.25)', borderColor: isLight ? '#0284C7' : '#38BDF8' },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Ionicons name="code-slash" size={13} color={isLight ? '#0284C7' : '#38BDF8'} />
+            <Text style={[styles.sampleBtnText, { color: isLight ? '#0284C7' : '#38BDF8' }]}>Use Sample: Web Architecture</Text>
+          </Pressable>
+        </View>
+
         <Field label="Lecture title" value={name} onChangeText={setName} />
         <Field
           label="Lecture text / Extracted content"
@@ -674,7 +861,32 @@ export default function LectureToLifeScreen() {
             ) : null}
           </View>
           <Card>
-            <Text style={[styles.copy, { color: colors.muted }]}>{selected.summary}</Text>
+            <Text style={[styles.copy, { color: colors.muted }]}>{safeStr(selected.summary)}</Text>
+            {selected.summary ? (
+              <View style={styles.summaryActionsRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Use in AI Assistant"
+                  onPress={() => {
+                    router.push({
+                      pathname: '/(tabs)/ai-assistant',
+                      params: {
+                        prompt: `I am studying "${safeStr(selected.fileName)}". Here is my study summary:\n\n${safeStr(selected.summary)}\n\nPlease explain the core concepts in detail, provide 3 practice interview questions with answers, and highlight common exam traps.`,
+                        autoAsk: 'true',
+                      },
+                    });
+                  }}
+                  style={({ pressed }) => [
+                    styles.useActionBtn,
+                    { backgroundColor: brandGreen },
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Ionicons name="chatbubbles" size={15} color="#FFFFFF" />
+                  <Text style={styles.useActionBtnText}>Use in AI Assistant</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </Card>
 
           {/* Flashcards Heading Outside Card */}
@@ -709,7 +921,7 @@ export default function LectureToLifeScreen() {
                           {isFlipped ? 'ANSWER' : `CARD ${index + 1}`}
                         </Text>
                         <Text style={[styles.flashcardText, { color: colors.text }]}>
-                          {isFlipped ? card.back : card.front}
+                          {isFlipped ? safeStr(card.back) : safeStr(card.front)}
                         </Text>
                         <Text style={[styles.flashcardHint, { color: colors.muted }]}>
                           {isFlipped ? 'Tap to see the question • Rate recall below' : 'Tap to reveal answer'}
@@ -728,7 +940,7 @@ export default function LectureToLifeScreen() {
                               disabled={srsReviewing}
                               onPress={() =>
                                 handleSrsReview(
-                                  { front: card.front, back: card.back, lectureId: selected?.id },
+                                  { front: safeStr(card.front), back: safeStr(card.back), lectureId: selected?.id },
                                   btn.quality
                                 )
                               }
@@ -767,12 +979,18 @@ export default function LectureToLifeScreen() {
                 <Text style={[styles.help, { color: colors.muted }]}>
                   Choose one answer for each question, then submit to check your work.
                 </Text>
-                {quiz.map((item, questionIndex) => (
-                  <View key={questionIndex} style={styles.question}>
-                    <Text style={[styles.questionText, { color: colors.text }]}>
-                      {questionIndex + 1}. {item.question}
-                    </Text>
-                    {item.options.map((option, optionIndex) => {
+                {quiz.map((item, questionIndex) => {
+                  const safeOptions = Array.isArray(item?.options)
+                    ? item.options.map(safeStr)
+                    : (item?.options && typeof item.options === 'object'
+                        ? Object.values(item.options as Record<string, unknown>).map(safeStr)
+                        : []);
+                  return (
+                    <View key={questionIndex} style={styles.question}>
+                      <Text style={[styles.questionText, { color: colors.text }]}>
+                        {questionIndex + 1}. {safeStr(item?.question || 'Review Question')}
+                      </Text>
+                      {safeOptions.map((option, optionIndex) => {
                       const chosen = answers[questionIndex] === optionIndex;
                       const isCorrect = item.answer === optionIndex;
                       return (
@@ -838,9 +1056,10 @@ export default function LectureToLifeScreen() {
                       );
                     })}
                   </View>
-                ))}
+                );
+              })}
                 <Button
-                  title={quizSubmitted ? `Score: ${score}/${quiz.length} · Try again` : 'Submit quiz'}
+                  title={quizSubmitted ? `Score: ${score ?? 0}/${quiz.length} · Try again` : 'Submit quiz'}
                   onPress={() => (quizSubmitted ? (setAnswers({}), setQuizSubmitted(false)) : setQuizSubmitted(true))}
                   disabled={!quizSubmitted && Object.keys(answers).length !== quiz.length}
                 />
@@ -860,8 +1079,8 @@ export default function LectureToLifeScreen() {
               <Card>
                 {projects.map((item, index) => (
                   <View key={index} style={styles.projectItem}>
-                    <Text style={[styles.projectTitle, { color: colors.text }]}>• {item.title}</Text>
-                    <Text style={[styles.copy, { color: colors.muted }]}>{item.description}</Text>
+                    <Text style={[styles.projectTitle, { color: colors.text }]}>• {safeStr(item.title)}</Text>
+                    <Text style={[styles.copy, { color: colors.muted }]}>{safeStr(item.description)}</Text>
                   </View>
                 ))}
               </Card>
@@ -881,14 +1100,73 @@ export default function LectureToLifeScreen() {
                 {exercises.map((item, index) => (
                   <View key={index} style={styles.exerciseItem}>
                     <Text style={[styles.projectTitle, { color: colors.text }]}>
-                      {index + 1}. {item.title}
+                      {index + 1}. {safeStr(item.title)}
                     </Text>
-                    <Text style={[styles.copy, { color: colors.muted }]}>{item.description}</Text>
+                    <Text style={[styles.copy, { color: colors.muted }]}>{safeStr(item.description)}</Text>
                     {item.hint ? (
                       <Text style={[styles.exerciseHint, { color: brandGreen }]}>
-                        💡 Hint: {item.hint}
+                        💡 Hint: {safeStr(item.hint)}
                       </Text>
                     ) : null}
+                    <View style={styles.exerciseActionsRow}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Use ${safeStr(item.title)} in Coding Studio`}
+                        onPress={() => {
+                          router.push({
+                            pathname: '/(tabs)/coding',
+                            params: {
+                              challengeTitle: safeStr(item.title),
+                              challengeDescription: `${safeStr(item.description)}${item.hint ? `\n\nHint: ${safeStr(item.hint)}` : ''}`,
+                              language: 'JavaScript',
+                              starterCode: `// ${safeStr(item.title)}\n// ${safeStr(item.description)}\n\nfunction solution() {\n  // Implement your solution here\n}\n`,
+                            },
+                          });
+                        }}
+                        style={({ pressed }) => [
+                          styles.useExerciseBtn,
+                          {
+                            backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)',
+                            borderColor: brandGreen,
+                          },
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Ionicons name="code-working" size={14} color={brandGreen} />
+                        <Text style={[styles.useExerciseBtnText, { color: brandGreen }]}>
+                          Use in Coding Studio
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Ask AI about ${safeStr(item.title)}`}
+                        onPress={() => {
+                          router.push({
+                            pathname: '/(tabs)/ai-assistant',
+                            params: {
+                              challengeTitle: safeStr(item.title),
+                              challengeDescription: safeStr(item.description),
+                              language: 'javascript',
+                              code: `// ${safeStr(item.title)}\n// Practice exercise from lecture\n`,
+                              autoAsk: 'true',
+                            },
+                          });
+                        }}
+                        style={({ pressed }) => [
+                          styles.useExerciseBtn,
+                          {
+                            backgroundColor: isLight ? '#E0F2FE' : 'rgba(2, 132, 199, 0.25)',
+                            borderColor: isLight ? '#0284C7' : '#38BDF8',
+                          },
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Ionicons name="help-buoy-outline" size={14} color={isLight ? '#0284C7' : '#38BDF8'} />
+                        <Text style={[styles.useExerciseBtnText, { color: isLight ? '#0284C7' : '#38BDF8' }]}>
+                          Ask AI Hints
+                        </Text>
+                      </Pressable>
+                    </View>
                   </View>
                 ))}
               </Card>
@@ -896,7 +1174,8 @@ export default function LectureToLifeScreen() {
           ) : null}
         </>
       ) : null}
-    </Screen>
+      </Screen>
+    </LectureErrorBoundary>
   );
 }
 
@@ -1046,6 +1325,63 @@ const styles = StyleSheet.create({
   projectTitle: { fontSize: 14, fontWeight: '700' },
   exerciseItem: { marginTop: 10, gap: 4 },
   exerciseHint: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+  sampleLecturesRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginBottom: 12,
+  },
+  sampleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  sampleBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  summaryActionsRow: {
+    flexDirection: 'row',
+    marginTop: 12,
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  useActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 9,
+  },
+  useActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  exerciseActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+    flexWrap: 'wrap',
+  },
+  useExerciseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  useExerciseBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
   pressed: { opacity: 0.75 },
   headerRow: {
     flexDirection: 'row',

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,47 @@ import {
   Download,
   Trash2,
 } from 'lucide-react';
+
+const safeStr = (v: unknown): string => {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (typeof v === 'object') {
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return '';
+    }
+  }
+  return '';
+};
+
+const asArray = <T,>(value: unknown): T[] => {
+  if (Array.isArray(value)) return value as T[];
+  if (!value) return [];
+  if (typeof value === 'object') return Object.values(value as Record<string, T>);
+  if (typeof value === 'string') {
+    try {
+      const p = JSON.parse(value);
+      if (Array.isArray(p)) return p as T[];
+      if (p && typeof p === 'object') return Object.values(p) as T[];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const SAMPLE_LECTURES = [
+  {
+    title: 'Data Structures & Algorithms: Balanced Trees & Hash Maps',
+    content: `Data Structures & Algorithms: Balanced Trees & Hash Maps\n\nKey Concepts:\n- Binary Search Trees (BST): A node-based binary tree data structure where each node has at most two children. The left subtree contains only nodes with keys less than the parent's key, and the right subtree contains only nodes with keys greater.\n- Self-Balancing Trees (AVL & Red-Black Trees): Ensure O(log n) time complexity for search, insert, and delete operations by maintaining tree height balance through rotations.\n- Hash Tables: Implement associative arrays using a hash function to map keys to bucket indices. Average case time complexity for lookups, insertions, and deletions is O(1).\n- Collision Resolution Techniques: Chaining (linked lists at each bucket) and Open Addressing (Linear Probing, Quadratic Probing, Double Hashing).\n- Big-O Complexity Comparisons: Array lookup is O(1) by index, O(n) by value. Hash Table lookup is O(1) average, O(n) worst-case. BST lookup is O(log n) balanced, O(n) degenerate.`,
+  },
+  {
+    title: 'Modern Web Architecture: Event Loop & Microservices',
+    content: `Modern Web Architecture: Event Loop & Microservices\n\nKey Concepts:\n- Node.js Event Loop: Single-threaded event loop driven by libuv with distinct execution phases: Timers, Pending Callbacks, Idle/Prepare, Poll, Check (setImmediate), and Close callbacks.\n- Microtasks vs Macrotasks: process.nextTick and Promise microtasks execute immediately after the current operation and before the next phase of the event loop.\n- Microservices Architecture: Decentralized software architecture where independently deployable services communicate over HTTP/REST, gRPC, or asynchronous message queues (RabbitMQ, Kafka).\n- Database Sharding & Replication: Horizontal partitioning across multiple database instances to scale read and write throughput while maintaining high availability.\n- Caching Strategies: Cache-aside, Read-Through, Write-Through, and Write-Back patterns utilizing distributed in-memory caches like Redis.`,
+  },
+];
 
 interface Flashcard {
   front: string;
@@ -57,6 +99,7 @@ const TABS = ['Summary', 'Flashcards', 'Quiz', 'Mini Projects', 'Coding Exercise
 type Tab = (typeof TABS)[number];
 
 export default function LectureToLifePage() {
+  const router = useRouter();
   const [pageMode, setPageMode] = useState<'upload' | 'challenges'>('upload');
   const [content, setContent] = useState('');
   const [fileName, setFileName] = useState('');
@@ -149,25 +192,35 @@ export default function LectureToLifePage() {
   const loadUploads = useCallback(async () => {
     try {
       const items = await api<LectureUpload[]>('/ai/lecture-to-life');
-      setUploads(items);
+      const list = Array.isArray(items) ? items : [];
+      setUploads(list);
       setSelected((prev) => {
-        if (prev && items.some((item) => item.id === prev.id)) return prev;
-        return items[0] || null;
+        if (list.length === 0) return null;
+        if (prev && list.some((item) => item.id === prev.id)) return prev;
+        return list[0] || null;
       });
-      loadSrsDue();
+      if (list.length === 0) {
+        setSrsDueCards([]);
+        setSrsFlippedId(null);
+      } else {
+        loadSrsDue();
+      }
     } catch {
       setError('Could not load saved lecture packs from the backend.');
     }
   }, [loadSrsDue]);
 
   async function clearAllSessions() {
-    if (!confirm('Are you sure you want to clear all saved lecture sessions? This cannot be undone.')) return;
+    if (!confirm('Are you sure you want to clear all saved lecture sessions and due flashcards? This cannot be undone.')) return;
     setClearing(true);
     setError('');
     try {
-      await api('/ai/lecture-to-life', { method: 'DELETE' });
       setUploads([]);
       setSelected(null);
+      setSrsDueCards([]);
+      setSrsFlippedId(null);
+      await api('/ai/lecture-to-life', { method: 'DELETE' }).catch(() => {});
+      await api('/ai/srs/due', { method: 'DELETE' }).catch(() => {});
     } catch {
       setError('Could not clear saved sessions.');
     } finally {
@@ -179,14 +232,23 @@ export default function LectureToLifePage() {
     if (e) e.stopPropagation();
     setError('');
     try {
-      await api(`/ai/lecture-to-life/${id}`, { method: 'DELETE' });
+      let remainingCount = 0;
       setUploads((prev) => {
         const remaining = prev.filter((item) => item.id !== id);
+        remainingCount = remaining.length;
         if (selected?.id === id) {
           setSelected(remaining[0] || null);
         }
         return remaining;
       });
+      setSrsDueCards((prev) => {
+        if (remainingCount === 0) {
+          setSrsFlippedId(null);
+          return [];
+        }
+        return prev.filter((c: any) => c.uploadId !== id && c.lectureId !== id && !String(c.cardKey || '').startsWith(`${id}:`));
+      });
+      await api(`/ai/lecture-to-life/${id}`, { method: 'DELETE' });
     } catch {
       setError('Could not delete this session.');
     }
@@ -292,10 +354,10 @@ export default function LectureToLifePage() {
     }
   }
 
-  const flashcards = selected?.flashcards || [];
-  const quiz = selected?.quiz || [];
-  const miniProjects = selected?.miniProjects || [];
-  const codingExercises = selected?.codingExercises || [];
+  const flashcards = asArray<Flashcard>(selected?.flashcards);
+  const quiz = asArray<QuizQuestion>(selected?.quiz);
+  const miniProjects = asArray<MiniProject>(selected?.miniProjects);
+  const codingExercises = asArray<CodingExercise>(selected?.codingExercises);
 
   return (
     <DashboardLayout>
@@ -354,9 +416,21 @@ export default function LectureToLifePage() {
                   <Layers3 className="h-4 w-4 text-amber-400" />
                   Due for Active Recall ({srsDueCards.length} Flashcards)
                 </CardTitle>
-                <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-mono font-bold text-amber-300">
-                  SM-2 Spaced Repetition • +5 XP
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-mono font-bold text-amber-300">
+                    SM-2 Spaced Repetition • +5 XP
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllSessions}
+                    disabled={clearing}
+                    className="h-6 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="mr-1 h-3 w-3" />
+                    {clearing ? 'Clearing...' : 'Clear'}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {(() => {
@@ -416,6 +490,34 @@ export default function LectureToLifePage() {
               </div>
               <Card>
                 <CardContent className="space-y-4 pt-6">
+                  {/* Quick Sample Lecture 'Use' Buttons */}
+                  <div className="flex flex-wrap gap-2 pb-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFileName(SAMPLE_LECTURES[0].title);
+                        setContent(SAMPLE_LECTURES[0].content);
+                        setFileType('text');
+                        setError('');
+                      }}
+                      className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/20"
+                    >
+                      <span>✨ Use Sample: Algorithms</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFileName(SAMPLE_LECTURES[1].title);
+                        setContent(SAMPLE_LECTURES[1].content);
+                        setFileType('text');
+                        setError('');
+                      }}
+                      className="flex items-center gap-1.5 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-400 transition hover:bg-sky-500/20"
+                    >
+                      <span>💻 Use Sample: Web Architecture</span>
+                    </button>
+                  </div>
+
                   <input
                     value={fileName}
                     onChange={(e) => setFileName(e.target.value)}
@@ -584,6 +686,16 @@ export default function LectureToLifePage() {
                         {selected.summary || 'No summary generated yet.'}
                       </p>
                       <div className="mt-5 flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            router.push(`/ai-assistant?prompt=${encodeURIComponent(`I am studying "${safeStr(selected.fileName)}". Here is my study summary:\n\n${safeStr(selected.summary)}\n\nPlease explain the key takeaways, test me on them, and clarify any difficult concepts.`)}&autoAsk=true`);
+                          }}
+                          className="gap-1.5 text-xs font-bold"
+                        >
+                          <BookOpen className="h-3.5 w-3.5" />
+                          Use in AI Assistant
+                        </Button>
                         <Button variant="secondary" size="sm" onClick={regenerate} disabled={loading}>
                           {loading ? 'Regenerating...' : 'Regenerate Materials'}
                         </Button>
@@ -657,7 +769,12 @@ export default function LectureToLifePage() {
                             <div key={question.question} className="rounded-lg border border-white/[0.07] bg-secondary/40 p-4">
                               <p className="mb-3 text-sm font-semibold text-white">{index + 1}. {question.question}</p>
                               <div className="grid gap-2">
-                                {question.options.map((option, optionIndex) => {
+                                {(Array.isArray(question?.options)
+                                  ? question.options
+                                  : (question?.options && typeof question.options === 'object'
+                                      ? Object.values(question.options as Record<string, string>)
+                                      : [])
+                                ).map((option, optionIndex) => {
                                   let style = 'border-white/[0.08] text-muted-foreground';
                                   if (answered) {
                                     if (optionIndex === question.answer) style = 'border-green-500/40 bg-green-500/10 text-green-400';
@@ -721,6 +838,31 @@ export default function LectureToLifePage() {
                             <p className="mt-3 rounded-md border border-primary/20 bg-primary/5 p-2 text-xs text-primary">
                               Hint: {exercise.hint}
                             </p>
+                            <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/[0.06] pt-2.5">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                  setPageMode('challenges');
+                                }}
+                                className="h-7 gap-1 text-xs font-bold text-primary hover:bg-primary/15"
+                              >
+                                <Code2 className="h-3 w-3" />
+                                Use in Coding Challenges
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  router.push(
+                                    `/ai-assistant?prompt=${encodeURIComponent(`Explain this coding exercise from my lecture:\n\nTitle: ${safeStr(exercise.title)}\nDescription: ${safeStr(exercise.description)}\nHint: ${safeStr(exercise.hint)}\n\nHow do I implement this solution step-by-step?`)}&autoAsk=true`
+                                  );
+                                }}
+                                className="h-7 text-xs text-muted-foreground hover:text-white"
+                              >
+                                Ask AI Hints
+                              </Button>
+                            </div>
                           </div>
                         ))
                       )}

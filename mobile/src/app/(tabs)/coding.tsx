@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View, TextInput, Modal, Image } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { Screen, Loading, Notice } from '@/components/Screen';
 import { Button, Card } from '@/components/ui';
@@ -445,6 +445,13 @@ export interface ChallengeEvaluation {
 
 export default function CodingScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    challengeTitle?: string;
+    challengeDescription?: string;
+    challengeHint?: string;
+    language?: string;
+    starterCode?: string;
+  }>();
   const { colors, theme } = useTheme();
   const { fontSize, largerText } = useAccessibility();
 
@@ -459,6 +466,28 @@ export default function CodingScreen() {
   const [selectedChallenge, setSelectedChallenge] = useState<BuiltinChallenge | Challenge | null>(BUILTIN_CHALLENGES[0]);
   const [code, setCode] = useState(BUILTIN_CHALLENGES[0].starterCode);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('All');
+
+  useEffect(() => {
+    if (params.challengeTitle) {
+      setMode('challenges');
+      const titleStr = String(params.challengeTitle);
+      const descStr = String(params.challengeDescription || 'Complete this exercise based on your lecture notes.');
+      const langStr = params.language || 'JavaScript';
+      const customChallenge: BuiltinChallenge = {
+        id: `lecture-${Date.now()}`,
+        title: titleStr,
+        description: descStr,
+        difficulty: 'MEDIUM',
+        language: langStr,
+        xpReward: 50,
+        starterCode: params.starterCode || `// ${titleStr}\n// ${descStr}\n\nfunction solution() {\n  // Write your code here\n}\n`,
+        solution: `// Verified solution for ${titleStr}\nfunction solution() {\n  return true;\n}`,
+        hint: params.challengeHint ? String(params.challengeHint) : 'Refer to your lecture study pack for guidance.',
+      };
+      setSelectedChallenge(customChallenge);
+      setCode(customChallenge.starterCode);
+    }
+  }, [params.challengeTitle, params.challengeDescription, params.challengeHint, params.language, params.starterCode]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('ALL');
   const [showHint, setShowHint] = useState(false);
   const [showBlueprint, setShowBlueprint] = useState(false);
@@ -588,6 +617,8 @@ export default function CodingScreen() {
     setTimeout(() => setEnrolledToast(''), 4000);
   }
 
+  const [showQuestionPicker, setShowQuestionPicker] = useState(false);
+
   // Combine builtin and API challenges
   const allChallenges = [
     ...BUILTIN_CHALLENGES,
@@ -595,10 +626,37 @@ export default function CodingScreen() {
   ];
 
   const filteredChallenges = allChallenges.filter((ch) => {
-    const langMatch = selectedLanguage === 'All' || ch.language === selectedLanguage;
+    const langMatch = selectedLanguage === 'All' || (ch.language || '').toLowerCase() === selectedLanguage.toLowerCase();
     const diffMatch = selectedDifficulty === 'ALL' || ch.difficulty.toUpperCase() === selectedDifficulty;
     return langMatch && diffMatch;
   });
+
+  // Questions scoped to the active language for Challenge Studio Prev/Next & Question Picker
+  const studioQuestions = (() => {
+    const activeLang = selectedLanguage !== 'All' ? selectedLanguage : (selectedChallenge?.language || 'JavaScript');
+    const langScoped = allChallenges.filter((ch) => {
+      const langMatch = (ch.language || '').toLowerCase() === activeLang.toLowerCase();
+      const diffMatch = selectedDifficulty === 'ALL' || ch.difficulty.toUpperCase() === selectedDifficulty;
+      return langMatch && diffMatch;
+    });
+    return langScoped.length > 0 ? langScoped : filteredChallenges;
+  })();
+
+  const currentQuestionIndex = selectedChallenge
+    ? Math.max(0, studioQuestions.findIndex((c) => c.id === selectedChallenge.id))
+    : 0;
+
+  function goToPrevQuestion() {
+    if (studioQuestions.length === 0) return;
+    const prevIdx = (currentQuestionIndex - 1 + studioQuestions.length) % studioQuestions.length;
+    selectChallenge(studioQuestions[prevIdx]);
+  }
+
+  function goToNextQuestion() {
+    if (studioQuestions.length === 0) return;
+    const nextIdx = (currentQuestionIndex + 1) % studioQuestions.length;
+    selectChallenge(studioQuestions[nextIdx]);
+  }
 
   const filteredResources = resources.filter((resource) =>
     isResourceMatchingLanguage(resource, selectedLanguage)
@@ -611,25 +669,38 @@ export default function CodingScreen() {
       if (!isSelectedStillValid) {
         selectChallenge(filteredChallenges[0]);
       }
+    } else if (selectedLanguage !== 'All') {
+      const langMatches = allChallenges.filter(
+        (c) => (c.language || '').toLowerCase() === selectedLanguage.toLowerCase()
+      );
+      if (langMatches.length > 0 && (!selectedChallenge || (selectedChallenge.language || '').toLowerCase() !== selectedLanguage.toLowerCase())) {
+        selectChallenge(langMatches[0]);
+      }
     }
   }, [selectedLanguage, selectedDifficulty, allChallenges.length]);
 
   function handleSelectLanguage(lang: string) {
     setSelectedLanguage(lang);
     const nextFiltered = allChallenges.filter((ch) => {
-      const langMatch = lang === 'All' || ch.language === lang;
+      const langMatch = lang === 'All' || (ch.language || '').toLowerCase() === lang.toLowerCase();
       const diffMatch = selectedDifficulty === 'ALL' || ch.difficulty.toUpperCase() === selectedDifficulty;
       return langMatch && diffMatch;
     });
     if (nextFiltered.length > 0) {
       selectChallenge(nextFiltered[0]);
+    } else {
+      const langOnly = allChallenges.filter((ch) => (ch.language || '').toLowerCase() === lang.toLowerCase());
+      if (langOnly.length > 0) {
+        setSelectedDifficulty('ALL');
+        selectChallenge(langOnly[0]);
+      }
     }
   }
 
   function handleSelectDifficulty(diff: string) {
     setSelectedDifficulty(diff);
     const nextFiltered = allChallenges.filter((ch) => {
-      const langMatch = selectedLanguage === 'All' || ch.language === selectedLanguage;
+      const langMatch = selectedLanguage === 'All' || (ch.language || '').toLowerCase() === selectedLanguage.toLowerCase();
       const diffMatch = diff === 'ALL' || ch.difficulty.toUpperCase() === diff;
       return langMatch && diffMatch;
     });
@@ -643,6 +714,7 @@ export default function CodingScreen() {
     setCode(ch.starterCode || '// Write your solution here…\n');
     setShowHint(false);
     setShowBlueprint(false);
+    setShowQuestionPicker(false);
     setTestOutput(null);
     setResult('');
     setError('');
@@ -1138,6 +1210,160 @@ export default function CodingScreen() {
             <>
               <Text style={[styles.section, { color: colors.text }]}>Challenge Studio</Text>
               <Card>
+                {/* Challenge Studio Question Switcher & Prev/Next Bar */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    paddingVertical: 8,
+                    paddingHorizontal: 10,
+                    marginBottom: 10,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: colors.surfaceElevated,
+                  }}
+                >
+                  <Pressable
+                    onPress={goToPrevQuestion}
+                    disabled={studioQuestions.length <= 1}
+                    style={({ pressed }) => [
+                      {
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        backgroundColor: colors.surface,
+                        opacity: studioQuestions.length <= 1 ? 0.4 : pressed ? 0.7 : 1,
+                      },
+                    ]}
+                  >
+                    <Ionicons name="chevron-back" size={14} color={colors.text} />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>Prev</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => setShowQuestionPicker((prev) => !prev)}
+                    style={({ pressed }) => [
+                      {
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 4,
+                        paddingHorizontal: 8,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        backgroundColor: colors.surface,
+                        opacity: pressed ? 0.75 : 1,
+                      },
+                    ]}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      style={{ fontSize: 12, fontWeight: '700', color: primaryAccent }}
+                    >
+                      Q{currentQuestionIndex + 1}/{studioQuestions.length} ({selectedChallenge.language || 'Code'}) · Change
+                    </Text>
+                    <Ionicons
+                      name={showQuestionPicker ? 'chevron-up' : 'chevron-down'}
+                      size={14}
+                      color={primaryAccent}
+                    />
+                  </Pressable>
+
+                  <Pressable
+                    onPress={goToNextQuestion}
+                    disabled={studioQuestions.length <= 1}
+                    style={({ pressed }) => [
+                      {
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: primaryAccent,
+                        backgroundColor: isLight ? '#E2F5DA' : 'rgba(30, 104, 39, 0.25)',
+                        opacity: studioQuestions.length <= 1 ? 0.4 : pressed ? 0.7 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: primaryAccent }}>Next</Text>
+                    <Ionicons name="chevron-forward" size={14} color={primaryAccent} />
+                  </Pressable>
+                </View>
+
+                {showQuestionPicker ? (
+                  <View
+                    style={{
+                      maxHeight: 220,
+                      marginBottom: 12,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      backgroundColor: colors.surface,
+                      padding: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.muted, marginBottom: 6 }}>
+                      SELECT {selectedChallenge.language?.toUpperCase() || 'CODING'} QUESTION ({studioQuestions.length} AVAILABLE):
+                    </Text>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }}>
+                      {studioQuestions.map((q, idx) => {
+                        const isCurrent = q.id === selectedChallenge.id;
+                        return (
+                          <Pressable
+                            key={q.id}
+                            onPress={() => selectChallenge(q)}
+                            style={({ pressed }) => [
+                              {
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                paddingVertical: 8,
+                                paddingHorizontal: 10,
+                                borderRadius: 8,
+                                marginBottom: 4,
+                                backgroundColor: isCurrent
+                                  ? isLight
+                                    ? '#E2F5DA'
+                                    : 'rgba(30, 104, 39, 0.28)'
+                                  : 'transparent',
+                                opacity: pressed ? 0.7 : 1,
+                              },
+                            ]}
+                          >
+                            <Text
+                              numberOfLines={1}
+                              style={{
+                                flex: 1,
+                                fontSize: 12,
+                                fontWeight: isCurrent ? '700' : '500',
+                                color: isCurrent ? primaryAccent : colors.text,
+                              }}
+                            >
+                              {idx + 1}. {q.title}
+                            </Text>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: colors.muted, marginLeft: 8 }}>
+                              {q.difficulty}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                ) : null}
+
                 <View style={styles.studioHeader}>
                   <View style={styles.studioTitleWrap}>
                     <Text style={[styles.studioTitle, { color: colors.text }]}>{selectedChallenge.title}</Text>
@@ -1390,6 +1616,32 @@ export default function CodingScreen() {
                   />
                 </View>
 
+                <Pressable
+                  onPress={goToNextQuestion}
+                  disabled={studioQuestions.length <= 1}
+                  style={({ pressed }) => [
+                    {
+                      marginTop: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      paddingVertical: 10,
+                      paddingHorizontal: 14,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: primaryAccent,
+                      backgroundColor: isLight ? '#ECFDF5' : 'rgba(16, 185, 129, 0.12)',
+                      opacity: studioQuestions.length <= 1 ? 0.45 : pressed ? 0.75 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: primaryAccent }}>
+                    Next Question in {selectedChallenge.language || 'Track'} ({currentQuestionIndex + 1}/{studioQuestions.length})
+                  </Text>
+                  <Ionicons name="arrow-forward" size={15} color={primaryAccent} />
+                </Pressable>
+
                 {/* Prominent Right / Wrong Submission Feedback Card */}
                 {evaluation ? (
                   <View
@@ -1480,7 +1732,11 @@ export default function CodingScreen() {
                         </View>
                         <Pressable
                           onPress={() => {
-                            const sol = evaluation?.solution || (selectedChallenge as BuiltinChallenge).solution || selectedChallenge.starterCode;
+                            const sol =
+                              (selectedChallenge as BuiltinChallenge).solution ||
+                              (selectedChallenge as any).solution ||
+                              evaluation?.solution ||
+                              selectedChallenge.starterCode;
                             if (sol) {
                               setCode(sol);
                               setResult('✓ Loaded reference solution into editor!');
@@ -1508,7 +1764,10 @@ export default function CodingScreen() {
                           },
                         ]}
                       >
-                        {evaluation?.solution || (selectedChallenge as BuiltinChallenge).solution || selectedChallenge.starterCode}
+                        {(selectedChallenge as BuiltinChallenge).solution ||
+                          (selectedChallenge as any).solution ||
+                          evaluation?.solution ||
+                          selectedChallenge.starterCode}
                       </Text>
 
                       {selectedChallenge.approach ? (
@@ -1542,9 +1801,27 @@ export default function CodingScreen() {
                   ) : null}
                 </View>
 
-                {/* Ask AI Assistant Deep Link */}
+                {/* Stuck? Paste Challenge Studio Code to AI Code Context & Get Insights */}
                 <Pressable
-                  onPress={() => router.push('/ai-assistant')}
+                  onPress={() => {
+                    if (selectedChallenge) {
+                      const codeToSend = code.trim() || selectedChallenge.starterCode || '';
+                      router.push({
+                        pathname: '/ai-assistant',
+                        params: {
+                          tab: 'codeContext',
+                          challengeTitle: selectedChallenge.title,
+                          challengeDescription: selectedChallenge.description,
+                          language: selectedChallenge.language || 'JavaScript',
+                          code: codeToSend,
+                          autoAsk: 'true',
+                          ts: String(Date.now()),
+                        },
+                      });
+                    } else {
+                      router.push('/ai-assistant');
+                    }
+                  }}
                   style={({ pressed }) => [
                     styles.aiHelpRow,
                     { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
@@ -1553,7 +1830,7 @@ export default function CodingScreen() {
                 >
                   <Ionicons name="sparkles" size={16} color={primaryAccent} />
                   <Text style={[styles.aiHelpText, { color: colors.text }]}>
-                    Stuck? Ask SynergySphere AI for hints or code review
+                    Stuck? Paste Code to AI Code Context &amp; Get Insights
                   </Text>
                   <Ionicons name="chevron-forward" size={16} color={colors.muted} />
                 </Pressable>

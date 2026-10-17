@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Users, Radio, Send, LogOut } from 'lucide-react';
+import { Users, Radio, Send, LogOut, X } from 'lucide-react';
 
 interface LiveCodeRoomBarProps {
   challengeId: string;
@@ -141,12 +141,13 @@ export function LiveCodeRoomBar({
   }
 
   return (
-    <div className="rounded-lg border border-white/[0.08] bg-secondary/30 p-3">
-      <div className="flex items-center justify-between gap-2">
+    <>
+      {/* Sleek, Compact Trigger Button (Takes zero unnecessary space) */}
+      <div className="flex items-center">
         <button
           type="button"
-          onClick={() => setExpanded((prev) => !prev)}
-          className="flex items-center gap-2 text-left text-xs font-semibold text-white"
+          onClick={() => setExpanded(true)}
+          className="inline-flex items-center gap-2 rounded-lg border border-white/[0.1] bg-secondary/40 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-secondary/70 hover:border-primary/40 shadow-sm"
         >
           {activeRoom ? (
             <Radio className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
@@ -156,99 +157,138 @@ export function LiveCodeRoomBar({
           <span>
             {activeRoom
               ? `Live Pair Room: #${activeRoom} (${participants.length || 1} online)`
-              : 'Live Pair-Programming Room'}
+              : 'Live Pair Programming'}
           </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setExpanded((prev) => !prev)}
-          className="text-[11px] font-semibold text-primary hover:underline"
-        >
-          {expanded ? 'Hide' : activeRoom ? 'Open Room' : 'Collaborate'}
+          <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] text-primary font-bold">
+            {activeRoom ? 'Active' : 'Open'}
+          </span>
         </button>
       </div>
 
+      {/* Modal Dialog */}
       {expanded && (
-        <div className="mt-3 space-y-2.5 border-t border-white/[0.07] pt-3">
-          {!activeRoom ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                value={roomInput}
-                onChange={(e) => setRoomInput(e.target.value)}
-                placeholder="Room code (e.g. PAIR-42)"
-                className="h-8 flex-1 rounded-md border border-white/10 bg-black/40 px-2.5 text-xs text-white outline-none focus:border-primary/50"
-              />
-              <Button size="sm" className="h-8 text-xs" onClick={() => handleJoin()}>
-                Join Room
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs"
-                onClick={() => {
-                  const randomCode = `PAIR-${Math.floor(100 + Math.random() * 900)}`;
-                  handleJoin(randomCode);
-                }}
-              >
-                Create Code
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {participants.map((p) => (
-                    <span
-                      key={p.userId}
-                      className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-300"
-                    >
-                      ● {p.name}
-                    </span>
-                  ))}
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setActiveRoom(null);
-                    setParticipants([]);
-                    setChatMessages([]);
-                  }}
-                  className="h-7 gap-1 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                >
-                  <LogOut className="h-3 w-3" /> Leave
-                </Button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-xl border border-white/10 bg-[#0c141d] p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Users className="h-4 w-4 text-primary" />
+                <span>{activeRoom ? `Live Pair Room: #${activeRoom}` : 'Live Pair-Programming'}</span>
+                {activeRoom && (
+                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-400 font-bold">
+                    {participants.length || 1} online
+                  </span>
+                )}
               </div>
+              <button
+                type="button"
+                onClick={() => setExpanded(false)}
+                className="rounded-md p-1 text-gray-400 hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
-              {chatMessages.length > 0 && (
-                <div className="max-h-24 overflow-y-auto rounded border border-white/5 bg-black/30 p-2 space-y-1">
-                  {chatMessages.slice(-4).map((m, idx) => (
-                    <div key={idx} className="text-[11px] text-gray-300">
-                      <span className="font-bold text-primary">{m.sender}: </span>
-                      {m.text}
+            <div className="space-y-3">
+              {!activeRoom ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={roomInput}
+                      onChange={(e) => setRoomInput(e.target.value)}
+                      placeholder="Room code (e.g. PAIR-42)"
+                      className="h-9 flex-1 rounded-md border border-white/10 bg-black/40 px-3 text-xs text-white outline-none focus:border-primary/50"
+                    />
+                    <Button size="sm" className="h-9 text-xs" onClick={() => handleJoin()}>
+                      Join Room
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 text-xs"
+                      onClick={() => {
+                        const randomCode = `PAIR-${Math.floor(100 + Math.random() * 900)}`;
+                        handleJoin(randomCode);
+                      }}
+                    >
+                      Create Code
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Create or join a temporary session to collaborate and sync code changes in real-time.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {participants.map((p) => (
+                        <span
+                          key={p.userId}
+                          className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-300"
+                        >
+                          ● {p.name}
+                        </span>
+                      ))}
                     </div>
-                  ))}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setActiveRoom(null);
+                        setParticipants([]);
+                        setChatMessages([]);
+                      }}
+                      className="h-7 gap-1 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                    >
+                      <LogOut className="h-3 w-3" /> Leave
+                    </Button>
+                  </div>
+
+                  {chatMessages.length > 0 && (
+                    <div className="max-h-28 overflow-y-auto rounded border border-white/5 bg-black/30 p-2 space-y-1">
+                      {chatMessages.slice(-5).map((m, idx) => (
+                        <div key={idx} className="text-[11px] text-gray-300">
+                          <span className="font-bold text-primary">{m.sender}: </span>
+                          {m.text}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={chatText}
+                      onChange={(e) => setChatText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSendChat();
+                      }}
+                      placeholder="Message pair partner..."
+                      className="h-8 flex-1 rounded-md border border-white/10 bg-black/40 px-2.5 text-xs text-white outline-none"
+                    />
+                    <Button size="sm" variant="secondary" className="h-8 px-2.5" onClick={handleSendChat}>
+                      <Send className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               )}
 
-              <div className="flex items-center gap-2">
-                <input
-                  value={chatText}
-                  onChange={(e) => setChatText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSendChat();
-                  }}
-                  placeholder="Message pair partner..."
-                  className="h-8 flex-1 rounded-md border border-white/10 bg-black/40 px-2.5 text-xs text-white outline-none"
-                />
-                <Button size="sm" variant="secondary" className="h-8 px-2.5" onClick={handleSendChat}>
-                  <Send className="h-3.5 w-3.5" />
-                </Button>
+              {/* Dedicated Live Pair Programming Rules Card */}
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-1.5 text-xs text-gray-300">
+                <div className="flex items-center gap-1.5 font-bold text-emerald-400">
+                  <Users className="h-3.5 w-3.5" />
+                  <span>Live Pair Programming Rules</span>
+                </div>
+                <ul className="space-y-1 pl-4 list-disc text-[11px] leading-relaxed text-gray-300">
+                  <li><strong className="text-white">Driver & Navigator Roles:</strong> One person writes the implementation (Driver) while the other reviews, anticipates edge cases, and guides algorithmic approach (Navigator).</li>
+                  <li><strong className="text-white">Rotate Roles Regularly:</strong> Switch roles every 15–20 minutes to keep code quality high and both partners active.</li>
+                  <li><strong className="text-white">Verbalize Thoughts:</strong> Clarify intent and function contracts before typing complex code blocks.</li>
+                  <li><strong className="text-white">Real-Time Sync:</strong> Code changes sync immediately between connected room partners.</li>
+                </ul>
               </div>
             </div>
-          )}
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

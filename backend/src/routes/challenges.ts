@@ -40,6 +40,8 @@ async function resolveChallengeById(id: string, ensurePersisted = false): Promis
     return builtinMatch
       ? {
           ...dbRow,
+          starterCode: builtinMatch.starterCode || dbRow.starterCode,
+          solution: builtinMatch.solution || dbRow.solution,
           hint: builtinMatch.hint,
           approach: builtinMatch.approach,
           timeComplexity: builtinMatch.timeComplexity,
@@ -118,6 +120,8 @@ router.get('/', authenticate, async (_req, res) => {
       builtinMatch
         ? {
             ...row,
+            starterCode: builtinMatch.starterCode || row.starterCode,
+            solution: builtinMatch.solution || row.solution,
             hint: builtinMatch.hint,
             approach: builtinMatch.approach,
             timeComplexity: builtinMatch.timeComplexity,
@@ -226,6 +230,7 @@ router.post('/:id/test', authenticate, validateBody(attemptSchema), async (req: 
     runtimeMs: judgeResult.runtimeMs ?? 1,
     memoryKb: judgeResult.memoryKb,
     language: judgeResult.language || effectiveChallenge.language || 'General',
+    solution: challenge.solution,
   });
 });
 

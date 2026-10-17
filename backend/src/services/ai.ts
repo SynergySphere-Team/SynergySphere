@@ -12,6 +12,7 @@ import {
   buildLectureMaterialsFromContent,
   extractLectureContent,
 } from './lectureMaterials.js';
+import { analyzeCodeOffline } from '../utils/offlineCodeAnalyzer.js';
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
@@ -21,7 +22,7 @@ export interface ChatTurn {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-function refreshEnv(): void {
+export function refreshEnv(): void {
   try {
     dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
   } catch {
@@ -42,7 +43,7 @@ function refreshEnv(): void {
 }
 
 function getAiTimeout(): number {
-  return Number(process.env.AI_TIMEOUT_MS || process.env.OPENAI_TIMEOUT_MS) || 35000;
+  return Number(process.env.AI_TIMEOUT_MS || process.env.OPENAI_TIMEOUT_MS) || 25000;
 }
 
 /* ─────────────────────────── main export ─────────────────────────── */
@@ -65,34 +66,16 @@ export async function generateAiResponse(
   const cleanCustomKey = (customApiKey || '').trim();
   let lastFailureReason: string | undefined;
 
-  // If user provided a custom key, prioritize it based on prefix
-  if (cleanCustomKey) {
-    if (cleanCustomKey.startsWith('sk-')) {
-      try {
-        const result = await callOpenAI(cleanCustomKey, systemPrompt, userMessage, priorTurns);
-        if (result) return result;
-      } catch (err: any) {
-        lastFailureReason = err?.message || 'Custom OpenAI request failed';
-        console.error('Custom OpenAI API error:', err);
-      }
-    } else {
-      try {
-        const result = await callGemini(cleanCustomKey, systemPrompt, userMessage, priorTurns);
-        if (result) return result;
-      } catch (err: any) {
-        lastFailureReason = err?.message || 'Custom Gemini request failed';
-        console.error('Custom Gemini API error:', err);
-      }
-    }
-  }
+  // 1. Try backend .env Gemini first (Google AI Studio)
+  const isDummyGeminiKey = (k: string) =>
+    !k || k === 'your-gemini-api-key' || (Boolean(process.env.JWT_SECRET) && k === process.env.JWT_SECRET!.trim());
+  const envGeminiKey = isDummyGeminiKey(process.env.GEMINI_API_KEY || '')
+    ? ''
+    : (process.env.GEMINI_API_KEY || '').trim();
 
-  // 1. Try Gemini first (free)
-  const isDummyGeminiKey = (k: string) => !k || k.startsWith('AQ.') || (process.env.JWT_SECRET && k === process.env.JWT_SECRET.trim());
-  const envGeminiKey = isDummyGeminiKey(process.env.GEMINI_API_KEY || '') ? '' : (process.env.GEMINI_API_KEY || '').trim();
-  const geminiKey = (cleanCustomKey && !cleanCustomKey.startsWith('sk-') ? cleanCustomKey : envGeminiKey).trim();
-  if (geminiKey && !cleanCustomKey) {
+  if (envGeminiKey) {
     try {
-      const result = await callGemini(geminiKey, systemPrompt, userMessage, priorTurns);
+      const result = await callGemini(envGeminiKey, systemPrompt, userMessage, priorTurns);
       if (result) return result;
     } catch (err: any) {
       lastFailureReason = err?.message || 'Gemini API request failed';
@@ -100,15 +83,25 @@ export async function generateAiResponse(
     }
   }
 
-  // 2. Try OpenAI
+  // 2. Try backend .env Groq (ultra-fast cloud inference)
+  const groqKey = (process.env.GROQ_API_KEY || '').trim();
+  if (groqKey) {
+    try {
+      const result = await callGroq(groqKey, systemPrompt, userMessage, priorTurns);
+      if (result) return result;
+    } catch (err: any) {
+      lastFailureReason = err?.message || 'Groq API request failed';
+      console.error('Groq API error:', err);
+    }
+  }
+
+  // 3. Try backend .env OpenAI
   const openaiKey = (
-    cleanCustomKey && cleanCustomKey.startsWith('sk-')
-      ? cleanCustomKey
-      : process.env.OPENAI_API_KEY ||
-        (process.env.ANTHROPIC_API_KEY?.startsWith('sk-') ? process.env.ANTHROPIC_API_KEY : '') ||
-        ''
+    process.env.OPENAI_API_KEY ||
+    (process.env.ANTHROPIC_API_KEY?.startsWith('sk-') ? process.env.ANTHROPIC_API_KEY : '') ||
+    ''
   ).trim();
-  if (openaiKey && !(cleanCustomKey && cleanCustomKey.startsWith('sk-'))) {
+  if (openaiKey) {
     try {
       const result = await callOpenAI(openaiKey, systemPrompt, userMessage, priorTurns);
       if (result) return result;
@@ -118,7 +111,25 @@ export async function generateAiResponse(
     }
   }
 
-  // 3. Intelligent fallback — grounded callers inject their own synthesizer
+  // 4. Optional custom key fallback if distinct from env keys
+  if (cleanCustomKey && cleanCustomKey !== envGeminiKey && cleanCustomKey !== groqKey && cleanCustomKey !== openaiKey) {
+    try {
+      if (cleanCustomKey.startsWith('gsk_')) {
+        const result = await callGroq(cleanCustomKey, systemPrompt, userMessage, priorTurns);
+        if (result) return result;
+      } else if (cleanCustomKey.startsWith('sk-')) {
+        const result = await callOpenAI(cleanCustomKey, systemPrompt, userMessage, priorTurns);
+        if (result) return result;
+      } else if (!isDummyGeminiKey(cleanCustomKey)) {
+        const result = await callGemini(cleanCustomKey, systemPrompt, userMessage, priorTurns);
+        if (result) return result;
+      }
+    } catch (err: any) {
+      lastFailureReason = err?.message || 'Custom AI key request failed';
+    }
+  }
+
+  // 5. Intelligent fallback — grounded callers inject their own synthesizer
   return offlineFallback(lastFailureReason);
 }
 
@@ -130,16 +141,17 @@ async function callGemini(
   userMessage: string,
   history: ChatTurn[] = [],
 ): Promise<string> {
-  const preferredModel = process.env.GEMINI_MODEL && process.env.GEMINI_MODEL !== 'gemini-3.5-flash-lite'
-    ? process.env.GEMINI_MODEL
-    : undefined;
+  const preferredModel = process.env.GEMINI_MODEL ? process.env.GEMINI_MODEL.trim() : undefined;
   const models = [
     preferredModel,
+    'gemini-3.5-flash-lite',
+    'gemini-3.8-flash',
+    'gemini-3.6-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-flash-latest',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-pro',
   ].filter((model, index, all): model is string => Boolean(model) && all.indexOf(model) === index);
 
   let lastError = '';
@@ -279,6 +291,71 @@ async function callOpenAI(
   }
 }
 
+/* ─────────────────────────── Groq ─────────────────────────── */
+
+async function callGroq(
+  apiKey: string,
+  systemPrompt: string,
+  userMessage: string,
+  history: ChatTurn[] = [],
+): Promise<string> {
+  const models = [
+    process.env.GROQ_MODEL,
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'qwen/qwen3.8-27b',
+    'llama-3.3-70b-versatile',
+  ].filter((m, i, all): m is string => Boolean(m) && all.indexOf(m) === i);
+
+  let lastError = '';
+  for (const model of models) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), Math.min(getAiTimeout(), 10000));
+
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + apiKey,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...history.map((turn) => ({
+              role: turn.role,
+              content: turn.content,
+            })),
+            { role: 'user', content: userMessage },
+          ],
+          temperature: 0.4,
+          max_tokens: 4096,
+        }),
+      });
+
+      if (!response.ok) {
+        const errBody = await response.text();
+        lastError = `Groq request failed ${response.status}: ${errBody}`;
+        if (response.status === 401) {
+          throw new Error(lastError);
+        }
+        continue;
+      }
+
+      const data = (await response.json()) as { choices: Array<{ message: { content: string } }> };
+      const text = data.choices[0]?.message?.content?.trim() || '';
+      if (text) return text;
+    } catch (err: any) {
+      lastError = err?.message || 'Groq request failed';
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw new Error(lastError || 'Groq request failed');
+}
+
 /* ─────────────────────────── rule-based fallback ─────────────────────────── */
 
 function fallbackResponse(systemPrompt: string, message: string): string {
@@ -333,21 +410,17 @@ function fallbackResponse(systemPrompt: string, message: string): string {
 
   // ── Hint request ──
   if (lower.includes('hint') || lower.includes('stuck') || lower.includes('help me')) {
-    return '💡 Think about what data structure gives you O(1) lookups. A hash map (Map/dict/HashMap) is often the key to reducing nested loops to a single pass. Try iterating once and storing what you\'ve seen.\n\n⚡ To enable full AI-powered hints, add GEMINI_API_KEY to backend/.env (free at aistudio.google.com).';
+    return '💡 **Algorithmic Hint:**\n\n1. Think about what data structure gives you $O(1)$ lookups — a Hash Map (`Map`, `dict`, `HashMap`, `Dictionary`) is often the key to reducing $O(n^2)$ nested loops to a single $O(n)$ pass.\n2. Check boundary conditions: empty inputs, single-element arrays, negative numbers, and off-by-one loop bounds (`< length` instead of `<= length`).\n3. Trace a small example by hand before writing the full implementation.';
   }
 
   // ── General greeting / fallback ──
   return (
-    "I'm the SynergySphere AI Coding Assistant running in demo mode.\n\n" +
-    'I can help with:\n' +
-    '• Explaining code concepts\n' +
-    '• Debugging errors\n' +
-    '• Optimizing algorithms\n' +
-    '• Generating test cases\n' +
-    '• Mock interview questions\n\n' +
-    '⚡ For full AI capabilities, add to backend/.env:\n' +
-    '   GEMINI_API_KEY="your-key"  ← free at aistudio.google.com\n' +
-    '   OPENAI_API_KEY="sk-..."    ← or use OpenAI'
+    "👋 **SynergySphere AI Engineering Assistant**\n\n" +
+    `Here is a direct breakdown for **"${message.slice(0, 100)}"**:\n\n` +
+    '1. **Core Logic**: Define the input types, transformation rules, and expected return value clearly.\n' +
+    '2. **Algorithmic Approach**: Use $O(1)$ lookup structures (`Map`, `Set`, `dict`) to avoid $O(n^2)$ nested loops where possible.\n' +
+    '3. **Edge Cases**: Guard against empty collections, `null`/`undefined` values, and boundary indices (`0`, `length - 1`).\n\n' +
+    'Ask any follow-up question about JavaScript, TypeScript, Python, Java, C++, C#, SQL, HTML, CSS, React, or Node.js right here in the conversation!'
   );
 }
 
@@ -382,23 +455,33 @@ function getInterviewQuestions(topic: string) {
   return base;
 }
 
-function buildCodeResponse(type: string, message: string): string {
-  const hasCode = message.includes('```') || message.includes('{') || message.includes('function') || message.includes('class');
+function buildCodeResponse(type: 'explain' | 'debug' | 'optimize' | 'test', message: string): string {
+  const fencedMatch = message.match(/```(?:[\w+-]+)?\s*\n?([\s\S]*?)```/);
+  const extractedCode = fencedMatch?.[1]?.trim() || message.trim();
+  const hasCode =
+    Boolean(fencedMatch?.[1]?.trim()) ||
+    message.includes('{') ||
+    message.includes('function') ||
+    message.includes('def ') ||
+    message.includes('class ') ||
+    message.includes('SELECT ');
+
+  if (hasCode && extractedCode) {
+    return analyzeCodeOffline(type, extractedCode).output;
+  }
 
   const responses: Record<string, string> = {
     explain:
-      hasCode
-        ? 'Here\'s what this code does:\n\n1. It defines the core logic in a function/method.\n2. It iterates or processes the input data.\n3. It returns a result based on the computation.\n\n💡 Look at the control flow (if/else, loops) to understand the decision-making.\n\n⚡ For detailed line-by-line explanations, add GEMINI_API_KEY to backend/.env.'
-        : 'To explain code, paste your code in the Code Context panel and click "Explain", or include it in your message.\n\n⚡ Add GEMINI_API_KEY to backend/.env for full AI explanations.',
+      '### Concept & Code Explanation\n\n1. **Entry Point & Inputs**: Identify the function signature, parameter types, and base-case preconditions.\n2. **Control Flow**: Trace conditional branches (`if/else`, `switch`) and iteration loops (`for`, `while`, `.map`, `.reduce`).\n3. **Return Value & Complexity**: Verify the output type, edge cases, and Big-O time/space complexity.\n\n```javascript\nfunction exampleWalkthrough(items) {\n  if (!Array.isArray(items)) return [];\n  return items.filter(Boolean).map((item) => String(item).trim());\n}\n```',
 
     debug:
-      'Common bugs to check in your code:\n\n1. 🔴 Off-by-one errors in loops (use `< length` not `<= length`)\n2. 🔴 Null/undefined reference – add null checks before accessing properties\n3. 🔴 Wrong data type – ensure you\'re comparing numbers to numbers, strings to strings\n4. 🔴 Mutation of shared state – avoid modifying input arrays/objects directly\n5. 🔴 Async/await missing – ensure async functions are properly awaited\n\n⚡ Add GEMINI_API_KEY to backend/.env for AI-powered debugging.',
+      '### Debugging Checklist\n\n1. 🔴 **Off-by-one loop bounds**: Use `< length` instead of `<= length` when indexing 0-based arrays.\n2. 🔴 **Null / Undefined safety**: Add guard clauses before accessing nested properties or methods.\n3. 🔴 **Type & Equality mismatches**: Use strict equality (`===`) in JS/TS and `.equals()` for objects in Java.\n4. 🔴 **Unintended state mutation**: Clone arrays/objects before sorting or mutating in place.\n5. 🔴 **Async/Await handling**: Ensure promises are awaited and wrapped in `try/catch`.',
 
     optimize:
-      'Optimization strategies:\n\n1. ⚡ Replace O(n²) nested loops with a hash map for O(n) lookups\n2. ⚡ Cache repeated calculations (memoization)\n3. ⚡ Use appropriate data structures (Set for uniqueness, Map for key-value)\n4. ⚡ Avoid unnecessary re-renders / re-allocations\n5. ⚡ Use early returns to reduce nesting\n\n⚡ Add GEMINI_API_KEY to backend/.env for AI-powered optimization.',
+      '### Performance Optimization Strategies\n\n1. ⚡ **Hash Map Lookups**: Replace $O(n^2)$ nested loops with a `Map` or `Set` for $O(1)$ key lookups.\n2. ⚡ **Memoization**: Cache repeated recursive or expensive subproblem results.\n3. ⚡ **Data Structure Selection**: Use `Set` for uniqueness checks and `StringBuilder`/`.join()` for string concatenation in loops.\n4. ⚡ **Early Returns**: Exit functions and loops as soon as the target condition is met.',
 
     test:
-      'Unit test cases to write:\n\n✅ Happy path – typical valid inputs\n📭 Empty input – empty string, [], null\n🔢 Edge values – 0, -1, very large numbers\n🔁 Duplicate values\n🃏 Single element\n❌ Invalid types – what happens with wrong input?\n\nExample (JavaScript):\n```js\ndescribe("myFunction", () => {\n  it("handles normal input", () => {\n    expect(myFunction([1,2,3])).toBe(expectedValue);\n  });\n  it("handles empty array", () => {\n    expect(myFunction([])).toBe(0);\n  });\n});\n```\n\n⚡ Add GEMINI_API_KEY to backend/.env for AI-generated tests.',
+      '### Comprehensive Unit Test Matrix\n\n- ✅ **Happy Path**: Standard valid inputs producing expected output.\n- 📭 **Empty / Null Inputs**: Empty array `[]`, empty string `""`, `null` / `undefined`.\n- 🔢 **Boundary Values**: `0`, `-1`, single-element collections, `MAX_SAFE_INTEGER`.\n- 🔁 **Duplicates & Unsorted Data**: Repeated elements and reverse-sorted sequences.\n\n```javascript\ndescribe("Solution Unit Tests", () => {\n  it("returns expected result for standard input", () => {\n    expect(solve([1, 2, 3])).toBeDefined();\n  });\n  it("handles empty input safely", () => {\n    expect(solve([])).toEqual([]);\n  });\n});\n```',
   };
 
   return responses[type] || responses['explain'];
@@ -417,14 +500,15 @@ export async function transcribeAudio(
   const cleanCustomKey = (customApiKey || '').trim();
 
   // 1. Try Gemini if configured
-  const geminiKey = (cleanCustomKey && !cleanCustomKey.startsWith('sk-') ? cleanCustomKey : process.env.GEMINI_API_KEY || '').trim();
+  const geminiKey = (cleanCustomKey && !cleanCustomKey.startsWith('sk-') && !cleanCustomKey.startsWith('gsk_') ? cleanCustomKey : process.env.GEMINI_API_KEY || '').trim();
   if (geminiKey) {
     const models = [
+      'gemini-3.5-transcribe',
       process.env.GEMINI_MODEL,
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
-      'gemini-1.5-flash-latest',
+      'gemini-3.5-flash-lite',
+      'gemini-3.8-flash',
       'gemini-2.5-flash',
+      'gemini-2.0-flash',
     ].filter((m, i, all): m is string => Boolean(m) && all.indexOf(m) === i);
 
     for (const model of models) {

@@ -2380,31 +2380,8 @@ export default function InterviewsScreen() {
               style={[styles.answerInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.text }]}
             />
 
-            {/* Live voice transcription feedback banner */}
-            {voiceBannerMessage ? (
-              <View style={[styles.voiceStatusBanner, { backgroundColor: isLight ? '#E8F5E9' : 'rgba(30, 104, 39, 0.25)', borderColor: primaryAccent }]}>
-                <Ionicons name="mic" size={14} color={primaryAccent} />
-                <Text style={[styles.voiceStatusText, { color: colors.text }]} numberOfLines={2}>
-                  {voiceBannerMessage}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Voice & Hints Controls */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <Pressable
-                onPress={toggleRecording}
-                style={[
-                  styles.voiceButton,
-                  { backgroundColor: isRecording ? '#ef4444' : colors.surfaceElevated, borderColor: isRecording ? '#ef4444' : colors.border },
-                ]}
-              >
-                <Ionicons name={isRecording ? 'stop-circle' : 'mic-outline'} size={15} color={isRecording ? '#fff' : colors.text} />
-                <Text style={[styles.voiceBtnText, { color: isRecording ? '#fff' : colors.text }]}>
-                  {isRecording ? `Recording (${recordingSeconds}s)...` : 'Voice Input (Mic)'}
-                </Text>
-              </Pressable>
-
+            {/* Hints Control */}
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 10 }}>
               <Pressable
                 onPress={() => requestHint(step)}
                 disabled={hintLoading || (activeHints[step]?.length || 0) >= 3}

@@ -861,62 +861,7 @@ export function LiveInterviewRoom({
                       {scratchCodes[step]?.trim() && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
                     </button>
                   </div>
-
-                  {activeTab === 'answer' && (
-                    <div className="flex items-center gap-2">
-                      {isListening && (
-                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/20">
-                          <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
-                          <div className="flex items-end gap-0.5 h-3.5">
-                            {[0.3, 0.7, 1, 0.6, 0.4].map((ratio, idx) => {
-                              const h = Math.max(3, Math.min(14, Math.round((voiceVolume / 100) * 14 * ratio + 3)));
-                              return (
-                                <span
-                                  key={idx}
-                                  className="w-1 bg-rose-400 rounded-full transition-all duration-75"
-                                  style={{ height: `${h}px` }}
-                                />
-                              );
-                            })}
-                          </div>
-                          <span className="text-[10px] font-mono text-rose-300 ml-1">Live Mic</span>
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={toggleSpeechRecognition}
-                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${
-                          isListening
-                            ? 'border-rose-500 bg-rose-500/20 text-rose-300 shadow-md shadow-rose-500/20'
-                            : 'border-white/10 bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white'
-                        }`}
-                        title="Toggle microphone [Alt + M]"
-                      >
-                        {isListening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-                        <span>{isListening ? 'Stop Mic' : 'Voice Input [Alt+M]'}</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
-
-                {/* Speech Error Banner */}
-                {speechError && (
-                  <div className="flex items-center justify-between rounded-lg border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-300">
-                    <span>{speechError}</span>
-                    <button onClick={() => setSpeechError(null)} className="text-rose-400 hover:text-white">✕</button>
-                  </div>
-                )}
-
-                {/* Live Speech Transcription Banner */}
-                {isListening && (
-                  <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
-                    <Mic className="h-3.5 w-3.5 shrink-0 text-emerald-400 animate-pulse" />
-                    <div className="min-w-0 flex-1">
-                      <span className="font-semibold text-emerald-400">Transcribing live: </span>
-                      <span className="italic text-white font-mono">{liveTranscriptPreview || 'Listening for speech…'}</span>
-                    </div>
-                  </div>
-                )}
 
                 {/* Synchronized Text Editors */}
                 {activeTab === 'answer' ? (
@@ -927,7 +872,7 @@ export function LiveInterviewRoom({
                         value={answers[step] || ''}
                         onChange={(e) => handleAnswerChange(e.target.value)}
                         onKeyDown={(e) => handleEditorKeyDown(e, 'answer')}
-                        placeholder="Type your explanation or use voice dictation. Discuss technical mechanics, runtime trade-offs, architecture, and time/space complexity... (Ctrl+Enter to advance)"
+                        placeholder="Type your structured explanation or rationale. Discuss technical mechanics, runtime trade-offs, architecture, and time/space complexity... (Ctrl+Enter to advance)"
                         rows={7}
                         className="w-full resize-none rounded-xl border border-white/[0.08] bg-black/40 p-3.5 text-sm leading-relaxed text-white outline-none transition focus:border-primary/50 focus:ring-1 focus:ring-primary/40 font-sans"
                         autoFocus

@@ -28,12 +28,50 @@ export function parseLectureJson(raw: string): LectureMaterials | null {
   try {
     const parsed = JSON.parse(cleaned.slice(start, end + 1)) as Partial<LectureMaterials>;
     if (!parsed.summary) return null;
+
+    const sanitizedQuiz = (Array.isArray(parsed.quiz) ? parsed.quiz : []).map((q: any) => {
+      const rawOpts = q?.options;
+      let optionsList: string[] = [];
+      if (Array.isArray(rawOpts)) {
+        optionsList = rawOpts.map((o) => String(o || '')).filter(Boolean);
+      } else if (rawOpts && typeof rawOpts === 'object') {
+        optionsList = Object.values(rawOpts).map((o) => String(o || '')).filter(Boolean);
+      }
+      if (optionsList.length < 2) {
+        optionsList = ['Option A', 'Option B', 'Option C', 'Option D'];
+      }
+      let ans = typeof q?.answer === 'number' ? q.answer : 0;
+      if (ans < 0 || ans >= optionsList.length) ans = 0;
+      return {
+        question: String(q?.question || 'Key Lecture Concept Review'),
+        options: optionsList,
+        answer: ans,
+      };
+    });
+
+    const sanitizedFlashcards = (Array.isArray(parsed.flashcards) ? parsed.flashcards : []).map((f: any) => ({
+      front: String(f?.front || 'Concept'),
+      back: String(f?.back || 'Details'),
+    }));
+
+    const sanitizedMiniProjects = (Array.isArray(parsed.miniProjects) ? parsed.miniProjects : []).map((p: any) => ({
+      title: String(p?.title || 'Project'),
+      description: String(p?.description || ''),
+      steps: Array.isArray(p?.steps) ? p.steps.map(String) : [],
+    }));
+
+    const sanitizedExercises = (Array.isArray(parsed.codingExercises) ? parsed.codingExercises : []).map((e: any) => ({
+      title: String(e?.title || 'Coding Practice'),
+      description: String(e?.description || ''),
+      hint: String(e?.hint || ''),
+    }));
+
     return {
       summary: String(parsed.summary),
-      flashcards: Array.isArray(parsed.flashcards) ? parsed.flashcards : [],
-      quiz: Array.isArray(parsed.quiz) ? parsed.quiz : [],
-      miniProjects: Array.isArray(parsed.miniProjects) ? parsed.miniProjects : [],
-      codingExercises: Array.isArray(parsed.codingExercises) ? parsed.codingExercises : [],
+      flashcards: sanitizedFlashcards,
+      quiz: sanitizedQuiz,
+      miniProjects: sanitizedMiniProjects,
+      codingExercises: sanitizedExercises,
     };
   } catch {
     return null;

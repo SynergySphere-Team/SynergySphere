@@ -1,19 +1,26 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/utils';
+import { BUILTIN_CHALLENGES } from '@/data/builtinChallenges';
 import { LiveCodeRoomBar } from './LiveCodeRoomBar';
 import {
   AlertCircle,
   BookOpen,
   CheckCircle,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Clock,
   Code2,
   Cpu,
+  ExternalLink,
+  Eye,
+  EyeOff,
   Filter,
   Lightbulb,
   Loader2,
@@ -35,6 +42,7 @@ export interface Challenge {
   description: string;
   language: string | null;
   starterCode: string | null;
+  solution?: string;
   xpReward: number;
   hint?: string;
   approach?: string;
@@ -84,569 +92,7 @@ const ALL_LANGUAGES = ['All', 'JavaScript', 'TypeScript', 'Python', 'Java', 'C++
 
 /* ─────────────────────────── challenge data ─────────────────────────── */
 
-const fallbackChallenges: Challenge[] = [
-  // ── JavaScript (11) ──────────────────────────────────────────────────
-  {
-    id: 'js-hello-world',
-    title: 'Hello World',
-    difficulty: 'EASY',
-    description: 'Write a function greet() that returns the string "Hello, SynergySphere!"',
-    language: 'JavaScript',
-    starterCode: 'function greet() {\n  // Your code here\n}',
-    xpReward: 50,
-  },
-  {
-    id: 'js-sum-array',
-    title: 'Sum Array',
-    difficulty: 'EASY',
-    description: 'Write a function sumArray(arr) that returns the sum of all numbers in an array.',
-    language: 'JavaScript',
-    starterCode: 'function sumArray(arr) {\n  // Your code here\n}',
-    xpReward: 50,
-  },
-  {
-    id: 'js-fizzbuzz',
-    title: 'FizzBuzz',
-    difficulty: 'MEDIUM',
-    description: 'Write fizzBuzz(n). Return "Fizz" for multiples of 3, "Buzz" for multiples of 5, "FizzBuzz" for both, otherwise return n.',
-    language: 'JavaScript',
-    starterCode: 'function fizzBuzz(n) {\n  // Your code here\n}',
-    xpReward: 75,
-  },
-  {
-    id: 'js-binary-search',
-    title: 'Binary Search',
-    difficulty: 'HARD',
-    description: 'Implement binarySearch(arr, target) on a sorted array. Return the index of target, or -1 if not found.',
-    language: 'JavaScript',
-    starterCode: 'function binarySearch(arr, target) {\n  // Your code here\n}',
-    xpReward: 100,
-  },
-  {
-    id: 'js-two-sum',
-    title: 'Two Sum',
-    difficulty: 'EASY',
-    description: 'Given an array and a target, return the indices of two numbers that add up to target.',
-    language: 'JavaScript',
-    starterCode: 'function twoSum(nums, target) {\n  // Your code here\n}',
-    xpReward: 60,
-  },
-  {
-    id: 'js-valid-parentheses',
-    title: 'Valid Parentheses',
-    difficulty: 'EASY',
-    description: 'Given a string of (, ), {, }, [, ], return true if brackets are properly matched and closed.',
-    language: 'JavaScript',
-    starterCode: 'function isValid(s) {\n  // Your code here\n}',
-    xpReward: 60,
-  },
-  {
-    id: 'js-longest-substring',
-    title: 'Longest Substring',
-    difficulty: 'MEDIUM',
-    description: 'Find the length of the longest substring without repeating characters.',
-    language: 'JavaScript',
-    starterCode: 'function lengthOfLongestSubstring(s) {\n  // Your code here\n}',
-    xpReward: 120,
-  },
-  {
-    id: 'js-fibonacci',
-    title: 'Fibonacci Number',
-    difficulty: 'EASY',
-    description: 'Calculate F(n): F(0)=0, F(1)=1, F(n)=F(n-1)+F(n-2). Use an iterative approach.',
-    language: 'JavaScript',
-    starterCode: 'function fib(n) {\n  // Your code here\n}',
-    xpReward: 40,
-  },
-  {
-    id: 'js-merge-sorted',
-    title: 'Merge Sorted Arrays',
-    difficulty: 'MEDIUM',
-    description: 'Merge two sorted arrays and return a single sorted array.',
-    language: 'JavaScript',
-    starterCode: 'function merge(nums1, nums2) {\n  // Your code here\n}',
-    xpReward: 100,
-  },
-  {
-    id: 'js-max-depth',
-    title: 'Maximum Array Depth',
-    difficulty: 'MEDIUM',
-    description: 'Given a nested array, return the maximum depth. E.g. [1,[2,[3]]] has depth 3.',
-    language: 'JavaScript',
-    starterCode: 'function maxDepth(arr) {\n  // Your code here\n}',
-    xpReward: 90,
-  },
-  {
-    id: 'js-flatten',
-    title: 'Flatten Array',
-    difficulty: 'MEDIUM',
-    description: 'Write flatten(arr) that recursively flattens a nested array into a single-level array.',
-    language: 'JavaScript',
-    starterCode: 'function flatten(arr) {\n  // Your code here\n}',
-    xpReward: 85,
-  },
-
-  // ── TypeScript (5) ───────────────────────────────────────────────────
-  {
-    id: 'ts-typed-greet',
-    title: 'Typed Greeting',
-    difficulty: 'EASY',
-    description: 'Write a typed function greet(name: string): string that returns "Hello, {name}! Welcome to SynergySphere."',
-    language: 'TypeScript',
-    starterCode: 'function greet(name: string): string {\n  // Your code here\n}',
-    xpReward: 55,
-  },
-  {
-    id: 'ts-generic-identity',
-    title: 'Generic Identity',
-    difficulty: 'EASY',
-    description: 'Write a generic function identity<T>(value: T): T that returns whatever is passed to it.',
-    language: 'TypeScript',
-    starterCode: 'function identity<T>(value: T): T {\n  // Your code here\n}',
-    xpReward: 60,
-  },
-  {
-    id: 'ts-interface-area',
-    title: 'Shape Interface',
-    difficulty: 'MEDIUM',
-    description: 'Define an interface Shape with a method area(): number. Implement a Rectangle class with width and height.',
-    language: 'TypeScript',
-    starterCode: 'interface Shape {\n  area(): number;\n}\n\nclass Rectangle implements Shape {\n  constructor(public width: number, public height: number) {}\n\n  area(): number {\n    // Your code here\n  }\n}',
-    xpReward: 80,
-  },
-  {
-    id: 'ts-union-types',
-    title: 'Union Types Handler',
-    difficulty: 'MEDIUM',
-    description: 'Write format(value: string | number): string. If number, prepend "$". If string, return it uppercased.',
-    language: 'TypeScript',
-    starterCode: 'function format(value: string | number): string {\n  // Your code here\n}',
-    xpReward: 75,
-  },
-  {
-    id: 'ts-tuple-swap',
-    title: 'Tuple Swap',
-    difficulty: 'MEDIUM',
-    description: 'Write swap<A, B>(tuple: [A, B]): [B, A] that returns the tuple with its elements swapped.',
-    language: 'TypeScript',
-    starterCode: 'function swap<A, B>(tuple: [A, B]): [B, A] {\n  // Your code here\n}',
-    xpReward: 70,
-  },
-
-  // ── Python (5) ───────────────────────────────────────────────────────
-  {
-    id: 'py-hello-world',
-    title: 'Hello SynergySphere',
-    difficulty: 'EASY',
-    description: 'Write a function greet() that returns the string "Hello, SynergySphere!"',
-    language: 'Python',
-    starterCode: 'def greet():\n    # Your code here\n    pass',
-    xpReward: 50,
-  },
-  {
-    id: 'py-list-sum',
-    title: 'List Sum',
-    difficulty: 'EASY',
-    description: 'Write sum_list(numbers) that returns the sum of all numbers in the list without using Python\'s built-in sum().',
-    language: 'Python',
-    starterCode: 'def sum_list(numbers):\n    # Your code here\n    pass',
-    xpReward: 50,
-  },
-  {
-    id: 'py-fizzbuzz',
-    title: 'FizzBuzz (Python)',
-    difficulty: 'MEDIUM',
-    description: 'Write fizzbuzz(n). Return "Fizz" for multiples of 3, "Buzz" for multiples of 5, "FizzBuzz" for both, else return n as a string.',
-    language: 'Python',
-    starterCode: 'def fizzbuzz(n):\n    # Your code here\n    pass',
-    xpReward: 75,
-  },
-  {
-    id: 'py-palindrome',
-    title: 'Palindrome Check',
-    difficulty: 'EASY',
-    description: 'Write is_palindrome(s) that returns True if s is a palindrome (reads the same forwards and backwards), ignoring case.',
-    language: 'Python',
-    starterCode: 'def is_palindrome(s):\n    # Your code here\n    pass',
-    xpReward: 60,
-  },
-  {
-    id: 'py-count-vowels',
-    title: 'Count Vowels',
-    difficulty: 'EASY',
-    description: 'Write count_vowels(s) that counts the number of vowels (a, e, i, o, u) in the string, case-insensitive.',
-    language: 'Python',
-    starterCode: 'def count_vowels(s):\n    # Your code here\n    pass',
-    xpReward: 55,
-  },
-
-  // ── Java (5) ─────────────────────────────────────────────────────────
-  {
-    id: 'java-hello-world',
-    title: 'Hello World (Java)',
-    difficulty: 'EASY',
-    description: 'Write a method greet() in a class Solution that returns the String "Hello, SynergySphere!"',
-    language: 'Java',
-    starterCode: 'public class Solution {\n    public String greet() {\n        // Your code here\n        return "";\n    }\n}',
-    xpReward: 50,
-  },
-  {
-    id: 'java-factorial',
-    title: 'Factorial',
-    difficulty: 'EASY',
-    description: 'Write factorial(int n) in a Solution class. Return n! using iteration (not recursion). factorial(0)=1.',
-    language: 'Java',
-    starterCode: 'public class Solution {\n    public long factorial(int n) {\n        // Your code here\n        return 0;\n    }\n}',
-    xpReward: 60,
-  },
-  {
-    id: 'java-reverse-string',
-    title: 'Reverse String',
-    difficulty: 'EASY',
-    description: 'Write reverseString(String s) that returns the string reversed. Do not use StringBuilder.reverse().',
-    language: 'Java',
-    starterCode: 'public class Solution {\n    public String reverseString(String s) {\n        // Your code here\n        return "";\n    }\n}',
-    xpReward: 60,
-  },
-  {
-    id: 'java-is-prime',
-    title: 'Is Prime',
-    difficulty: 'MEDIUM',
-    description: 'Write isPrime(int n) that returns true if n is a prime number, false otherwise. Handle edge cases n < 2.',
-    language: 'Java',
-    starterCode: 'public class Solution {\n    public boolean isPrime(int n) {\n        // Your code here\n        return false;\n    }\n}',
-    xpReward: 75,
-  },
-  {
-    id: 'java-fizzbuzz',
-    title: 'FizzBuzz (Java)',
-    difficulty: 'MEDIUM',
-    description: 'Write fizzBuzz(int n). Return "Fizz" for multiples of 3, "Buzz" for 5, "FizzBuzz" for both, else return String.valueOf(n).',
-    language: 'Java',
-    starterCode: 'public class Solution {\n    public String fizzBuzz(int n) {\n        // Your code here\n        return "";\n    }\n}',
-    xpReward: 75,
-  },
-
-  // ── C++ (5) ──────────────────────────────────────────────────────────
-  {
-    id: 'cpp-hello-world',
-    title: 'Hello World (C++)',
-    difficulty: 'EASY',
-    description: 'Write a function greet() that returns the std::string "Hello, SynergySphere!"',
-    language: 'C++',
-    starterCode: '#include <string>\nusing namespace std;\n\nstring greet() {\n    // Your code here\n    return "";\n}',
-    xpReward: 50,
-  },
-  {
-    id: 'cpp-factorial',
-    title: 'Factorial (C++)',
-    difficulty: 'EASY',
-    description: 'Write long long factorial(int n) that computes n! iteratively. factorial(0) = 1.',
-    language: 'C++',
-    starterCode: 'long long factorial(int n) {\n    // Your code here\n    return 0;\n}',
-    xpReward: 60,
-  },
-  {
-    id: 'cpp-max-element',
-    title: 'Array Maximum',
-    difficulty: 'EASY',
-    description: 'Write int maxElement(vector<int>& nums) that returns the largest element in the array without using std::max_element.',
-    language: 'C++',
-    starterCode: '#include <vector>\nusing namespace std;\n\nint maxElement(vector<int>& nums) {\n    // Your code here\n    return 0;\n}',
-    xpReward: 55,
-  },
-  {
-    id: 'cpp-is-palindrome',
-    title: 'Palindrome (C++)',
-    difficulty: 'MEDIUM',
-    description: 'Write bool isPalindrome(string s) that returns true if the string reads the same forwards and backwards.',
-    language: 'C++',
-    starterCode: '#include <string>\nusing namespace std;\n\nbool isPalindrome(string s) {\n    // Your code here\n    return false;\n}',
-    xpReward: 70,
-  },
-  {
-    id: 'cpp-bubble-sort',
-    title: 'Bubble Sort',
-    difficulty: 'MEDIUM',
-    description: 'Implement bubbleSort(vector<int>& arr) that sorts the array in ascending order in-place using bubble sort.',
-    language: 'C++',
-    starterCode: '#include <vector>\nusing namespace std;\n\nvoid bubbleSort(vector<int>& arr) {\n    // Your code here\n}',
-    xpReward: 80,
-  },
-
-  // ── C# (5) ───────────────────────────────────────────────────────────
-  {
-    id: 'cs-hello-world',
-    title: 'Hello World (C#)',
-    difficulty: 'EASY',
-    description: 'Write a method Greet() in a Solution class that returns the string "Hello, SynergySphere!"',
-    language: 'C#',
-    starterCode: 'public class Solution {\n    public string Greet() {\n        // Your code here\n        return "";\n    }\n}',
-    xpReward: 50,
-  },
-  {
-    id: 'cs-fibonacci',
-    title: 'Fibonacci (C#)',
-    difficulty: 'EASY',
-    description: 'Write int Fibonacci(int n) in Solution. F(0)=0, F(1)=1, F(n)=F(n-1)+F(n-2). Use iteration.',
-    language: 'C#',
-    starterCode: 'public class Solution {\n    public int Fibonacci(int n) {\n        // Your code here\n        return 0;\n    }\n}',
-    xpReward: 60,
-  },
-  {
-    id: 'cs-reverse-string',
-    title: 'Reverse String (C#)',
-    difficulty: 'EASY',
-    description: 'Write string ReverseString(string s) in Solution. Return the string reversed without using Array.Reverse.',
-    language: 'C#',
-    starterCode: 'public class Solution {\n    public string ReverseString(string s) {\n        // Your code here\n        return "";\n    }\n}',
-    xpReward: 60,
-  },
-  {
-    id: 'cs-count-words',
-    title: 'Word Count',
-    difficulty: 'MEDIUM',
-    description: 'Write int CountWords(string s) that counts the number of words in the string (split by spaces, ignore extra spaces).',
-    language: 'C#',
-    starterCode: 'public class Solution {\n    public int CountWords(string s) {\n        // Your code here\n        return 0;\n    }\n}',
-    xpReward: 75,
-  },
-  {
-    id: 'cs-is-anagram',
-    title: 'Is Anagram (C#)',
-    difficulty: 'MEDIUM',
-    description: 'Write bool IsAnagram(string s, string t) that returns true if s and t are anagrams of each other (same characters, different order).',
-    language: 'C#',
-    starterCode: 'public class Solution {\n    public bool IsAnagram(string s, string t) {\n        // Your code here\n        return false;\n    }\n}',
-    xpReward: 75,
-  },
-
-  // ── SQL (6) ──────────────────────────────────────────────────────────
-  {
-    id: 'sql-top-students',
-    title: 'Top Students',
-    difficulty: 'EASY',
-    description: 'Query the students table to find all students with GPA greater than 3.5. Return all columns.',
-    language: 'SQL',
-    starterCode: '-- Table: students(id, name, gpa, major)\nSELECT * FROM students\nWHERE -- your condition here',
-    xpReward: 60,
-  },
-  {
-    id: 'sql-count-records',
-    title: 'Count All Users',
-    difficulty: 'EASY',
-    description: 'Write a query to count the total number of users in the users table. Return the result as "total_users".',
-    language: 'SQL',
-    starterCode: '-- Table: users(id, name, email, created_at)\nSELECT -- your query here',
-    xpReward: 50,
-  },
-  {
-    id: 'sql-average-salary',
-    title: 'Average Salary by Dept',
-    difficulty: 'MEDIUM',
-    description: 'Write a query to get the average salary per department from the employees table. Only include departments with average salary > 50000.',
-    language: 'SQL',
-    starterCode: '-- Table: employees(id, name, department, salary)\nSELECT department, AVG(salary) AS avg_salary\nFROM employees\nGROUP BY department\nHAVING -- your condition here',
-    xpReward: 80,
-  },
-  {
-    id: 'sql-join-orders',
-    title: 'Join Orders and Customers',
-    difficulty: 'MEDIUM',
-    description: 'Join the orders and customers tables to get each order\'s id, customer name, and total_amount. Only include orders where total_amount > 100.',
-    language: 'SQL',
-    starterCode: '-- orders(id, customer_id, total_amount, created_at)\n-- customers(id, name, email)\nSELECT o.id, c.name, o.total_amount\nFROM orders o\n-- Your JOIN and WHERE here',
-    xpReward: 90,
-  },
-  {
-    id: 'sql-top-n',
-    title: 'Top 5 Highest Salaries',
-    difficulty: 'MEDIUM',
-    description: 'Write a query to find the top 5 employees with the highest salaries. Return name and salary, ordered highest to lowest.',
-    language: 'SQL',
-    starterCode: '-- Table: employees(id, name, department, salary)\nSELECT name, salary\nFROM employees\n-- Your ORDER BY and LIMIT here',
-    xpReward: 75,
-  },
-  {
-    id: 'sql-duplicate-emails',
-    title: 'Find Duplicate Emails',
-    difficulty: 'HARD',
-    description: 'Write a query to find all emails that appear more than once in the users table. Return just the email column.',
-    language: 'SQL',
-    starterCode: '-- Table: users(id, name, email)\nSELECT email\nFROM users\nGROUP BY email\nHAVING -- your condition here',
-    xpReward: 100,
-  },
-
-  // ── HTML (4) ─────────────────────────────────────────────────────────
-  {
-    id: 'html-heading-paragraph',
-    title: 'Heading and Paragraph',
-    difficulty: 'EASY',
-    description: 'Create an h1 with text "SynergySphere" and a p tag below it with text "Learn. Build. Impact." Use correct semantic HTML.',
-    language: 'HTML',
-    starterCode: '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>SynergySphere</title>\n</head>\n<body>\n  <!-- Your HTML here -->\n</body>\n</html>',
-    xpReward: 40,
-  },
-  {
-    id: 'html-form',
-    title: 'Login Form',
-    difficulty: 'MEDIUM',
-    description: 'Build a login form with: an email input (type="email", required), a password input (type="password", required), and a submit button that says "Log In".',
-    language: 'HTML',
-    starterCode: '<form action="/login" method="POST">\n  <!-- Your form fields here -->\n</form>',
-    xpReward: 70,
-  },
-  {
-    id: 'html-nav',
-    title: 'Navigation Bar',
-    difficulty: 'MEDIUM',
-    description: 'Create a <nav> element with an unordered list containing links: Home (/), About (/about), and Contact (/contact).',
-    language: 'HTML',
-    starterCode: '<!-- Build your nav here -->\n<nav>\n  <!-- Your code here -->\n</nav>',
-    xpReward: 65,
-  },
-  {
-    id: 'html-table',
-    title: 'Data Table',
-    difficulty: 'MEDIUM',
-    description: 'Create an HTML table with headers: Name, Language, XP. Add 3 rows of sample data for learners.',
-    language: 'HTML',
-    starterCode: '<table>\n  <!-- Your table headers and rows here -->\n</table>',
-    xpReward: 70,
-  },
-
-  // ── CSS (4) ──────────────────────────────────────────────────────────
-  {
-    id: 'css-center-div',
-    title: 'Center a Div',
-    difficulty: 'EASY',
-    description: 'Using Flexbox, center a .box element both horizontally and vertically inside a .container that is 400px × 400px.',
-    language: 'CSS',
-    starterCode: '.container {\n  width: 400px;\n  height: 400px;\n  /* Your centering code here */\n}\n\n.box {\n  width: 100px;\n  height: 100px;\n  background-color: #4ade80;\n}',
-    xpReward: 50,
-  },
-  {
-    id: 'css-style-button',
-    title: 'Style a Button',
-    difficulty: 'EASY',
-    description: 'Style a .btn class: green background (#16a34a), white text, 12px 24px padding, 6px border-radius, no border, pointer cursor, and a darker green on hover (#15803d).',
-    language: 'CSS',
-    starterCode: '.btn {\n  /* Your button styles here */\n}\n\n.btn:hover {\n  /* Hover state */\n}',
-    xpReward: 50,
-  },
-  {
-    id: 'css-grid-layout',
-    title: 'CSS Grid Layout',
-    difficulty: 'MEDIUM',
-    description: 'Create a .grid container with 3 equal columns, a 16px gap, and make items inside have a light grey (#f3f4f6) background and 16px padding.',
-    language: 'CSS',
-    starterCode: '.grid {\n  /* Your grid container styles */\n}\n\n.grid-item {\n  /* Your grid item styles */\n}',
-    xpReward: 70,
-  },
-  {
-    id: 'css-card',
-    title: 'Card Component',
-    difficulty: 'MEDIUM',
-    description: 'Style a .card: white background, 8px border-radius, a subtle box shadow (0 2px 8px rgba(0,0,0,0.1)), 24px padding, and a smooth box-shadow transition on hover (0 8px 24px rgba(0,0,0,0.15)).',
-    language: 'CSS',
-    starterCode: '.card {\n  /* Your card styles here */\n}\n\n.card:hover {\n  /* Hover enhancement */\n}',
-    xpReward: 75,
-  },
-
-  // ── React (5) ────────────────────────────────────────────────────────
-  {
-    id: 'react-hello-component',
-    title: 'Hello Component',
-    difficulty: 'EASY',
-    description: 'Create a functional component Greeting that accepts a name prop and renders <h1>Hello, {name}!</h1>',
-    language: 'React',
-    starterCode: "import React from 'react';\n\nfunction Greeting({ name }) {\n  // Your code here\n}\n\nexport default Greeting;",
-    xpReward: 55,
-  },
-  {
-    id: 'react-counter',
-    title: 'Counter with useState',
-    difficulty: 'MEDIUM',
-    description: 'Build a Counter component using useState. Show the current count and two buttons: "Increment" and "Decrement". Start at 0.',
-    language: 'React',
-    starterCode: "import React, { useState } from 'react';\n\nfunction Counter() {\n  // Your code here\n}\n\nexport default Counter;",
-    xpReward: 80,
-  },
-  {
-    id: 'react-list-render',
-    title: 'Render a List',
-    difficulty: 'MEDIUM',
-    description: 'Create a component TodoList that accepts an array of strings as items and renders them as an <ul> with <li> elements. Each li must have a unique key.',
-    language: 'React',
-    starterCode: "import React from 'react';\n\nfunction TodoList({ items }) {\n  // Your code here\n}\n\nexport default TodoList;",
-    xpReward: 75,
-  },
-  {
-    id: 'react-toggle',
-    title: 'Toggle Component',
-    difficulty: 'MEDIUM',
-    description: 'Build a Toggle component that shows either "ON" or "OFF" text and a button that switches between states when clicked.',
-    language: 'React',
-    starterCode: "import React, { useState } from 'react';\n\nfunction Toggle() {\n  // Your code here\n}\n\nexport default Toggle;",
-    xpReward: 80,
-  },
-  {
-    id: 'react-fetch-data',
-    title: 'Fetch and Display Data',
-    difficulty: 'HARD',
-    description: 'Build a component UserCard that fetches user data from "https://jsonplaceholder.typicode.com/users/1" using useEffect and displays the user name and email.',
-    language: 'React',
-    starterCode: "import React, { useState, useEffect } from 'react';\n\nfunction UserCard() {\n  // Your code here\n}\n\nexport default UserCard;",
-    xpReward: 110,
-  },
-
-  // ── Node.js (5) ──────────────────────────────────────────────────────
-  {
-    id: 'node-http-server',
-    title: 'HTTP Hello Server',
-    difficulty: 'EASY',
-    description: 'Create an HTTP server using Node\'s built-in http module that responds with "Hello from SynergySphere!" and status 200 on any request.',
-    language: 'Node.js',
-    starterCode: "const http = require('http');\n\nconst server = http.createServer((req, res) => {\n  // Your code here\n});\n\nserver.listen(3000);\nmodule.exports = server;",
-    xpReward: 60,
-  },
-  {
-    id: 'node-read-json',
-    title: 'Parse JSON Data',
-    difficulty: 'EASY',
-    description: 'Write a function parseData(jsonString) that parses a JSON string and returns the object. If parsing fails, return null.',
-    language: 'Node.js',
-    starterCode: 'function parseData(jsonString) {\n  // Your code here\n}\n\nmodule.exports = parseData;',
-    xpReward: 55,
-  },
-  {
-    id: 'node-async-await',
-    title: 'Async File Reader',
-    difficulty: 'MEDIUM',
-    description: 'Write an async function readConfig() that reads "config.json" using fs.promises.readFile, parses it, and returns the parsed object. Return null on any error.',
-    language: 'Node.js',
-    starterCode: "const fs = require('fs');\n\nasync function readConfig() {\n  // Your code here\n}\n\nmodule.exports = readConfig;",
-    xpReward: 80,
-  },
-  {
-    id: 'node-filter-users',
-    title: 'Filter Active Users',
-    difficulty: 'MEDIUM',
-    description: 'Write filterActiveUsers(users) that takes an array of user objects {name, active} and returns only the users where active === true.',
-    language: 'Node.js',
-    starterCode: 'function filterActiveUsers(users) {\n  // Your code here\n}\n\nmodule.exports = filterActiveUsers;',
-    xpReward: 65,
-  },
-  {
-    id: 'node-event-emitter',
-    title: 'Event Emitter',
-    difficulty: 'HARD',
-    description: 'Create a class EventBus extending EventEmitter. Add a method publish(event, data) that emits the event with data, and subscribe(event, handler) that registers a listener.',
-    language: 'Node.js',
-    starterCode: "const { EventEmitter } = require('events');\n\nclass EventBus extends EventEmitter {\n  publish(event, data) {\n    // Your code here\n  }\n\n  subscribe(event, handler) {\n    // Your code here\n  }\n}\n\nmodule.exports = EventBus;",
-    xpReward: 110,
-  },
-];
+const fallbackChallenges: Challenge[] = BUILTIN_CHALLENGES;
 
 /* ─────────────────────────── per-challenge test cases (JS only runs locally) ─── */
 
@@ -1364,9 +810,12 @@ interface CodingChallengesSectionProps {
 }
 
 export function CodingChallengesSection({ showHeading = true }: CodingChallengesSectionProps) {
+  const router = useRouter();
   const [challenges, setChallenges] = useState<Challenge[]>(fallbackChallenges);
   const [selected, setSelected] = useState<Challenge | null>(fallbackChallenges[0]);
   const [code, setCode] = useState(fallbackChallenges[0].starterCode || '');
+  const [showSolution, setShowSolution] = useState(false);
+  const [solutionToast, setSolutionToast] = useState('');
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [submitResult, setSubmitResult] = useState<{ passed: boolean; xpEarned: number } | null>(null);
   const [running, setRunning] = useState(false);
@@ -1410,34 +859,35 @@ export function CodingChallengesSection({ showHeading = true }: CodingChallenges
   function handleSelectLanguage(lang: string) {
     setLanguageFilter(lang);
     const matches = challenges.filter((c) => {
-      const langMatch = lang === 'All' || c.language === lang;
-      const diffMatch = difficultyFilter === 'All' || c.difficulty === difficultyFilter.toUpperCase();
+      const langMatch = lang === 'All' || (c.language || '').toLowerCase() === lang.toLowerCase();
+      const diffMatch = difficultyFilter === 'All' || c.difficulty.toUpperCase() === difficultyFilter.toUpperCase();
       return langMatch && diffMatch;
     });
     if (matches.length > 0) {
       selectChallenge(matches[0]);
     } else {
-      setSelected(null);
-      setCode('');
-      setTestResults([]);
-      setSubmitResult(null);
+      const langOnly = challenges.filter((c) => (c.language || '').toLowerCase() === lang.toLowerCase());
+      if (langOnly.length > 0) {
+        setDifficultyFilter('All');
+        selectChallenge(langOnly[0]);
+      } else {
+        setSelected(null);
+        setCode('');
+        setTestResults([]);
+        setSubmitResult(null);
+      }
     }
   }
 
   function handleSelectDifficulty(diff: string) {
     setDifficultyFilter(diff);
     const matches = challenges.filter((c) => {
-      const langMatch = languageFilter === 'All' || c.language === languageFilter;
-      const diffMatch = diff === 'All' || c.difficulty === diff.toUpperCase();
+      const langMatch = languageFilter === 'All' || (c.language || '').toLowerCase() === languageFilter.toLowerCase();
+      const diffMatch = diff === 'All' || c.difficulty.toUpperCase() === diff.toUpperCase();
       return langMatch && diffMatch;
     });
     if (matches.length > 0) {
       selectChallenge(matches[0]);
-    } else {
-      setSelected(null);
-      setCode('');
-      setTestResults([]);
-      setSubmitResult(null);
     }
   }
 
@@ -1617,6 +1067,33 @@ export function CodingChallengesSection({ showHeading = true }: CodingChallenges
   const timeComplexity = selected?.timeComplexity || metadata?.timeComplexity;
   const spaceComplexity = selected?.spaceComplexity || metadata?.spaceComplexity;
 
+  // Questions scoped to the currently active language (and difficulty filter if set) for Challenge Studio navigation
+  const studioQuestions = (() => {
+    const activeLang = languageFilter !== 'All' ? languageFilter : (selected?.language || 'JavaScript');
+    const langScoped = challenges.filter((c) => {
+      const langMatch = (c.language || '').toLowerCase() === activeLang.toLowerCase();
+      const diffMatch = difficultyFilter === 'All' || c.difficulty.toUpperCase() === difficultyFilter.toUpperCase();
+      return langMatch && diffMatch;
+    });
+    return langScoped.length > 0 ? langScoped : filteredChallenges;
+  })();
+
+  const currentQuestionIndex = selected
+    ? Math.max(0, studioQuestions.findIndex((c) => c.id === selected.id))
+    : 0;
+
+  function goToPrevQuestion() {
+    if (studioQuestions.length === 0) return;
+    const prevIdx = (currentQuestionIndex - 1 + studioQuestions.length) % studioQuestions.length;
+    selectChallenge(studioQuestions[prevIdx]);
+  }
+
+  function goToNextQuestion() {
+    if (studioQuestions.length === 0) return;
+    const nextIdx = (currentQuestionIndex + 1) % studioQuestions.length;
+    selectChallenge(studioQuestions[nextIdx]);
+  }
+
   return (
     <div>
       {/* ── Header & Filters ── */}
@@ -1739,21 +1216,73 @@ export function CodingChallengesSection({ showHeading = true }: CodingChallenges
           </Card>
         ) : (
           <Card>
-            <CardHeader className="flex-row items-start justify-between space-y-0 pb-3">
-              <div className="min-w-0">
-                <CardTitle className="text-base">{selected.title}</CardTitle>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">{selected.description}</p>
+            <CardHeader className="space-y-3 pb-3">
+              {/* Challenge Studio Question Switcher & Prev/Next Controls */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/[0.08] bg-secondary/40 px-3 py-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-primary shrink-0">
+                    Challenge Studio
+                  </span>
+                  <span className="text-xs text-muted-foreground shrink-0">•</span>
+                  <span className="text-xs font-semibold text-white shrink-0">
+                    Question {currentQuestionIndex + 1} of {studioQuestions.length} ({selected.language || 'JavaScript'})
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={goToPrevQuestion}
+                    disabled={studioQuestions.length <= 1}
+                    className="flex items-center gap-1 rounded-md border border-white/[0.1] bg-black/40 px-2.5 py-1 text-xs font-semibold text-slate-200 transition hover:border-primary/40 hover:text-white disabled:opacity-40"
+                    title="Previous question in this language"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    Prev
+                  </button>
+                  <select
+                    aria-label="Change question in Challenge Studio"
+                    value={selected.id}
+                    onChange={(e) => {
+                      const nextQ = studioQuestions.find((q) => q.id === e.target.value);
+                      if (nextQ) selectChallenge(nextQ);
+                    }}
+                    className="max-w-[210px] truncate rounded-md border border-white/[0.1] bg-[#050a0d] px-2 py-1 text-xs text-white outline-none focus:border-primary"
+                  >
+                    {studioQuestions.map((q, idx) => (
+                      <option key={q.id} value={q.id} className="bg-[#050a0d] text-white">
+                        {idx + 1}. {q.title} ({q.difficulty})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={goToNextQuestion}
+                    disabled={studioQuestions.length <= 1}
+                    className="flex items-center gap-1 rounded-md border border-primary/40 bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary transition hover:bg-primary/25 disabled:opacity-40"
+                    title="Next question in this language"
+                  >
+                    Next Question
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
-              <div className="ml-3 flex shrink-0 flex-col items-end gap-1.5">
-                <span className={`rounded-lg border px-2 py-1 text-xs font-semibold ${langColor}`}>
-                  {selected.language || 'JavaScript'}
-                </span>
-                <span className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold ${difficultyColor[selected.difficulty]}`}>
-                  {selected.difficulty}
-                </span>
-                {canRunLocally && (
-                  <span className="rounded bg-green-400/10 px-1.5 py-0.5 text-[10px] text-green-400">⚡ In-browser</span>
-                )}
+
+              <div className="flex items-start justify-between">
+                <div className="min-w-0">
+                  <CardTitle className="text-base">{selected.title}</CardTitle>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{selected.description}</p>
+                </div>
+                <div className="ml-3 flex shrink-0 flex-col items-end gap-1.5">
+                  <span className={`rounded-lg border px-2 py-1 text-xs font-semibold ${langColor}`}>
+                    {selected.language || 'JavaScript'}
+                  </span>
+                  <span className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold ${difficultyColor[selected.difficulty]}`}>
+                    {selected.difficulty}
+                  </span>
+                  {canRunLocally && (
+                    <span className="rounded bg-green-400/10 px-1.5 py-0.5 text-[10px] text-green-400">⚡ In-browser</span>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -1853,6 +1382,23 @@ export function CodingChallengesSection({ showHeading = true }: CodingChallenges
                   {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   {submitting ? 'Submitting…' : 'Submit'}
                 </Button>
+                <Button
+                  onClick={() => setShowSolution((prev) => !prev)}
+                  variant="outline"
+                  className="gap-1.5 text-xs text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                >
+                  {showSolution ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  {showSolution ? 'Hide Solution' : 'View Reference Solution'}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={goToNextQuestion}
+                  variant="outline"
+                  className="gap-1 text-xs border-primary/30 text-primary hover:bg-primary/10"
+                >
+                  Next Question ({selected.language})
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
                 {submitResult && (
                   <div className={`flex items-center gap-2 text-sm ${submitResult.passed ? 'text-green-300' : 'text-red-300'}`}>
                     {submitResult.passed ? <CheckCircle className="h-4 w-4" /> : <X className="h-4 w-4" />}
@@ -1862,6 +1408,65 @@ export function CodingChallengesSection({ showHeading = true }: CodingChallenges
                   </div>
                 )}
               </div>
+
+              {/* Verified Reference Solution Box */}
+              {showSolution && selected && (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                      <CheckCircle className="h-4 w-4" />
+                      Verified Reference Solution ({selected.language})
+                    </span>
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs bg-emerald-600 hover:bg-emerald-500 text-white gap-1"
+                      onClick={() => {
+                        const verifiedSol =
+                          BUILTIN_CHALLENGES.find((b) => b.id === selected.id)?.solution ||
+                          selected.solution ||
+                          selected.starterCode;
+                        if (verifiedSol) {
+                          setCode(verifiedSol);
+                          setSolutionToast('✓ Loaded reference solution into editor!');
+                          setTimeout(() => setSolutionToast(''), 3000);
+                        }
+                      }}
+                    >
+                      Load into Editor
+                    </Button>
+                  </div>
+                  {solutionToast && (
+                    <p className="text-[11px] font-semibold text-emerald-400">{solutionToast}</p>
+                  )}
+                  <pre className="max-h-48 overflow-x-auto overflow-y-auto rounded bg-black/60 p-3 font-mono text-xs text-emerald-300">
+                    {BUILTIN_CHALLENGES.find((b) => b.id === selected.id)?.solution || selected.solution || '// Reference solution not available'}
+                  </pre>
+                </div>
+              )}
+
+              {/* Stuck? Paste Challenge Studio code directly into AI Workspace Code Context & give insights */}
+              <button
+                type="button"
+                onClick={() => {
+                  const codeToSend = code.trim() || selected.starterCode || '';
+                  const params = new URLSearchParams({
+                    tab: 'codeContext',
+                    challengeTitle: selected.title,
+                    challengeDescription: selected.description,
+                    language: selected.language || 'JavaScript',
+                    code: codeToSend,
+                    autoAsk: 'true',
+                  });
+                  router.push(`/ai-assistant?${params.toString()}`);
+                }}
+                className="flex w-full items-center justify-between rounded-lg border border-primary/25 bg-primary/10 p-2.5 text-xs font-semibold text-primary transition hover:bg-primary/20"
+              >
+                <span className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Stuck? Paste Code to AI Code Context &amp; Get Insights
+                </span>
+                <ExternalLink className="h-3.5 w-3.5" />
+              </button>
 
               {/* Test results */}
               {testResults.length > 0 && (

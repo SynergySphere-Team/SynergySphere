@@ -58,6 +58,7 @@ function isPrivateOrLocalIp(url: string): boolean {
 }
 
 let cachedWorkingBaseUrl: string | null = null;
+let activeProbePromise: Promise<string | null> | null = null;
 
 export function getCandidateApiUrls(): string[] {
   const envUrl = normalizeApiUrl(process.env.EXPO_PUBLIC_API_URL);
@@ -72,15 +73,16 @@ export function getCandidateApiUrls(): string[] {
     if (typeof window !== 'undefined' && window.location?.hostname) {
       const hostname = window.location.hostname;
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        candidates.push(`http://localhost:${targetPort}/api`);
         candidates.push(`http://127.0.0.1:${targetPort}/api`);
+        candidates.push(`http://localhost:${targetPort}/api`);
       } else {
         candidates.push(`http://${hostname}:${targetPort}/api`);
       }
     }
-    candidates.push(`http://localhost:${targetPort}/api`);
     candidates.push(`http://127.0.0.1:${targetPort}/api`);
+    candidates.push(`http://localhost:${targetPort}/api`);
     if (envUrl) candidates.push(envUrl);
+    candidates.push(`http://192.168.0.198:${targetPort}/api`);
     return [...new Set(candidates.filter(Boolean))];
   }
 
@@ -100,14 +102,72 @@ export function getCandidateApiUrls(): string[] {
 
   if (metroUrl) candidates.push(metroUrl);
   if (envUrl) candidates.push(envUrl);
-  // Always include localhost and loopback fallbacks for PC / dev tools
-  candidates.push(`http://localhost:${targetPort}/api`);
+  candidates.push(`http://192.168.0.198:${targetPort}/api`);
+  // Always include loopback fallbacks for PC / simulator / dev tools
   candidates.push(`http://127.0.0.1:${targetPort}/api`);
+  candidates.push(`http://localhost:${targetPort}/api`);
   if (Platform.OS === 'android') {
     candidates.push(`http://10.0.2.2:${targetPort}/api`);
   }
 
   return [...new Set(candidates.filter(Boolean))];
+}
+
+async function probeFastestBaseUrl(candidates: string[]): Promise<string | null> {
+  if (cachedWorkingBaseUrl) return cachedWorkingBaseUrl;
+  if (candidates.length <= 1) return candidates[0] || null;
+  if (activeProbePromise) return activeProbePromise;
+
+  activeProbePromise = new Promise<string | null>((resolve) => {
+    let settled = false;
+    let remaining = candidates.length;
+    const controllers = candidates.map(() => new AbortController());
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        controllers.forEach((c) => c.abort());
+        resolve(null);
+      }
+    }, 2500);
+
+    candidates.forEach((base, idx) => {
+      fetch(`${base}/health`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: controllers[idx].signal,
+      })
+        .then((res) => {
+          if (res.ok && !settled) {
+            settled = true;
+            clearTimeout(timer);
+            cachedWorkingBaseUrl = base;
+            controllers.forEach((c, i) => {
+              if (i !== idx) c.abort();
+            });
+            resolve(base);
+          } else {
+            remaining -= 1;
+            if (remaining <= 0 && !settled) {
+              settled = true;
+              clearTimeout(timer);
+              resolve(null);
+            }
+          }
+        })
+        .catch(() => {
+          remaining -= 1;
+          if (remaining <= 0 && !settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve(null);
+          }
+        });
+    });
+  }).finally(() => {
+    activeProbePromise = null;
+  });
+
+  return activeProbePromise;
 }
 
 import {
@@ -126,7 +186,7 @@ export { getOfflineStatus, subscribeOfflineStatus, getOfflineQueue };
 
 export function getApiUrl(): string {
   const candidates = getCandidateApiUrls();
-  return candidates[0] || 'http://localhost:4000/api';
+  return candidates[0] || 'http://127.0.0.1:4000/api';
 }
 
 export function getWsUrl(): string {
@@ -151,14 +211,21 @@ async function getToken(): Promise<string | null> {
   return SecureStore.getItemAsync(TOKEN_KEY);
 }
 
-const REQUEST_TIMEOUT_MS = 10_000;
-const FALLBACK_TIMEOUT_MS = 3_000;
+const REQUEST_TIMEOUT_MS = 6_000;
+const FALLBACK_TIMEOUT_MS = 3_500;
 let isFlushingQueue = false;
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const candidateUrls = getCandidateApiUrls();
+  let candidateUrls = getCandidateApiUrls();
   if (candidateUrls.length === 0) {
     throw new ApiError('API URL is not configured. Set EXPO_PUBLIC_API_URL in mobile/.env.');
+  }
+
+  if (!cachedWorkingBaseUrl && candidateUrls.length > 1) {
+    const fastest = await probeFastestBaseUrl(candidateUrls);
+    if (fastest) {
+      candidateUrls = [fastest, ...candidateUrls.filter((u) => u !== fastest)];
+    }
   }
 
   const method = (options.method || 'GET').toUpperCase();
@@ -179,7 +246,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   for (let i = 0; i < candidateUrls.length; i++) {
     const baseUrl = candidateUrls[i];
     const fullUrl = `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
-    const timeoutMs = i === 0 ? REQUEST_TIMEOUT_MS : FALLBACK_TIMEOUT_MS;
+    const isAiRoute = path.startsWith('/ai/') || path === '/ai';
+    // Dedicated timeout: 25s for AI routes on verified URL, 15s for verified working URL, 6s for first candidate, 3.5s for fallbacks
+    const timeoutMs = isAiRoute
+      ? (baseUrl === cachedWorkingBaseUrl || i === 0 ? 25_000 : 10_000)
+      : (baseUrl === cachedWorkingBaseUrl ? 15_000 : (i === 0 ? REQUEST_TIMEOUT_MS : FALLBACK_TIMEOUT_MS));
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -196,8 +267,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       break;
     } catch (err: any) {
       clearTimeout(timer);
+      if (cachedWorkingBaseUrl === baseUrl) {
+        cachedWorkingBaseUrl = null;
+      }
       lastError = err;
-      // If there are more candidates, try the next fallback (e.g. localhost/127.0.0.1)
+      // If there are more candidates, try the next fallback (e.g. 127.0.0.1 / localhost / LAN IP)
       if (i < candidateUrls.length - 1) {
         continue;
       }
@@ -287,6 +361,9 @@ export const api = {
 const ONBOARDING_KEY = 'synergysphere.onboarding-completed';
 let webOnboardingCompleted = false;
 
+const USER_KEY = 'synergysphere.auth-user';
+let webUserRaw: string | null = null;
+
 export const authStorage = {
   getToken,
   setToken: (token: string) => {
@@ -299,11 +376,44 @@ export const authStorage = {
   },
   clearToken: () => {
     if (Platform.OS === 'web') {
-      if (typeof localStorage !== 'undefined') localStorage.removeItem(TOKEN_KEY);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+      }
       webToken = null;
+      webUserRaw = null;
       return Promise.resolve();
     }
-    return SecureStore.deleteItemAsync(TOKEN_KEY);
+    return Promise.all([
+      SecureStore.deleteItemAsync(TOKEN_KEY),
+      SecureStore.deleteItemAsync(USER_KEY).catch(() => {}),
+    ]).then(() => {});
+  },
+  getUser: async <T = unknown>(): Promise<T | null> => {
+    try {
+      let raw: string | null = null;
+      if (Platform.OS === 'web') {
+        raw = typeof localStorage !== 'undefined' ? localStorage.getItem(USER_KEY) || webUserRaw : webUserRaw;
+      } else {
+        raw = await SecureStore.getItemAsync(USER_KEY);
+      }
+      return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+      return null;
+    }
+  },
+  setUser: async (user: unknown): Promise<void> => {
+    try {
+      const raw = JSON.stringify(user);
+      if (Platform.OS === 'web') {
+        if (typeof localStorage !== 'undefined') localStorage.setItem(USER_KEY, raw);
+        webUserRaw = raw;
+        return;
+      }
+      await SecureStore.setItemAsync(USER_KEY, raw);
+    } catch {
+      // ignore storage errors
+    }
   },
 };
 

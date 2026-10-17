@@ -6,11 +6,11 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "clean:frontend": "node scripts/clean-next.js",
-    "dev:frontend": "npm run clean:frontend && npm run dev --workspace=frontend",
+    "dev:frontend": "npm run dev --workspace=frontend",
     "dev:backend": "npm run dev --workspace=backend",
     "dev:mobile": "concurrently --raw \"npm run dev:backend\" \"npm run start --workspace=mobile\"",
     "db:up": "docker compose up -d",
-    "build": "npm run clean:frontend && npm run build --workspace=frontend && npm run build --workspace=backend",
+    "build": "npm run build --workspace=frontend && npm run build --workspace=backend",
     "db:migrate": "npm run db:migrate --workspace=backend",
     "db:seed": "npm run db:seed --workspace=backend",
     "record:demo": "node scripts/record-demo.mjs",

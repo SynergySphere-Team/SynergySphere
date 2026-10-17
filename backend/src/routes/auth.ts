@@ -60,12 +60,8 @@ function setSessionCookie(res: Response, token: string) {
   res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions());
 }
 
-function isMobileClient(req: { get(name: string): string | undefined }): boolean {
-  return req.get('X-SynergySphere-Client') === 'mobile';
-}
-
-function sessionResponse<T extends SafeUser>(req: { get(name: string): string | undefined }, user: T, token: string) {
-  return isMobileClient(req) ? { user, token } : { user };
+function sessionResponse<T extends SafeUser>(_req: { get(name: string): string | undefined }, user: T, token: string) {
+  return { user, token };
 }
 
 router.post('/register', validateBody(registerSchema), async (req, res) => {

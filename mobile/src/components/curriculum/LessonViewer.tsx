@@ -410,6 +410,40 @@ export function LessonViewer({
               <Text style={[styles.practiceSuccess, { color: isLight ? '#0284c7' : colors.primary }]}>Answer: {lesson.content.quiz.answer}</Text>
             </View>
           ) : null}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              const starterSnippet =
+                examples[0]?.code ||
+                `// ${lesson.title}\n// ${lesson.content.challenge?.prompt || lesson.content.exercise?.prompt || ''}\n`;
+              router.push({
+                pathname: '/(tabs)/ai-assistant',
+                params: {
+                  tab: 'codeContext',
+                  lesson: lesson.id,
+                  challengeTitle: lesson.title,
+                  challengeDescription:
+                    lesson.content.challenge?.prompt ||
+                    lesson.content.exercise?.prompt ||
+                    lesson.overview,
+                  language: examples[0]?.language || lesson.subjectName,
+                  code: starterSnippet,
+                  autoAsk: 'true',
+                  ts: String(Date.now()),
+                },
+              });
+            }}
+            style={({ pressed }) => [
+              styles.askAiBtn,
+              { borderColor: colors.primary, marginTop: 10 },
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <Ionicons name="sparkles-outline" size={15} color={colors.primary} />
+            <Text style={[styles.askAiBtnText, { color: colors.primary }]}>
+              Stuck? Paste Code to AI Code Context &amp; Get Insights
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 

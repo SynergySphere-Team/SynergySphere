@@ -11,6 +11,7 @@ try {
 } catch {
   // ignore
 }
+import http from 'node:http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -37,7 +38,7 @@ import { initRealtime } from './services/realtime.js';
 
 export const app = express();
 const PORT = Number(process.env.PORT) || 4000;
-const HOST = process.env.HOST || '0.0.0.0';
+const EXPLICIT_HOST = process.env.HOST?.trim();
 
 // Trust one proxy hop (ngrok / load-balancer) so that express-rate-limit
 // can read the real client IP from X-Forwarded-For without throwing a
@@ -121,7 +122,7 @@ app.use('/api/', limiter);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: process.env.NODE_ENV === 'production' ? 30 : 1000,
   message: { error: 'Too many auth attempts, please try again later.' },
 });
 app.use('/api/auth/login', authLimiter);
@@ -197,11 +198,31 @@ async function checkDatabaseConnection(): Promise<boolean> {
   }
 }
 
-const server = app.listen(PORT, HOST, () => {
-  console.log(`SynergySphere API running on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT} (bound to ${HOST}:${PORT})`);
-  initRealtime(server);
-  void checkDatabaseConnection();
-});
+const server = http.createServer(app);
+server.keepAliveTimeout = 65_000;
+server.headersTimeout = 66_000;
+initRealtime(server);
+
+let bindRetries = 0;
+let usingIpv4Fallback = Boolean(EXPLICIT_HOST);
+
+function startListening() {
+  if (EXPLICIT_HOST || usingIpv4Fallback) {
+    const hostToBind = EXPLICIT_HOST || '0.0.0.0';
+    server.listen(PORT, hostToBind, () => {
+      console.log(`SynergySphere API running on http://localhost:${PORT} (bound to ${hostToBind}:${PORT})`);
+      void checkDatabaseConnection();
+    });
+  } else {
+    // Dual-stack listener accepts both IPv6 (::1 / localhost) and IPv4 (127.0.0.1 & LAN 192.168.x.x)
+    server.listen({ port: PORT, host: '::', ipv6Only: false }, () => {
+      console.log(`SynergySphere API running on http://localhost:${PORT} (dual-stack IPv4/IPv6 on port ${PORT})`);
+      void checkDatabaseConnection();
+    });
+  }
+}
+
+startListening();
 
 // Periodically check DB connection if currently disconnected so it auto-recovers when DB starts
 setInterval(() => {
@@ -232,9 +253,26 @@ if (process.env.GITHUB_ACTIVITY_POLLING !== 'false') {
 }
 
 server.on('error', (error: NodeJS.ErrnoException) => {
+  if (!usingIpv4Fallback && (error.code === 'EAFNOSUPPORT' || error.code === 'EADDRNOTAVAIL' || error.code === 'EINVAL')) {
+    usingIpv4Fallback = true;
+    startListening();
+    return;
+  }
+
   if (error.code === 'EADDRINUSE') {
+    if (bindRetries < 5) {
+      bindRetries += 1;
+      console.warn(`Port ${PORT} busy, retrying bind (${bindRetries}/5) in 1.5s...`);
+      setTimeout(() => {
+        try {
+          server.close();
+        } catch {}
+        startListening();
+      }, 1500);
+      return;
+    }
     console.error(
-      `Port ${PORT} is already in use. Stop the existing service on that port, or set PORT to another value in backend/.env.`,
+      `Port ${PORT} is already in use. Another SynergySphere backend instance may already be serving requests on port ${PORT}.`,
     );
     return;
   }

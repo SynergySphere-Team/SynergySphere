@@ -11,7 +11,6 @@ import {
   UIManager,
   View,
   Image,
-  Modal,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
@@ -22,6 +21,7 @@ import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import { MarkdownView } from '@/components/MarkdownView';
+import { analyzeCodeOffline } from '@/utils/offlineCodeAnalyzer';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -142,14 +142,35 @@ const starterPrompts = [
 export default function AIAssistantScreen() {
   const { colors, theme } = useTheme();
   const { fontSize, largerText } = useAccessibility();
-  const { lesson: lessonParamRaw } = useLocalSearchParams<{ lesson?: string | string[] }>();
-  const lessonParam = Array.isArray(lessonParamRaw) ? lessonParamRaw[0] : lessonParamRaw;
+  const searchParams = useLocalSearchParams<{
+    lesson?: string | string[];
+    challengeTitle?: string | string[];
+    challengeDescription?: string | string[];
+    language?: string | string[];
+    code?: string | string[];
+    prompt?: string | string[];
+    autoAsk?: string | string[];
+    tab?: string | string[];
+    ts?: string | string[];
+  }>();
+  const lessonParam = Array.isArray(searchParams.lesson) ? searchParams.lesson[0] : searchParams.lesson;
+  const challengeTitle = Array.isArray(searchParams.challengeTitle) ? searchParams.challengeTitle[0] : searchParams.challengeTitle;
+  const challengeDescription = Array.isArray(searchParams.challengeDescription) ? searchParams.challengeDescription[0] : searchParams.challengeDescription;
+  const challengeLanguage = Array.isArray(searchParams.language) ? searchParams.language[0] : searchParams.language;
+  const challengeCode = Array.isArray(searchParams.code) ? searchParams.code[0] : searchParams.code;
+  const promptParam = Array.isArray(searchParams.prompt) ? searchParams.prompt[0] : searchParams.prompt;
+  const autoAsk = Array.isArray(searchParams.autoAsk) ? searchParams.autoAsk[0] : searchParams.autoAsk;
+  const tabParam = Array.isArray(searchParams.tab) ? searchParams.tab[0] : searchParams.tab;
+  const tsParam = Array.isArray(searchParams.ts) ? searchParams.ts[0] : searchParams.ts;
+  const lastAutoAskKeyRef = useRef<string>('');
 
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Tab State: 'conversation' vs 'codeContext'
-  const [activeTab, setActiveTab] = useState<'conversation' | 'codeContext'>('conversation');
-  const tabAnim = useRef(new Animated.Value(0)).current;
+  const [activeTab, setActiveTab] = useState<'conversation' | 'codeContext'>(
+    tabParam === 'codeContext' || autoAsk === 'true' ? 'codeContext' : 'conversation'
+  );
+  const tabAnim = useRef(new Animated.Value(tabParam === 'codeContext' || autoAsk === 'true' ? 1 : 0)).current;
 
   // Expandable & Collapsible Chat History state
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
@@ -161,6 +182,7 @@ export default function AIAssistantScreen() {
     let cancelled = false;
     (async () => {
       try {
+        await SecureStore.deleteItemAsync('synergysphere_gemini_api_key').catch(() => {});
         const stored = await SecureStore.getItemAsync(QUERY_HISTORY_STORAGE_KEY);
         if (!cancelled && stored) {
           const parsed = JSON.parse(stored);
@@ -184,13 +206,14 @@ export default function AIAssistantScreen() {
     {
       role: 'assistant',
       content:
-        "👋 Hi! I'm your SynergySphere AI Workspace assistant, grounded in the Learning Hub and your study packs. Ask about the lesson you're studying, paste code, or use quick actions!",
+        "👋 Hi! I'm your SynergySphere AI Workspace assistant, grounded in the Learning Hub and your study packs. Ask about the lesson you're studying, or switch to Code Context to analyze and debug code!",
     },
   ]);
   const [threads, setThreads] = useState<Array<{ id: string; title: string; updatedAt: string }>>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [context, setContext] = useState('');
+  const [codeQuestion, setCodeQuestion] = useState('');
   const [contextEditedByUser, setContextEditedByUser] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -205,28 +228,16 @@ export default function AIAssistantScreen() {
   } | null>(null);
   const [codeActionLoading, setCodeActionLoading] = useState<string | null>(null);
 
-  // Gemini API Key management
-  const [geminiKeyModalVisible, setGeminiKeyModalVisible] = useState(false);
-  const [geminiKeyInput, setGeminiKeyInput] = useState('');
-  const [geminiKeyTesting, setGeminiKeyTesting] = useState(false);
-  const [geminiKeyFeedback, setGeminiKeyFeedback] = useState<{ valid: boolean; message: string } | null>(null);
-  const [hasLinkedKey, setHasLinkedKey] = useState(false);
-  const [hasServerKey, setHasServerKey] = useState(false);
+  // Backend AI key status
+  const [hasServerKey, setHasServerKey] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const stored = await SecureStore.getItemAsync('synergysphere_gemini_api_key');
-        if (!cancelled && stored) {
-          setHasLinkedKey(true);
-          setGeminiKeyInput(stored);
-        }
-      } catch {}
-      try {
         const status = await api.get<{ hasEnvKey: boolean }>('/ai/key-status');
-        if (!cancelled && status?.hasEnvKey) {
-          setHasServerKey(true);
+        if (!cancelled && status) {
+          setHasServerKey(Boolean(status.hasEnvKey));
         }
       } catch {}
     })();
@@ -250,50 +261,6 @@ export default function AIAssistantScreen() {
       setToastMessage(null);
     }, 2800);
   }, []);
-
-  const handleTestAndSaveKey = useCallback(async () => {
-    const key = geminiKeyInput.trim();
-    if (!key) {
-      setGeminiKeyFeedback({ valid: false, message: 'Please enter a Gemini API key.' });
-      return;
-    }
-    setGeminiKeyTesting(true);
-    setGeminiKeyFeedback(null);
-    try {
-      const res = await api.post<{ valid: boolean; message?: string }>('/ai/test-key', { apiKey: key });
-      if (res.valid) {
-        await SecureStore.setItemAsync('synergysphere_gemini_api_key', key);
-        setHasLinkedKey(true);
-        setGeminiKeyFeedback({ valid: true, message: '✓ Gemini API key is valid and linked!' });
-        showToast('Gemini API key linked successfully!');
-        setTimeout(() => {
-          setGeminiKeyModalVisible(false);
-          setGeminiKeyFeedback(null);
-        }, 1200);
-      } else {
-        setGeminiKeyFeedback({ valid: false, message: res.message || 'Key rejected by Google Gemini.' });
-      }
-    } catch (err: any) {
-      setGeminiKeyFeedback({
-        valid: false,
-        message: err?.response?.data?.message || err?.message || 'Could not validate key. Please check your network.',
-      });
-    } finally {
-      setGeminiKeyTesting(false);
-    }
-  }, [geminiKeyInput, showToast]);
-
-  const handleRemoveKey = useCallback(async () => {
-    try {
-      await SecureStore.deleteItemAsync('synergysphere_gemini_api_key');
-      setHasLinkedKey(false);
-      setGeminiKeyInput('');
-      setGeminiKeyFeedback(null);
-      showToast('Gemini API key removed.');
-    } catch {
-      showToast('Failed to remove key.');
-    }
-  }, [showToast]);
 
   // Restore draft code if not opened from a lesson
   useEffect(() => {
@@ -439,12 +406,7 @@ export default function AIAssistantScreen() {
     });
 
     try {
-      const contextToSend =
-        forcedContext?.trim() || (contextEditedByUser && context.trim() ? context : undefined);
-      let storedKey = '';
-      try {
-        storedKey = (await SecureStore.getItemAsync('synergysphere_gemini_api_key')) || '';
-      } catch {}
+      const contextToSend = forcedContext?.trim() || undefined;
 
       const response = await api.post<{ response: string; grounding?: Grounding }>('/ai/chat', {
         message: question,
@@ -452,7 +414,6 @@ export default function AIAssistantScreen() {
         ...(contextToSend ? { context: contextToSend } : {}),
         ...(lesson ? { lessonId: lesson.id } : {}),
         history: historyFromMessages(baseMessages).slice(-20),
-        ...(storedKey ? { apiKey: storedKey } : {}),
       });
       if (activeThreadId) {
         setThreads((prev) =>
@@ -482,8 +443,38 @@ export default function AIAssistantScreen() {
         return updated;
       });
     } catch {
-      // Local fallback so user can still continue learning offline
-      const reply = `Analysis for: "${question}"\n\nCode Context Review:\n- Checked against standard best practices.\n- Time Complexity: ${liveAnalysis ? liveAnalysis[0]?.items[0] : 'O(1)'}\n- Space Complexity: ${liveAnalysis ? liveAnalysis[0]?.items[1] : 'O(1)'}\n\nTip: Test edge cases such as null/empty inputs and unexpected input types.`;
+      const lower = question.toLowerCase();
+      let reply =
+        `### Answer: ${question.slice(0, 80)}\n\n` +
+        `1. **Core Concept**: Define the expected inputs, transformation rules, and output contract.\n` +
+        `2. **Optimal Approach**: Use $O(1)$ lookup structures (\`Map\`, \`Set\`, \`dict\`) instead of $O(n^2)$ nested loops when searching or deduplicating.\n` +
+        `3. **Edge Cases**: Handle empty inputs (\`[]\`, \`""\`), single-element arrays, and boundary values (\`0\`, negative numbers).\n\n` +
+        `\`\`\`javascript\nfunction solve(items) {\n  if (!Array.isArray(items) || items.length === 0) return [];\n  return [...new Set(items)];\n}\n\`\`\``;
+
+      if (/\b(loop|for|while|iterate)\b/.test(lower)) {
+        reply =
+          `### Loops & Iteration Explained\n\n` +
+          `- **\`for\` loop**: Best when you need the index or fixed iteration count.\n` +
+          `- **\`for...of\` / \`for x in list\`**: Iterates directly over values.\n` +
+          `- **\`while\` loop**: Repeats while a condition remains \`true\`.\n` +
+          `- **\`.map()\` / \`.filter()\` / \`.reduce()\`**: Functional array transformations.\n\n` +
+          `\`\`\`javascript\nconst nums = [1, 2, 3];\nconst doubled = nums.map((n) => n * 2);\n\`\`\``;
+      } else if (/\b(async|await|promise|fetch)\b/.test(lower)) {
+        reply =
+          `### Asynchronous Programming (\`Promise\` & \`async/await\`)\n\n` +
+          `- **\`Promise\`**: Represents a future result (\`pending\` → \`fulfilled\` / \`rejected\`).\n` +
+          `- **\`async / await\`**: Pauses execution inside an \`async\` function until the Promise settles.\n` +
+          `- Always wrap \`await\` calls in \`try / catch\` blocks.\n\n` +
+          `\`\`\`javascript\nasync function fetchData(url) {\n  try {\n    const res = await fetch(url);\n    return await res.json();\n  } catch (err) {\n    return null;\n  }\n}\n\`\`\``;
+      } else if (/\b(sql|join|select|where|group by)\b/.test(lower)) {
+        reply =
+          `### SQL Queries & Joins\n\n` +
+          `- **\`INNER JOIN\`**: Matching rows in both tables.\n` +
+          `- **\`LEFT JOIN\`**: All left-table rows plus matching right-table rows.\n` +
+          `- **\`WHERE\` vs \`HAVING\`**: \`WHERE\` filters rows before \`GROUP BY\`; \`HAVING\` filters groups after \`GROUP BY\`.\n\n` +
+          `\`\`\`sql\nSELECT u.name, COUNT(o.id) AS total\nFROM users u\nLEFT JOIN orders o ON o.user_id = u.id\nGROUP BY u.id, u.name;\n\`\`\``;
+      }
+
       setMessages((current) => [
         ...current,
         {
@@ -507,6 +498,94 @@ export default function AIAssistantScreen() {
     }
   }
 
+  async function runCodeContextReview(
+    codeToAnalyze: string,
+    title?: string,
+    desc?: string,
+    lang?: string,
+    customQ?: string,
+  ) {
+    const cleanCode = codeToAnalyze.trim();
+    if (!cleanCode) {
+      showToast('Please paste code in the Code Context editor first!');
+      return;
+    }
+
+    const actionType = customQ ? 'custom' : 'review';
+    const actionLabel = customQ
+      ? `Answer: ${customQ.slice(0, 42)}`
+      : title
+        ? `Challenge Review: ${title}`
+        : 'Complete Code Review & Solution';
+
+    setCodeActionLoading(actionLabel);
+    const explainOffline = analyzeCodeOffline('explain', cleanCode, lang).output;
+    const debugOffline = analyzeCodeOffline('debug', cleanCode, lang).output;
+    const offlineFallbackOutput = `### SynergySphere Code Review (${lang || 'Local Engine'})\n\n${explainOffline}\n\n---\n\n### Bug Discovery & Recommended Solution\n\n${debugOffline}`;
+
+    try {
+      const res = await api.post<{
+        ok: boolean;
+        action: string;
+        output: string;
+        fromAi: boolean;
+        provider?: string;
+      }>('/ai/code-action', {
+        action: actionType,
+        code: cleanCode,
+        language: lang,
+        customPrompt: customQ,
+        challengeTitle: title,
+        challengeDescription: desc,
+        lessonId: lesson?.id,
+      });
+
+      setCodeActionResult({
+        action: actionType,
+        title: actionLabel,
+        output: res.output || offlineFallbackOutput,
+        fromAi: res.fromAi,
+      });
+      showToast('Answer ready under Code Context!');
+    } catch {
+      setCodeActionResult({
+        action: actionType,
+        title: actionLabel,
+        output: offlineFallbackOutput,
+        fromAi: false,
+      });
+      showToast('Code analysis ready under Code Context!');
+    } finally {
+      setCodeActionLoading(null);
+    }
+  }
+
+  // Automatically trigger code review in Code Context tab when arriving from Coding Challenge "Ask SynergySphere AI"
+  useEffect(() => {
+    const autoAskKey = `${challengeTitle || ''}::${challengeCode || ''}::${promptParam || ''}::${tsParam || ''}`;
+    if ((autoAsk === 'true' || tabParam === 'codeContext') && lastAutoAskKeyRef.current !== autoAskKey) {
+      if (challengeTitle || challengeCode) {
+        lastAutoAskKeyRef.current = autoAskKey;
+        const codeToUse =
+          challengeCode ||
+          `// ${challengeTitle || 'Coding Challenge'}\n// ${challengeDescription || ''}\n`;
+        setContext(codeToUse);
+        setContextEditedByUser(true);
+        setActiveTab('codeContext');
+        Animated.spring(tabAnim, {
+          toValue: 1,
+          useNativeDriver: false,
+          bounciness: 4,
+          speed: 14,
+        }).start();
+        void runCodeContextReview(codeToUse, challengeTitle, challengeDescription, challengeLanguage);
+      } else if (promptParam) {
+        lastAutoAskKeyRef.current = autoAskKey;
+        void send(promptParam);
+      }
+    }
+  }, [autoAsk, tabParam, tsParam, challengeTitle, challengeDescription, challengeLanguage, challengeCode, promptParam]);
+
   async function handleQuickAction(action: 'Explain' | 'Debug' | 'Optimize' | 'Generate Tests') {
     if (!context.trim()) {
       showToast('Please paste code in the Code Context editor first!');
@@ -524,12 +603,10 @@ export default function AIAssistantScreen() {
     // Keep user in Code Context tab – do NOT switch to conversation!
     setCodeActionLoading(action);
 
-    try {
-      let storedKey = '';
-      try {
-        storedKey = (await SecureStore.getItemAsync('synergysphere_gemini_api_key')) || '';
-      } catch {}
+    // Compute instant comprehensive offline analysis
+    const offlineResult = analyzeCodeOffline(actionKey, context, challengeLanguage);
 
+    try {
       const res = await api.post<{
         ok: boolean;
         action: string;
@@ -539,35 +616,45 @@ export default function AIAssistantScreen() {
       }>('/ai/code-action', {
         action: actionKey,
         code: context,
-        apiKey: storedKey || undefined,
+        language: challengeLanguage,
         lessonId: lesson?.id,
       });
 
       setCodeActionResult({
         action: actionKey,
         title: action,
-        output: res.output,
+        output: res.output || offlineResult.output,
         fromAi: res.fromAi,
       });
-      showToast(`${action} completed! Answer posted below.`);
+      showToast(`${action} completed!`);
     } catch {
-      // Local fallback
-      const fallbackMap: Record<string, string> = {
-        Explain: `### Code Explanation\n\n• **Lines Analyzed:** ${context.split('\n').length}\n• **Flow:** The code implements the core computational logic.\n\n*⚡ To get deep live AI explanations, connect a Gemini API key.*`,
-        Debug: `### Bug Inspection\n\n• Check for off-by-one errors in iterations\n• Verify null/undefined checks\n• Ensure variables are properly scoped\n\n*⚡ To get deep live AI debugging, connect a Gemini API key.*`,
-        Optimize: `### Optimization Suggestions\n\n• Reduce nested iteration loops (aim for O(N))\n• Use Map or Set for fast key/set lookups\n• Cache repeated calculations outside loops\n\n*⚡ To get deep live AI optimization, connect a Gemini API key.*`,
-        'Generate Tests': `### Generated Test Cases\n\n• Happy path: standard valid inputs\n• Boundary cases: empty strings, null, negative numbers\n• Stress test: large scale arrays\n\n*⚡ To get full auto-generated tests, connect a Gemini API key.*`,
-      };
+      // 100% resilient offline analysis supporting all 11 languages
       setCodeActionResult({
         action: actionKey,
         title: action,
-        output: fallbackMap[action] || 'Analysis completed.',
+        output: offlineResult.output,
         fromAi: false,
       });
-      showToast(`${action} output generated below.`);
+      showToast(`${action} analysis ready!`);
     } finally {
       setCodeActionLoading(null);
     }
+  }
+
+  async function handleAskAboutCode() {
+    if (!context.trim()) {
+      showToast('Please paste code in the Code Context editor first!');
+      return;
+    }
+    const q = codeQuestion.trim();
+    setCodeQuestion('');
+    await runCodeContextReview(
+      context,
+      challengeTitle,
+      challengeDescription,
+      challengeLanguage,
+      q || 'Explain this code, find any bugs, and show the corrected solution.',
+    );
   }
 
   // Load threads on mount
@@ -851,23 +938,23 @@ export default function AIAssistantScreen() {
           paddingHorizontal: 12,
           borderRadius: 10,
           backgroundColor:
-            hasLinkedKey || hasServerKey
+            hasServerKey
               ? isLight
                 ? 'rgba(5, 150, 105, 0.08)'
                 : 'rgba(5, 150, 105, 0.18)'
               : isLight
-              ? 'rgba(217, 119, 6, 0.08)'
-              : 'rgba(217, 119, 6, 0.18)',
+              ? 'rgba(16, 185, 129, 0.05)'
+              : 'rgba(16, 185, 129, 0.10)',
           borderWidth: 1,
-          borderColor: hasLinkedKey || hasServerKey ? '#10b981' : '#f59e0b',
+          borderColor: hasServerKey ? '#10b981' : colors.border,
           marginBottom: 10,
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
           <Ionicons
-            name={hasLinkedKey || hasServerKey ? 'sparkles' : 'key-outline'}
+            name={hasServerKey ? 'sparkles' : 'code-working-outline'}
             size={14}
-            color={hasLinkedKey || hasServerKey ? '#10b981' : '#d97706'}
+            color={hasServerKey ? '#10b981' : primaryAccent}
           />
           <Text
             style={{
@@ -877,39 +964,27 @@ export default function AIAssistantScreen() {
               flex: 1,
             }}
           >
-            {hasLinkedKey
-              ? 'Gemini AI Active (Custom Key)'
-              : hasServerKey
-              ? 'Gemini AI Active (Server)'
-              : 'Offline Mode • Link Gemini Key'}
+            {hasServerKey ? 'AI Engine: Cloud Active (Backend)' : 'AI Engine: Local & Offline Ready'}
           </Text>
         </View>
-        <Pressable
-          onPress={() => {
-            setGeminiKeyFeedback(null);
-            setGeminiKeyModalVisible(true);
+        <View
+          style={{
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: 6,
+            backgroundColor: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)',
           }}
-          hitSlop={8}
-          style={({ pressed }) => [
-            {
-              paddingHorizontal: 10,
-              paddingVertical: 5,
-              borderRadius: 6,
-              backgroundColor: hasLinkedKey || hasServerKey ? primaryAccent : '#d97706',
-            },
-            pressed && styles.pressed,
-          ]}
         >
           <Text
             style={{
-              fontSize: fontSize(11),
-              fontWeight: 'bold',
-              color: isLight ? '#FFFFFF' : '#0B1510',
+              fontSize: fontSize(10.5),
+              fontWeight: '600',
+              color: colors.muted,
             }}
           >
-            {hasLinkedKey ? 'Manage' : 'Link Key'}
+            {hasServerKey ? 'Cloud' : '11 Languages'}
           </Text>
-        </Pressable>
+        </View>
       </View>
 
       {/* ── Segmented Tab Bar with Smooth Animated Sliding Indicator ── */}
@@ -1470,49 +1545,6 @@ export default function AIAssistantScreen() {
             </Card>
           )}
 
-          {/* ── Active Code Attached Pill in Conversation ── */}
-          {context.trim().length > 0 && (
-            <Pressable
-              onPress={() => handleSwitchTab('codeContext')}
-              style={({ pressed }) => [
-                styles.attachedCodeBanner,
-                {
-                  backgroundColor: isLight
-                    ? '#E8F5E9'
-                    : 'rgba(145, 219, 94, 0.1)',
-                  borderColor: isLight
-                    ? '#C8E6C9'
-                    : 'rgba(145, 219, 94, 0.28)',
-                },
-                pressed && styles.pressed,
-              ]}
-            >
-              <View style={styles.attachedCodeLeft}>
-                <Ionicons name="code-slash" size={16} color={primaryAccent} />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[
-                      styles.attachedCodeTitle,
-                      { color: primaryAccent, fontSize: fontSize(13) },
-                    ]}
-                  >
-                    Code Context Attached
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.attachedCodeSub,
-                      { color: colors.muted, fontSize: fontSize(11) },
-                    ]}
-                  >
-                    {context.trim().split('\n').length} lines loaded • Tap to inspect or edit
-                  </Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={primaryAccent} />
-            </Pressable>
-          )}
-
           {/* ── Suggested Prompts Chips ── */}
           <Text style={[styles.section, { color: colors.text }]}>Suggested Topics</Text>
           <ScrollView
@@ -1648,42 +1680,34 @@ export default function AIAssistantScreen() {
               Code Context Editor
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Pressable
-                onPress={() => {
-                  setGeminiKeyFeedback(null);
-                  setGeminiKeyModalVisible(true);
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: hasServerKey ? '#10b981' : colors.border,
+                  borderWidth: 1,
                 }}
-                hitSlop={6}
-                style={({ pressed }) => [
-                  {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 4,
-                    paddingHorizontal: 8,
-                    paddingVertical: 4,
-                    borderRadius: 6,
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: hasLinkedKey || hasServerKey ? '#10b981' : '#d97706',
-                    borderWidth: 1,
-                  },
-                  pressed && styles.pressed,
-                ]}
               >
                 <Ionicons
-                  name={hasLinkedKey || hasServerKey ? 'sparkles' : 'key-outline'}
+                  name={hasServerKey ? 'sparkles' : 'code-slash'}
                   size={12}
-                  color={hasLinkedKey || hasServerKey ? '#10b981' : '#d97706'}
+                  color={hasServerKey ? '#10b981' : primaryAccent}
                 />
                 <Text
                   style={{
                     fontSize: 11,
                     fontWeight: '600',
-                    color: hasLinkedKey || hasServerKey ? '#10b981' : '#d97706',
+                    color: hasServerKey ? '#10b981' : colors.text,
                   }}
                 >
-                  {hasLinkedKey ? 'Gemini Key' : hasServerKey ? 'Gemini Live' : 'Link Key'}
+                  {hasServerKey ? 'Cloud AI' : 'Offline Ready'}
                 </Text>
-              </Pressable>
+              </View>
               {context.trim().length > 0 && (
                 <Pressable
                   onPress={() => {
@@ -1747,7 +1771,7 @@ export default function AIAssistantScreen() {
                 { color: colors.muted, fontSize: fontSize(11) },
               ]}
             >
-              Run Instant Actions (answers appear below in this editor):
+              Run Instant Actions (all answers appear directly under Code Context below):
             </Text>
             <View style={styles.quickActionsGrid}>
               <Pressable
@@ -1814,6 +1838,83 @@ export default function AIAssistantScreen() {
                 <Ionicons name="flask" size={14} color={primaryAccent} />
                 <Text style={[styles.quickActionText, { color: colors.text }]}>Tests</Text>
               </Pressable>
+              <Pressable
+                onPress={() => {
+                  const trimmed = context.trim();
+                  if (!trimmed) {
+                    showToast('Please paste code into the editor first.');
+                    return;
+                  }
+                  void runCodeContextReview(
+                    trimmed,
+                    challengeTitle,
+                    challengeDescription,
+                    challengeLanguage
+                  );
+                }}
+                disabled={codeActionLoading !== null}
+                style={({ pressed }) => [
+                  styles.quickActionBtn,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: primaryAccent,
+                  },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons name="checkmark-done-circle" size={14} color={primaryAccent} />
+                <Text style={[styles.quickActionText, { color: primaryAccent }]}>
+                  Full Review & Solution
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Inline Custom Question about Code Context */}
+            <View
+              style={{
+                marginTop: 14,
+                paddingTop: 12,
+                borderTopWidth: 1,
+                borderTopColor: colors.border,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: fontSize(12),
+                  fontWeight: '700',
+                  color: colors.text,
+                  marginBottom: 8,
+                }}
+              >
+                Ask a Question about this Code (Answered right here under Code Context):
+              </Text>
+              <TextInput
+                value={codeQuestion}
+                onChangeText={setCodeQuestion}
+                keyboardAppearance={theme === 'dark' ? 'dark' : 'light'}
+                placeholder="e.g., Why does my loop fail on edge cases? How do I fix line 4?"
+                placeholderTextColor={colors.muted}
+                multiline
+                style={[
+                  styles.inputBox,
+                  {
+                    minHeight: 68,
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                    color: colors.text,
+                    marginBottom: 8,
+                  },
+                ]}
+              />
+              <Button
+                title={
+                  codeActionLoading
+                    ? `Analyzing (${codeActionLoading})…`
+                    : 'Get Answer in Code Context'
+                }
+                onPress={() => handleAskAboutCode()}
+                disabled={codeActionLoading !== null}
+              />
             </View>
 
             {/* Loading Indicator for Code Action */}
@@ -1829,319 +1930,96 @@ export default function AIAssistantScreen() {
                 }}
               >
                 <Text style={{ fontSize: fontSize(12), fontWeight: 'bold', color: primaryAccent }}>
-                  ⚡ Gemini AI is analyzing your code ({codeActionLoading})…
+                  ⚡ SynergySphere AI is analyzing your code ({codeActionLoading})…
                 </Text>
                 <Text style={{ fontSize: fontSize(11), color: colors.muted, marginTop: 4 }}>
-                  Answers are generated and displayed directly on this page.
+                  Answers are generated and displayed directly under Code Context.
                 </Text>
               </View>
             )}
 
             {/* AI Code Action Output Section (Rendered directly in Code Context) */}
             {codeActionResult && !codeActionLoading && (
-              <View
-                style={{
-                  marginTop: 14,
-                  padding: 14,
-                  borderRadius: 10,
-                  backgroundColor: isLight ? '#f8fafc' : '#070e13',
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-              >
+              <View style={{ marginTop: 14 }}>
+                <Text style={[styles.section, { color: colors.text, marginTop: 0, marginBottom: 8 }]}>
+                  Live Code Analysis
+                </Text>
                 <View
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: 10,
-                    paddingBottom: 8,
-                    borderBottomWidth: 1,
-                    borderBottomColor: colors.border,
+                    padding: 14,
+                    borderRadius: 10,
+                    backgroundColor: isLight ? '#f8fafc' : '#070e13',
+                    borderWidth: 1,
+                    borderColor: colors.border,
                   }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <Ionicons name="sparkles" size={14} color={primaryAccent} />
-                    <Text style={{ fontSize: fontSize(12), fontWeight: 'bold', color: colors.text }}>
-                      {codeActionResult.title}
-                    </Text>
-                    <View
-                      style={{
-                        paddingHorizontal: 6,
-                        paddingVertical: 2,
-                        borderRadius: 4,
-                        backgroundColor: codeActionResult.fromAi ? '#059669' : '#d97706',
-                      }}
-                    >
-                      <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#fff' }}>
-                        {codeActionResult.fromAi ? '⚡ Gemini AI' : 'Offline Static'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Pressable onPress={() => setCodeActionResult(null)} hitSlop={8}>
-                    <Ionicons name="close" size={16} color={colors.muted} />
-                  </Pressable>
-                </View>
-                {!codeActionResult.fromAi && (
-                  <Pressable
-                    onPress={() => {
-                      setGeminiKeyFeedback(null);
-                      setGeminiKeyModalVisible(true);
-                    }}
+                  <View
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
-                      gap: 8,
-                      marginBottom: 12,
-                      padding: 10,
-                      borderRadius: 8,
-                      backgroundColor: isLight ? '#fef3c7' : 'rgba(217, 119, 6, 0.15)',
-                      borderColor: '#f59e0b',
-                      borderWidth: 1,
+                      justifyContent: 'space-between',
+                      marginBottom: 10,
+                      paddingBottom: 8,
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border,
                     }}
                   >
-                    <Ionicons name="alert-circle" size={16} color="#d97706" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: fontSize(11.5), fontWeight: '600', color: isLight ? '#92400e' : '#fef3c7' }}>
-                        Running in offline static mode
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Ionicons name="sparkles" size={14} color={primaryAccent} />
+                      <Text style={{ fontSize: fontSize(12), fontWeight: 'bold', color: colors.text }}>
+                        {codeActionResult.title}
                       </Text>
-                      <Text style={{ fontSize: fontSize(10.5), color: isLight ? '#b45309' : '#fde68a' }}>
-                        Tap here to link your Google Gemini API key for deep live model reasoning.
-                      </Text>
+                      <View
+                        style={{
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                          backgroundColor: codeActionResult.fromAi ? '#059669' : '#d97706',
+                        }}
+                      >
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#fff' }}>
+                          {codeActionResult.fromAi ? '⚡ Cloud AI' : 'Offline Static'}
+                        </Text>
+                      </View>
                     </View>
-                    <Ionicons name="chevron-forward" size={14} color="#d97706" />
-                  </Pressable>
-                )}
-                <MarkdownView content={codeActionResult.output} />
+                    <Pressable onPress={() => setCodeActionResult(null)} hitSlop={8}>
+                      <Ionicons name="close" size={16} color={colors.muted} />
+                    </Pressable>
+                  </View>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      marginBottom: 10,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                      backgroundColor: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.05)',
+                      alignSelf: 'flex-start',
+                    }}
+                  >
+                    <Ionicons
+                      name={codeActionResult.fromAi ? 'sparkles' : 'hardware-chip-outline'}
+                      size={13}
+                      color={codeActionResult.fromAi ? '#10b981' : primaryAccent}
+                    />
+                    <Text style={{ fontSize: fontSize(11), fontWeight: '600', color: colors.text }}>
+                      {codeActionResult.fromAi ? 'Cloud AI Verified' : 'Local High-Accuracy Analysis'}
+                    </Text>
+                  </View>
+                  <MarkdownView
+                    content={codeActionResult.output}
+                    onApplyCode={applySnippetToContext}
+                  />
+                </View>
               </View>
             )}
           </Card>
-
-          {/* ── Switch to Conversation Navigation Card ── */}
-          <Pressable
-            onPress={() => handleSwitchTab('conversation')}
-            style={({ pressed }) => [
-              styles.switchToConversationCard,
-              {
-                backgroundColor: colors.surfaceElevated,
-                borderColor: colors.border,
-              },
-              pressed && styles.pressed,
-            ]}
-          >
-            <View style={styles.switchToConversationLeft}>
-              <Ionicons name="chatbubbles-outline" size={18} color={primaryAccent} />
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[
-                    styles.switchToConversationTitle,
-                    { color: colors.text, fontSize: fontSize(13) },
-                  ]}
-                >
-                  Ask about this Code
-                </Text>
-                <Text
-                  style={[
-                    styles.switchToConversationSub,
-                    { color: colors.muted, fontSize: fontSize(11) },
-                  ]}
-                >
-                  Switch back to Conversation to ask custom follow-ups.
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="arrow-forward" size={16} color={primaryAccent} />
-          </Pressable>
-
-          {/* ── Live Complexity & Structure Analysis ── */}
-          {liveAnalysis ? (
-            <>
-              <Text style={[styles.section, { color: colors.text }]}>
-                Live Code Analysis
-              </Text>
-              <Card>
-                {liveAnalysis.map((sec, idx) => (
-                  <View
-                    key={sec.title}
-                    style={[
-                      styles.analysisSection,
-                      idx > 0 && [styles.divider, { borderTopColor: colors.border }],
-                    ]}
-                  >
-                    <Text style={[styles.analysisTitle, { color: primaryAccent }]}>
-                      {sec.title}
-                    </Text>
-                    {sec.items.map((item, itemIdx) => (
-                      <Text
-                        key={itemIdx}
-                        style={[styles.analysisItem, { color: colors.text }]}
-                      >
-                        {item}
-                      </Text>
-                    ))}
-                  </View>
-                ))}
-              </Card>
-            </>
-          ) : null}
         </>
       )}
-      {/* ── Gemini Key Setup Modal ── */}
-      <Modal
-        visible={geminiKeyModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setGeminiKeyModalVisible(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.65)',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: 20,
-          }}
-        >
-          <View
-            style={{
-              width: '100%',
-              maxWidth: 440,
-              borderRadius: 16,
-              backgroundColor: isLight ? '#FFFFFF' : '#0B1510',
-              borderColor: colors.border,
-              borderWidth: 1,
-              padding: 20,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.3,
-              shadowRadius: 20,
-              elevation: 10,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 14,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="sparkles" size={18} color={primaryAccent} />
-                <Text
-                  style={{
-                    fontSize: fontSize(16),
-                    fontWeight: 'bold',
-                    color: colors.text,
-                  }}
-                >
-                  Configure Gemini AI
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => setGeminiKeyModalVisible(false)}
-                hitSlop={8}
-              >
-                <Ionicons name="close" size={20} color={colors.muted} />
-              </Pressable>
-            </View>
 
-            <Text
-              style={{
-                fontSize: fontSize(12),
-                color: colors.muted,
-                lineHeight: 18,
-                marginBottom: 14,
-              }}
-            >
-              Link your Google Gemini API key (starts with{' '}
-              <Text style={{ fontWeight: 'bold', color: primaryAccent }}>AIzaSy…</Text>) to receive
-              live model responses for Explain, Debug, Optimize, Tests, and Conversation.
-            </Text>
 
-            <TextInput
-              value={geminiKeyInput}
-              onChangeText={setGeminiKeyInput}
-              placeholder="Paste your Gemini API key (AIzaSy...)"
-              placeholderTextColor={colors.muted}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 10,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                fontSize: fontSize(13),
-                color: colors.text,
-                backgroundColor: colors.surfaceElevated,
-                marginBottom: 12,
-              }}
-            />
-
-            {geminiKeyFeedback && (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: 10,
-                  borderRadius: 8,
-                  backgroundColor: geminiKeyFeedback.valid
-                    ? isLight
-                      ? '#dcfce7'
-                      : '#052e16'
-                    : isLight
-                    ? '#fee2e2'
-                    : '#450a0a',
-                  borderColor: geminiKeyFeedback.valid ? '#22c55e' : '#ef4444',
-                  borderWidth: 1,
-                  marginBottom: 14,
-                }}
-              >
-                <Ionicons
-                  name={geminiKeyFeedback.valid ? 'checkmark-circle' : 'alert-circle'}
-                  size={16}
-                  color={geminiKeyFeedback.valid ? '#16a34a' : '#dc2626'}
-                />
-                <Text
-                  style={{
-                    fontSize: fontSize(11.5),
-                    color: geminiKeyFeedback.valid ? '#16a34a' : '#dc2626',
-                    flex: 1,
-                  }}
-                >
-                  {geminiKeyFeedback.message}
-                </Text>
-              </View>
-            )}
-
-            <View style={{ gap: 8, marginTop: 4 }}>
-              <Button
-                title={geminiKeyTesting ? 'Testing & Verifying…' : 'Test & Save Key'}
-                onPress={handleTestAndSaveKey}
-                disabled={geminiKeyTesting || !geminiKeyInput.trim()}
-              />
-
-              {hasLinkedKey && (
-                <Pressable
-                  onPress={handleRemoveKey}
-                  hitSlop={6}
-                  style={{
-                    alignItems: 'center',
-                    paddingVertical: 8,
-                  }}
-                >
-                  <Text style={{ fontSize: fontSize(12), color: '#ef4444', fontWeight: '600' }}>
-                    Remove Linked Key
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
     </Screen>
   );
 }

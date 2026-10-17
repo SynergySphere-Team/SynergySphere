@@ -557,14 +557,6 @@ export default function SettingsScreen() {
     setResetSending,
   ] = useState(false);
 
-  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
-
-  useEffect(() => {
-    void SecureStore.getItemAsync('synergysphere_biometrics_enabled').then((val: string | null) => {
-      if (val === 'true') setBiometricsEnabled(true);
-    });
-  }, []);
-
   // Help & Support ticketing state
   const [userTickets, setUserTickets] = useState<UserTicket[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
@@ -3160,32 +3152,6 @@ function confirmDeleteAccount() {
             <Text style={[styles.description, { color: colors.muted }]}>
               Your authenticated session is stored securely on this device. Use the dedicated Logout option in Settings when you want to end your session.
             </Text>
-
-            <View style={[styles.securityDivider, { backgroundColor: colors.border }]} />
-
-            <Text style={[styles.panelTitle, { color: colors.text }]}>
-              Biometric Security
-            </Text>
-
-            <Text style={[styles.description, { color: colors.muted }]}>
-              Enable biometric authentication (Face ID / Fingerprint) to quickly and securely authenticate on this device without re-entering your password.
-            </Text>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }}>
-              <View style={{ flex: 1, paddingRight: 12 }}>
-                <Text style={{ fontWeight: '600', color: colors.text, fontSize: 14 }}>Biometric Unlock</Text>
-                <Text style={{ fontSize: 12, color: colors.muted }}>Protect application launch with device biometrics</Text>
-              </View>
-              <Switch
-                value={biometricsEnabled}
-                onValueChange={(val) => {
-                  setBiometricsEnabled(val);
-                  void SecureStore.setItemAsync('synergysphere_biometrics_enabled', val ? 'true' : 'false');
-                }}
-                trackColor={{ false: colors.border, true: primaryAccent }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
           </View>
 
         ) : null}

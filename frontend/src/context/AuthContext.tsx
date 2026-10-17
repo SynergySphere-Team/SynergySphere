@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { api, User, getStoredUser, setStoredUser, clearAuth } from '@/lib/utils';
+import { api, User, getStoredUser, setStoredUser, clearAuth, setStoredToken } from '@/lib/utils';
 
 interface AuthContextType {
   user: User | null;
@@ -38,26 +38,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await api<User>('/auth/me');
       setUser(data);
       setStoredUser(data);
-    } catch {
-      clearAuth();
-      setUser(null);
+    } catch (err: any) {
+      if (err?.message === 'Unauthorized' || String(err?.message || '').includes('401')) {
+        clearAuth();
+        setUser(null);
+      }
+      // Transient connection failures do not wipe local user session
     }
   }
 
   async function login(email: string, password: string) {
-    const data = await api<{ user: User }>('/auth/login', {
+    const data = await api<{ user: User; token?: string }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
+    if (data.token) {
+      setStoredToken(data.token);
+    }
     setStoredUser(data.user);
     setUser(data.user);
   }
 
   async function register(formData: RegisterData) {
-    const data = await api<{ user: User }>('/auth/register', {
+    const data = await api<{ user: User; token?: string }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(formData),
     });
+    if (data.token) {
+      setStoredToken(data.token);
+    }
     setStoredUser(data.user);
     setUser(data.user);
   }

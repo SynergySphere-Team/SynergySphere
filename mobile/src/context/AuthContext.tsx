@@ -14,14 +14,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const refresh = useCallback(async () => {
     const token = await authStorage.getToken();
-    if (!token) { setUser(null); return; }
-    try { setUser(await api.get<User>('/auth/me')); }
-    catch (error) { if (error instanceof ApiError && error.status === 401) await authStorage.clearToken(); setUser(null); }
+    if (!token) {
+      setUser(null);
+      return;
+    }
+    const cachedUser = await authStorage.getUser<User>();
+    if (cachedUser) {
+      setUser((prev) => prev || cachedUser);
+    }
+    try {
+      const freshUser = await api.get<User>('/auth/me');
+      setUser(freshUser);
+      await authStorage.setUser(freshUser);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        await authStorage.clearToken();
+        setUser(null);
+      }
+      // Do not clear user on transient network or offline errors
+    }
   }, []);
   useEffect(() => { refresh().finally(() => setLoading(false)); }, [refresh]);
   useEffect(() => { if (user) void registerCommunityPushNotifications(); }, [user]);
   const establishSession = async (response: AuthResponse): Promise<User> => {
-    await authStorage.setToken(response.token);
+    await Promise.all([
+      authStorage.setToken(response.token),
+      authStorage.setUser(response.user),
+    ]);
     setUser(response.user);
     return response.user;
   };
@@ -29,10 +48,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user, loading, refresh,
     login: async (email, password) => establishSession(await api.post<AuthResponse>('/auth/login', { email, password })),
     register: async (data) => establishSession(await api.post<AuthResponse>('/auth/register', data)),
-    updateProfile: async (data) => setUser(await api.patch<User>('/auth/me', data)),
+    updateProfile: async (data) => {
+      const updated = await api.patch<User>('/auth/me', data);
+      await authStorage.setUser(updated);
+      setUser(updated);
+    },
     logout: async () => {
       try {
         await api.post('/auth/logout');
+      } catch {
+        // Ignore network errors during logout so local session is always cleared
       } finally {
         await Promise.all([
           authStorage.clearToken(),

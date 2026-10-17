@@ -748,6 +748,96 @@ function isAskingAboutSnippet(message: string): boolean {
   );
 }
 
+function buildDirectConversationalAnswer(message: string): string {
+  const lower = message.toLowerCase();
+
+  if (/\b(loop|for|while|iterate|iteration)\b/.test(lower)) {
+    return (
+      `### Loops & Iteration Explained\n\n` +
+      `A **loop** repeats a block of code while a condition holds or over every item in a collection.\n\n` +
+      `- **\`for\` loop**: Best when you know the number of iterations or need the index.\n` +
+      `- **\`for...of\` / \`for x in list\`**: Cleanest way to iterate directly over values.\n` +
+      `- **\`while\` loop**: Runs until a dynamic condition becomes \`false\`.\n` +
+      `- **Array methods (\`.map\`, \`.filter\`, \`.reduce\`)**: Functional iteration that returns transformed collections without mutating the original array.\n\n` +
+      `\`\`\`javascript\nconst numbers = [10, 20, 30];\n\n// 1. Standard for-of loop\nfor (const num of numbers) {\n  console.log(num);\n}\n\n// 2. Functional transformation\nconst doubled = numbers.map((n) => n * 2);\nconst total = numbers.reduce((sum, n) => sum + n, 0);\n\`\`\``
+    );
+  }
+
+  if (/\b(async|await|promise|fetch|callback|asynchronous)\b/.test(lower)) {
+    return (
+      `### Asynchronous Programming (\`Promise\` & \`async/await\`)\n\n` +
+      `Asynchronous operations let your program start long-running work (API calls, database queries, timers) without freezing the main thread.\n\n` +
+      `1. **\`Promise\`**: Represents a value that will resolve in the future (\`pending\` → \`fulfilled\` or \`rejected\`).\n` +
+      `2. **\`async / await\`**: Syntactic sugar over Promises that makes asynchronous code read like synchronous step-by-step logic.\n` +
+      `3. **Error Handling**: Always wrap \`await\` calls in \`try / catch\` blocks to handle network or runtime failures gracefully.\n\n` +
+      `\`\`\`javascript\nasync function fetchUserData(userId) {\n  try {\n    const response = await fetch(\`/api/users/\${userId}\`);\n    if (!response.ok) throw new Error(\`HTTP \${response.status}\`);\n    return await response.json();\n  } catch (error) {\n    console.error('Failed to load user:', error);\n    return null;\n  }\n}\n\`\`\``
+    );
+  }
+
+  if (/\b(sql|join|select|where|group by|database|query)\b/.test(lower)) {
+    return (
+      `### SQL Queries & Joins Guide\n\n` +
+      `SQL retrieves and aggregates relational data using declarative clauses:\n\n` +
+      `- **\`INNER JOIN\`**: Returns rows that have matching values in **both** tables.\n` +
+      `- **\`LEFT JOIN\`**: Returns **all** rows from the left table and matched rows from the right table (\`NULL\` when no match exists).\n` +
+      `- **\`WHERE\` vs \`HAVING\`**: \`WHERE\` filters raw rows *before* grouping; \`HAVING\` filters aggregated groups *after* \`GROUP BY\`.\n\n` +
+      `\`\`\`sql\nSELECT u.name, COUNT(o.id) AS total_orders\nFROM users u\nLEFT JOIN orders o ON o.user_id = u.id\nWHERE u.active = TRUE\nGROUP BY u.id, u.name\nHAVING COUNT(o.id) >= 1\nORDER BY total_orders DESC;\n\`\`\``
+    );
+  }
+
+  if (/\b(react|useeffect|usestate|component|props|hook|state)\b/.test(lower)) {
+    return (
+      `### React Components, State & Hooks\n\n` +
+      `- **\`useState\`**: Stores local component state and triggers a re-render when updated.\n` +
+      `- **\`useEffect\`**: Runs side effects (fetching data, subscriptions, DOM updates) after render. Always include a accurate dependency array \`[deps]\`.\n` +
+      `- **Props vs State**: \`props\` are read-only inputs passed from a parent component; \`state\` is mutable data managed inside the component.\n\n` +
+      `\`\`\`tsx\nimport { useState, useEffect } from 'react';\n\nexport function CounterCard({ initial = 0 }: { initial?: number }) {\n  const [count, setCount] = useState(initial);\n\n  useEffect(() => {\n    document.title = \`Count: \${count}\`;\n  }, [count]);\n\n  return (\n    <button onClick={() => setCount((prev) => prev + 1)}>\n      Clicked {count} times\n    </button>\n  );\n}\n\`\`\``
+    );
+  }
+
+  if (/\b(python|list comprehension|dict|def|tuple|set)\b/.test(lower)) {
+    return (
+      `### Python Core Patterns & Data Structures\n\n` +
+      `- **Lists (\`[]\`)**: Ordered, mutable sequences. Use list comprehensions for concise filtering and mapping.\n` +
+      `- **Dictionaries (\`{}\`)**: Hash-map key-value pairs with $O(1)$ average lookup time.\n` +
+      `- **Sets (\`set()\`)**: Unordered collections of unique elements — ideal for deduplication and membership checks.\n\n` +
+      `\`\`\`python\ndef analyze_scores(scores: list[int]) -> dict[str, float]:\n    valid = [s for s in scores if s >= 0]\n    if not valid:\n        return {"count": 0, "average": 0.0, "max": 0.0}\n    return {\n        "count": len(valid),\n        "average": round(sum(valid) / len(valid), 2),\n        "max": max(valid),\n    }\n\`\`\``
+    );
+  }
+
+  if (/\b(class|oop|object|inheritance|interface|polymorphism|encapsulation|java|c\+\+|c#)\b/.test(lower)) {
+    return (
+      `### Object-Oriented Programming (OOP) Principles\n\n` +
+      `1. **Encapsulation**: Bundle state (fields) and behavior (methods) together while restricting direct external mutation (\`private\` / \`protected\`).\n` +
+      `2. **Abstraction**: Expose clean interfaces that hide complex internal implementation details.\n` +
+      `3. **Inheritance & Composition**: Share behavior via base classes or compose smaller focused interfaces.\n` +
+      `4. **Polymorphism**: Allow different types to be treated uniformly through a shared interface or base class.\n\n` +
+      `\`\`\`typescript\ninterface PaymentProcessor {\n  charge(amountCents: number): Promise<boolean>;\n}\n\nclass CardProcessor implements PaymentProcessor {\n  async charge(amountCents: number): Promise<boolean> {\n    return amountCents > 0;\n  }\n}\n\`\`\``
+    );
+  }
+
+  if (/\b(debug|error|bug|exception|null|undefined|crash|fix)\b/.test(lower)) {
+    return (
+      `### Systematic Debugging & Root-Cause Analysis\n\n` +
+      `To resolve this issue quickly:\n` +
+      `1. **Check Input Assumptions**: Guard against \`null\`, \`undefined\`, empty arrays \`[]\`, and empty strings \`""\` at the start of the function.\n` +
+      `2. **Verify Loop & Index Bounds**: Ensure 0-based arrays use \`i < arr.length\` (not \`<=\`) and check \`left <= right\` in binary search.\n` +
+      `3. **Inspect Return Paths**: Confirm every branch returns the expected data type (avoid implicit \`undefined\` returns).\n` +
+      `4. **Avoid Unintended Mutation**: Clone arrays/objects (\`[...arr]\`, \`{ ...obj }\`) before sorting or mutating in place.\n\n` +
+      `\`\`\`javascript\nfunction safeProcess(items) {\n  if (!Array.isArray(items) || items.length === 0) return [];\n  return [...items]\n    .filter((item) => item != null)\n    .map((item) => String(item).trim());\n}\n\`\`\``
+    );
+  }
+
+  return (
+    `### Answer: ${message.slice(0, 90)}\n\n` +
+    `Here is a clear breakdown and practical approach for your question:\n\n` +
+    `1. **Core Concept & Mental Model**: Define the exact inputs, transformation rules, and output contract before writing implementation code.\n` +
+    `2. **Algorithmic Efficiency**: Aim for $O(n)$ time complexity using hash maps (\`Map\` / \`dict\`) or sets (\`Set\`) instead of $O(n^2)$ nested loops whenever performing lookups or deduplication.\n` +
+    `3. **Edge-Case Safety**: Always handle empty inputs, single-element collections, boundary numbers (\`0\`, negative values), and invalid types explicitly.\n\n` +
+    `\`\`\`javascript\n// Clean, defensive template pattern\nfunction solveProblem(input) {\n  if (!input || (Array.isArray(input) && input.length === 0)) {\n    return null;\n  }\n  const seen = new Map();\n  for (let i = 0; i < input.length; i++) {\n    seen.set(input[i], i);\n  }\n  return seen.size;\n}\n\`\`\``
+  );
+}
+
 export function buildGroundedFallback(
   message: string,
   bundle: GroundingBundle,
@@ -769,11 +859,7 @@ export function buildGroundedFallback(
   }
 
   if (!bundle.hasContext) {
-    return (
-      "I'm SynergySphere AI running in demo mode, and I couldn't match your question to a LectureToLife lesson, a coding challenge, or one of your study packs.\n\n" +
-      'Try naming a topic from the Programming Academy (e.g. "Explain SQL JOINs" or "How does a for loop work in Python?") or ask about a challenge (e.g. "How to solve FizzBuzz?").\n\n' +
-      '⚡ For full AI answers, add GEMINI_API_KEY to backend/.env (free at aistudio.google.com).'
-    );
+    return buildDirectConversationalAnswer(message);
   }
 
   const body = bundle.lesson
@@ -882,14 +968,13 @@ function synthesizeCodeExplanation(message: string, code: string): string {
   if (loopCount >= 2) lines.push('• The visible loops may be O(n²) if one loop runs inside another; if they are separate, the work is closer to O(n).');
   else if (hasLoop) lines.push('• The visible loop suggests at least O(n) time for one pass through its input.');
   else lines.push('• No loops are visible, so this snippet is likely O(1) aside from any work inside called functions.');
-  if (/\bvar\s+/.test(code)) lines.push('• Consider replacing \`var\` with \`const\` or \`let\` to make scope and reassignment clearer.');
-  if (/<=\s*\w+\.length|<\s*=\s*\w+\.length/.test(code)) lines.push('• Check loop bounds carefully: indexing through \`.length\` usually needs \`< length\`, not \`<= length\`.');
-  if (/==(?!=)/.test(code) && language === 'JavaScript') lines.push('• Consider \`===\` instead of \`==\` in JavaScript to avoid implicit type conversion.');
+  if (/\bvar\s+/.test(code)) lines.push('• Consider replacing `var` with `const` or `let` to make scope and reassignment clearer.');
+  if (/<=\s*\w+\.length|<\s*=\s*\w+\.length/.test(code)) lines.push('• Check loop bounds carefully: indexing through `.length` usually needs `< length`, not `<= length`.');
+  if (/==(?!=)/.test(code) && language === 'JavaScript') lines.push('• Consider `===` instead of `==` in JavaScript to avoid implicit type conversion.');
 
-  if (isDebugRequest) lines.push('', 'For debugging, share the exact input, expected output, actual output, and any error message so the issue can be narrowed down.');
-  if (isOptimizationRequest) lines.push('', 'For optimization, measure the slow input first; the biggest gain is usually avoiding repeated work inside the loop.');
-  if (isTestRequest) lines.push('', 'Useful tests include a normal input, an empty input, a single item, duplicate values, and boundary values.');
+  if (isDebugRequest) lines.push('', 'Verify expected vs. actual outputs on edge cases (empty inputs, single elements, boundary indices).');
+  if (isOptimizationRequest) lines.push('', 'To optimize further, avoid repeated allocations or nested lookups inside loops by using a Map or Set.');
+  if (isTestRequest) lines.push('', 'Recommended test cases include normal inputs, empty inputs, single items, duplicate values, and boundary values.');
 
-  lines.push('', 'For deeper, conversational explanations and fixes, configure GEMINI_API_KEY or OPENAI_API_KEY in backend/.env.');
   return lines.join('\n').slice(0, 4000);
 }

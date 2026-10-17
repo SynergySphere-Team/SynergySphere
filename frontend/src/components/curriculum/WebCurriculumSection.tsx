@@ -22,6 +22,7 @@ import {
   MessageCircleQuestion,
   ShieldCheck,
   AlertTriangle,
+  Sparkles,
 } from 'lucide-react';
 
 interface Technology {
@@ -609,6 +610,25 @@ export function WebCurriculumSection() {
                             </button>
 
                             <button
+                              onClick={() => {
+                                const params = new URLSearchParams({
+                                  tab: 'codeContext',
+                                  lesson: activeLesson.id,
+                                  challengeTitle: `${activeLesson.title}: ${ex.title}`,
+                                  challengeDescription: ex.explanation || activeLesson.overview,
+                                  language: ex.language || activeLesson.subjectName,
+                                  code: ex.code,
+                                  autoAsk: 'true',
+                                });
+                                router.push(`/ai-assistant?${params.toString()}`);
+                              }}
+                              className="flex items-center gap-1 rounded border border-primary/30 bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/25"
+                            >
+                              <Sparkles className="h-3 w-3" />
+                              <span>Analyze in Code Context</span>
+                            </button>
+
+                            <button
                               onClick={() => handleRunCode(i)}
                               className="flex items-center gap-1 rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-500"
                             >
@@ -685,9 +705,36 @@ export function WebCurriculumSection() {
               {/* Practice material is tied to the selected lesson, rather than a generic runner card. */}
               {(activeLesson.content.exercise || activeLesson.content.quiz || activeLesson.content.challenge) && (
                 <div className="rounded-xl border border-white/[0.08] bg-black/20 p-6 space-y-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-primary">
-                    Apply this lesson
-                  </h3>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary">
+                      Apply this lesson
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const starterSnippet =
+                          activeLesson.content.examples?.[0]?.code ||
+                          `// ${activeLesson.title}\n// ${activeLesson.content.challenge?.prompt || activeLesson.content.exercise?.prompt || ''}\n`;
+                        const params = new URLSearchParams({
+                          tab: 'codeContext',
+                          lesson: activeLesson.id,
+                          challengeTitle: activeLesson.title,
+                          challengeDescription:
+                            activeLesson.content.challenge?.prompt ||
+                            activeLesson.content.exercise?.prompt ||
+                            activeLesson.overview,
+                          language: activeLesson.content.examples?.[0]?.language || activeLesson.subjectName,
+                          code: starterSnippet,
+                          autoAsk: 'true',
+                        });
+                        router.push(`/ai-assistant?${params.toString()}`);
+                      }}
+                      className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/25"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>Stuck? Paste Lesson Code to AI Code Context &amp; Get Insights</span>
+                    </button>
+                  </div>
                   {activeLesson.content.exercise && (
                     <div className="space-y-1">
                       <p className="text-xs font-bold text-slate-200">Exercise</p>

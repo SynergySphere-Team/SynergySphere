@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import pg, { type PoolClient, type QueryResultRow, type PoolConfig } from 'pg';
 
 const { Pool } = pg;
-const DEFAULT_DEV_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/synergysphere';
+const DEFAULT_DEV_DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:5432/synergysphere';
 
 function normalizeDatabaseUrl(url: string): string {
   try {
@@ -11,6 +11,9 @@ function normalizeDatabaseUrl(url: string): string {
     parsed.searchParams.delete('schema');
     parsed.searchParams.delete('connection_limit');
     parsed.searchParams.delete('pool_timeout');
+    if (parsed.hostname === 'localhost') {
+      parsed.hostname = '127.0.0.1';
+    }
     return parsed.toString();
   } catch {
     return url;
@@ -49,6 +52,8 @@ export const pool = new Pool({
   max: Number(process.env.DB_POOL_SIZE || 10),
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10_000,
   ...(isLocalhost ? {} : { ssl: { rejectUnauthorized: false } }),
 } as PoolConfig & { keepAlive?: boolean; keepAliveInitialDelayMillis?: number });
 
@@ -126,16 +131,18 @@ export async function execute(
 
 export async function transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
+  let broken = false;
   try {
     await client.query('BEGIN');
     const result = await work(client);
     await client.query('COMMIT');
     return result;
   } catch (error) {
-    await client.query('ROLLBACK');
+    broken = isTransientDbError(error);
+    await client.query('ROLLBACK').catch(() => {});
     throw error;
   } finally {
-    client.release();
+    (client.release as (destroy?: boolean) => void)(broken);
   }
 }
 

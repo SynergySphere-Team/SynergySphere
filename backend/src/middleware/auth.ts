@@ -101,6 +101,18 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
   }
 }
 
+export function optionalAuthenticate(req: AuthRequest, _res: Response, next: NextFunction): void {
+  const token = getRequestToken(req);
+  if (token) {
+    try {
+      req.user = verifyToken(token);
+    } catch {
+      req.user = undefined;
+    }
+  }
+  next();
+}
+
 export type AppRole = 'superadmin' | 'admin' | 'moderator' | 'user';
 
 export function normalizeRole(role?: string | null): AppRole {
