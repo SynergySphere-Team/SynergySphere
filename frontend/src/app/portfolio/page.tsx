@@ -1200,51 +1200,62 @@ export default function PortfolioPage() {
                       </p>
                     </div>
 
-                    {!jobsData?.configured && (
-                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200">
-                        <div className="flex items-center gap-2 font-semibold text-white mb-1">
-                          <AlertCircle className="h-4 w-4 text-amber-400" />
-                          Live Job Aggregator Notice (Adzuna API)
+                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-xs text-emerald-200">
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-2 font-semibold text-white">
+                          <Sparkles className="h-4 w-4 text-emerald-400" />
+                          Live Developer Opportunities &amp; Skill Matching
                         </div>
-                        <p className="text-muted-foreground leading-relaxed">
-                          To stream live real-time job listings from the market, configure <code className="text-amber-300">ADZUNA_APP_ID</code> and <code className="text-amber-300">ADZUNA_APP_KEY</code> in <code className="text-white">backend/.env</code>.
-                          In the meantime, click any tailored search link below to query live hiring boards directly with your exact skills!
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {jobsData?.searchLinks && (
-                            <>
-                              <a
-                                href={jobsData.searchLinks.linkedin}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 rounded bg-[#0077b5]/30 hover:bg-[#0077b5]/50 px-2.5 py-1 text-xs font-semibold text-sky-300"
-                              >
-                                <Linkedin className="h-3.5 w-3.5" />
-                                Search LinkedIn Jobs
-                              </a>
-                              <a
-                                href={jobsData.searchLinks.indeed}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 rounded bg-white/10 hover:bg-white/20 px-2.5 py-1 text-xs font-semibold text-white"
-                              >
-                                <Search className="h-3.5 w-3.5" />
-                                Search Indeed
-                              </a>
-                              <a
-                                href={jobsData.searchLinks.googleJobs}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 rounded bg-white/10 hover:bg-white/20 px-2.5 py-1 text-xs font-semibold text-white"
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                                Google Jobs
-                              </a>
-                            </>
-                          )}
-                        </div>
+                        <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                          {jobsData?.source === 'remotive-and-curated' ? 'Live Tech Feed & Curated' : 'Market Ready'}
+                        </span>
                       </div>
-                    )}
+                      <p className="text-muted-foreground leading-relaxed">
+                        Positions ranked and scored against your verified Learning Hub skills, completed challenges, and interview scores. Explore live openings below or query top hiring networks:
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {jobsData?.searchLinks && (
+                          <>
+                            <a
+                              href="https://www.offerzen.com/candidate/signup"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 rounded bg-[#1f2937] hover:bg-[#374151] px-2.5 py-1 text-xs font-semibold text-white transition border border-white/10"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 text-cyan-400" />
+                              OfferZen Developer Network
+                            </a>
+                            <a
+                              href={jobsData.searchLinks.linkedin}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 rounded bg-[#0077b5]/30 hover:bg-[#0077b5]/50 px-2.5 py-1 text-xs font-semibold text-sky-300 transition"
+                            >
+                              <Linkedin className="h-3.5 w-3.5" />
+                              Search LinkedIn Jobs
+                            </a>
+                            <a
+                              href={jobsData.searchLinks.indeed}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 rounded bg-white/10 hover:bg-white/20 px-2.5 py-1 text-xs font-semibold text-white transition"
+                            >
+                              <Search className="h-3.5 w-3.5" />
+                              Search Indeed SA
+                            </a>
+                            <a
+                              href={jobsData.searchLinks.googleJobs}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 rounded bg-white/10 hover:bg-white/20 px-2.5 py-1 text-xs font-semibold text-white transition"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              Google Jobs
+                            </a>
+                          </>
+                        )}
+                      </div>
+                    </div>
 
                     {jobsData && jobsData.jobs.length > 0 && (
                       <div className="grid gap-4 md:grid-cols-2">

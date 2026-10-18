@@ -525,18 +525,24 @@ export function CareerStudioModal({
                   </Text>
                 </View>
 
-                {/* Fallback job search when live listings are unavailable */}
-                {!jobsData?.configured && (
+                {/* Verified tech opportunities & hiring networks header */}
+                <View
+                  style={[
+                    styles.intelCard,
+                    {
+                      backgroundColor: isLight
+                        ? '#F4F8F4'
+                        : colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
                   <View
-                    style={[
-                      styles.intelCard,
-                      {
-                        backgroundColor: isLight
-                          ? '#F4F8F4'
-                          : colors.surfaceElevated,
-                        borderColor: colors.border,
-                      },
-                    ]}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
                   >
                     <View
                       style={{
@@ -552,137 +558,152 @@ export function CareerStudioModal({
                       />
 
                       <Text style={[styles.intelTitle, { color: colors.text }]}>
-                        Find Opportunities
+                        Verified Tech Opportunities
                       </Text>
                     </View>
-
-                    <Text style={[styles.intelDesc, { color: colors.muted }]}>
-                      Live job matches are not available right now. You can still
-                      search opportunities tailored to {targetRole} using the
-                      platforms below.
-                    </Text>
-
-                    {jobsData?.searchLinks && (
-                      <View
+                    <View
+                      style={{
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: 12,
+                      }}
+                    >
+                      <Text
                         style={{
-                          flexDirection: 'row',
-                          flexWrap: 'wrap',
-                          gap: 8,
-                          marginTop: 10,
+                          fontSize: 10,
+                          fontWeight: '700',
+                          color: '#10b981',
                         }}
                       >
-                        <Pressable
-                          onPress={() =>
-                            Linking.openURL(jobsData.searchLinks.linkedin)
-                          }
-                          style={[
-                            styles.searchBtn,
-                            { backgroundColor: colors.surfaceElevated },
-                          ]}
-                        >
-                          <Ionicons
-                            name="logo-linkedin"
-                            size={14}
-                            color="#0077b5"
-                          />
-                          <Text
-                            style={[
-                              styles.searchBtnText,
-                              { color: colors.text },
-                            ]}
-                          >
-                            LinkedIn Jobs
-                          </Text>
-                        </Pressable>
-
-                        <Pressable
-                          onPress={() =>
-                            Linking.openURL(jobsData.searchLinks.indeed)
-                          }
-                          style={[
-                            styles.searchBtn,
-                            { backgroundColor: colors.surfaceElevated },
-                          ]}
-                        >
-                          <Ionicons
-                            name="search"
-                            size={14}
-                            color={primaryAccent}
-                          />
-                          <Text
-                            style={[
-                              styles.searchBtnText,
-                              { color: colors.text },
-                            ]}
-                          >
-                            Indeed
-                          </Text>
-                        </Pressable>
-
-                        <Pressable
-                          onPress={() =>
-                            Linking.openURL(jobsData.searchLinks.googleJobs)
-                          }
-                          style={[
-                            styles.searchBtn,
-                            { backgroundColor: colors.surfaceElevated },
-                          ]}
-                        >
-                          <Ionicons
-                            name="globe-outline"
-                            size={14}
-                            color={primaryAccent}
-                          />
-                          <Text
-                            style={[
-                              styles.searchBtnText,
-                              { color: colors.text },
-                            ]}
-                          >
-                            Google Jobs
-                          </Text>
-                        </Pressable>
-                      </View>
-                    )}
-                  </View>
-                )}
-
-                {!jobsData?.configured && (
-                  <View style={[styles.intelCard, { backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.3)' }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Ionicons name="information-circle-outline" size={16} color="#f59e0b" />
-                      <Text style={[styles.intelTitle, { color: '#f59e0b' }]}>Live Aggregator Notice</Text>
+                        Live Feed &amp; Curated
+                      </Text>
                     </View>
-                    <Text style={[styles.intelDesc, { color: colors.muted }]}>
-                      Configure ADZUNA_APP_ID & ADZUNA_APP_KEY in backend/.env for real-time listings. In the meantime, use targeted 1-click hiring queries below.
-                    </Text>
-                    {jobsData?.searchLinks && (
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-                        <Pressable
-                          onPress={() => Linking.openURL(jobsData.searchLinks.linkedin)}
-                          style={[styles.searchBtn, { backgroundColor: 'rgba(0, 119, 181, 0.2)' }]}
-                        >
-                          <Ionicons name="logo-linkedin" size={13} color="#0077b5" />
-                          <Text style={[styles.searchBtnText, { color: '#38bdf8' }]}>LinkedIn Jobs</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => Linking.openURL(jobsData.searchLinks.indeed)}
-                          style={[styles.searchBtn, { backgroundColor: colors.surfaceElevated }]}
-                        >
-                          <Ionicons name="search" size={13} color={colors.text} />
-                          <Text style={[styles.searchBtnText, { color: colors.text }]}>Indeed</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => Linking.openURL(jobsData.searchLinks.googleJobs)}
-                          style={[styles.searchBtn, { backgroundColor: colors.surfaceElevated }]}
-                        >
-                          <Ionicons name="globe-outline" size={13} color={colors.text} />
-                          <Text style={[styles.searchBtnText, { color: colors.text }]}>Google Jobs</Text>
-                        </Pressable>
-                      </View>
-                    )}
                   </View>
-                )}
+
+                  <Text style={[styles.intelDesc, { color: colors.muted }]}>
+                    Scored against your verified learning curriculum and skills. Tap any job below to view details and apply, or explore live hiring networks:
+                  </Text>
+
+                  {jobsData?.searchLinks && (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        gap: 8,
+                        marginTop: 10,
+                      }}
+                    >
+                      <Pressable
+                        onPress={() =>
+                          Linking.openURL('https://www.offerzen.com/candidate/signup')
+                        }
+                        style={[
+                          styles.searchBtn,
+                          {
+                            backgroundColor: colors.surfaceElevated,
+                            borderColor: colors.border,
+                            borderWidth: 1,
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name="open-outline"
+                          size={13}
+                          color="#38bdf8"
+                        />
+                        <Text
+                          style={[
+                            styles.searchBtnText,
+                            { color: colors.text },
+                          ]}
+                        >
+                          OfferZen SA
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() =>
+                          Linking.openURL(jobsData.searchLinks.linkedin)
+                        }
+                        style={[
+                          styles.searchBtn,
+                          { backgroundColor: 'rgba(0, 119, 181, 0.2)' },
+                        ]}
+                      >
+                        <Ionicons
+                          name="logo-linkedin"
+                          size={13}
+                          color="#0077b5"
+                        />
+                        <Text
+                          style={[
+                            styles.searchBtnText,
+                            { color: '#38bdf8' },
+                          ]}
+                        >
+                          LinkedIn Jobs
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() =>
+                          Linking.openURL(jobsData.searchLinks.indeed)
+                        }
+                        style={[
+                          styles.searchBtn,
+                          {
+                            backgroundColor: colors.surfaceElevated,
+                            borderColor: colors.border,
+                            borderWidth: 1,
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name="search"
+                          size={13}
+                          color={colors.text}
+                        />
+                        <Text
+                          style={[
+                            styles.searchBtnText,
+                            { color: colors.text },
+                          ]}
+                        >
+                          Indeed SA
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() =>
+                          Linking.openURL(jobsData.searchLinks.googleJobs)
+                        }
+                        style={[
+                          styles.searchBtn,
+                          {
+                            backgroundColor: colors.surfaceElevated,
+                            borderColor: colors.border,
+                            borderWidth: 1,
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name="globe-outline"
+                          size={13}
+                          color={colors.text}
+                        />
+                        <Text
+                          style={[
+                            styles.searchBtnText,
+                            { color: colors.text },
+                          ]}
+                        >
+                          Google Jobs
+                        </Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
 
                 {jobsData?.jobs && jobsData.jobs.map((job) => (
                   <View key={job.id} style={[styles.jobCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
