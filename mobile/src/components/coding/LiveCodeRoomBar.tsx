@@ -55,7 +55,6 @@ export function LiveCodeRoomBar({
         wsRef.current.send(JSON.stringify({ type: 'leave_code_room', roomId }));
         wsRef.current.close();
       } catch {
-        // ignore
       }
     }
     wsRef.current = null;
@@ -74,7 +73,6 @@ export function LiveCodeRoomBar({
       try {
         wsRef.current.close();
       } catch {
-        // ignore
       }
     }
 
@@ -138,7 +136,6 @@ export function LiveCodeRoomBar({
           ]);
         }
       } catch {
-        // ignore
       }
     };
 
@@ -179,7 +176,6 @@ export function LiveCodeRoomBar({
         try {
           wsRef.current.close();
         } catch {
-          // ignore
         }
       }
     };

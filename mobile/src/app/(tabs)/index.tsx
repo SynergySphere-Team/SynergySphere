@@ -161,7 +161,6 @@ export default function HomeScreen() {
       await api.patch<Task>(`/tasks/${task.id}`, { status: nextSt });
       await load();
     } catch (e) {
-      // Ignore or log
     }
   }
 
@@ -188,7 +187,6 @@ export default function HomeScreen() {
       setFocusSuccess(`🎉 ${focusMinutes}m sprint complete! +15 XP earned.`);
       await Promise.all([load(), refreshAuth()]);
     } catch {
-      // Ignore save error
     }
   }, [focusMinutes, load, refreshAuth]);
 
@@ -293,7 +291,6 @@ export default function HomeScreen() {
 
   const profile = data?.developerProfile;
 
-  // Real 3 core metrics
   const challengesPassed = profile?.challenges?.passedTotal ?? data?.stats?.challengesPassed ?? 0;
   const tasksCompletedThisWeek = profile?.tasksSummary?.completedThisWeek ?? data?.stats?.tasksCompleted ?? 0;
   const lessonsCompleted = profile?.hubSkills

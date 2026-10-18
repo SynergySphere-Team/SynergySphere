@@ -662,7 +662,6 @@ export default function CodingScreen() {
     isResourceMatchingLanguage(resource, selectedLanguage)
   );
 
-  // Automatically keep selectedChallenge in sync with active language & difficulty filters
   useEffect(() => {
     if (filteredChallenges.length > 0) {
       const isSelectedStillValid = selectedChallenge && filteredChallenges.some((c) => c.id === selectedChallenge.id);

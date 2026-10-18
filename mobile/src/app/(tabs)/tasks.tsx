@@ -187,7 +187,6 @@ export default function TasksScreen() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [goalMinutes, setGoalMinutes] = useState(DEFAULT_GOAL_MINUTES);
 
-  // Focus Timer States with Dynamic Custom Duration
   const [durationInput, setDurationInput] = useState(String(DEFAULT_MINUTES));
   const [selectedMinutes, setSelectedMinutes] = useState(DEFAULT_MINUTES);
   const [timeLeft, setTimeLeft] = useState(DEFAULT_MINUTES * 60);
@@ -310,14 +309,12 @@ export default function TasksScreen() {
     try {
       deactivateKeepAwake();
     } catch {
-      // Ignore keep awake deactivation errors
     }
 
     // Gentle single pulse
     try {
       Vibration.vibrate(80);
     } catch {
-      // Ignore vibration error
     }
 
     if (timerMode === 'break') {
@@ -382,7 +379,6 @@ export default function TasksScreen() {
     };
   }, [timerState]);
 
-  // Clean up interval on unmount
   useEffect(() => {
     return () => {
       if (timerIntervalRef.current) {

@@ -23,10 +23,8 @@ export async function saveInterviewDraft(state: InterviewSessionState): Promise<
       }
     }
 
-    // SecureStore / native storage wrapper
     await SecureStore.setItemAsync(STORAGE_KEY, serialized);
   } catch (error) {
-    // If SecureStore fails (e.g. payload size exceeded or storage error), fallback to memory
     IN_MEMORY_FALLBACK.set(STORAGE_KEY, serialized);
   }
 }
@@ -51,7 +49,6 @@ export async function loadInterviewDraft(): Promise<InterviewSessionState | null
 
     const parsed = JSON.parse(raw) as InterviewSessionState;
 
-    // Validate essential properties
     if (!parsed.sessionId || !parsed.stages || !Array.isArray(parsed.stages)) {
       return null;
     }
@@ -73,7 +70,6 @@ export async function clearInterviewDraft(): Promise<void> {
       await SecureStore.deleteItemAsync(STORAGE_KEY);
     }
   } catch (err) {
-    // ignore deletion errors
   }
   IN_MEMORY_FALLBACK.delete(STORAGE_KEY);
 }

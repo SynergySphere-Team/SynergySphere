@@ -149,7 +149,6 @@ export function computeConsecutiveStreak(dates: Array<Date | string>, timeZone =
 }
 
 export async function getProfileSignals(userId: string): Promise<ProfileSignalData> {
-  // 1. Fetch completed lessons from LectureLessonProgress
   const completedRows = await query<{ lessonId: string }>(
     `SELECT "lessonId" FROM "LectureLessonProgress" WHERE "userId" = $1`,
     [userId],
@@ -175,7 +174,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
     }
   }
 
-  // Build Hub skills array
   const hubSkills: HubSkillSignal[] = technologiesCatalog.map((tech) => {
     const completed = completionCounts[tech.id] || 0;
     const percent = Math.min(100, Math.round((completed / Math.max(tech.totalLessons, 1)) * 100));
@@ -191,7 +189,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
     };
   });
 
-  // 2. Fetch manual skills from PortfolioSkill
   const manualSkills = await query<ManualSkillSignal>(
     `SELECT "id", "name", "level", "source", "category"
      FROM "PortfolioSkill"
@@ -200,7 +197,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
     [userId],
   ).catch(() => []);
 
-  // 3. Fetch PortfolioProfile
   const profileRow = await queryOne<{
     githubUrl: string | null;
     linkedinUrl: string | null;
@@ -215,7 +211,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
     [userId],
   ).catch(() => null);
 
-  // 4. Fetch best interview scores
   const scoreRows = await query<{ topic: string; bestScore: number; attempts: number }>(
     `SELECT "topic", MAX("score") as "bestScore", COUNT("id")::int as "attempts"
      FROM "Interview"
@@ -225,7 +220,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
     [userId],
   ).catch(() => []);
 
-  // 5. Fetch joined community projects
   const joinedProjects = await query<{
     id: string;
     title: string;
@@ -240,7 +234,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
     [userId],
   ).catch(() => []);
 
-  // 6. Fetch portfolio projects
   const featuredProjects = await query<{
     id: string;
     title: string;
@@ -255,7 +248,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
     [userId],
   ).catch(() => []);
 
-  // 7. Fetch Passed Challenges
   const passedChallengeRows = await query<{
     challengeId: string;
     title: string;
@@ -278,7 +270,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
     challengesByDiff[c.difficulty] = (challengesByDiff[c.difficulty] || 0) + 1;
   }
 
-  // 8. Fetch Real Weekly Activity (last 7 days by day of week)
   const activityRows = await query<{ day_num: number; cnt: number }>(
     `SELECT EXTRACT(ISODOW FROM occurred)::int AS day_num, COUNT(*)::int AS cnt
      FROM (
@@ -307,7 +298,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
   });
   const totalEvents = days.reduce((sum, d) => sum + d.count, 0);
 
-  // 9. Fetch Tasks Summary (Done this week + upcoming tasks)
   const doneThisWeek = await queryOne<{ count: number }>(
     `SELECT COUNT(*)::int AS "count"
      FROM "Task"
@@ -330,7 +320,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
     [userId],
   ).catch(() => []);
 
-  // 10. Fetch Star Bullets
   const starBullets = await query<{
     id: string;
     title: string;
@@ -345,7 +334,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
     [userId],
   ).catch(() => []);
 
-  // 11. Calculate Offer Readiness
   const interviewScores: Record<string, number> = {};
   for (const r of scoreRows) {
     if (r.topic) {
@@ -365,7 +353,6 @@ export async function getProfileSignals(userId: string): Promise<ProfileSignalDa
   ];
   const readinessScore = Math.round((checklist.filter((c) => c.met).length / checklist.length) * 100);
 
-  // 12. Determine Next Action from Profile Gaps
   let nextLesson: { id: string; title: string; subjectId: string; subjectName: string } | null = null;
   for (const subject of w3schoolsProgrammingDomain.subjects) {
     for (const mod of subject.modules) {
@@ -544,7 +531,6 @@ export interface PublicGithubRepo {
 
 export async function fetchGithubReposForUser(userId: string, explicitGithubUrl?: string | null): Promise<PublicGithubRepo[]> {
   try {
-    // 1. Try authenticated connection
     try {
       const auth = await accessTokenForUser(userId);
       if (auth?.token) {
@@ -571,7 +557,6 @@ export async function fetchGithubReposForUser(userId: string, explicitGithubUrl?
       }
     } catch {}
 
-    // 2. Try public github url parsing
     const profile = await queryOne<{ githubUrl: string | null }>(
       `SELECT "githubUrl" FROM "PortfolioProfile" WHERE "userId" = $1`,
       [userId],

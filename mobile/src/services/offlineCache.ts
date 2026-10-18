@@ -46,11 +46,9 @@ export async function saveCachedResponse(path: string, data: unknown): Promise<v
         localStorage.setItem(key, serialized);
       }
     } else if (serialized.length < 1900) {
-      // SecureStore has a 2048-byte limit on some native platforms; larger payloads stay in memoryCache
       await SecureStore.setItemAsync(key, serialized);
     }
   } catch {
-    // ignore storage quota errors
   }
 }
 
@@ -103,7 +101,6 @@ async function saveOfflineQueue(queue: QueuedMutation[]): Promise<void> {
       await SecureStore.setItemAsync(QUEUE_KEY, serialized);
     }
   } catch {
-    // ignore
   }
   notifyOfflineListeners(isCurrentlyOffline, queue.length);
 }
@@ -167,7 +164,6 @@ function notifyOfflineListeners(offline: boolean, queuedCount: number): void {
     try {
       cb(offline, queuedCount);
     } catch {
-      // ignore
     }
   }
 }

@@ -31,7 +31,6 @@ export function InteractiveTrendsAnalytics({
   });
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  // Filter entries according to time range
   const filteredEntries = useMemo(() => {
     if (!entries || entries.length === 0) return [];
     const sorted = [...entries].sort(
@@ -55,7 +54,6 @@ export function InteractiveTrendsAnalytics({
     }
   }, [entries, timeRange]);
 
-  // Averages for filtered slice
   const stats = useMemo(() => {
     if (filteredEntries.length === 0) return { avgStress: 0, avgMood: 0, avgEnergy: 0 };
     const avgStress =
@@ -72,7 +70,6 @@ export function InteractiveTrendsAnalytics({
     };
   }, [filteredEntries]);
 
-  // Module Correlation Heatmap Data
   const correlationData = useMemo(() => {
     const map: Record<
       string,
@@ -120,14 +117,12 @@ export function InteractiveTrendsAnalytics({
     });
   }, [entries, modules]);
 
-  // SVG Chart Geometry
   const width = 800;
   const height = 240;
   const padding = { top: 20, right: 30, bottom: 35, left: 35 };
   const graphWidth = width - padding.left - padding.right;
   const graphHeight = height - padding.top - padding.bottom;
 
-  // Build points
   const points = useMemo(() => {
     if (filteredEntries.length === 0) return [];
     const count = filteredEntries.length;
@@ -135,7 +130,6 @@ export function InteractiveTrendsAnalytics({
 
     return filteredEntries.map((e, idx) => {
       const x = padding.left + (count > 1 ? idx * stepX : graphWidth / 2);
-      // scale 1 to 10 onto graphHeight
       const getY = (val: number) =>
         padding.top + graphHeight - ((val - 1) / 9) * graphHeight;
 
@@ -149,7 +143,6 @@ export function InteractiveTrendsAnalytics({
     });
   }, [filteredEntries, graphWidth, graphHeight]);
 
-  // Cubic Bezier SVG Curve Generator
   const generateSmoothPath = (pts: { x: number; y: number }[]) => {
     if (pts.length < 2) return '';
     let d = `M ${pts[0].x} ${pts[0].y}`;
@@ -590,10 +583,6 @@ export function InteractiveTrendsAnalytics({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {correlationData.map((item) => {
             const ModIcon = item.icon;
-            // Determine heat tier:
-            // High Stress (Net Strain > 1.0) -> Red/Pink
-            // High Flow (Net Strain < -1.0) -> Green/Emerald
-            // Neutral -> Cyan/Slate
             const isHighStrain = item.avgStress >= 6.0 || item.netStrain > 0.8;
             const isHighFlow = item.avgEnergy >= 6.5 && item.netStrain <= -0.5;
 

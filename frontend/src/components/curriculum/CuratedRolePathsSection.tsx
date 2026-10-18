@@ -138,7 +138,6 @@ export function CuratedRolePathsSection({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Active view states
   const [selectedPathId, setSelectedPathId] = useState<string | null>(initialPathId || null);
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [activeLesson, setActiveLesson] = useState<LessonDetail | null>(null);
@@ -147,7 +146,6 @@ export function CuratedRolePathsSection({
   const [goalToast, setGoalToast] = useState<string | null>(null);
   const [xpBanner, setXpBanner] = useState<string | null>(null);
 
-  // Code Block interactive helpers
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [consoleOpen, setConsoleOpen] = useState<Record<number, boolean>>({});
   const [runningIndex, setRunningIndex] = useState<number | null>(null);
@@ -160,7 +158,6 @@ export function CuratedRolePathsSection({
       const list = Array.isArray(data?.paths) ? data.paths : [];
       setRolePaths(list);
 
-      // Check saved active goal
       try {
         const saved = localStorage.getItem('synergysphere.active_role_path');
         if (saved && list.some((p) => p.id === saved)) {
@@ -169,7 +166,6 @@ export function CuratedRolePathsSection({
           setActiveGoalId(list[0].id);
         }
       } catch {
-        // ignore
       }
     } catch (err: any) {
       setError(err?.message || 'Unable to load role paths. Please ensure backend is running.');
@@ -184,7 +180,6 @@ export function CuratedRolePathsSection({
 
   const selectedPath = rolePaths.find((p) => p.id === selectedPathId) || null;
 
-  // Load lesson detail when activeLessonId changes
   useEffect(() => {
     if (!activeLessonId) {
       setActiveLesson(null);
@@ -219,7 +214,6 @@ export function CuratedRolePathsSection({
     try {
       localStorage.setItem('synergysphere.active_role_path', pathId);
     } catch {
-      // ignore
     }
     setGoalToast(`Set "${pathTitle}" as your active career focus goal.`);
     setTimeout(() => setGoalToast(null), 4000);
@@ -227,7 +221,6 @@ export function CuratedRolePathsSection({
 
   const handleStartRoadmap = (path: RolePath) => {
     setSelectedPathId(path.id);
-    // Find next uncompleted lesson in syllabus
     const nextUncompleted = path.syllabus?.find((l) => !l.completed);
     const targetLessonId = nextUncompleted?.id || path.syllabus?.[0]?.id || null;
     setActiveLessonId(targetLessonId);
@@ -251,7 +244,6 @@ export function CuratedRolePathsSection({
       );
       setActiveLesson((prev) => (prev ? { ...prev, completed: res.completed } : null));
 
-      // Update role paths in memory
       setRolePaths((prev) =>
         prev.map((rp) => {
           if (rp.id !== selectedPath.id) return rp;
@@ -285,7 +277,6 @@ export function CuratedRolePathsSection({
         setXpBanner(`Step Completed! You earned +${res.xpEarned} XP.`);
       }
     } catch {
-      // ignore
     }
   };
 
@@ -297,7 +288,6 @@ export function CuratedRolePathsSection({
       setActiveLessonId(nextLesson.id);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      // Completed entire roadmap!
       setActiveLessonId(null);
       setGoalToast(`Incredible! You have completed all lessons in ${selectedPath.title}!`);
     }

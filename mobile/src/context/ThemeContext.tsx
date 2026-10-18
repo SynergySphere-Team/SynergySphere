@@ -110,7 +110,6 @@ export function ThemeProvider({
         try {
           await saveStoredTheme(nextTheme);
         } catch {
-          // ignore storage error
         }
       },
     }),

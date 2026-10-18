@@ -320,7 +320,6 @@ export function clusterWellnessEntries(
 ): ClusteredSession[] {
   if (!entries || entries.length === 0) return [];
 
-  // Sort descending by date
   const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const clusters: ClusteredSession[] = [];
 

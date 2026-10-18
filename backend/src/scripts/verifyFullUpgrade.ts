@@ -6,7 +6,6 @@ import { query } from '../lib/db.js';
 async function runVerification() {
   console.log('=== STARTING SYNERGYSPHERE UPGRADE VERIFICATION ===\n');
 
-  // 1. Verify Interview Bank Size and Tracks
   console.log('1. Checking Interview Question Bank...');
   console.log(`Found ${ALL_INTERVIEW_TRACKS.length} tracks registered in interview bank:`);
   let totalCatalogQuestions = 0;
@@ -19,7 +18,6 @@ async function runVerification() {
   if (totalCatalogQuestions < 550) throw new Error('Expected at least 550 questions in bank');
   console.log('✔ Question bank verified!\n');
 
-  // 2. Verify Session Selector & Weighting
   console.log('2. Testing Session Selector (Java, count=10, mixed)...');
   const sessionQs = selectSessionQuestions({ topic: 'java', count: 10, mode: 'mixed' });
   console.log(`Selected ${sessionQs.length} questions for Java session:`);
@@ -32,7 +30,6 @@ async function runVerification() {
   if (sessionQs.length !== 10) throw new Error('Expected 10 questions');
   console.log('✔ Session selector verified!\n');
 
-  // 3. Test User, Profile Signals & Real Interview Session
   console.log('3. Testing User, Profile Signals & Real Interview Session...');
   const users = await query<{ id: string; email: string }>('SELECT id, email FROM "User" LIMIT 1');
   if (users.length === 0) throw new Error('No user found in database for testing');
@@ -50,7 +47,6 @@ async function runVerification() {
   const session = await startInterviewSession({ userId, topic: 'java', count: 10, mode: 'mixed' });
   console.log(`Started session id: ${session.id} with ${session.questions.length} questions`);
 
-  // 4. Test Live Rubric Critique on Question 0
   console.log('\n4. Testing Live Rubric Critique on Question 0...');
   const testQuestion = session.questions[0];
   console.log(`Prompt: "${testQuestion.prompt.substring(0, 80)}..."`);
@@ -88,7 +84,6 @@ async function runVerification() {
     }
     console.log('✔ Session evaluation & dynamic XP verified!\n');
 
-  // 5. Test Job Aggregator Integration
   console.log('5. Testing Job Aggregator & Search Deep-Links...');
   const jobsRes = await fetchRecommendedJobs({ role: 'Junior Backend Developer', userSkills: ['Java', 'Spring Boot', 'SQL'] });
   console.log(`Job Aggregator status:`);
@@ -103,7 +98,6 @@ async function runVerification() {
   }
   console.log('✔ Job aggregator verified!\n');
 
-  // 6. Test Community Projects & IT Briefs
   console.log('6. Checking Community Projects in Database...');
   const projects = await query<{ id: string; title: string; category: string; techStack: string | null; teamCapacity: number | null }>(
     'SELECT id, title, category, "techStack", "teamCapacity" FROM "Project" ORDER BY "createdAt" DESC LIMIT 10'

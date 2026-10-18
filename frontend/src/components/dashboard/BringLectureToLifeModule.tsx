@@ -140,7 +140,6 @@ type StudyTab = 'summary' | 'flashcards' | 'quiz' | 'projects' | 'exercises';
 export function BringLectureToLifeModule() {
   const [activeSection, setActiveSection] = useState<'upload' | 'programming'>('upload');
 
-  // File Upload State
   const [content, setContent] = useState('');
   const [fileName, setFileName] = useState('');
   const [fileType, setFileType] = useState('text');
@@ -153,7 +152,6 @@ export function BringLectureToLifeModule() {
   const [activeFlippedCard, setActiveFlippedCard] = useState<number | null>(null);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number | null>>({});
 
-  // Programming / Learning Hub State
   const [technologies, setTechnologies] = useState<LearningHubTech[]>(FALLBACK_PROGRAMMING_RESOURCES);
   const [techFilter, setTechFilter] = useState('all');
   const [techSearch, setTechSearch] = useState('');
@@ -162,7 +160,6 @@ export function BringLectureToLifeModule() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  // Load saved lecture uploads
   const loadUploads = useCallback(async () => {
     try {
       const items = await api<LectureUpload[]>('/ai/lecture-to-life');
@@ -175,7 +172,6 @@ export function BringLectureToLifeModule() {
     }
   }, []);
 
-  // Load Learning Hub technologies
   const loadTechnologies = useCallback(async () => {
     setLoadingTech(true);
     try {
@@ -184,7 +180,6 @@ export function BringLectureToLifeModule() {
         setTechnologies(res.technologies);
       }
     } catch {
-      // Use fallback catalog
     } finally {
       setLoadingTech(false);
     }
@@ -195,7 +190,6 @@ export function BringLectureToLifeModule() {
     loadTechnologies();
   }, [loadUploads, loadTechnologies]);
 
-  // Handle study material upload
   async function processSelectedFile(file: File) {
     setExtracting(true);
     setUploadError('');
@@ -227,7 +221,6 @@ export function BringLectureToLifeModule() {
     }
   }
 
-  // Convert uploaded notes/slides into AI study pack
   async function handleGenerateStudyPack() {
     if (!content.trim() || content.trim().length < 20) {
       setUploadError('Please provide at least 20 characters of lecture content to generate materials.');
@@ -259,7 +252,6 @@ export function BringLectureToLifeModule() {
     }
   }
 
-  // Filtered technologies for Programming section
   const filteredTech = technologies.filter((tech) => {
     const matchesSearch =
       tech.name.toLowerCase().includes(techSearch.toLowerCase()) ||

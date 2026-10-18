@@ -26,19 +26,16 @@ export function refreshEnv(): void {
   try {
     dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
   } catch {
-    // ignore
   }
   try {
     dotenv.config({ path: path.resolve(process.cwd(), 'backend/.env'), override: true });
   } catch {
-    // ignore
   }
   try {
     const currentDir = path.dirname(fileURLToPath(import.meta.url));
     dotenv.config({ path: path.resolve(currentDir, '../../../.env'), override: true });
     dotenv.config({ path: path.resolve(currentDir, '../../.env'), override: true });
   } catch {
-    // ignore
   }
 }
 
@@ -66,7 +63,6 @@ export async function generateAiResponse(
   const cleanCustomKey = (customApiKey || '').trim();
   let lastFailureReason: string | undefined;
 
-  // 1. Try backend .env Gemini first (Google AI Studio)
   const isDummyGeminiKey = (k: string) =>
     !k || k === 'your-gemini-api-key' || (Boolean(process.env.JWT_SECRET) && k === process.env.JWT_SECRET!.trim());
   const envGeminiKey = isDummyGeminiKey(process.env.GEMINI_API_KEY || '')
@@ -83,7 +79,6 @@ export async function generateAiResponse(
     }
   }
 
-  // 2. Try backend .env Groq (ultra-fast cloud inference)
   const groqKey = (process.env.GROQ_API_KEY || '').trim();
   if (groqKey) {
     try {
@@ -95,7 +90,6 @@ export async function generateAiResponse(
     }
   }
 
-  // 3. Try backend .env OpenAI
   const openaiKey = (
     process.env.OPENAI_API_KEY ||
     (process.env.ANTHROPIC_API_KEY?.startsWith('sk-') ? process.env.ANTHROPIC_API_KEY : '') ||
@@ -111,7 +105,6 @@ export async function generateAiResponse(
     }
   }
 
-  // 4. Optional custom key fallback if distinct from env keys
   if (cleanCustomKey && cleanCustomKey !== envGeminiKey && cleanCustomKey !== groqKey && cleanCustomKey !== openaiKey) {
     try {
       if (cleanCustomKey.startsWith('gsk_')) {
@@ -129,7 +122,6 @@ export async function generateAiResponse(
     }
   }
 
-  // 5. Intelligent fallback — grounded callers inject their own synthesizer
   return offlineFallback(lastFailureReason);
 }
 
@@ -225,7 +217,6 @@ async function callGeminiModel(
     };
 
     const parts = data.candidates?.[0]?.content?.parts || [];
-    // Ignore internal thought parts (Gemini 2.5/3.8 thinking models)
     const contentParts = parts.filter((part) => !part.thought);
     const text = (contentParts.length > 0 ? contentParts : parts)
       .map((part) => (typeof part.text === 'string' ? part.text : ''))
@@ -499,7 +490,6 @@ export async function transcribeAudio(
   const cleanMime = mimeType.split(';')[0].trim() || 'audio/m4a';
   const cleanCustomKey = (customApiKey || '').trim();
 
-  // 1. Try Gemini if configured
   const geminiKey = (cleanCustomKey && !cleanCustomKey.startsWith('sk-') && !cleanCustomKey.startsWith('gsk_') ? cleanCustomKey : process.env.GEMINI_API_KEY || '').trim();
   if (geminiKey) {
     const models = [
@@ -565,7 +555,6 @@ export async function transcribeAudio(
     }
   }
 
-  // 2. Try OpenAI Whisper if configured
   const openaiKey = (
     cleanCustomKey && cleanCustomKey.startsWith('sk-')
       ? cleanCustomKey
@@ -607,7 +596,6 @@ export async function transcribeAudio(
     }
   }
 
-  // 3. Fallback: Contextual simulated transcription when no external API key is active
   if (contextHint) {
     return `In addressing this challenge, I analyzed the core requirements and focused on maintainability and performance. Specifically regarding ${contextHint.toLowerCase()}, I structured the solution into modular components with clear separation of concerns, optimized the data flow to minimize bottlenecks, and implemented robust error handling to guarantee reliable execution under production conditions.`;
   }

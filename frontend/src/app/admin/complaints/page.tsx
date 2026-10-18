@@ -45,11 +45,9 @@ export default function AdminComplaintsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Filters
   const [statusFilter, setStatusFilter] = useState('all');
   const [targetTypeFilter, setTargetTypeFilter] = useState('all');
 
-  // Detail Modal state
   const [selectedComplaint, setSelectedComplaint] = useState<ComplaintItem | null>(null);
   const [actionType, setActionType] = useState('reviewed');
   const [actionNotes, setActionNotes] = useState('');

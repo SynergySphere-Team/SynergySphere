@@ -114,7 +114,6 @@ export function MyWorkView({
     error.toLowerCase().includes('not connected') ||
     error.toLowerCase().includes('github_not_connected');
 
-  // Search filter
   const query = search.trim().toLowerCase();
 
   const filteredIssues = useMemo(() => {

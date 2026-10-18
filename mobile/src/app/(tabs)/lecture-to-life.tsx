@@ -182,7 +182,6 @@ export default function LectureToLifeScreen() {
         setSrsTotalCount(res.totalCount || res.cards.length);
       }
     } catch {
-      // ignore if offline
     }
   }, []);
 

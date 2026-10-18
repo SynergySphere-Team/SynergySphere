@@ -415,7 +415,7 @@ describe('7. Sections 2, 3 & 4 Implementations + Removal of GitHub Commit Coach'
     testApp.use('/api/github', githubRoutes);
 
     const server = http.createServer(testApp);
-    initRealtime(server);
+    const wss = initRealtime(server);
 
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
     const addr = server.address() as { port: number };
@@ -598,6 +598,7 @@ describe('7. Sections 2, 3 & 4 Implementations + Removal of GitHub Commit Coach'
       clientA.close();
       clientB.close();
     } finally {
+      wss.close();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });

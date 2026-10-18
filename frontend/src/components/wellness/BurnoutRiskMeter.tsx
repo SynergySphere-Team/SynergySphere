@@ -27,7 +27,6 @@ export function BurnoutRiskMeter({
     }));
   };
 
-  // Color config based on risk level
   const isCritical = risk.level === 'CRITICAL';
   const isModerate = risk.level === 'MODERATE';
   const isLow = risk.level === 'LOW';

@@ -26,7 +26,6 @@ export function QuickResets({ onLogGratitudeWin }: QuickResetsProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [activeTool, setActiveTool] = useState<'breathing' | 'pomodoro' | 'gratitude'>('breathing');
 
-  // --- 1. 4-7-8 Breathing State ---
   const [isBreathingActive, setIsBreathingActive] = useState(false);
   const [breathPhase, setBreathPhase] = useState<'Inhale' | 'Hold' | 'Exhale'>('Inhale');
   const [breathSecondsLeft, setBreathSecondsLeft] = useState(4);
@@ -39,7 +38,6 @@ export function QuickResets({ onLogGratitudeWin }: QuickResetsProps) {
       setBreathSecondsLeft((prev) => {
         if (prev > 1) return prev - 1;
 
-        // Transition phases
         if (breathPhase === 'Inhale') {
           setBreathPhase('Hold');
           return 7;
@@ -63,8 +61,7 @@ export function QuickResets({ onLogGratitudeWin }: QuickResetsProps) {
     setBreathSecondsLeft(4);
   };
 
-  // --- 2. Pomodoro Decompression & Ambient Audio State ---
-  const [pomoSecondsLeft, setPomoSecondsLeft] = useState(300); // 5 minutes
+  const [pomoSecondsLeft, setPomoSecondsLeft] = useState(300);
   const [isPomoRunning, setIsPomoRunning] = useState(false);
   const [soundscape, setSoundscape] = useState<'binaural' | 'rain' | 'cafe'>('binaural');
   const [isAudioMuted, setIsAudioMuted] = useState(false);
@@ -224,7 +221,6 @@ export function QuickResets({ onLogGratitudeWin }: QuickResetsProps) {
     setIsAudioPlaying(false);
   };
 
-  // Adjust volume
   useEffect(() => {
     if (audioNodesRef.current.gainNode && audioCtxRef.current) {
       audioNodesRef.current.gainNode.gain.setValueAtTime(
@@ -243,7 +239,6 @@ export function QuickResets({ onLogGratitudeWin }: QuickResetsProps) {
     };
   }, []);
 
-  // --- 3. Quick Win Gratitude Box State ---
   const [gratitudeText, setGratitudeText] = useState('');
   const [gratitudeSaved, setGratitudeSaved] = useState(false);
 
@@ -501,7 +496,6 @@ export function QuickResets({ onLogGratitudeWin }: QuickResetsProps) {
                       onClick={() => {
                         setSoundscape(preset.id as any);
                         if (isAudioPlaying) {
-                          // restart with new soundscape
                           setTimeout(startAmbientAudio, 50);
                         }
                       }}

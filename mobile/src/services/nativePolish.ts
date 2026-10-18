@@ -15,7 +15,6 @@ export function triggerLightHaptic(): void {
       window.navigator.vibrate(15);
     }
   } catch {
-    // Vibration silently ignored on unsupported devices
   }
 }
 
@@ -29,7 +28,6 @@ export function triggerMediumHaptic(): void {
       window.navigator.vibrate(30);
     }
   } catch {
-    // Vibration silently ignored
   }
 }
 
@@ -41,7 +39,6 @@ export function triggerSuccessHaptic(): void {
       Vibration.vibrate(30);
     }
   } catch {
-    // Vibration silently ignored
   }
 }
 
@@ -53,7 +50,6 @@ export function triggerErrorHaptic(): void {
       Vibration.vibrate(50);
     }
   } catch {
-    // Vibration silently ignored
   }
 }
 
@@ -70,7 +66,6 @@ export async function enableKeepAwake(tag: string = 'realistic-interview'): Prom
       isKeepAwakeActive = true;
     }
   } catch {
-    // Keep awake silently ignored if unsupported on platform
   }
 }
 
@@ -81,6 +76,5 @@ export async function disableKeepAwake(tag: string = 'realistic-interview'): Pro
       isKeepAwakeActive = false;
     }
   } catch {
-    // Keep awake release silently ignored
   }
 }

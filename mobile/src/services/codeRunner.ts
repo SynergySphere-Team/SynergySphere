@@ -17,7 +17,6 @@ export async function executeCodeTestSuite(
   let passedCount = 0;
   let failedCount = 0;
 
-  // Intercept console.log safely
   const originalLog = console.log;
   const mockLog = (...args: any[]) => {
     capturedStdout.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
@@ -26,10 +25,8 @@ export async function executeCodeTestSuite(
   try {
     console.log = mockLog;
 
-    // Clean TypeScript annotations if running in JS engine
     const sanitizedCode = sanitizeTypeScriptForExecution(code);
 
-    // Evaluate function in local scope
     // eslint-disable-next-line no-new-func
     const factory = new Function(`
       ${sanitizedCode}
@@ -55,7 +52,6 @@ export async function executeCodeTestSuite(
           const rawOutput = runnerFn(...parsedArgs);
           actualOutput = rawOutput !== undefined ? JSON.stringify(rawOutput) : 'undefined';
 
-          // Normalize for comparison
           const cleanExpected = tc.expectedOutput.trim();
           const cleanActual = actualOutput.trim();
 
@@ -78,7 +74,6 @@ export async function executeCodeTestSuite(
       });
     }
   } catch (fatalErr: any) {
-    // Syntax / Parse Error in candidate code
     capturedStdout.push(`Syntax/Parse Error: ${fatalErr?.message || String(fatalErr)}`);
     for (const tc of testCases) {
       results.push({
@@ -125,7 +120,6 @@ function parseTestCaseInput(inputStr: string): any[] {
       const eqIdx = part.indexOf('=');
       if (eqIdx !== -1) {
         const valStr = part.slice(eqIdx + 1).trim();
-        // Safe JSON parse for arrays, numbers, objects
         try {
           args.push(JSON.parse(valStr));
         } catch {
@@ -136,7 +130,6 @@ function parseTestCaseInput(inputStr: string): any[] {
 
     if (args.length > 0) return args;
 
-    // Fallback: try parsing whole string as single JSON arg
     return [JSON.parse(inputStr)];
   } catch {
     return [];

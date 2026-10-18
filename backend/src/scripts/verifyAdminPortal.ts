@@ -74,9 +74,7 @@ async function runTests() {
   await waitForServer();
 
   try {
-    // -----------------------------------------------------------------
     // TEST 1: Student Login
-    // -----------------------------------------------------------------
     console.log('\n[1] Student Authentication:');
     const studentLogin = await request('/api/auth/login', {
       method: 'POST',
@@ -87,9 +85,7 @@ async function runTests() {
     assert(!!studentToken, 'Student receives valid JWT');
     assert(studentLogin.data.user.role === 'STUDENT', 'User role is STUDENT');
 
-    // -----------------------------------------------------------------
     // TEST 2: Submit Support Ticket from Settings
-    // -----------------------------------------------------------------
     console.log('\n[2] User Help & Support - Ticket Submission:');
     const newTicketRes = await request('/api/settings/tickets', {
       method: 'POST',
@@ -106,9 +102,7 @@ async function runTests() {
     assert(createdTicket.status === 'open', 'Default status is "open"');
     assert(createdTicket.priority === 'medium', 'Default priority is "medium"');
 
-    // -----------------------------------------------------------------
     // TEST 3: User View My Submitted Issues
-    // -----------------------------------------------------------------
     console.log('\n[3] User Help & Support - Fetch My Issues:');
     const myTicketsRes = await request('/api/settings/tickets/me', {
       method: 'GET',
@@ -130,9 +124,7 @@ async function runTests() {
     assert(singleTicket.adminNotes === undefined || singleTicket.adminNotes === null,
       'Internal adminNotes are NEVER leaked to normal user');
 
-    // -----------------------------------------------------------------
     // TEST 4: Student RBAC Boundaries (403 Forbidden)
-    // -----------------------------------------------------------------
     console.log('\n[4] RBAC Protection - Student Access Forbidden:');
     const studentOverview = await request('/api/admin/overview', { token: studentToken });
     assert(studentOverview.status === 403, 'Student blocked from /api/admin/overview (403)');
@@ -146,9 +138,7 @@ async function runTests() {
     const studentDb = await request('/api/admin/database/health', { token: studentToken });
     assert(studentDb.status === 403, 'Student blocked from /api/admin/database (403)');
 
-    // -----------------------------------------------------------------
     // TEST 5: Single Unified Admin Authentication & Full Platform Access
-    // -----------------------------------------------------------------
     console.log('\n[5] Unified Admin (admin@synergysphere.com) - Full Access:');
     const adminLogin = await request('/api/auth/login', {
       method: 'POST',
@@ -221,9 +211,7 @@ async function runTests() {
     assert(csvReport.status === 200, 'Admin can export CSV reports');
     assert(typeof csvReport.data === 'string' && csvReport.data.length > 0, 'CSV report content present');
 
-    // -----------------------------------------------------------------
     // TEST 6: User Feedback Loop
-    // -----------------------------------------------------------------
     console.log('\n[6] User Feedback Loop:');
     const studentUpdatedCheck = await request(`/api/settings/tickets/${createdTicket.id}`, {
       method: 'GET',

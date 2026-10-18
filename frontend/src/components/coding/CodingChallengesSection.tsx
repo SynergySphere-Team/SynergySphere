@@ -822,7 +822,6 @@ export function CodingChallengesSection({ showHeading = true }: CodingChallenges
   const [submitting, setSubmitting] = useState(false);
   const [pageError, setPageError] = useState('');
 
-  // Filters
   const [difficultyFilter, setDifficultyFilter] = useState('All');
   const [languageFilter, setLanguageFilter] = useState('All');
 
@@ -906,7 +905,6 @@ export function CodingChallengesSection({ showHeading = true }: CodingChallenges
     return langMatch && diffMatch;
   });
 
-  // Keep selection synchronized if current selection doesn't match active filters
   useEffect(() => {
     const isCurrentValid =
       selected !== null &&

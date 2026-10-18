@@ -32,7 +32,6 @@ export interface JudgeResult {
   language?: string;
 }
 
-// First-party server-side test specifications (includes hidden test cases)
 const CHALLENGE_TESTS: Record<string, { fn: string; cases: TestCase[] }> = {
   'Hello World': {
     fn: 'greet',
@@ -230,7 +229,6 @@ export async function judgeJavaScript(
   const context = vm.createContext(sandbox);
 
   try {
-    // Run the user code script with a strict 2000ms timeout
     const userScript = new vm.Script(code, { filename: 'solution.js' });
     userScript.runInContext(context, { timeout: 2000 });
   } catch (err: any) {
@@ -347,7 +345,6 @@ export async function judgeSql(queryText: string, challengeTitle?: string): Prom
   try {
     await client.query('BEGIN');
 
-    // Create a temporary sandbox tables
     await client.query(`
       CREATE TEMP TABLE IF NOT EXISTS temp_students (
         id SERIAL PRIMARY KEY,
@@ -390,7 +387,6 @@ export async function judgeSql(queryText: string, challengeTitle?: string): Prom
       ('Alice Brown', 'Sales', 60000);
     `);
 
-    // Replace table names in query to target temp tables
     const sanitizedQuery = queryText
       .replace(/\bstudents\b/gi, 'temp_students')
       .replace(/\busers\b/gi, 'temp_users')
@@ -422,7 +418,6 @@ export async function judgeSql(queryText: string, challengeTitle?: string): Prom
         hidden: true,
       });
     } else {
-      // Default students check
       const names = res.rows.map((r: any) => r.name).sort();
       const expected = ['Alice Walker', 'Chidi Anagonye'].sort();
       const passed = JSON.stringify(names) === JSON.stringify(expected);
@@ -869,7 +864,6 @@ public class ${className} {
     if (!compileResult.ok) {
       const runtimeMs = Math.max(1, Math.round(performance.now() - startTime));
       if (compileResult.error && /ENOENT/i.test(compileResult.error)) {
-        // Local JDK (javac) is not installed on host — evaluate Java syntax & structure
         const hasBalancedBraces =
           (code.match(/\{/g) || []).length === (code.match(/\}/g) || []).length &&
           (code.match(/\{/g) || []).length > 0;
@@ -970,12 +964,10 @@ export async function judgeChallengeSubmission(
 ): Promise<JudgeResult> {
   const lang = (challenge.language || 'JavaScript').toLowerCase();
 
-  // 1. SQL Challenge Judge
   if (lang === 'sql' || challenge.title.toLowerCase().includes('sql')) {
     return judgeSql(submittedCode, challenge.title);
   }
 
-  // 2. Python Challenge Judge
   if (lang === 'python' || challenge.title.toLowerCase().includes('python')) {
     const spec = CHALLENGE_TESTS[challenge.title];
     if (spec) {
@@ -985,24 +977,20 @@ export async function judgeChallengeSubmission(
     return judgePythonGeneric(submittedCode, detectedFn, challenge.solution);
   }
 
-  // 3. Java Challenge Judge
   if (lang === 'java' || challenge.title.toLowerCase().includes('java')) {
     return judgeJava(submittedCode, challenge.title, challenge.solution);
   }
 
-  // 4. JavaScript / TypeScript Judge via Sandboxed Node VM
   const spec = CHALLENGE_TESTS[challenge.title];
   if (spec) {
     return judgeJavaScript(submittedCode, spec);
   }
 
-  // 5. Fallback for challenges with starter code or function detection
   const detectedFn = detectFunctionName(submittedCode, 'javascript') || 'solution';
   if (challenge.solution && challenge.solution.trim()) {
     return testGenericFunction(submittedCode, detectedFn, challenge.solution);
   }
 
-  // Fallback to strict AST/string normalization if no VM test spec exists
   const normalizedSubmitted = submittedCode.replace(/\s+/g, ' ').trim().toLowerCase();
   const normalizedSolution = (challenge.solution || '').replace(/\s+/g, ' ').trim().toLowerCase();
   const passed = normalizedSolution.length > 0 && normalizedSubmitted.includes(normalizedSolution);

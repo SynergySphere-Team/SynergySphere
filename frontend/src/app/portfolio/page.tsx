@@ -7,6 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/utils';
+import {
+  parseDocument,
+  serializeToHtml,
+  serializeToMarkdown,
+  serializeToPlainText,
+  escapeHtml,
+  type DocBlock,
+} from '@/lib/careerDocument';
+import { CareerDocumentEditor } from '@/components/portfolio/CareerDocumentEditor';
 import Link from 'next/link';
 import {
   Briefcase,
@@ -35,6 +44,7 @@ import {
   Building,
   MapPin,
   RefreshCw,
+  Pencil,
 } from 'lucide-react';
 
 interface PortfolioItem {
@@ -124,6 +134,7 @@ interface JobsResponse {
 
 const SKILLS_KEY = 'synergysphere.portfolio.skills';
 const LINKS_KEY = 'synergysphere.portfolio.links';
+const DOCS_KEY = 'synergysphere.portfolio.documents';
 
 const CAREER_TOOLS = [
   {
@@ -157,6 +168,8 @@ const CAREER_TOOLS = [
 ] as const;
 
 type ToolId = typeof CAREER_TOOLS[number]['id'];
+
+const docKeyFor = (tool: ToolId, role: string) => `${tool}_${role}`;
 
 const PRESET_ROLES = [
   'Junior Backend Developer (Java / Spring)',
@@ -194,9 +207,49 @@ export default function PortfolioPage() {
   // Career Tools
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
   const [targetRole, setTargetRole] = useState(PRESET_ROLES[0]);
-  const [toolOutputs, setToolOutputs] = useState<Record<string, string>>({});
+  const [docs, setDocs] = useState<Record<string, DocBlock[]>>({});
+  const [editedKeys, setEditedKeys] = useState<string[]>([]);
+  const [isEditing, setIsEditing] = useState(true);
+  const [toolError, setToolError] = useState('');
   const [toolLoading, setToolLoading] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [docsHydrated, setDocsHydrated] = useState(false);
+
+  // Restore documents the user edited on a previous visit
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DOCS_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as Record<string, DocBlock[]>;
+        if (saved && typeof saved === 'object') {
+          setDocs(saved);
+          setEditedKeys(Object.keys(saved));
+        }
+      }
+    } catch {
+      localStorage.removeItem(DOCS_KEY);
+    } finally {
+      setDocsHydrated(true);
+    }
+  }, []);
+
+  // Persist only edited documents; generated ones can always be regenerated
+  useEffect(() => {
+    if (!docsHydrated) return;
+    try {
+      const edited: Record<string, DocBlock[]> = {};
+      editedKeys.forEach((key) => {
+        if (docs[key]) edited[key] = docs[key];
+      });
+      if (Object.keys(edited).length > 0) {
+        localStorage.setItem(DOCS_KEY, JSON.stringify(edited));
+      } else {
+        localStorage.removeItem(DOCS_KEY);
+      }
+    } catch {
+      // Storage may be full or unavailable; edits still live in memory for this session
+    }
+  }, [docs, editedKeys, docsHydrated]);
 
   // Jobs tool state
   const [jobsData, setJobsData] = useState<JobsResponse | null>(null);
@@ -370,12 +423,21 @@ export default function PortfolioPage() {
     }
   }
 
-  // Run or refresh career tool
-  async function runCareerTool(toolId: ToolId, role = targetRole) {
+  // Run or refresh career tool. Cached documents are reused unless `force` is set so
+  // switching tabs never discards the user's edits.
+  async function runCareerTool(toolId: ToolId, role = targetRole, force = false) {
     setActiveTool(toolId);
+    setToolError('');
+    setIsEditing(toolId !== 'jobs');
 
     if (toolId === 'jobs') {
       await loadJobs(role);
+      return;
+    }
+
+    const key = docKeyFor(toolId, role);
+    if (!force && docs[key]) return;
+    if (force && editedKeys.includes(key) && !window.confirm('Regenerating will replace your edits to this document. Continue?')) {
       return;
     }
 
@@ -391,32 +453,71 @@ export default function PortfolioPage() {
       });
 
       if (res?.content) {
-        setToolOutputs((prev) => ({ ...prev, [`${toolId}_${role}`]: res.content, [toolId]: res.content }));
+        setDocs((prev) => ({ ...prev, [key]: parseDocument(res.content) }));
+        setEditedKeys((prev) => prev.filter((k) => k !== key));
+      } else {
+        setToolError('The generator returned an empty document. Please try Regenerate.');
       }
     } catch (err) {
-      console.warn('Career-tools request fallback:', err);
+      console.warn('Career-tools request failed:', err);
+      setToolError('Could not generate this document right now. Check your connection and click Regenerate.');
     } finally {
       setToolLoading(false);
     }
   }
 
-  const currentOutput = toolOutputs[`${activeTool}_${targetRole}`] || toolOutputs[activeTool ?? ''] || '';
+  const currentDocKey = activeTool ? docKeyFor(activeTool, targetRole) : '';
+  const currentBlocks = useMemo<DocBlock[]>(() => docs[currentDocKey] ?? [], [docs, currentDocKey]);
+  const isDocEdited = editedKeys.includes(currentDocKey);
+
+  function updateBlocks(blocks: DocBlock[]) {
+    if (!currentDocKey) return;
+    setDocs((prev) => ({ ...prev, [currentDocKey]: blocks }));
+    setEditedKeys((prev) => (prev.includes(currentDocKey) ? prev : [...prev, currentDocKey]));
+  }
+
+  function documentTitle() {
+    const label = CAREER_TOOLS.find((t) => t.id === activeTool)?.label ?? 'Document';
+    return `${label} - ${fullName}`;
+  }
+
+  function printDocument() {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      setToolError('Your browser blocked the print window. Allow pop-ups for this site and try again.');
+      return;
+    }
+    printWindow.document.write(serializeToHtml(currentBlocks, documentTitle()));
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 300);
+  }
+
+  function downloadMarkdown() {
+    const blob = new Blob([serializeToMarkdown(currentBlocks)], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${fullName.replace(/\s+/g, '_')}_${activeTool}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   // Download CV document
   function downloadCV() {
     const skillsHtml = effectiveSkills
-      .map(([s, v]) => `<li><strong>${s}</strong>: ${v}% proficiency</li>`)
+      .map(([s, v]) => `<li><strong>${escapeHtml(s)}</strong>: ${v}% proficiency</li>`)
       .join('');
     const projectsHtml = items.length
       ? items
           .map(
             (p) => `
         <div style="margin-bottom:18px;border-left:3px solid #91db5e;padding-left:12px;">
-          <h4 style="margin:0 0 4px 0;font-size:16px;">${p.title}</h4>
-          ${p.description ? `<p style="margin:2px 0 6px 0;color:#4b5563;font-size:14px;">${p.description}</p>` : ''}
+          <h4 style="margin:0 0 4px 0;font-size:16px;">${escapeHtml(p.title)}</h4>
+          ${p.description ? `<p style="margin:2px 0 6px 0;color:#4b5563;font-size:14px;">${escapeHtml(p.description)}</p>` : ''}
           <div style="font-size:12px;color:#2563eb;">
-            ${p.projectLink ? `<a href="${p.projectLink}" style="margin-right:12px;">🔗 Live Project</a>` : ''}
-            ${p.githubLink ? `<a href="${p.githubLink}">💻 GitHub Repository</a>` : ''}
+            ${p.projectLink ? `<a href="${escapeHtml(p.projectLink)}" style="margin-right:12px;">Live Project</a>` : ''}
+            ${p.githubLink ? `<a href="${escapeHtml(p.githubLink)}">GitHub Repository</a>` : ''}
           </div>
         </div>`
           )
@@ -427,7 +528,7 @@ export default function PortfolioPage() {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>${fullName} — Curriculum Vitae</title>
+  <title>${escapeHtml(fullName)} — Curriculum Vitae</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 820px; margin: 40px auto; color: #1f2937; padding: 0 24px; line-height: 1.6; }
     h1 { font-size: 28px; margin: 0 0 4px 0; color: #111827; }
@@ -445,17 +546,17 @@ export default function PortfolioPage() {
     <span style="font-size: 13px; font-weight: 600;">Print-Ready Document</span>
     <button onclick="window.print()" style="background: #16a34a; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600;">Print / Save as PDF</button>
   </div>
-  <h1>${fullName}</h1>
+  <h1>${escapeHtml(fullName)}</h1>
   <div class="subtitle">Software Engineer · Backend &amp; Full-Stack Developer</div>
   <div class="contact">
-    Email: ${user?.email ?? 'developer@example.com'}
-    ${links.github ? ` · GitHub: <a href="${links.github}">${links.github}</a>` : ''}
-    ${links.linkedin ? ` · LinkedIn: <a href="${links.linkedin}">${links.linkedin}</a>` : ''}
+    ${user?.email ? `Email: ${escapeHtml(user.email)}` : ''}
+    ${links.github ? ` · GitHub: <a href="${escapeHtml(links.github)}">${escapeHtml(links.github)}</a>` : ''}
+    ${links.linkedin ? ` · LinkedIn: <a href="${escapeHtml(links.linkedin)}">${escapeHtml(links.linkedin)}</a>` : ''}
   </div>
 
   <div class="section-title">Professional Summary</div>
   <p style="font-size: 14px; color: #374151;">
-    Passionate software developer proficient in <strong>${skillsSummary}</strong>. Experienced in designing scalable backend systems, normalized relational databases, and modern web architectures. Strong collaborator dedicated to clean code, robust API design, and continuous learning.
+    Passionate software developer proficient in <strong>${escapeHtml(skillsSummary)}</strong>. Experienced in designing scalable backend systems, normalized relational databases, and modern web architectures. Strong collaborator dedicated to clean code, robust API design, and continuous learning.
   </p>
 
   <div class="section-title">Technical Proficiencies</div>
@@ -466,7 +567,7 @@ export default function PortfolioPage() {
 
   <div class="section-title">Education &amp; Verified SynergySphere Credentials</div>
   <p style="font-size: 14px; margin: 0 0 4px 0;"><strong>SynergySphere Verified Learning Hub Track Completions</strong></p>
-  <p style="font-size: 13px; color: #6b7280; margin: 0;">Developer Level ${user?.level ?? 1} (${user?.xp ?? 285} Contribution XP)</p>
+  <p style="font-size: 13px; color: #6b7280; margin: 0;">Developer Level ${user?.level ?? 1} (${user?.xp ?? 0} Contribution XP)</p>
 </body>
 </html>`;
 
@@ -1064,7 +1165,7 @@ export default function PortfolioPage() {
                     size="sm"
                     variant="ghost"
                     className="h-7 text-xs text-primary hover:text-primary"
-                    onClick={() => runCareerTool(activeTool, targetRole)}
+                    onClick={() => runCareerTool(activeTool, targetRole, true)}
                     disabled={toolLoading || jobsLoading}
                   >
                     <RefreshCw className={`mr-1.5 h-3 w-3 ${(toolLoading || jobsLoading) ? 'animate-spin' : ''}`} />
@@ -1213,104 +1314,95 @@ export default function PortfolioPage() {
                       </div>
                     )}
                   </div>
-                ) : activeTool === 'linkedin' ? (
-                  /* ── LinkedIn Optimizer View ── */
-                  <div className="space-y-6">
-                    <div className="rounded-xl border border-white/10 bg-[#161f30] p-4 text-xs text-gray-200 leading-relaxed font-sans">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-bold text-white flex items-center gap-2">
-                          <Linkedin className="h-4 w-4 text-[#0077b5]" />
-                          Tailored LinkedIn Profile Narrative
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="h-7 text-xs"
-                          onClick={() => copyText('li_narrative', currentOutput)}
-                        >
-                          {copiedKey === 'li_narrative' ? <Check className="h-3 w-3 text-primary mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
-                          {copiedKey === 'li_narrative' ? 'Copied' : 'Copy'}
-                        </Button>
-                      </div>
-                      <pre className="whitespace-pre-wrap font-sans text-xs md:text-sm leading-6 selection:bg-primary selection:text-black">
-                        {currentOutput}
-                      </pre>
-                    </div>
-
-                    <div className="rounded-xl border border-white/10 bg-[#161f30] p-4 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-bold text-white">Open LinkedIn</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">Apply your tailored headlines and narrative directly to your profile.</p>
-                      </div>
-                      <Button onClick={openLinkedIn} size="sm" className="bg-[#0077b5] hover:bg-[#0077b5]/90 text-white">
-                        <Linkedin className="mr-1.5 h-4 w-4" />
-                        Go to LinkedIn
-                      </Button>
-                    </div>
-                  </div>
                 ) : (
-                  /* ── Formatted Resume / CV Preview ── */
+                  /* ── Editable Resume / CV / LinkedIn Document ── */
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Formatted ATS Output (Grounded in Verified Hub Data)</span>
-                      <div className="flex items-center gap-2">
+                    {toolError && (
+                      <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                        <span>{toolError}</span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-2">
+                        {activeTool === 'linkedin'
+                          ? 'Tailored LinkedIn profile kit'
+                          : 'ATS-friendly document grounded in your verified Hub data'}
+                        {isDocEdited && (
+                          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                            Edited · saved on this device
+                          </span>
+                        )}
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
                         <Button
                           size="sm"
-                          variant="secondary"
+                          variant={isEditing ? 'default' : 'secondary'}
                           className="h-7 text-xs"
-                          onClick={() => {
-                            const printWindow = window.open('', '_blank');
-                            if (printWindow) {
-                              printWindow.document.write(`
-                                <html>
-                                  <head>
-                                    <title>${activeTool === 'resume' ? 'Resume' : 'CV'} — ${fullName}</title>
-                                    <style>
-                                      body { font-family: Arial, sans-serif; padding: 30px; line-height: 1.6; color: #111; max-width: 800px; margin: 0 auto; }
-                                      h1 { margin-bottom: 4px; font-size: 26px; }
-                                      h2 { font-size: 15px; border-bottom: 2px solid #333; padding-bottom: 3px; margin-top: 22px; text-transform: uppercase; }
-                                      h3 { font-size: 15px; margin: 12px 0 4px 0; }
-                                      pre { white-space: pre-wrap; font-family: inherit; font-size: 13px; }
-                                    </style>
-                                  </head>
-                                  <body>
-                                    <pre>${currentOutput.replace(/#/g, '')}</pre>
-                                    <script>window.print();</script>
-                                  </body>
-                                </html>
-                              `);
-                              printWindow.document.close();
-                            }
-                          }}
+                          onClick={() => setIsEditing((prev) => !prev)}
+                          disabled={currentBlocks.length === 0 && !isEditing}
                         >
-                          <Printer className="mr-1.5 h-3 w-3" />
-                          Print / PDF
+                          {isEditing ? <Check className="mr-1.5 h-3 w-3" /> : <Pencil className="mr-1.5 h-3 w-3" />}
+                          {isEditing ? 'Done Editing' : 'Edit'}
                         </Button>
                         <Button
                           size="sm"
                           variant="secondary"
                           className="h-7 text-xs"
-                          onClick={() => {
-                            const blob = new Blob([currentOutput], { type: 'text/markdown' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `${fullName.replace(/\s+/g, '_')}_${activeTool}.md`;
-                            a.click();
-                            URL.revokeObjectURL(url);
-                          }}
+                          onClick={() => copyText('doc', serializeToPlainText(currentBlocks))}
+                          disabled={currentBlocks.length === 0}
                         >
-                          <Download className="mr-1.5 h-3 w-3" />
-                          Download .md
+                          {copiedKey === 'doc' ? <Check className="mr-1.5 h-3 w-3 text-primary" /> : <Copy className="mr-1.5 h-3 w-3" />}
+                          {copiedKey === 'doc' ? 'Copied' : 'Copy'}
                         </Button>
+                        {activeTool !== 'linkedin' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="h-7 text-xs"
+                              onClick={printDocument}
+                              disabled={currentBlocks.length === 0}
+                            >
+                              <Printer className="mr-1.5 h-3 w-3" />
+                              Print / PDF
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="h-7 text-xs"
+                              onClick={downloadMarkdown}
+                              disabled={currentBlocks.length === 0}
+                            >
+                              <Download className="mr-1.5 h-3 w-3" />
+                              Download .md
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-white/10 bg-[#161f30] p-6 text-sm text-gray-100 font-sans leading-relaxed shadow-inner">
-                      <pre className="whitespace-pre-wrap font-sans text-xs md:text-sm leading-6 selection:bg-primary selection:text-black">
-                        {currentOutput}
-                      </pre>
-                    </div>
+                    {isEditing && (
+                      <p className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                        Click any line to change its text. Press <kbd className="rounded bg-white/10 px-1">Enter</kbd> to add a new line below, use the controls on the right of each line to restyle, reorder or delete it, then click <strong className="text-white">Done Editing</strong>.
+                      </p>
+                    )}
+
+                    <CareerDocumentEditor blocks={currentBlocks} editing={isEditing} onChange={updateBlocks} />
+
+                    {activeTool === 'linkedin' && (
+                      <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#161f30] p-4">
+                        <div>
+                          <p className="text-sm font-bold text-white">Open LinkedIn</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">Apply your tailored headlines and narrative directly to your profile.</p>
+                        </div>
+                        <Button onClick={openLinkedIn} size="sm" className="bg-[#0077b5] text-white hover:bg-[#0077b5]/90">
+                          <Linkedin className="mr-1.5 h-4 w-4" />
+                          Go to LinkedIn
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -255,7 +255,6 @@ async function main() {
       );
     }
 
-    // 1. Seed 12 Completed Java Curriculum Lessons
     const javaLessonsToSeed = [
       'w3s-java-java-intro',
       'w3s-java-java-get-started',
@@ -280,7 +279,6 @@ async function main() {
       );
     }
 
-    // 2. Seed 3 Passed Challenges
     const challengesToPass = [
       {
         title: 'Hello World',
@@ -314,7 +312,6 @@ async function main() {
       }
     }
 
-    // 3. Seed 1 Completed Technical Interview
     const interviewSessionId = newId();
     await client.query(
       `INSERT INTO "Interview" ("id", "userId", "topic", "score", "feedback", "weakAreas", "questions")
@@ -337,7 +334,6 @@ async function main() {
       ],
     );
 
-    // 4. Seed 1 Community Project Application
     const projectRow = await client.query<{ id: string }>(
       `SELECT "id" FROM "Project" WHERE "title" = 'Campus Recycling Dashboard' LIMIT 1`,
     );
@@ -350,7 +346,6 @@ async function main() {
       );
     }
 
-    // 5. Seed Real Tasks
     await client.query(
       `INSERT INTO "Task" ("id", "userId", "title", "description", "status", "dueDate")
        VALUES
@@ -360,7 +355,6 @@ async function main() {
       [newId(), studentId, newId()],
     );
 
-    // 6. Seed Wellness Log
     await client.query(
       `INSERT INTO "Wellness" ("id", "userId", "stressLevel", "mood", "energyLevel", "notes", "date")
        VALUES ($1, $2, 3, 8, 8, 'Productive morning session completing Java exercises. Ready for interview practice.', CURRENT_TIMESTAMP)
@@ -368,7 +362,6 @@ async function main() {
       [newId(), studentId],
     );
 
-    // 7. Seed Portfolio Profile & Verified STAR Bullet
     await client.query(
       `INSERT INTO "PortfolioProfile" ("id", "userId", "headline", "about", "location", "targetRole", "githubUrl", "linkedinUrl")
        VALUES ($1, $2, 'Aspiring Backend & Systems Developer',
@@ -391,7 +384,6 @@ async function main() {
       [newId(), studentId],
     );
 
-    // Clean up any deprecated demo accounts so only single Admin remains
     await client.query(
       `DELETE FROM "User" WHERE "email" IN ('superadmin@synergysphere.com', 'moderator@synergysphere.com', 'suspended.badactor@campus.edu')`
     );

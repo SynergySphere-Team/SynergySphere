@@ -94,7 +94,6 @@ export function HelpSupportSection() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Report Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formCategory, setFormCategory] = useState<(typeof CATEGORIES)[number]>('Bug / Technical Issue');
@@ -104,14 +103,12 @@ export function HelpSupportSection() {
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Confirmation state
   const [confirmedTicket, setConfirmedTicket] = useState<{
     ticketNumber: string;
     category: string;
     title: string;
   } | null>(null);
 
-  // Detail View Modal state
   const [selectedTicket, setSelectedTicket] = useState<UserTicket | null>(null);
 
   useEffect(() => {
@@ -187,21 +184,18 @@ export function HelpSupportSection() {
         }),
       });
 
-      // Clear form
       setFormSubject('');
       setFormDescription('');
       setAttachmentName(null);
       setAttachmentUrl(null);
       setIsModalOpen(false);
 
-      // Open confirmation modal
       setConfirmedTicket({
         ticketNumber: created.ticketNumber,
         category: created.category,
         title: created.title,
       });
 
-      // Refresh list
       await fetchTickets();
     } catch (err: any) {
       setFormError(err.message || 'Failed to submit ticket. Please check your network and try again.');

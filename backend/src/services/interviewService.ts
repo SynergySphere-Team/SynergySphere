@@ -20,7 +20,6 @@ import {
   type TopicLevel,
   type UserTopicProgressData,
 } from '../data/interviewBank/index.js';
-// In-memory fallback cache for sessions and progress (ensures resilience during offline / transient DB drops)
 const inMemoryInterviews = new Map<string, any>();
 const inMemoryTopicProgress = new Map<string, Map<string, UserTopicProgressData>>();
 
@@ -54,7 +53,6 @@ export async function startInterviewSession(params: StartInterviewParams) {
   const track = resolveTrack(topic || role);
   const resolvedTopicName = track ? track.name : (topic || role);
 
-  // 1. Fetch questions user has already mastered (score >= 80)
   const masteredRows = await query<{ questionId: string }>(
     `SELECT DISTINCT "questionId"
      FROM "InterviewAttempt"
@@ -63,7 +61,6 @@ export async function startInterviewSession(params: StartInterviewParams) {
   ).catch(() => []);
   const excludedQuestionIds = masteredRows.map((r) => r.questionId);
 
-  // 2. Fetch recent weak areas from past interviews or topic progress
   const pastInterviews = await query<{ weakAreas: string | string[] | null }>(
     `SELECT "weakAreas"
      FROM "Interview"
@@ -97,7 +94,6 @@ export async function startInterviewSession(params: StartInterviewParams) {
     if (!weakAreas.includes(row.topic)) weakAreas.push(row.topic);
   }
 
-  // 3. Select questions from bank tailored to role, type, difficulty, duration & weak areas
   const selectedQuestions = selectSessionQuestions({
     topic,
     role,
@@ -112,7 +108,6 @@ export async function startInterviewSession(params: StartInterviewParams) {
     weakAreas,
   });
 
-  // Client-safe questions with hints available
   const clientSafeQuestions = selectedQuestions.map((q) => ({
     id: q.id,
     topic: q.topic,
@@ -133,7 +128,6 @@ export async function startInterviewSession(params: StartInterviewParams) {
     estimatedTime: q.estimatedTime || 3,
   }));
 
-  // Construct styled interviewer greeting based on interviewerStyle
   let interviewerGreeting = '';
   switch (interviewerStyle) {
     case 'Friendly':
@@ -169,10 +163,8 @@ export async function startInterviewSession(params: StartInterviewParams) {
     status: 'IN_PROGRESS',
   };
 
-  // Cache in-memory
   inMemoryInterviews.set(sessionId, sessionData);
 
-  // Store in DB
   await query(
     `INSERT INTO "Interview" (
        "id", "userId", "topic", "role", "interviewType", "difficulty",
@@ -253,7 +245,6 @@ export async function getQuestionHint(params: HintParams) {
 
   session.hintsUsedTotal = (session.hintsUsedTotal || 0) + 1;
 
-  // Persist hint counter in DB if available
   query(
     `UPDATE "Interview" SET "hintsUsed" = COALESCE("hintsUsed", 0) + 1 WHERE "id" = $1`,
     [interviewId],
@@ -677,7 +668,6 @@ export async function evaluateInterviewSession(params: EvaluateInterviewParams):
       weakTopicTags.push(...q.tags);
     }
 
-    // Save individual attempt
     query(
       `INSERT INTO "InterviewAttempt" (
          "id", "userId", "interviewId", "questionId", "questionIndex",
@@ -699,11 +689,9 @@ export async function evaluateInterviewSession(params: EvaluateInterviewParams):
     ).catch(() => {});
   }
 
-  // Calculate overall score
   const totalScore = questionEvaluations.reduce((sum, qe) => sum + qe.score, 0);
   const overallScore = Math.round(totalScore / Math.max(questionEvaluations.length, 1));
 
-  // Build Multi-Dimensional Evaluation (Prompt 31)
   const calcRating = (sc: number): 'Strong' | 'Improving' | 'Developing' | 'Needs Practice' => {
     if (sc >= 82) return 'Strong';
     if (sc >= 68) return 'Improving';
@@ -769,7 +757,6 @@ export async function evaluateInterviewSession(params: EvaluateInterviewParams):
     },
   };
 
-  // Strengths and Weaknesses
   const strengths: string[] = [];
   if (overallScore >= 75) strengths.push('Strong conceptual grasp of core language features');
   if (codingScore >= 75) strengths.push('Proficient algorithmic problem-solving in scratchpad');
@@ -785,7 +772,6 @@ export async function evaluateInterviewSession(params: EvaluateInterviewParams):
     weaknesses.push('High-throughput distributed concurrency and memory optimization');
   }
 
-  // Map weak areas to specific topics
   const weakAreas: string[] = [];
   for (const tag of uniqueWeakTags.slice(0, 4)) {
     const formatted = tag.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
@@ -831,7 +817,6 @@ export async function evaluateInterviewSession(params: EvaluateInterviewParams):
     });
   }
 
-  // Connect interview topics to SynergySphere Skills (Prompt 50)
   const primaryTopic = session.topic || 'Software Engineering';
   const calculatedSkillLevel = Math.max(1, Math.min(5, Math.floor(overallScore / 20) + 1));
   await updateSkillProgress(userId, primaryTopic, calculatedSkillLevel);
@@ -1001,7 +986,6 @@ async function updateUserTopicProgress(
 }
 
 export async function getInterviewHomeStats(userId: string) {
-  // 1. Fetch counts
   const [interviewCountRow, attemptCountRow, practiceCountRow] = await Promise.all([
     queryOne<{ count: number }>(`SELECT COUNT(*)::int as count FROM "Interview" WHERE "userId" = $1`, [userId]).catch(() => null),
     queryOne<{ count: number }>(`SELECT COUNT(*)::int as count FROM "InterviewAttempt" WHERE "userId" = $1`, [userId]).catch(() => null),
@@ -1012,7 +996,6 @@ export async function getInterviewHomeStats(userId: string) {
   const questionsAnswered = attemptCountRow?.count || (interviewsCompleted * 6) || 0;
   const practiceSessions = practiceCountRow?.count || 0;
 
-  // 2. Fetch past interviews
   const recentInterviewRows = await query<{
     id: string;
     topic: string;
@@ -1032,7 +1015,6 @@ export async function getInterviewHomeStats(userId: string) {
     [userId],
   ).catch(() => []);
 
-  // 3. Fetch topic progress & compute recommended practice
   const topicProgressRows: UserTopicProgressData[] = await query<UserTopicProgressData>(
     `SELECT * FROM "UserTopicProgress" WHERE "userId" = $1 ORDER BY "updatedAt" DESC`,
     [userId],
@@ -1143,7 +1125,6 @@ export async function getInterviewHomeStats(userId: string) {
     },
   ];
 
-  // Calculate practiced skills dynamically
   const skillOccurrences = new Map<string, number>();
   for (const row of recentInterviewRows) {
     if (row.topic) {

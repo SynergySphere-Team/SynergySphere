@@ -63,7 +63,6 @@ export default function SettingsPage() {
     }
   }, []);
 
-  // Form state
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -76,11 +75,9 @@ export default function SettingsPage() {
     emailNotifications: true,
   });
 
-  // Password reset state
   const [resetSending, setResetSending] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
 
-  // Delete modal state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);

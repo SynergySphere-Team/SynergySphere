@@ -42,7 +42,6 @@ for (const rawSubject of w3schoolsProgrammingDomain.subjects) {
         failures.push(`${subject.name} › ${lesson.title} has only template-like examples.`);
       }
 
-      // Template detection must also catch the new materializer's own output if it regresses.
       if (examples.length > 0) {
         const firstCode = examples[0].code.toLowerCase();
         if (firstCode.includes('lesson title') || firstCode.includes('this topic') || firstCode.includes('the selected topic')) {

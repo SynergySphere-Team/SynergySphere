@@ -19,7 +19,6 @@ import {
   Loader2,
 } from 'lucide-react';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Channel {
   id: string;
@@ -76,7 +75,6 @@ interface PostDetail extends QAPost {
   replies: QAReply[];
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatTime(iso: string) {
   const d = new Date(iso);
@@ -101,7 +99,6 @@ function Avatar({ firstName, lastName, size = 'sm' }: { firstName: string; lastN
   );
 }
 
-// ─── Reply Quote Banner ────────────────────────────────────────────────────────
 
 function ReplyBanner({
   firstName,
@@ -128,7 +125,6 @@ function ReplyBanner({
   );
 }
 
-// ─── Quoted Reply inside a message ────────────────────────────────────────────
 
 function QuotedReply({ firstName, lastName, body }: { firstName: string; lastName: string; body: string }) {
   return (
@@ -142,7 +138,6 @@ function QuotedReply({ firstName, lastName, body }: { firstName: string; lastNam
   );
 }
 
-// ─── Chat Channel View ────────────────────────────────────────────────────────
 
 function ChatView({ channel, currentUserId }: { channel: Channel; currentUserId: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -159,7 +154,6 @@ function ChatView({ channel, currentUserId }: { channel: Channel; currentUserId:
       const data = await api<ChatMessage[]>(`/community-chat/channels/${channel.id}/messages`);
       setMessages(data);
     } catch {
-      // silently fail poll
     }
   }, [channel.id]);
 
@@ -194,7 +188,6 @@ function ChatView({ channel, currentUserId }: { channel: Channel; currentUserId:
             });
           }
         } catch {
-          // ignore
         }
       };
     } catch {
@@ -318,7 +311,6 @@ function ChatView({ channel, currentUserId }: { channel: Channel; currentUserId:
   );
 }
 
-// ─── Q&A Post Card ────────────────────────────────────────────────────────────
 
 function PostCard({ post, onClick }: { post: QAPost; onClick: () => void }) {
   const tags = post.tags ? post.tags.split(',').map((t) => t.trim()).filter(Boolean) : [];
@@ -359,7 +351,6 @@ function PostCard({ post, onClick }: { post: QAPost; onClick: () => void }) {
   );
 }
 
-// ─── Q&A Channel View ─────────────────────────────────────────────────────────
 
 function QAView({ channel, currentUserId }: { channel: Channel; currentUserId: string }) {
   const [posts, setPosts] = useState<QAPost[]>([]);
@@ -671,7 +662,6 @@ function QAView({ channel, currentUserId }: { channel: Channel; currentUserId: s
   );
 }
 
-// ─── Main Community Chat Component ────────────────────────────────────────────
 
 export function CommunityChat() {
   const { user } = useAuth();

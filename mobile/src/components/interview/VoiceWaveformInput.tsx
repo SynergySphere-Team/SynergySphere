@@ -77,7 +77,6 @@ export function VoiceWaveformInput({
       try {
         speechRecRef.current.stop();
       } catch {
-        // ignore
       }
       speechRecRef.current = null;
     }
@@ -85,7 +84,6 @@ export function VoiceWaveformInput({
       try {
         mediaStreamRef.current.getTracks?.().forEach((t: any) => t.stop());
       } catch {
-        // ignore
       }
       mediaStreamRef.current = null;
     }
@@ -93,7 +91,6 @@ export function VoiceWaveformInput({
       try {
         audioContextRef.current.close?.();
       } catch {
-        // ignore
       }
       audioContextRef.current = null;
     }

@@ -49,7 +49,6 @@ export default function AdminEventsPage() {
   const [editingEvent, setEditingEvent] = useState<CommunityEvent | null>(null);
   const [cancelModalEvent, setCancelModalEvent] = useState<CommunityEvent | null>(null);
 
-  // Form state
   const [form, setForm] = useState({
     title: '',
     description: '',

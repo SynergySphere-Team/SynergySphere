@@ -466,7 +466,6 @@ export function generateOfflineOptimize(code: string, language: string): string 
 
 #### 3. Optimized Production Code
 \`\`\`${normLang.toLowerCase()}
-// Optimized implementation with guard clauses and minimal allocations
 ${code
   .split('\n')
   .map((l) => (l.trim().startsWith('var ') ? l.replace('var ', 'const ') : l))
@@ -496,7 +495,6 @@ describe('${targetFunc} Test Suite', () => {
 
   test('does not throw uncaught exceptions on unexpected values', () => {
     expect(() => {
-      // Robustness check
     }).not.toThrow();
   });
 
@@ -577,7 +575,6 @@ public class ${targetFunc.charAt(0).toUpperCase() + targetFunc.slice(1)}Test {
     @DisplayName("Should handle boundary conditions and null values")
     void testBoundaryConditions() {
         assertDoesNotThrow(() -> {
-            // invocation
         });
     }
 }
@@ -597,7 +594,6 @@ TEST(${targetFunc}Test, HandlesStandardInput) {
 
 TEST(${targetFunc}Test, HandlesBoundaryConditions) {
     EXPECT_NO_THROW({
-        // execute
     });
 }
 
@@ -628,7 +624,6 @@ public class ${targetFunc.charAt(0).toUpperCase() + targetFunc.slice(1)}Tests
     {
         var exception = Record.Exception(() =>
         {
-            // invocation
         });
         Assert.Null(exception);
     }
@@ -652,7 +647,6 @@ ROLLBACK TRANSACTION;
 
   return `### 🧪 Automated Unit Test Harness
 \`\`\`
-// Standard verification harness for ${normLang}
 assert(${targetFunc} != null);
 \`\`\``;
 }

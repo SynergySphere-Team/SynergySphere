@@ -207,6 +207,19 @@ router.patch('/threads/:id', validateBody(updateThreadSchema), async (req: AuthR
   }
 });
 
+router.delete('/threads', async (req: AuthRequest, res) => {
+  try {
+    if (req.user?.userId) {
+      await query(`DELETE FROM "AiChatMessage" WHERE "userId" = $1`, [req.user.userId]);
+      await query(`DELETE FROM "AiChatThread" WHERE "userId" = $1`, [req.user.userId]);
+    }
+    res.json({ message: 'All conversations cleared' });
+  } catch (error) {
+    console.error('Error clearing all conversations:', error);
+    res.status(500).json({ error: 'Failed to clear all conversations' });
+  }
+});
+
 router.delete('/threads/:id', async (req: AuthRequest, res) => {
   try {
     const threadId = paramId(req);

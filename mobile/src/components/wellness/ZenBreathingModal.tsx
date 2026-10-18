@@ -58,11 +58,9 @@ export function ZenBreathingModal({
   const [isCompleted, setIsCompleted] = useState(false);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
 
-  // Animation values for the biophilic pulse
   const scaleAnim = useRef(new Animated.Value(1.0)).current;
   const pulseRing = useRef(new Animated.Value(1.0)).current;
 
-  // Reset state on open
   useEffect(() => {
     if (visible) {
       setPhase('Inhale');
@@ -73,7 +71,6 @@ export function ZenBreathingModal({
     }
   }, [visible, scaleAnim]);
 
-  // Phase transition animator
   useEffect(() => {
     if (!visible || isCompleted) return;
 
@@ -96,7 +93,6 @@ export function ZenBreathingModal({
     }
   }, [phase, visible, isCompleted, scaleAnim]);
 
-  // Secondary continuous ripple effect
   useEffect(() => {
     if (!visible || isCompleted) return;
     const ripple = Animated.loop(
@@ -119,7 +115,6 @@ export function ZenBreathingModal({
     return () => ripple.stop();
   }, [visible, isCompleted, pulseRing]);
 
-  // Main timer tick
   useEffect(() => {
     if (!visible || isCompleted) return;
 
@@ -129,7 +124,6 @@ export function ZenBreathingModal({
           return prev - 1;
         }
 
-        // Phase advance
         if (phase === 'Inhale') {
           setPhase('Hold');
           if (hapticsEnabled) {
@@ -143,7 +137,6 @@ export function ZenBreathingModal({
           }
           return PHASE_CONFIG.Exhale.seconds;
         } else {
-          // Exhale finished
           if (currentCycle >= targetCycles) {
             setIsCompleted(true);
             if (hapticsEnabled) {

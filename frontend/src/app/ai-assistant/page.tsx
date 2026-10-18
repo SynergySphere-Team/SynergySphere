@@ -946,6 +946,7 @@ function AIAssistantInner() {
   }
 
   async function clearChat() {
+    if (!window.confirm('Clear all messages in this conversation?')) return;
     try {
       const suffix = activeThreadId ? `?threadId=${encodeURIComponent(activeThreadId)}` : '';
       await api(`/ai/chat/history${suffix}`, { method: 'DELETE' });
@@ -964,6 +965,42 @@ function AIAssistantInner() {
       },
     ];
     setMessages(fresh);
+  }
+
+  async function deleteCurrentThread() {
+    if (!window.confirm('Delete this conversation permanently and start a new one?')) return;
+    const threadId = activeThreadId;
+    try {
+      if (threadId) {
+        await api(`/ai/threads/${threadId}`, { method: 'DELETE' });
+      } else {
+        await api('/ai/chat/history', { method: 'DELETE' });
+      }
+    } catch {
+      // Offline or signed out: continue with the local removal.
+    }
+    if (threadId) {
+      setThreads((prev) => prev.filter((t) => t.id !== threadId));
+    }
+    await startNewThread();
+  }
+
+  async function clearAllConversations() {
+    if (!window.confirm('Clear ALL conversations and chat history? This cannot be undone.')) return;
+    try {
+      await api('/ai/threads', { method: 'DELETE' });
+    } catch {
+      // Offline or signed out: continue with the local removal.
+    }
+    setThreads([]);
+    setActiveThreadId(null);
+    setMessages([
+      {
+        role: 'assistant',
+        content: 'All conversations cleared! Ask about any Learning Hub lesson or challenge, paste code, or use search above to get started.',
+        timestamp: new Date(),
+      },
+    ]);
   }
 
   function formatTime(date: Date) {
@@ -989,14 +1026,34 @@ function AIAssistantInner() {
                 : 'Grounded in Learning Hub (1,000+ programming lessons & 60 interactive challenges).'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="default" size="sm" onClick={startNewThread} className="gap-1.5">
             <Wand2 className="h-3.5 w-3.5" />
             + New Thread
           </Button>
-          <Button variant="secondary" size="sm" onClick={clearChat} className="gap-1.5">
+          <Button variant="secondary" size="sm" onClick={clearChat} className="gap-1.5" title="Clear all messages in the live conversation">
             <Trash2 className="h-3.5 w-3.5" />
-            Clear Thread
+            Clear Chat
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={deleteCurrentThread}
+            className="gap-1.5 text-rose-300 hover:text-rose-200"
+            title="Delete this conversation and start a new one"
+          >
+            <X className="h-3.5 w-3.5" />
+            Delete &amp; Start New
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={clearAllConversations}
+            className="gap-1.5 text-rose-300 hover:text-rose-200"
+            title="Delete every conversation and the chat history"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Clear All
           </Button>
         </div>
       </div>
@@ -1302,18 +1359,43 @@ function AIAssistantInner() {
         {/* ── AI Chat Card (Visible in 'conversation' and 'split' tabs) ── */}
         {(activeTab === 'conversation' || activeTab === 'split') && (
           <Card className="min-h-[650px]">
-            <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
               <CardTitle className="flex items-center gap-2">
                 <Bot className="h-4 w-4 text-primary" />
-                AI Assistant
+                Live Conversation
               </CardTitle>
-              <button
-                onClick={clearChat}
-                className="rounded-md p-1 text-muted-foreground transition hover:text-white"
-                title="Clear chat"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearChat}
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-white gap-1.5"
+                  title="Clear all messages in the live conversation"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Clear Conversation
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={deleteCurrentThread}
+                  className="h-7 px-2 text-xs text-rose-300 hover:bg-rose-500/10 hover:text-rose-200 gap-1.5"
+                  title="Delete this conversation and start a new one"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Delete &amp; New
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAllConversations}
+                  className="h-7 px-2 text-xs text-rose-300 hover:bg-rose-500/10 hover:text-rose-200 gap-1.5"
+                  title="Clear every conversation"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Clear All
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="flex h-[560px] flex-col">
               {/* ── Collapsible Chat History ── */}
@@ -1480,12 +1562,12 @@ function AIAssistantInner() {
         {/* ── Code Context Editor Card (Visible in 'codeContext' and 'split' tabs) ── */}
         {(activeTab === 'codeContext' || activeTab === 'split') && (
           <Card className="min-h-[650px]">
-            <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
               <CardTitle className="flex items-center gap-2">
                 <Code2 className="h-4 w-4 text-primary" />
                 Code Context
               </CardTitle>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-secondary/30 px-2.5 py-1 text-xs font-medium text-muted-foreground">
                   <Sparkles className="h-3.5 w-3.5 text-primary" />
                   <span>
@@ -1500,7 +1582,17 @@ function AIAssistantInner() {
                   title="Clear code editor and remove previous AI response"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  Clear
+                  Clear Code
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAllConversations}
+                  className="h-7 px-2 text-xs text-rose-300 hover:text-rose-200 hover:bg-rose-500/10 gap-1.5 transition"
+                  title="Clear every conversation across the AI Workspace"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Clear All Conversations
                 </Button>
                 <span className="rounded-lg border border-white/[0.08] bg-secondary/50 px-2 py-1 text-xs text-muted-foreground">
                   {lesson?.firstExampleLanguage

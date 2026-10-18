@@ -109,7 +109,6 @@ export default function NotificationPopup() {
               }
             }
           } catch {
-            // ignore non-json message
           }
         };
 
@@ -145,7 +144,6 @@ export default function NotificationPopup() {
       try {
         ws?.close();
       } catch {
-        // ignore
       }
     };
   }, [user?.id]);

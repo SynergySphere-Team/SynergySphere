@@ -247,7 +247,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const baseUrl = candidateUrls[i];
     const fullUrl = `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
     const isAiRoute = path.startsWith('/ai/') || path === '/ai';
-    // Dedicated timeout: 25s for AI routes on verified URL, 15s for verified working URL, 6s for first candidate, 3.5s for fallbacks
     const timeoutMs = isAiRoute
       ? (baseUrl === cachedWorkingBaseUrl || i === 0 ? 25_000 : 10_000)
       : (baseUrl === cachedWorkingBaseUrl ? 15_000 : (i === 0 ? REQUEST_TIMEOUT_MS : FALLBACK_TIMEOUT_MS));
@@ -271,7 +270,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         cachedWorkingBaseUrl = null;
       }
       lastError = err;
-      // If there are more candidates, try the next fallback (e.g. 127.0.0.1 / localhost / LAN IP)
       if (i < candidateUrls.length - 1) {
         continue;
       }
@@ -279,7 +277,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!response) {
-    // Offline fallback for cacheable GET routes
     if (method === 'GET' && isCacheableGetPath(path)) {
       const cached = await loadCachedResponse<T>(path);
       if (cached !== null) {
@@ -289,7 +286,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       }
     }
 
-    // Offline queue for task status updates and focus sessions
     if (
       (method === 'PATCH' && path.startsWith('/tasks/')) ||
       (method === 'POST' && path === '/tasks/focus-session')
@@ -334,7 +330,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError(message, response.status, body.details);
   }
 
-  // Connection succeeded — mark online, cache GET responses, and flush any queued offline mutations
   setOfflineStatus(false, 0);
   if (method === 'GET' && isCacheableGetPath(path)) {
     void saveCachedResponse(path, body);
@@ -412,7 +407,6 @@ export const authStorage = {
       }
       await SecureStore.setItemAsync(USER_KEY, raw);
     } catch {
-      // ignore storage errors
     }
   },
 };

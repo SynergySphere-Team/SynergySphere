@@ -54,7 +54,6 @@ export default function AdminPostsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Filters
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [flagFilter, setFlagFilter] = useState('all');

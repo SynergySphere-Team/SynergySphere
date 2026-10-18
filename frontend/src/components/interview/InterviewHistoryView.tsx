@@ -31,7 +31,6 @@ export function InterviewHistoryView({ onStartNewInterview }: InterviewHistoryVi
   const [selectedTopicFilter, setSelectedTopicFilter] = useState('all');
   const [selectedScoreFilter, setSelectedScoreFilter] = useState<'all' | 'high' | 'mid' | 'low'>('all');
 
-  // Detail Modal state
   const [selectedInterviewId, setSelectedInterviewId] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailData, setDetailData] = useState<InterviewHistoryDetail | null>(null);
@@ -69,7 +68,6 @@ export function InterviewHistoryView({ onStartNewInterview }: InterviewHistoryVi
     }
   }
 
-  // Filter list
   const filteredHistory = history.filter((item) => {
     if (selectedTopicFilter !== 'all' && item.topic.toLowerCase() !== selectedTopicFilter.toLowerCase()) {
       return false;
@@ -80,7 +78,6 @@ export function InterviewHistoryView({ onStartNewInterview }: InterviewHistoryVi
     return true;
   });
 
-  // Analytics derivations
   const totalCompleted = history.length;
   const avgScore = totalCompleted > 0
     ? Math.round(history.reduce((sum, h) => sum + (h.score || 0), 0) / totalCompleted)

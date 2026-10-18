@@ -35,7 +35,6 @@ function parseInline(raw: string): InlineToken[] {
   const len = raw.length;
 
   while (index < len) {
-    // 1. Inline code: `code`
     if (raw[index] === '`') {
       const end = raw.indexOf('`', index + 1);
       if (end !== -1) {
@@ -45,7 +44,6 @@ function parseInline(raw: string): InlineToken[] {
       }
     }
 
-    // 2. Bold: **bold** or __bold__
     if (
       (raw[index] === '*' && raw[index + 1] === '*') ||
       (raw[index] === '_' && raw[index + 1] === '_')
@@ -59,7 +57,6 @@ function parseInline(raw: string): InlineToken[] {
       }
     }
 
-    // 3. Italic: *italic* or _italic_
     if (
       raw[index] === '*' ||
       (raw[index] === '_' && (index === 0 || /\s/.test(raw[index - 1])))

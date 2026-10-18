@@ -122,7 +122,6 @@ export default function AdminScreen() {
   const isLight = theme === 'light';
   const primaryAccent = isLight ? '#1e6827' : (colors.primary || '#91db5e');
 
-  // 1. Overview Loader
   const loadOverview = useCallback(async () => {
     try {
       const res = await api.get<AdminOverview>('/admin/overview');
@@ -134,7 +133,6 @@ export default function AdminScreen() {
     }
   }, []);
 
-  // 2. Users Loader
   const loadUsers = useCallback(async () => {
     try {
       setLoadingUsers(true);
@@ -151,7 +149,6 @@ export default function AdminScreen() {
     }
   }, [userSearch, userStatusFilter]);
 
-  // 3. Pending Approvals Loader
   const loadPending = useCallback(async () => {
     try {
       setLoadingPending(true);
@@ -165,7 +162,6 @@ export default function AdminScreen() {
     }
   }, []);
 
-  // 4. Moderation Loaders
   const loadPosts = useCallback(async () => {
     try {
       setLoadingPosts(true);
@@ -192,7 +188,6 @@ export default function AdminScreen() {
     }
   }, []);
 
-  // 5. Events Loader
   const loadEvents = useCallback(async () => {
     try {
       setLoadingEvents(true);
@@ -206,7 +201,6 @@ export default function AdminScreen() {
     }
   }, []);
 
-  // 6. Tickets Loader
   const loadTickets = useCallback(async () => {
     try {
       setLoadingTickets(true);
@@ -222,7 +216,6 @@ export default function AdminScreen() {
     }
   }, [ticketStatusFilter]);
 
-  // 7. Reports Loader
   const loadReports = useCallback(async () => {
     try {
       setLoadingReports(true);
@@ -240,7 +233,6 @@ export default function AdminScreen() {
     }
   }, []);
 
-  // 8. Database Loader
   const loadDatabase = useCallback(async () => {
     try {
       setLoadingDb(true);

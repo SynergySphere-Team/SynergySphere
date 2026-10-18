@@ -175,7 +175,6 @@ router.delete('/:id', async (req: AuthRequest, res) => {
   res.status(204).send();
 });
 
-// ── 2. Profile Signals (Learning Hub Progress, DB Skills, Real Links) ──
 
 router.get('/profile-signals', async (req: AuthRequest, res) => {
   try {
@@ -240,7 +239,6 @@ router.get('/jobs', async (req: AuthRequest, res) => {
     const targetRole = String(req.query.role || signals.profile.targetRole || 'Junior Software Engineer');
     const location = String(req.query.location || signals.profile.location || 'South Africa');
 
-    // Extract top active skills from Hub + manual
     const activeSkills = [
       ...signals.hubSkills.filter((s) => s.completedLessons > 0).map((s) => s.name),
       ...signals.manualSkills.map((s) => s.name),
@@ -259,7 +257,6 @@ router.get('/jobs', async (req: AuthRequest, res) => {
   }
 });
 
-// ── 4. Career Tools (Real Data Generator) ──
 
 const careerToolSchema = z.object({
   tool: z.enum(['resume', 'cv', 'linkedin', 'jobs']),
@@ -273,18 +270,15 @@ router.post('/career-tools', validateBody(careerToolSchema), async (req: AuthReq
     const { tool, targetRole, skills: inputSkills, customNotes } = req.body;
     const userId = req.user!.userId;
 
-    // 1. Fetch User
     const user = await queryOne<{ firstName: string; lastName: string; email: string; xp: number; level: number }>(
       `SELECT "firstName", "lastName", "email", "xp", "level" FROM "User" WHERE "id" = $1`,
       [userId],
     );
     const userName = `${user?.firstName ?? 'Student'} ${user?.lastName ?? 'Developer'}`;
 
-    // 2. Fetch Profile Signals
     const signals = await getProfileSignals(userId);
     const role = targetRole || signals.profile.targetRole || 'Junior Software Engineer';
 
-    // 3. Collect Real Completed Lessons
     const completedRows = await query<{ lessonId: string }>(
       `SELECT "lessonId" FROM "LectureLessonProgress" WHERE "userId" = $1`,
       [userId],
@@ -302,7 +296,6 @@ router.post('/career-tools', validateBody(careerToolSchema), async (req: AuthReq
       }
     }
 
-    // 4. Collect Portfolio Projects
     const projects = await query<{
       title: string;
       description: string | null;
@@ -316,7 +309,6 @@ router.post('/career-tools', validateBody(careerToolSchema), async (req: AuthReq
       [userId],
     );
 
-    // 5. Collect Joined Community Projects
     const communityProjects = await query<{
       title: string;
       organization: string;
@@ -330,10 +322,8 @@ router.post('/career-tools', validateBody(careerToolSchema), async (req: AuthReq
       [userId],
     ).catch(() => []);
 
-    // 6. Fetch Public GitHub Repos
     const githubRepos = await fetchGithubReposForUser(userId, signals.profile.githubUrl);
 
-    // 7. Format Skills List from Real Signals (or input overrides if passed)
     let skillsList = '';
     const skillsArray: [string, number][] = [];
 
@@ -360,7 +350,6 @@ router.post('/career-tools', validateBody(careerToolSchema), async (req: AuthReq
       }
     }
 
-    // 8. Assemble Full Context
     const ctx: CareerProfileContext = {
       userName,
       email: user?.email ?? 'developer@example.com',
@@ -394,7 +383,7 @@ router.post('/career-tools', validateBody(careerToolSchema), async (req: AuthReq
       'CRITICAL: Strictly ground all projects, education, and skills in the candidate\'s provided verified portfolio, GitHub repositories, and Learning Hub curriculum progress.',
       'Do NOT invent fictional company experiences or degrees not present in the data.',
       'Highlight real technical achievements, architecture, and code skills cleanly.',
-      'Output formatted Markdown.',
+      'Use clean headings (#, ##, ###) and simple bullet lines (- ). Do NOT include horizontal dashed lines (---), decorative asterisks (*), or emojis.',
     ].join('\n');
 
     const userPrompt = [

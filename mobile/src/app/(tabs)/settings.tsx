@@ -709,7 +709,6 @@ export default function SettingsScreen() {
 
     } catch {
 
-      // Ignore background refresh errors
 
     }
 

@@ -73,7 +73,6 @@ function verifyColorTemperatureShifts() {
 
   let passed = true;
 
-  // 1. Light mode background warmth
   const defaultLightBg = hexToRgb(themes.light.background);
   const comfortLightBg = hexToRgb(eyeComfortThemes.light.background);
   console.log(
@@ -84,14 +83,12 @@ function verifyColorTemperatureShifts() {
   console.log(`  -> Warm sepia tint (R, G > B): ${isSepiaWarm ? 'PASS' : 'FAIL'}`);
   if (!isSepiaWarm) passed = false;
 
-  // 2. Light mode surface softens pure #FFFFFF
   const lightSurfaceSoftened = eyeComfortThemes.light.surface.toLowerCase() !== '#ffffff';
   console.log(
     `  -> Light Mode Surface softened from #FFFFFF to ${eyeComfortThemes.light.surface}: ${lightSurfaceSoftened ? 'PASS' : 'FAIL'}`
   );
   if (!lightSurfaceSoftened) passed = false;
 
-  // 3. Dark mode background softens pure black / high blue
   const comfortDarkBg = hexToRgb(eyeComfortThemes.dark.background);
   console.log(
     `  Dark Mode Background: Default (${themes.dark.background}) vs Eye Comfort (${eyeComfortThemes.dark.background} -> R:${comfortDarkBg[0]} G:${comfortDarkBg[1]} B:${comfortDarkBg[2]})`
@@ -100,7 +97,6 @@ function verifyColorTemperatureShifts() {
   console.log(`  -> Soft charcoal/slate background (no harsh #000000): ${isWarmCharcoal ? 'PASS' : 'FAIL'}`);
   if (!isWarmCharcoal) passed = false;
 
-  // 4. Dark mode text softens harsh #FFFFFF
   const darkTextSoftened = eyeComfortThemes.dark.text.toLowerCase() !== '#ffffff';
   console.log(
     `  -> Dark Mode Text softened from #FFFFFF to ${eyeComfortThemes.dark.text}: ${darkTextSoftened ? 'PASS' : 'FAIL'}`

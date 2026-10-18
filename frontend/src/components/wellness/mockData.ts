@@ -99,7 +99,6 @@ export function generateDynamicTaskDeconstruction(
 ): TaskDeconstruction {
   const lower = taskTitle.toLowerCase();
 
-  // Match domain resources based on keyword
   let matchedResources: CuratedResource[] = [];
   if (lower.includes('java') || lower.includes('spring') || lower.includes('backend')) {
     matchedResources = [CURATED_RESOURCE_LIBRARY[1], CURATED_RESOURCE_LIBRARY[2]];
@@ -112,11 +111,9 @@ export function generateDynamicTaskDeconstruction(
   } else if (lower.includes('git') || lower.includes('pr') || lower.includes('commit') || lower.includes('merge')) {
     matchedResources = [CURATED_RESOURCE_LIBRARY[6], CURATED_RESOURCE_LIBRARY[4]];
   } else {
-    // Default smart pair
     matchedResources = [CURATED_RESOURCE_LIBRARY[0], CURATED_RESOURCE_LIBRARY[2]];
   }
 
-  // Generate actionable deconstruction based on stress & energy levels
   let bloatAnalysis = '';
   let actionableAdvice = '';
   let subtasks: TaskDeconstruction['subtasks'] = [];
@@ -230,7 +227,6 @@ export const GRATITUDE_PROMPT_PRESETS = [
   'Stepped away for a 15-minute walk when stress peaked 🌿',
 ];
 
-// Generates baseline mock historical data if user has fewer than 8 entries
 export function generateSeedAnalyticsEntries(): WellnessEntry[] {
   const now = new Date();
   const sampleModules = ['PRODUCTIVITY', 'LEARNING_HUB', 'AI_WORKSPACE', 'COMMUNITY', 'INTERVIEWS', 'GENERAL'];
@@ -247,7 +243,6 @@ export function generateSeedAnalyticsEntries(): WellnessEntry[] {
   const entries: WellnessEntry[] = [];
   for (let i = 24; i >= 0; i--) {
     const entryDate = new Date(now.getTime() - i * 86400000);
-    // Alternate trends: early days high stress, middle days flow, recent balanced
     const baseStress = i > 16 ? 7 + (i % 3) : i > 8 ? 4 + (i % 3) : 3 + (i % 4);
     const baseEnergy = i > 16 ? 4 + (i % 2) : i > 8 ? 7 + (i % 2) : 6 + (i % 3);
     const baseMood = Math.round((baseEnergy * 1.5 + (10 - baseStress)) / 2.5);

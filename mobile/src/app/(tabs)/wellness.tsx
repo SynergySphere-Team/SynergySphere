@@ -64,7 +64,6 @@ export default function WellnessScreen() {
   // Multi-step Check-in Navigation: 1: Mind & Focus | 2: Physical & Rest | 3: Reflection
   const [checkInStep, setCheckInStep] = useState<1 | 2 | 3>(1);
 
-  // Check-In Form State
   const [moduleId, setModuleId] = useState('PRODUCTIVITY');
   const [taskTitle, setTaskTitle] = useState('');
   const [markTaskDone, setMarkTaskDone] = useState(false);
@@ -82,7 +81,6 @@ export default function WellnessScreen() {
   // Accordion state for past logged sessions
   const [isSessionListExpanded, setIsSessionListExpanded] = useState(false);
 
-  // Status & Data
   const [entries, setEntries] = useState<WellnessEntry[]>([]);
   const [insights, setInsights] = useState<WellnessInsights | null>(null);
   const [error, setError] = useState('');
@@ -243,7 +241,6 @@ export default function WellnessScreen() {
     }
   };
 
-  // Toggle mood tag
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
@@ -412,7 +409,6 @@ export default function WellnessScreen() {
     return generateDynamicTaskDeconstruction(taskTitle.trim(), stress, energy);
   }, [taskTitle, stress, energy]);
 
-  // Derived Burnout Risk
   const burnoutRisk = useMemo(() => {
     if (insights?.burnoutRisk) return insights.burnoutRisk;
     const score = Math.round((stress / 10) * 55 + ((10 - energy) / 10) * 45);
@@ -452,12 +448,10 @@ export default function WellnessScreen() {
     return sorted;
   }, [entries, timeRange]);
 
-  // Step 2: Cluster micro-logs into cohesive session cards (45-min window)
   const clusteredSessions: ClusteredSession[] = useMemo(() => {
     return clusterWellnessEntries(entries, 45);
   }, [entries]);
 
-  // Step 3: Partition modules into active vs inactive (0 checks)
   const { activeModules, inactiveModules } = useMemo(() => {
     const active: typeof WELLNESS_MODULES = [];
     const inactive: typeof WELLNESS_MODULES = [];
@@ -469,7 +463,6 @@ export default function WellnessScreen() {
     return { activeModules: active, inactiveModules: inactive };
   }, [insights]);
 
-  // Step 5: Gamification Streak Progress toward next milestone
   const currentStreak = insights?.streak?.current || 0;
   const milestoneProgress = useMemo(() => {
     if (currentStreak < 3) {
@@ -499,12 +492,10 @@ export default function WellnessScreen() {
     };
   }, [currentStreak]);
 
-  // Step 1: Rating handler
   const setRatingWithHaptic = (setter: (v: number) => void, val: number) => {
     setter(val);
   };
 
-  // Step 4: Contextual 1-Tap Interventions
   const liveStrain = stress - energy;
   const isHighStrainSpike = liveStrain >= 2 || stress >= 7 || burnoutRisk.level === 'CRITICAL';
 

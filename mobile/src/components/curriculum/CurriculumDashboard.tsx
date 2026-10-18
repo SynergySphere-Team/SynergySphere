@@ -33,7 +33,6 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CurriculumSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -156,7 +155,6 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
     }
   }
 
-  // 1. LOADING STATE
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -168,7 +166,6 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
     );
   }
 
-  // 2. ERROR STATE (when no technologies could be loaded)
   if (error && technologies.length === 0) {
     return (
       <View style={styles.centerContainer}>
@@ -193,7 +190,6 @@ export function CurriculumDashboard({ onSelectLesson }: CurriculumDashboardProps
     );
   }
 
-  // 3. EMPTY STATE (technologies list is empty)
   if (technologies.length === 0) {
     return (
       <View style={styles.centerContainer}>

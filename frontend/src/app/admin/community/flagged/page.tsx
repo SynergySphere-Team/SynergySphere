@@ -60,7 +60,6 @@ export default function FlaggedContentPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Detail Modal state
   const [activeItem, setActiveItem] = useState<{
     type: 'post' | 'complaint';
     item: any;

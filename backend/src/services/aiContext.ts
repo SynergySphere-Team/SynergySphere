@@ -376,7 +376,6 @@ export async function buildGroundingBundle(options: {
     starterLanguage?: string;
   } = { source: 'none', contextBlock: '', reference: {} };
 
-  // 1. Explicit challenge pin — from Learning Hub Coding Challenges
   if (options.challengeId) {
     const matchedChallenge = LEARNING_HUB_CHALLENGES.find((c) => c.id === options.challengeId);
     if (matchedChallenge) {
@@ -403,7 +402,6 @@ export async function buildGroundingBundle(options: {
     }
   }
 
-  // 2. Explicit lesson pin — same lesson GET /curriculum/lessons/:lessonId returns.
   if (bundle.source === 'none' && options.lessonId) {
     const entry = findLessonById(options.lessonId);
     if (entry) {
@@ -423,7 +421,6 @@ export async function buildGroundingBundle(options: {
     }
   }
 
-  // 3. Explicit study pack — that user's LectureUpload.
   if (bundle.source === 'none' && options.uploadId) {
     const upload = await loadUpload(options.uploadId, userId);
     if (upload) {
@@ -439,7 +436,6 @@ export async function buildGroundingBundle(options: {
     }
   }
 
-  // 4. Free-text search using high-accuracy word recognition across Learning Hub
   if (bundle.source === 'none') {
     const matches = searchLearningHub(message, 3);
     if (matches.length > 0) {

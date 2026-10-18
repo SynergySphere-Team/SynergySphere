@@ -69,15 +69,12 @@ export function WellnessQuickCheckIn({
   const { colors, theme } = useTheme();
   const isLight = theme === 'light';
 
-  // Mode: 'quick' (10-second pulse) vs 'detailed' (full multi-dimensional log)
   const [mode, setMode] = useState<'quick' | 'detailed'>('quick');
 
-  // Core metrics
   const [stress, setStress] = useState(5);
   const [mood, setMood] = useState(6);
   const [energy, setEnergy] = useState(6);
 
-  // Detailed fields
   const [moduleId, setModuleId] = useState('PRODUCTIVITY');
   const [taskTitle, setTaskTitle] = useState('');
   const [markTaskDone, setMarkTaskDone] = useState(false);

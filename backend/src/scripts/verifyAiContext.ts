@@ -12,7 +12,6 @@ async function main() {
     console.log(`${ok ? 'PASS' : 'FAIL'} — ${name}${detail ? ` (${detail})` : ''}`);
   };
 
-  // 1. Acceptance: pinned JS lesson + closure question cites the lesson and its example.
   const pinned = await buildGroundingBundle({
     userId: 'offline-test-user',
     message: 'What is a closure?',
@@ -39,7 +38,6 @@ async function main() {
   );
   check('grounding bundle ≤ 8k chars', pinned.contextBlock.length <= 8000, `${pinned.contextBlock.length} chars`);
 
-  // 2. On-topic free-text question matches the right academy lesson.
   const forLoop = await buildGroundingBundle({ userId: 'offline-test-user', message: 'how does a for loop work?' });
   check(
     'for-loop question matches a JavaScript loops lesson',
@@ -76,7 +74,6 @@ async function main() {
     `subject=${typoTest.reference.subjectName ?? 'none'}`,
   );
 
-  // 3. No false grounding: canned API-key copy ONLY when nothing matched.
   const outside = await buildGroundingBundle({ userId: 'offline-test-user', message: 'Who wrote Hamlet?' });
   const outsideAnswer = buildGroundedFallback('Who wrote Hamlet?', outside);
   check(
@@ -88,7 +85,6 @@ async function main() {
     !outsideAnswer.includes('GEMINI_API_KEY') && !outsideAnswer.includes('OPENAI_API_KEY') && outsideAnswer.length > 50,
   );
 
-  // 4. Starter code prefill comes from the lesson example, not the generic Java loop.
   check(
     'starter code taken from the lesson example',
     Boolean(pinned.starterCode) && !pinned.starterCode!.includes('public class Main'),

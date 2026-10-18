@@ -180,7 +180,6 @@ const attemptSchema = z.object({
   code: z.string().min(1).max(50000),
   language: z.string().max(40).optional(),
   customInputs: z.array(z.string().max(2000)).max(10).optional(),
-  // Any client-supplied testResults are ignored; server judgment is authoritative
   testResults: z.any().optional(),
 });
 
@@ -241,7 +240,6 @@ router.post('/:id/submit', authenticate, validateBody(attemptSchema), async (req
     return;
   }
 
-  // 1. Authoritative Server-Side Evaluation (Never trust client body)
   const judgeResult = await judgeChallengeSubmission(challenge, req.body.code);
   const passed = judgeResult.passed;
 

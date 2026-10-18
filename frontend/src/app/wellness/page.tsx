@@ -144,7 +144,6 @@ export default function WellnessPage() {
   // Primary Tab: 'checkin' | 'trends'
   const [activeTab, setActiveTab] = useState<'checkin' | 'trends'>('checkin');
 
-  // Check-In Form State
   const [stress, setStress] = useState(5);
   const [mood, setMood] = useState(6);
   const [energy, setEnergy] = useState(6);
@@ -158,7 +157,6 @@ export default function WellnessPage() {
   const [customTaskTitle, setCustomTaskTitle] = useState('');
   const [markTaskDone, setMarkTaskDone] = useState(false);
 
-  // Status & Data
   const [successBanner, setSuccessBanner] = useState<{
     message: string;
     xp?: number;
@@ -171,7 +169,6 @@ export default function WellnessPage() {
 
 
 
-  // Initial Load
   useEffect(() => {
     loadAllData();
   }, []);
@@ -199,14 +196,12 @@ export default function WellnessPage() {
     }
   }
 
-  // Toggle mood tag
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
     );
   };
 
-  // Submit check-in
   async function logEntry() {
     setLoading(true);
     setSuccessBanner(null);
@@ -243,7 +238,6 @@ export default function WellnessPage() {
       // Reload wellness data
       await loadAllData();
 
-      // Clear non-persistent fields
       setNotes('');
       setGratitudeWin('');
       setCustomTaskTitle('');
@@ -302,11 +296,9 @@ export default function WellnessPage() {
 
   const selectedTaskObj = tasks.find((t) => t.id === selectedTaskId);
 
-  // Derived Burnout Risk
   const currentBurnoutRisk = useMemo(() => {
     if (insights?.burnoutRisk) return insights.burnoutRisk;
 
-    // Fallback formula
     const avgStress = stress;
     const avgEnergy = energy;
     const score = Math.round((avgStress / 10) * 55 + ((10 - avgEnergy) / 10) * 45);

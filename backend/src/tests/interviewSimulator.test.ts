@@ -19,8 +19,12 @@ import {
   ALL_DIFFICULTIES,
   ALL_INTERVIEWER_STYLES,
 } from '../data/interviewBank/index.js';
+import { pool } from '../lib/db.js';
 
 test('SynergySphere Developer Interview Simulator & Practice System', async (t) => {
+  t.after(async () => {
+    await pool.end();
+  });
   const testUserId = 'test-user-dev-sim-123';
 
   await t.test('1. Metadata catalogs are registered and complete', () => {

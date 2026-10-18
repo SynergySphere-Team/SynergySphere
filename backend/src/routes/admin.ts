@@ -15,7 +15,6 @@ const router = Router();
 router.use(authenticate);
 router.use(requireAdmin('moderator'));
 
-// Helper to get current admin display name
 async function getAdminName(userId: string): Promise<string> {
   const admin = await queryOne<{ firstName: string; lastName: string }>(
     `SELECT "firstName", "lastName" FROM "User" WHERE "id" = $1`,
@@ -24,9 +23,6 @@ async function getAdminName(userId: string): Promise<string> {
   return admin ? `${admin.firstName} ${admin.lastName}`.trim() : 'Administrator';
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. Overview & Dashboard
-// ─────────────────────────────────────────────────────────────────────────────
 
 router.get('/overview', async (_req, res) => {
   try {
@@ -175,9 +171,6 @@ async function getPlatformStats() {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 2. User Management & Pending Approvals
-// ─────────────────────────────────────────────────────────────────────────────
 
 router.get('/users', requireAdmin('admin'), async (req, res) => {
   try {
@@ -420,9 +413,6 @@ const updateUserRoleHandler = async (req: AuthRequest, res: Response) => {
 router.patch('/users/:id/role', requireAdmin('admin'), validateBody(updateUserRoleSchema), updateUserRoleHandler);
 router.put('/users/:id/role', requireAdmin('admin'), validateBody(updateUserRoleSchema), updateUserRoleHandler);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 3. Community Posts & Moderation
-// ─────────────────────────────────────────────────────────────────────────────
 
 router.get('/posts', async (req, res) => {
   try {
@@ -638,9 +628,6 @@ router.get('/community/flagged', async (_req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 4. Complaints Management
-// ─────────────────────────────────────────────────────────────────────────────
 
 router.get('/complaints', async (req, res) => {
   try {
@@ -741,9 +728,6 @@ router.patch('/complaints/:id', validateBody(patchComplaintSchema), async (req: 
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 5. Events Management
-// ─────────────────────────────────────────────────────────────────────────────
 
 router.get('/events', async (_req, res) => {
   try {
@@ -912,9 +896,6 @@ router.delete('/events/:id', requireAdmin('admin'), async (req: AuthRequest, res
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 6. Support Tickets Management
-// ─────────────────────────────────────────────────────────────────────────────
 
 router.get('/tickets', async (req, res) => {
   try {
@@ -1132,9 +1113,6 @@ router.patch('/tickets/:id', validateBody(patchTicketSchema), async (req: AuthRe
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 7. Analytics & System Reports
-// ─────────────────────────────────────────────────────────────────────────────
 
 router.get('/analytics', async (_req, res) => {
   try {
@@ -1280,9 +1258,6 @@ router.get('/audit-logs', async (_req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 8. Database Administration & Diagnostics (Admin Accessible)
-// ─────────────────────────────────────────────────────────────────────────────
 
 router.get('/database/health', requireAdmin('admin'), async (_req, res) => {
   try {
@@ -1395,7 +1370,6 @@ router.post('/database/maintenance', requireAdmin('admin'), async (req: AuthRequ
       try {
         await pool.query('DISCARD TEMP');
       } catch {
-        // ignore if not supported
       }
 
       await logAdminAction({

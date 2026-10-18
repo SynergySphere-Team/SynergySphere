@@ -290,7 +290,6 @@ export function evaluateDynamicFollowUp(
     }
   }
 
-  // Generic fallback probe if long answer provided
   if (wordCount > 35) {
     const probingPhrase =
       persona.probingPhrases[Math.floor(Math.random() * persona.probingPhrases.length)];
@@ -307,26 +306,22 @@ export function generateFAANGScorecard(session: InterviewSessionState): FAANGSco
   const persona = INTERVIEWER_PERSONAS[session.personaId] || INTERVIEWER_PERSONAS.strict;
   const stages = session.stages;
 
-  // Compute individual stage metrics
   let totalPoints = 0;
   const stageBreakdown = stages.map((st, idx) => {
     const textAns = session.answers[idx] || '';
     const codeAns = session.codeDrafts[idx] || '';
     const combinedLength = (textAns + codeAns).trim().length;
 
-    // Base score by participation and depth
     let stageScore = 50;
     if (combinedLength > 60) stageScore += 20;
     if (combinedLength > 150) stageScore += 15;
     if (combinedLength > 250) stageScore += 10;
 
-    // Check expected concepts
     const foundConcepts = st.expectedConcepts.filter((c) =>
       (textAns + codeAns).toLowerCase().includes(c.toLowerCase())
     ).length;
     stageScore += Math.min(10, foundConcepts * 4);
 
-    // Test cases for coding stage
     if (st.stage === 'CODING' && session.testReports?.[idx]) {
       const report = session.testReports[idx];
       const testAccuracy = report.total > 0 ? report.passed / report.total : 0.8;
@@ -350,7 +345,6 @@ export function generateFAANGScorecard(session: InterviewSessionState): FAANGSco
 
   const overallScore = Math.round(totalPoints / stages.length);
 
-  // Calibrate hiring recommendation
   let recommendation: HiringRecommendation = 'LEANING_HIRE';
   if (overallScore >= 88) recommendation = 'STRONG_HIRE';
   else if (overallScore >= 76) recommendation = 'HIRE';

@@ -9,7 +9,6 @@ try {
   const _currDir = path.dirname(fileURLToPath(import.meta.url));
   dotenv.config({ path: path.resolve(_currDir, '../../.env'), override: false });
 } catch {
-  // ignore
 }
 import http from 'node:http';
 import express from 'express';

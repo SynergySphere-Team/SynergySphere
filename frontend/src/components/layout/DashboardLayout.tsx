@@ -39,7 +39,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     message: string;
   } | null>(null);
 
-  // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -90,11 +89,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             setTimeout(() => setLiveNotification(null), 5000);
           }
         } catch {
-          // ignore
         }
       };
     } catch {
-      // ignore if ws unavailable
     }
 
     return () => {
@@ -104,7 +101,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     };
   }, [user]);
 
-  // Debounced search
   useEffect(() => {
     if (!searchQuery.trim()) {
       setResults({ challenges: [], projects: [], tasks: [] });
@@ -128,7 +124,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Close dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useState, useMemo, useRef, type ComponentProps } from 'react';
 import {
+  Alert,
   Animated,
   LayoutAnimation,
   Platform,
@@ -49,6 +50,57 @@ function formatRelativeTime(ts: number): string {
   if (days === 1) return 'Yesterday';
   if (days < 7) return `${days}d ago`;
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function confirmAction(title: string, message: string, confirmLabel: string, onConfirm: () => void) {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+  Alert.alert(title, message, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: confirmLabel, style: 'destructive', onPress: onConfirm },
+  ]);
+}
+
+function ConversationDangerButton({
+  icon,
+  label,
+  accessibilityLabel,
+  onPress,
+  borderColor,
+  backgroundColor,
+  disabled = false,
+}: {
+  icon: ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  accessibilityLabel: string;
+  onPress: () => void;
+  borderColor: string;
+  backgroundColor: string;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      style={({ pressed }) => [
+        styles.conversationDangerBtn,
+        { borderColor, backgroundColor },
+        disabled && { opacity: 0.45 },
+        pressed && styles.pressed,
+      ]}
+    >
+      <Ionicons name={icon} size={14} color="#EF4444" />
+      <Text style={styles.conversationDangerText}>{label}</Text>
+    </Pressable>
+  );
 }
 
 type Message = {
@@ -786,16 +838,98 @@ export default function AIAssistantScreen() {
     showToast('Thread deleted');
   }
 
-  function resetCurrentThread() {
-    setMessages([
-      {
-        role: 'assistant',
-        content: lesson
-          ? `Chat thread reset. Ask me anything about "${lesson.title}".`
-          : 'Chat thread reset. Ask any question or paste code in Code Context.',
+  function clearConversation() {
+    confirmAction(
+      'Clear conversation?',
+      'All messages in the live conversation will be removed. Your saved query history stays available.',
+      'Clear',
+      async () => {
+        try {
+          const suffix = activeThreadId ? `?threadId=${encodeURIComponent(activeThreadId)}` : '';
+          await api.delete(`/ai/chat/history${suffix}`);
+        } catch {
+          // Offline or signed out: the local reset below still applies.
+        }
+        setMessages([
+          {
+            role: 'assistant',
+            content: lesson
+              ? `Conversation cleared. Ask me anything about "${lesson.title}".`
+              : 'Conversation cleared. Ask any question or paste code in Code Context.',
+          },
+        ]);
+        setMessage('');
+        showToast('Conversation cleared ✓');
       },
-    ]);
-    showToast('Conversation reset • History retained');
+    );
+  }
+
+  function deleteCurrentConversation() {
+    confirmAction(
+      'Delete conversation?',
+      'This conversation will be permanently deleted and a new one will start.',
+      'Delete',
+      async () => {
+        const threadId = activeThreadId;
+        try {
+          if (threadId) {
+            await api.delete(`/ai/threads/${threadId}`);
+          } else {
+            await api.delete('/ai/chat/history');
+          }
+        } catch {
+          // Offline or signed out: continue with the local removal.
+        }
+        if (threadId) {
+          setThreads((prev) => prev.filter((t) => t.id !== threadId));
+        }
+        await startNewConversation();
+        showToast('Conversation deleted • New chat ready');
+      },
+    );
+  }
+
+  function clearAllConversations() {
+    confirmAction(
+      'Clear all conversations?',
+      'Every saved conversation and your query history will be permanently deleted.',
+      'Clear all',
+      async () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        try {
+          await api.delete('/ai/threads');
+        } catch {
+          // Offline or signed out: continue with the local removal.
+        }
+        await SecureStore.deleteItemAsync(QUERY_HISTORY_STORAGE_KEY).catch(() => {});
+        setHistoryQueries([]);
+        setThreads([]);
+        setActiveThreadId(null);
+        setMessages([
+          {
+            role: 'assistant',
+            content: 'All conversations cleared. Ask any question or paste code in Code Context.',
+          },
+        ]);
+        setMessage('');
+        showToast('All conversations cleared ✓');
+      },
+    );
+  }
+
+  function clearCodeContextWorkspace() {
+    confirmAction(
+      'Clear code context?',
+      'The code editor, your question and the latest analysis result will be cleared.',
+      'Clear',
+      () => {
+        setContext('');
+        setContextEditedByUser(true);
+        setCodeQuestion('');
+        setCodeActionResult(null);
+        showToast('Code context cleared ✓');
+      },
+    );
   }
 
   function deleteHistoryItem(id: string) {
@@ -1164,24 +1298,35 @@ export default function AIAssistantScreen() {
                   color={isHistoryExpanded ? primaryAccent : colors.muted}
                 />
               </Pressable>
-
-              <Pressable
-                onPress={resetCurrentThread}
-                hitSlop={6}
-                accessibilityRole="button"
-                accessibilityLabel="Reset active conversation"
-                style={({ pressed }) => [
-                  styles.resetThreadBtn,
-                  { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
-                  pressed && styles.pressed,
-                ]}
-              >
-                <View style={styles.btnIconWrapper}>
-                  <Ionicons name="refresh-outline" size={13} color={colors.muted} />
-                </View>
-                <Text style={[styles.resetThreadText, { color: colors.muted }]}>Reset</Text>
-              </Pressable>
             </View>
+          </View>
+
+          {/* ── Clear / Delete controls (always visible, wraps on narrow screens) ── */}
+          <View style={styles.conversationDangerRow}>
+            <ConversationDangerButton
+              icon="trash-outline"
+              label="Clear Chat"
+              accessibilityLabel="Clear the live conversation"
+              onPress={clearConversation}
+              borderColor={colors.border}
+              backgroundColor={colors.surfaceElevated}
+            />
+            <ConversationDangerButton
+              icon="close-circle-outline"
+              label="Delete & Start New"
+              accessibilityLabel="Delete this conversation and start a new one"
+              onPress={deleteCurrentConversation}
+              borderColor={colors.border}
+              backgroundColor={colors.surfaceElevated}
+            />
+            <ConversationDangerButton
+              icon="flame-outline"
+              label="Clear All"
+              accessibilityLabel="Clear every conversation"
+              onPress={clearAllConversations}
+              borderColor={colors.border}
+              backgroundColor={colors.surfaceElevated}
+            />
           </View>
 
           {/* ── Multi-Thread Selector Chips ── */}
@@ -1578,10 +1723,36 @@ export default function AIAssistantScreen() {
 
           {/* ── Conversation Thread ── */}
           <View style={styles.conversationHeaderRow}>
-            <Text style={[styles.section, { color: colors.text }]}>Conversation</Text>
+            <Text style={[styles.section, { color: colors.text }]}>Live Conversation</Text>
             <Text style={[styles.conversationCountText, { color: colors.muted }]}>
               {messages.length} message{messages.length !== 1 ? 's' : ''}
             </Text>
+          </View>
+          <View style={styles.conversationDangerRow}>
+            <ConversationDangerButton
+              icon="trash-outline"
+              label="Clear Conversation"
+              accessibilityLabel="Clear the live conversation"
+              onPress={clearConversation}
+              borderColor={colors.border}
+              backgroundColor={colors.surfaceElevated}
+            />
+            <ConversationDangerButton
+              icon="close-circle-outline"
+              label="Delete & New"
+              accessibilityLabel="Delete this conversation and start a new one"
+              onPress={deleteCurrentConversation}
+              borderColor={colors.border}
+              backgroundColor={colors.surfaceElevated}
+            />
+            <ConversationDangerButton
+              icon="flame-outline"
+              label="Clear All"
+              accessibilityLabel="Clear every conversation"
+              onPress={clearAllConversations}
+              borderColor={colors.border}
+              backgroundColor={colors.surfaceElevated}
+            />
           </View>
 
           {messages.map((item, index) => (
@@ -1708,26 +1879,29 @@ export default function AIAssistantScreen() {
                   {hasServerKey ? 'Cloud AI' : 'Offline Ready'}
                 </Text>
               </View>
-              {context.trim().length > 0 && (
-                <Pressable
-                  onPress={() => {
-                    setContext('');
-                    setContextEditedByUser(true);
-                    showToast('Editor cleared');
-                  }}
-                  hitSlop={6}
-                  style={({ pressed }) => [
-                    styles.clearCodeSnippetBtn,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Ionicons name="trash-outline" size={12} color={colors.muted} />
-                  <Text style={[styles.clearCodeSnippetText, { color: colors.muted }]}>
-                    Clear Editor
-                  </Text>
-                </Pressable>
-              )}
             </View>
+          </View>
+
+          <View style={styles.conversationDangerRow}>
+            <ConversationDangerButton
+              icon="trash-outline"
+              label="Clear Code & Output"
+              accessibilityLabel="Clear the code editor, question and analysis output"
+              onPress={clearCodeContextWorkspace}
+              borderColor={colors.border}
+              backgroundColor={colors.surfaceElevated}
+              disabled={
+                context.trim().length === 0 && !codeActionResult && codeQuestion.trim().length === 0
+              }
+            />
+            <ConversationDangerButton
+              icon="flame-outline"
+              label="Clear All Conversations"
+              accessibilityLabel="Clear every conversation"
+              onPress={clearAllConversations}
+              borderColor={colors.border}
+              backgroundColor={colors.surfaceElevated}
+            />
           </View>
 
           <Card>
@@ -2141,20 +2315,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  resetThreadBtn: {
+  conversationDangerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  conversationDangerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 9,
+    gap: 5,
+    paddingHorizontal: 11,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    height: 34,
-    flexShrink: 0,
+    minHeight: 34,
   },
-  resetThreadText: {
-    fontSize: 11.5,
-    fontWeight: '600',
+  conversationDangerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#EF4444',
   },
   historyTimestampText: {
     fontSize: 10.5,
@@ -2479,17 +2660,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
     marginBottom: 4,
-  },
-  clearCodeSnippetBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  clearCodeSnippetText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   editorHeaderInfo: {
     flexDirection: 'row',

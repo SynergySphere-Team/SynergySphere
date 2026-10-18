@@ -149,7 +149,6 @@ export default function LectureToLifePage() {
         setSrsDueCards(res.cards);
       }
     } catch {
-      // ignore
     }
   }, []);
 
@@ -183,7 +182,6 @@ export default function LectureToLifePage() {
       setTimeout(() => setSrsNotice(null), 3500);
       loadSrsDue();
     } catch {
-      // ignore
     } finally {
       setSrsReviewing(false);
     }

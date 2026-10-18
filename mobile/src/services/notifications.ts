@@ -3,7 +3,6 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { api } from './api';
 
-// Configure notification presentation in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -151,7 +150,6 @@ export async function sendImmediateFocusNotification(durationMinutes: number): P
 
 export async function registerCommunityPushNotifications(): Promise<void> {
   if (Platform.OS === 'web') return;
-  // Expo Go on Android removed remote push notifications in SDK 53+
   if (Constants.appOwnership === 'expo' && Platform.OS === 'android') {
     return;
   }
@@ -165,7 +163,6 @@ export async function registerCommunityPushNotifications(): Promise<void> {
     const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
     await api.put('/github/push-token', { token, platform: Platform.OS });
   } catch {
-    // Development clients or Expo Go without push credentials still use the in-app feed.
   }
 }
 

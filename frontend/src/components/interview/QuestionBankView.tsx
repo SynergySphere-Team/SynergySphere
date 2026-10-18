@@ -30,20 +30,17 @@ export function QuestionBankView({ onLaunchTrack }: QuestionBankViewProps) {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTopic, setSelectedTopic] = useState('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
 
-  // Expanded question rubrics
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     loadQuestions();
   }, [page, selectedTopic, selectedDifficulty, selectedType]);
 
-  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       setPage(1);

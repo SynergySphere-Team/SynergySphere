@@ -255,7 +255,6 @@ router.patch('/posts/:postId/replies/:replyId/accept', authenticate, async (req:
   res.json(updated);
 });
 
-// ─── Mobile Community Feed ────────────────────────────────────────────────
 
 const feedPostSchema = z.object({
   body: z.string().trim().min(1).max(4000),

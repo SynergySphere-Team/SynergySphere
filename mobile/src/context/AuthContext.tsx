@@ -31,7 +31,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await authStorage.clearToken();
         setUser(null);
       }
-      // Do not clear user on transient network or offline errors
     }
   }, []);
   useEffect(() => { refresh().finally(() => setLoading(false)); }, [refresh]);
@@ -57,7 +56,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         await api.post('/auth/logout');
       } catch {
-        // Ignore network errors during logout so local session is always cleared
       } finally {
         await Promise.all([
           authStorage.clearToken(),

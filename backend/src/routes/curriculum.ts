@@ -61,7 +61,6 @@ async function getUserCompletions(userId?: string): Promise<Set<string>> {
   return completed;
 }
 
-// 1. GET /api/curriculum/technologies - list all technologies with progress
 router.get('/technologies', async (req: AuthRequest, res) => {
   const completedSet = await getUserCompletions(req.user?.userId);
 
@@ -96,7 +95,6 @@ router.get('/technologies', async (req: AuthRequest, res) => {
   });
 });
 
-// 2. GET /api/curriculum/technologies/:techId - details of a single technology with sections & lessons
 router.get('/technologies/:techId', async (req: AuthRequest, res) => {
   const techId = String(req.params.techId || '').toLowerCase();
   const techMeta = technologiesCatalog.find((t) => t.id === techId);
@@ -168,7 +166,6 @@ router.get('/technologies/:techId', async (req: AuthRequest, res) => {
   });
 });
 
-// 3. GET /api/curriculum/lessons/:lessonId - full lesson view with code examples, output, prev/next
 router.get('/lessons/:lessonId', async (req: AuthRequest, res) => {
   const lessonId = String(req.params.lessonId || '');
   const allEntries = getAllFlatLessons();
@@ -204,7 +201,6 @@ router.get('/lessons/:lessonId', async (req: AuthRequest, res) => {
   });
 });
 
-// 4. POST /api/curriculum/lessons/:lessonId/progress - mark complete or toggle
 router.post('/lessons/:lessonId/progress', async (req: AuthRequest, res) => {
   const lessonId = String(req.params.lessonId || '');
   const match = findLessonEntry(lessonId);
@@ -258,7 +254,6 @@ router.post('/lessons/:lessonId/progress', async (req: AuthRequest, res) => {
   });
 });
 
-// 5. GET /api/curriculum/learning-hub-search - unified high-accuracy search across lessons & challenges
 router.get('/learning-hub-search', async (req: AuthRequest, res) => {
   const q = String(req.query.q || '').trim();
   if (!q) {
@@ -287,7 +282,6 @@ router.get('/learning-hub-search', async (req: AuthRequest, res) => {
   res.json({ query: q, total: results.length, results });
 });
 
-// 6. GET /api/curriculum/search - search lessons across technologies
 router.get('/search', async (req: AuthRequest, res) => {
   const q = String(req.query.q || '').trim();
   if (!q) {
@@ -345,7 +339,6 @@ router.get('/search', async (req: AuthRequest, res) => {
   res.json({ query: q, total: fallbackResults.length, results: fallbackResults });
 });
 
-// 6. POST /api/curriculum/sync - run dynamic scan, update lessons, flag changes
 router.post('/sync', async (req, res) => {
   const targetTech = req.body?.technologyId ? String(req.body.technologyId) : undefined;
   const syncResult = await W3SchoolsSyncEngine.runSync(targetTech);
@@ -358,19 +351,16 @@ router.post('/sync', async (req, res) => {
   });
 });
 
-// 7. GET /api/curriculum/sync/status - status of W3Schools synchronization
 router.get('/sync/status', (_req, res) => {
   res.json(W3SchoolsSyncEngine.getStatus());
 });
 
-// 8. GET /api/curriculum/sync/review-queue - items flagged for admin review
 router.get('/sync/review-queue', (_req, res) => {
   res.json({
     reviewQueue: W3SchoolsSyncEngine.getReviewQueue(),
   });
 });
 
-// 9. POST /api/curriculum/sync/review-queue/:lessonId/resolve - resolve admin review
 router.post('/sync/review-queue/:lessonId/resolve', (req, res) => {
   const lessonId = String(req.params.lessonId);
   const action = (req.body?.action || 'keep') as 'keep' | 'deprecate' | 'update';

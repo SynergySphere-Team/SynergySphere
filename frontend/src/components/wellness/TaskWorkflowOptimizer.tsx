@@ -39,7 +39,6 @@ export function TaskWorkflowOptimizer({
   const [isExpanded, setIsExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<'subtasks' | 'resources'>('subtasks');
 
-  // Trigger task deconstruction when active task or strain changes
   useEffect(() => {
     if (activeTitle) {
       const result = generateDynamicTaskDeconstruction(
@@ -62,7 +61,6 @@ export function TaskWorkflowOptimizer({
     }));
   };
 
-  // If no task is entered yet, show an inviting idle preview with prompt to select or type a task
   if (!activeTitle) {
     return (
       <div className="rounded-xl border border-white/[0.08] bg-black/25 p-4 transition-all">

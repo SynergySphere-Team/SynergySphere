@@ -121,7 +121,6 @@ export function TaskCard({
   const isInProgress = currentStatus === 'IN_PROGRESS';
   const isTodo = currentStatus === 'TODO';
 
-  // Compute actions if not explicitly provided via props
   const effectiveActions: TaskCardAction[] = actions ?? (() => {
     if (!onUpdateStatus) return [];
 
@@ -177,7 +176,6 @@ export function TaskCard({
       return acts;
     }
 
-    // Fallback for REVIEW or any future task status
     return [
       {
         label: 'Done',

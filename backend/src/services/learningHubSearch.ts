@@ -136,7 +136,6 @@ export function stemWord(word: string): string {
   const w = word.toLowerCase();
   if (w.length <= 3) return w;
 
-  // Specific common irregular forms in programming
   if (w === 'indices' || w === 'indexes') return 'index';
   if (w === 'matrices') return 'matrix';
   if (w === 'children') return 'child';

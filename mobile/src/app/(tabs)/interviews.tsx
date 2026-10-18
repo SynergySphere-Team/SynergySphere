@@ -260,7 +260,6 @@ export default function InterviewsScreen() {
   const [interviewerStyles, setInterviewerStyles] = useState<InterviewerStyleItem[]>(DEFAULT_INTERVIEWER_STYLES);
   const [homeStats, setHomeStats] = useState<HomeStats | null>(null);
 
-  // Setup form states
   const [selectedRole, setSelectedRole] = useState('Full Stack Developer');
   const [selectedType, setSelectedType] = useState('Technical Interview');
   const [selectedDifficulty, setSelectedDifficulty] = useState('Medium');
@@ -375,7 +374,6 @@ export default function InterviewsScreen() {
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  // 1. Initial Load of Metadata & Stats
   const loadDashboardData = useCallback(async () => {
     try {
       setError('');

@@ -202,7 +202,6 @@ bodyRouter.post('/projects', authenticate, validateBody(wizardSchema), async (re
             }),
           });
         } catch {
-          // ignore secondary file errors
         }
       }
     }

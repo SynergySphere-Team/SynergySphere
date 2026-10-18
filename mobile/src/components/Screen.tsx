@@ -92,7 +92,6 @@ export function Screen({
   const [isOffline, setIsOffline] = useState(() => getOfflineStatus());
   const [queuedOfflineOps, setQueuedOfflineOps] = useState(0);
 
-  // Animated values for smooth swipe-to-back transitions
   const screenWidth = Dimensions.get('window').width;
   const translateX = useSharedValue(0);
   const opacity = useSharedValue(1);
@@ -130,7 +129,6 @@ export function Screen({
     if (router.canGoBack()) {
       router.back();
     } else {
-      // Smart fallbacks for non-root / sub-screens
       if (pathname === '/my-work') {
         router.replace('/(tabs)/tasks' as never);
       } else if (
@@ -206,13 +204,11 @@ export function Screen({
   const shouldShowBack = showBackButton !== undefined ? showBackButton : !isMainTabRoot;
   const canPerformBack = !disableSwipeBack && swipeBack && (!isMainTabRoot || router.canGoBack());
 
-  // Handle Android hardware back press
   useEffect(() => {
     if (Platform.OS !== 'android') return;
 
     const onHardwareBack = () => {
       if (disableSwipeBack) {
-        // Block hardware back if screen explicitly locked (e.g. active timed session)
         return true;
       }
       if (canPerformBack) {
@@ -228,7 +224,6 @@ export function Screen({
 
   const finishGestureBack = useCallback(() => {
     handleBack();
-    // Maintain transition state during navigation pop, then smoothly reset
     const timer = setTimeout(() => {
       translateX.value = 0;
       opacity.value = 1;
@@ -238,7 +233,6 @@ export function Screen({
 
   const edgeWidth = Math.max(20, Math.min(swipeBackEdgeWidth, 50));
 
-  // 1. Left Edge: Swiping left-to-right (→) within outer edge bounds
   const leftEdgeGesture = Gesture.Pan()
     .enabled(canPerformBack)
     .hitSlop({ left: 0, width: edgeWidth })
@@ -287,7 +281,6 @@ export function Screen({
       }
     });
 
-  // 2. Right Edge: Swiping right-to-left (←) within outer edge bounds
   const rightEdgeGesture = Gesture.Pan()
     .enabled(canPerformBack && allowBothEdges)
     .hitSlop({ right: 0, width: edgeWidth })
@@ -345,9 +338,7 @@ export function Screen({
     opacity: opacity.value,
   }));
 
-  // Floating bottom navigation has a height of ~70px (78px with larger text)
   // and sits at Math.max(insets.bottom, 12).
-  // Content bottom padding should only clear the floating bottom navigation bar
   // (~80px to 96px / pb-24 on standard viewports, or insets.bottom + 76px on notched viewports)
   // plus safe area insets without leaving an excessive blank void.
   const hasBottomNav = !pathname.includes('/(auth)');

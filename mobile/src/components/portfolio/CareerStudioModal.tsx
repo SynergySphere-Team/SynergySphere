@@ -18,6 +18,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/services/api';
 import type { User } from '@/types/api';
+import { CareerDocumentEditor } from '@/components/portfolio/CareerDocumentEditor';
+import {
+  parseDocument,
+  serializeToHtml,
+  serializeToPlainText,
+  type DocBlock,
+} from '@/utils/careerDocument';
 
 export type CareerToolId = 'resume' | 'cv' | 'linkedin' | 'jobs';
 
@@ -87,7 +94,10 @@ export function CareerStudioModal({
   const [activeTool, setActiveTool] = useState<CareerToolId>(initialTool);
   const [targetRole, setTargetRole] = useState(savedTargetRole || PRESET_ROLES[0]);
   const [loading, setLoading] = useState(false);
-  const [outputs, setOutputs] = useState<Record<string, string>>({});
+  const [docs, setDocs] = useState<Record<string, DocBlock[]>>({});
+  const [editedKeys, setEditedKeys] = useState<string[]>([]);
+  const [isEditing, setIsEditing] = useState(true);
+  const [fetchError, setFetchError] = useState('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Live jobs state
@@ -130,7 +140,8 @@ export function CareerStudioModal({
         void fetchLiveJobs(targetRole);
       } else {
         const cacheKey = `${activeTool}_${targetRole}`;
-        if (!outputs[cacheKey]) {
+        setIsEditing(activeTool === 'resume' || activeTool === 'cv');
+        if (!docs[cacheKey]) {
           void fetchCareerContent(activeTool, targetRole);
         }
       }
@@ -171,6 +182,7 @@ export function CareerStudioModal({
 
   async function fetchCareerContent(toolId: CareerToolId, role: string) {
     if (toolId === 'jobs') return;
+    setFetchError('');
     setLoading(true);
     try {
       const res = await api.post<{ content: string; tool: string; targetRole: string }>(
@@ -182,17 +194,45 @@ export function CareerStudioModal({
         }
       );
       if (res?.content) {
-        setOutputs((prev) => ({
-          ...prev,
-          [`${toolId}_${role}`]: res.content,
-          [toolId]: res.content,
-        }));
+        const key = `${toolId}_${role}`;
+        setDocs((prev) => ({ ...prev, [key]: parseDocument(res.content) }));
+        setEditedKeys((prev) => prev.filter((k) => k !== key));
+        setIsEditing(toolId === 'resume' || toolId === 'cv');
+      } else {
+        setFetchError('The generator returned an empty document. Please try Regenerate.');
       }
     } catch (e) {
       console.warn('Career tool generation error:', e);
+      setFetchError('Could not generate this document right now. Check your connection and tap Regenerate.');
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleRegenerate() {
+    if (activeTool === 'jobs') return;
+    const run = () => void fetchCareerContent(activeTool, targetRole);
+    if (editedKeys.includes(docKey) && Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm('Regenerating will discard your edits to this document. Continue?')) {
+        run();
+      }
+    } else if (editedKeys.includes(docKey)) {
+      Alert.alert(
+        'Replace your edits?',
+        'Regenerating will discard the changes you made to this document.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Regenerate', style: 'destructive', onPress: run },
+        ]
+      );
+    } else {
+      run();
+    }
+  }
+
+  function handleBlocksChange(blocks: DocBlock[]) {
+    setDocs((prev) => ({ ...prev, [docKey]: blocks }));
+    setEditedKeys((prev) => (prev.includes(docKey) ? prev : [...prev, docKey]));
   }
 
   async function handleCopy(key: string, text: string) {
@@ -211,75 +251,14 @@ export function CareerStudioModal({
 
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
-  function generatePrintableHtml(title: string, candidateName: string, content: string, role: string): string {
-    const safeContent = content
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/\n\n/g, '</p><p>')
-      .replace(/\n/g, '<br/>')
-      .replace(/### (.*?)(<br\/>|<\/p>)/g, '<h3>$1</h3>')
-      .replace(/## (.*?)(<br\/>|<\/p>)/g, '<h2>$1</h2>')
-      .replace(/# (.*?)(<br\/>|<\/p>)/g, '<h1>$1</h1>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-    const skillsHtml = skills && skills.length > 0
-      ? `<div class="skills-bar">${skills.slice(0, 15).map(([name, level]) => `<span class="skill-pill">${name} (${level}%)</span>`).join(' ')}</div>`
-      : '';
-
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>${title}</title>
-  <style>
-    @page { size: A4 portrait; margin: 16mm 14mm; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: #111827;
-      background: #ffffff;
-      line-height: 1.55;
-      font-size: 10.5pt;
-      margin: 0;
-      padding: 20px;
-    }
-    h1 { font-size: 20pt; margin: 0 0 4px 0; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #0f172a; padding-bottom: 6px; }
-    h2 { font-size: 13pt; margin: 16px 0 6px 0; color: #1e3a8a; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
-    h3 { font-size: 11pt; margin: 10px 0 3px 0; color: #1e293b; }
-    p { margin: 0 0 8px 0; }
-    .header { text-align: center; margin-bottom: 20px; }
-    .role-badge { font-size: 11pt; color: #475569; font-weight: 600; margin-top: 2px; }
-    .skills-bar { margin: 12px 0 16px 0; text-align: center; }
-    .skill-pill { display: inline-block; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 8px; font-size: 9pt; color: #334155; font-weight: 600; margin: 2px; }
-    .content { margin-top: 10px; }
-    .footer { margin-top: 30px; font-size: 8pt; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 8px; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>${candidateName}</h1>
-    <div class="role-badge">${role} · Certified Portfolio</div>
-    ${skillsHtml}
-  </div>
-  <div class="content">
-    <p>${safeContent}</p>
-  </div>
-  <div class="footer">
-    Generated by SynergySphere Career Development Studio & Certified Portfolio Engine · Verified Developer Profile
-  </div>
-</body>
-</html>`;
-  }
-
-  async function handleDownloadPdf(title: string, text: string) {
-    if (!text.trim()) {
+  async function handleDownloadPdf(title: string, documentBlocks: DocBlock[]) {
+    if (documentBlocks.length === 0) {
       Alert.alert('No Content', 'Please generate your resume or CV before downloading.');
       return;
     }
     setDownloadingPdf(true);
     try {
-      const htmlContent = generatePrintableHtml(title, fullName, text, targetRole);
+      const htmlContent = serializeToHtml(documentBlocks, title);
       if (Platform.OS === 'web') {
         if (typeof window !== 'undefined') {
           const printWindow = window.open('', '_blank');
@@ -310,7 +289,10 @@ export function CareerStudioModal({
     }
   }
 
-  const currentOutput = outputs[`${activeTool}_${targetRole}`] || outputs[activeTool] || '';
+  const docKey = `${activeTool}_${targetRole}`;
+  const currentBlocks = docs[docKey] ?? [];
+  const currentOutput = serializeToPlainText(currentBlocks);
+  const isDocEdited = editedKeys.includes(docKey);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -403,7 +385,7 @@ export function CareerStudioModal({
           {/* Action Toolbar */}
           <View style={[styles.toolbar, { borderBottomColor: colors.border }]}>
             <Pressable
-              onPress={() => fetchCareerContent(activeTool, targetRole)}
+              onPress={handleRegenerate}
               disabled={loading || activeTool === 'jobs'}
               style={[
                 styles.actionBtn,
@@ -415,7 +397,34 @@ export function CareerStudioModal({
             </Pressable>
 
             {currentOutput && activeTool !== 'jobs' ? (
-              <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                {activeTool !== 'linkedin' && (
+                  <Pressable
+                    onPress={() => setIsEditing((prev) => !prev)}
+                    accessibilityRole="button"
+                    accessibilityLabel={isEditing ? 'Finish editing document' : 'Edit document'}
+                    style={[
+                      styles.actionBtn,
+                      isEditing
+                        ? { backgroundColor: primaryAccent, borderColor: primaryAccent }
+                        : { backgroundColor: colors.surfaceElevated, borderColor: primaryAccent },
+                    ]}
+                  >
+                    <Ionicons
+                      name={isEditing ? 'checkmark' : 'create-outline'}
+                      size={14}
+                      color={isEditing ? (isLight ? '#FFFFFF' : colors.primaryText) : primaryAccent}
+                    />
+                    <Text
+                      style={[
+                        styles.actionBtnText,
+                        { color: isEditing ? (isLight ? '#FFFFFF' : colors.primaryText) : primaryAccent },
+                      ]}
+                    >
+                      {isEditing ? 'Done' : 'Edit'}
+                    </Text>
+                  </Pressable>
+                )}
                 <Pressable
                   onPress={() => handleCopy('main_output', currentOutput)}
                   style={[styles.actionBtn, { backgroundColor: primaryAccent }]}
@@ -440,7 +449,7 @@ export function CareerStudioModal({
 
                 {(activeTool === 'resume' || activeTool === 'cv') && (
                   <Pressable
-                    onPress={() => handleDownloadPdf(`${fullName} — ${activeTool === 'resume' ? 'Resume' : 'CV'}`, currentOutput)}
+                    onPress={() => handleDownloadPdf(`${fullName} — ${activeTool === 'resume' ? 'Resume' : 'CV'}`, currentBlocks)}
                     disabled={downloadingPdf}
                     style={[styles.actionBtn, { backgroundColor: isLight ? '#E0F2FE' : 'rgba(2, 132, 199, 0.2)', borderColor: '#0284c7' }]}
                   >
@@ -873,7 +882,21 @@ export function CareerStudioModal({
               <View style={[styles.docCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 {currentOutput ? (
                   <>
-                    <Text style={[styles.docText, { color: colors.text }]}>{currentOutput}</Text>
+                    {isDocEdited && (
+                      <Text style={[styles.editedNote, { color: primaryAccent }]}>
+                        Edited — your changes are kept while this screen is open
+                      </Text>
+                    )}
+                    {isEditing && (
+                      <Text style={[styles.editedNote, { color: colors.muted }]}>
+                        Tap any line to change its text. Use the controls under each line to restyle, reorder, add or delete it, then tap Done.
+                      </Text>
+                    )}
+                    <CareerDocumentEditor
+                      blocks={currentBlocks}
+                      editing={isEditing}
+                      onChange={handleBlocksChange}
+                    />
                     <View style={[styles.downloadCtaCard, { backgroundColor: isLight ? '#F0FDF4' : 'rgba(34, 197, 94, 0.1)', borderColor: primaryAccent }]}>
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.downloadCtaTitle, { color: colors.text }]}>
@@ -884,7 +907,7 @@ export function CareerStudioModal({
                         </Text>
                       </View>
                       <Pressable
-                        onPress={() => handleDownloadPdf(`${fullName} — ${activeTool === 'resume' ? 'Resume' : 'CV'}`, currentOutput)}
+                        onPress={() => handleDownloadPdf(`${fullName} — ${activeTool === 'resume' ? 'Resume' : 'CV'}`, currentBlocks)}
                         disabled={downloadingPdf}
                         style={[styles.downloadCtaBtn, { backgroundColor: primaryAccent }]}
                       >
@@ -902,6 +925,9 @@ export function CareerStudioModal({
                 ) : (
                   <View style={styles.emptyDoc}>
                     <Ionicons name="document-text-outline" size={40} color={colors.muted} />
+                    {fetchError ? (
+                      <Text style={[styles.emptyDocText, { color: '#f59e0b' }]}>{fetchError}</Text>
+                    ) : null}
                     <Text style={[styles.emptyDocText, { color: colors.muted }]}>
                       Tap "Regenerate" above to create your custom {activeTool === 'resume' ? 'ATS Resume' : 'Technical CV'} for {targetRole}.
                     </Text>
@@ -1241,6 +1267,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 20,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  editedNote: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    lineHeight: 17,
+    marginBottom: 8,
   },
   emptyDoc: {
     alignItems: 'center',

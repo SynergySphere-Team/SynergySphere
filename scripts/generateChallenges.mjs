@@ -48,7 +48,6 @@ console.log(`Total challenges: ${totalChallenges}`);
 
 const allChallenges = allLanguageDatasets.flatMap(d => d.list);
 
-// 1. Generate backend/src/data/builtinChallenges.ts
 const backendTsContent = `// Auto-generated challenge data bank containing 495+ production-ready challenges across 11 languages
 export interface BuiltinChallengeData {
   id: string;
@@ -72,7 +71,6 @@ const backendFilePath = path.join(rootDir, 'backend', 'src', 'data', 'builtinCha
 fs.writeFileSync(backendFilePath, backendTsContent, 'utf-8');
 console.log(`Written ${backendFilePath} (${allChallenges.length} challenges)`);
 
-// 2. Generate mobile/src/data/builtinChallenges.ts
 const mobileTsContent = `// Auto-generated challenge data bank containing 495+ production-ready challenges across 11 languages
 export interface BuiltinChallenge {
   id: string;
@@ -96,7 +94,6 @@ const mobileFilePath = path.join(rootDir, 'mobile', 'src', 'data', 'builtinChall
 fs.writeFileSync(mobileFilePath, mobileTsContent, 'utf-8');
 console.log(`Written ${mobileFilePath} (${allChallenges.length} challenges)`);
 
-// 3. Generate frontend/src/data/builtinChallenges.ts
 const frontendTsContent = `// Auto-generated challenge data bank containing 495+ production-ready challenges across 11 languages
 export interface BuiltinChallenge {
   id: string;

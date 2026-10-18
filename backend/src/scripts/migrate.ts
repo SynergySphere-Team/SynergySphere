@@ -16,7 +16,6 @@ export async function runMigrations() {
     return;
   }
 
-  // 1. Ensure migrations tracking table exists
   await pool.query(`
     CREATE TABLE IF NOT EXISTS "schema_migrations" (
       "id" SERIAL PRIMARY KEY,
@@ -25,7 +24,6 @@ export async function runMigrations() {
     );
   `);
 
-  // 2. Fetch already applied migration files
   const appliedRows = await pool.query<{ filename: string }>(
     'SELECT "filename" FROM "schema_migrations"',
   );

@@ -23,7 +23,6 @@ export interface ReviewQueueItem {
   status: 'pending_review' | 'resolved';
 }
 
-// In-memory sync state and audit ledger (persisted across live server session)
 const syncAuditHistory: SyncAuditItem[] = [];
 const adminReviewQueue: ReviewQueueItem[] = [];
 let lastSyncTimestamp = '17 September 2026';
@@ -55,9 +54,7 @@ export class W3SchoolsSyncEngine {
     for (const subject of subjectsToScan) {
       const allLessons = subject.modules.flatMap((m) => m.lessons);
 
-      // Verify each lesson's integrity and metadata
       for (const lesson of allLessons) {
-        // Ensure standard metadata is updated
         if (!lesson.sources || lesson.sources.length === 0) {
           lesson.sources = [
             {
@@ -73,7 +70,6 @@ export class W3SchoolsSyncEngine {
           updatedCount++;
         }
 
-        // Check if lesson was marked review_required
         if (lesson.status === 'review_required') {
           reviewCount++;
           if (!adminReviewQueue.some((r) => r.lessonId === lesson.id)) {
@@ -89,7 +85,6 @@ export class W3SchoolsSyncEngine {
         }
       }
 
-      // Record audit record for scanned technology
       const auditEntry: SyncAuditItem = {
         id: `audit-${subject.id}-${Date.now()}`,
         lessonId: `tech-${subject.id}`,
@@ -157,7 +152,6 @@ export class W3SchoolsSyncEngine {
       item.status = 'resolved';
     }
 
-    // Find lesson in domain and update its status
     for (const subject of w3schoolsProgrammingDomain.subjects) {
       for (const mod of subject.modules) {
         const target = mod.lessons.find((l) => l.id === lessonId);

@@ -46,7 +46,6 @@ export function GamificationBadgeBar({
     },
   ];
 
-  // Calculate next milestone
   const nextMilestone = milestones.find((m) => !m.achieved) || milestones[milestones.length - 1];
   const progressToNext = nextMilestone
     ? Math.min(100, Math.round((currentStreak / nextMilestone.days) * 100))

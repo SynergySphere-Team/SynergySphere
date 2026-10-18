@@ -129,7 +129,6 @@ export function AccessibilityProvider({
       setReduceMotion: (enabled) =>
         updatePreferences({ reduceMotion: enabled }),
 
-      // 30% increase keeps layouts readable without making controls overflow.
       fontSize: (size) =>
         preferences.largerText
           ? Math.round(size * 1.3)

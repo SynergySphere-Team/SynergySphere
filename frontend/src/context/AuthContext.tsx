@@ -43,7 +43,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearAuth();
         setUser(null);
       }
-      // Transient connection failures do not wipe local user session
     }
   }
 
@@ -75,7 +74,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api('/auth/logout', { method: 'POST' });
     } catch {
-      // Local cleanup still happens if the API is unreachable.
     }
     clearAuth();
     setUser(null);

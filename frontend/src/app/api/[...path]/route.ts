@@ -32,7 +32,6 @@ async function proxyRequest(request: NextRequest, pathSegments: string[]) {
   try {
     backendResponse = await fetch(url, init);
   } catch {
-    // A route handler must return a JSON response when the local API is down.
     // Letting this throw produces an HTML 500 page, which becomes the opaque
     // "Request failed" message in every client screen.
     return NextResponse.json(

@@ -79,7 +79,6 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-// Gentle Web Audio API synthesizer for timer chimes and task notifications
 function playNotificationChime(type: 'focus_done' | 'task_done' | 'break') {
   try {
     const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -88,7 +87,6 @@ function playNotificationChime(type: 'focus_done' | 'task_done' | 'break') {
     const now = ctx.currentTime;
 
     if (type === 'focus_done') {
-      // 3-tone cheerful ascending chime (C5, E5, G5)
       const freqs = [523.25, 659.25, 783.99];
       freqs.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
@@ -104,7 +102,6 @@ function playNotificationChime(type: 'focus_done' | 'task_done' | 'break') {
         osc.stop(now + idx * 0.14 + 0.36);
       });
     } else if (type === 'break') {
-      // Gentle bell tone (A4, F4)
       const freqs = [440, 349.23];
       freqs.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
@@ -119,7 +116,6 @@ function playNotificationChime(type: 'focus_done' | 'task_done' | 'break') {
         osc.stop(now + idx * 0.18 + 0.41);
       });
     } else {
-      // Task completed celebration chord
       const freqs = [587.33, 739.99, 880];
       freqs.forEach((freq) => {
         const osc = ctx.createOscillator();
@@ -135,7 +131,6 @@ function playNotificationChime(type: 'focus_done' | 'task_done' | 'break') {
       });
     }
   } catch {
-    // Audio context not allowed or not supported; ignore gracefully
   }
 }
 
@@ -168,7 +163,6 @@ export default function TasksPage() {
   const [success, setSuccess] = useState('');
   const [alertNotification, setAlertNotification] = useState<NotificationAlert | null>(null);
 
-  // New task form fields
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formStatus, setFormStatus] = useState('TODO');
@@ -177,7 +171,6 @@ export default function TasksPage() {
   const [formLink, setFormLink] = useState('');
   const [formPushOnComplete, setFormPushOnComplete] = useState(false);
 
-  // Task completion & wellness modal state
   const [editingLearned, setEditingLearned] = useState<string | null>(null);
   const [learnedDraft, setLearnedDraft] = useState('');
   const [includeWellnessCheckIn, setIncludeWellnessCheckIn] = useState(true);
@@ -186,7 +179,6 @@ export default function TasksPage() {
   const [checkInMood, setCheckInMood] = useState(8);
   const [checkInEnergy, setCheckInEnergy] = useState(7);
 
-  // Focus Timer state
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [timerPhase, setTimerPhase] = useState<'work' | 'break'>('work');
   const [durationInput, setDurationInput] = useState(String(DEFAULT_MINUTES));
@@ -254,7 +246,6 @@ export default function TasksPage() {
     }
   }, []);
 
-  // Restore timer state from localStorage
   useEffect(() => {
     const saved = localStorage.getItem(TIMER_STORAGE_KEY);
     if (!saved) return;
@@ -289,7 +280,6 @@ export default function TasksPage() {
     }
   }, []);
 
-  // Timer interval clock
   useEffect(() => {
     if (timerStatus !== 'running') {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -305,17 +295,14 @@ export default function TasksPage() {
     };
   }, [timerStatus]);
 
-  // Timer completion handler
   useEffect(() => {
     if (timerStatus === 'running' && secondsLeft === 0) {
       if (timerPhase === 'work') {
         setTimerStatus('idle');
         void completeFocusSession();
-        // Prepare break interval
         setTimerPhase('break');
         setSecondsLeft(DEFAULT_BREAK_MINUTES * 60);
       } else {
-        // Break ended
         playNotificationChime('break');
         sendBrowserNotification('Break Ended', 'Break time has finished. Ready to start your next sprint?');
         setAlertNotification({
@@ -330,7 +317,6 @@ export default function TasksPage() {
     }
   }, [secondsLeft, timerStatus, timerPhase, durationMinutes, completeFocusSession]);
 
-  // Sync timer to localStorage
   useEffect(() => {
     const payload = {
       durationMinutes,
@@ -406,7 +392,6 @@ export default function TasksPage() {
     setTimerPhase('work');
   }
 
-  // Start or resume focus directly on a specific task
   function startTaskTimer(task: Task) {
     setError('');
     setSuccess('');
@@ -442,7 +427,6 @@ export default function TasksPage() {
     setTimerStatus('running');
   }
 
-  // Create task with full configuration (description, target minutes, break intervals, link, status)
   async function handleCreateTask(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (!formTitle.trim()) {

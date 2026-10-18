@@ -66,14 +66,12 @@ export function LiveInterviewRoom({
   const [showFollowUps, setShowFollowUps] = useState(false);
   const [activeTab, setActiveTab] = useState<'answer' | 'code'>('answer');
 
-  // Auto-launch initialTopic if passed in query param
   useEffect(() => {
     if (initialTopic && !activeInterview && !result && tracks.length > 0) {
       startInterview(initialTopic);
     }
   }, [initialTopic, tracks.length]);
 
-  // Keyboard synchronization & shortcut feedback state
   const [lastShortcutTriggered, setLastShortcutTriggered] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -82,7 +80,6 @@ export function LiveInterviewRoom({
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sync answers/codes array length when interview starts
   useEffect(() => {
     if (activeInterview) {
       const qCount = activeInterview.questions.length;
@@ -94,7 +91,6 @@ export function LiveInterviewRoom({
     }
   }, [activeInterview]);
 
-  // Live Critique caller
   const triggerCritique = useCallback(
     async (ans: string, code: string, currentStep: number, session: InterviewSession) => {
       if (!session || !session.id) return;
@@ -119,7 +115,6 @@ export function LiveInterviewRoom({
     [],
   );
 
-  // Handle answer change with typing synchronization indicator
   function handleAnswerChange(val: string) {
     const next = [...answers];
     next[step] = val;
@@ -139,7 +134,6 @@ export function LiveInterviewRoom({
     }
   }
 
-  // Handle scratch code change
   function handleCodeChange(val: string) {
     const next = [...scratchCodes];
     next[step] = val;
@@ -159,7 +153,6 @@ export function LiveInterviewRoom({
     }
   }
 
-  // Helper to trigger brief visual highlight on shortcut key
   function highlightShortcut(name: string) {
     setLastShortcutTriggered(name);
     setTimeout(() => {
@@ -167,12 +160,10 @@ export function LiveInterviewRoom({
     }, 900);
   }
 
-  // Keyboard navigation & editor keydown handler
   function handleEditorKeyDown(
     e: React.KeyboardEvent<HTMLTextAreaElement>,
     editorType: 'answer' | 'code',
   ) {
-    // 1. Ctrl+Enter or Cmd+Enter: Next Question or Submit
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       highlightShortcut('submit_next');
@@ -186,7 +177,6 @@ export function LiveInterviewRoom({
       return;
     }
 
-    // 2. Tab key in Code Scratchpad: insert 2 spaces indentation
     if (editorType === 'code' && e.key === 'Tab') {
       e.preventDefault();
       highlightShortcut('tab_indent');
@@ -196,7 +186,6 @@ export function LiveInterviewRoom({
       const val = textarea.value;
 
       if (e.shiftKey) {
-        // Shift+Tab: Unindent
         const lineStart = val.lastIndexOf('\n', start - 1) + 1;
         if (val.substring(lineStart, lineStart + 2) === '  ') {
           const updated = val.substring(0, lineStart) + val.substring(lineStart + 2);
@@ -207,7 +196,6 @@ export function LiveInterviewRoom({
           }, 0);
         }
       } else {
-        // Indent 2 spaces
         const updated = val.substring(0, start) + '  ' + val.substring(end);
         handleCodeChange(updated);
         setTimeout(() => {
@@ -218,7 +206,6 @@ export function LiveInterviewRoom({
       return;
     }
 
-    // 3. Alt+ArrowRight or Alt+N: Next question
     if (e.altKey && (e.key === 'ArrowRight' || e.key === 'n' || e.key === 'N')) {
       e.preventDefault();
       if (activeInterview && step < activeInterview.questions.length - 1) {
@@ -228,7 +215,6 @@ export function LiveInterviewRoom({
       return;
     }
 
-    // 4. Alt+ArrowLeft or Alt+P: Previous question
     if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'p' || e.key === 'P')) {
       e.preventDefault();
       if (step > 0) {
@@ -238,7 +224,6 @@ export function LiveInterviewRoom({
       return;
     }
 
-    // 5. Alt+1: Switch to Answer tab
     if (e.altKey && (e.key === '1' || e.key === 'a' || e.key === 'A')) {
       e.preventDefault();
       highlightShortcut('tab_answer');
@@ -247,7 +232,6 @@ export function LiveInterviewRoom({
       return;
     }
 
-    // 6. Alt+2: Switch to Code tab
     if (e.altKey && (e.key === '2' || e.key === 'c' || e.key === 'C')) {
       e.preventDefault();
       highlightShortcut('tab_code');
@@ -256,7 +240,6 @@ export function LiveInterviewRoom({
       return;
     }
 
-    // 7. Alt+M: Toggle Voice mic
     if (e.altKey && (e.key === 'm' || e.key === 'M')) {
       e.preventDefault();
       highlightShortcut('mic');
@@ -264,7 +247,6 @@ export function LiveInterviewRoom({
       return;
     }
 
-    // 8. Alt+H: Toggle Hints & Followups
     if (e.altKey && (e.key === 'h' || e.key === 'H')) {
       e.preventDefault();
       highlightShortcut('hints');
@@ -273,12 +255,10 @@ export function LiveInterviewRoom({
     }
   }
 
-  // Global window shortcut listener so user can navigate even if outside textarea
   useEffect(() => {
     function handleGlobalKeyDown(e: KeyboardEvent) {
       if (!activeInterview) return;
 
-      // Don't intercept if user is typing in a different input (e.g. search)
       const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (targetTag === 'input') return;
 
@@ -343,7 +323,6 @@ export function LiveInterviewRoom({
     activeInterviewRef.current = activeInterview;
   }, [activeInterview]);
 
-  // Speech Recognition state & mic visualizer
   const [isListening, setIsListening] = useState(false);
   const [voiceVolume, setVoiceVolume] = useState(0);
   const [liveTranscriptPreview, setLiveTranscriptPreview] = useState('');
@@ -579,7 +558,6 @@ export function LiveInterviewRoom({
     }
   }
 
-  // Active answer word & char counts
   const currentAnswerText = answers[step] || '';
   const wordCount = currentAnswerText.trim().split(/\s+/).filter(Boolean).length;
   const charCount = currentAnswerText.length;
