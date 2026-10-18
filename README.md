@@ -26,11 +26,13 @@ SynergySphere is a university capstone platform combining:
 
 - Node.js 18+
 - Docker for local PostgreSQL, or a Supabase PostgreSQL project
+- Expo Go on iOS/Android physical device, or Xcode iOS Simulator / Android Studio Emulator (for mobile development)
 
 ### 1. Install
 
 ~~~bash
 npm install
+npm install --workspace=mobile
 ~~~
 
 ### 2. Start Local Database
@@ -44,15 +46,22 @@ docker compose up -d
 ~~~bash
 cp backend/.env.example backend/.env
 cp frontend/.env.local.example frontend/.env.local
+cp mobile/.env.example mobile/.env
 ~~~
 
-Edit backend/.env and set a strong unique JWT_SECRET:
+Edit `backend/.env` and set a strong unique JWT_SECRET:
 
 ~~~env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/synergysphere"
 JWT_SECRET="replace-with-a-long-random-secret"
 PORT=4001
 FRONTEND_URL="http://localhost:3000"
+~~~
+
+Configure `mobile/.env` with your computer's LAN IP address (or `localhost` if testing solely in an iOS simulator):
+
+~~~env
+EXPO_PUBLIC_API_URL=http://<YOUR-COMPUTER-LAN-IP>:4001/api
 ~~~
 
 For full AI Workspace responses, add one provider to `backend/.env` (Gemini is tried first when both are configured):
@@ -78,13 +87,26 @@ npm run db:seed
 
 ### 5. Run Development Servers
 
+**Web & Backend:**
 ~~~bash
 npm run dev
 ~~~
-
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:4001
 - Frontend proxy: http://localhost:3000/api forwards to the backend in development
+
+**Mobile Application (Expo):**
+~~~bash
+# Start backend and Expo mobile client concurrently
+npm run dev:mobile
+
+# Or run mobile independently
+npm run start --workspace=mobile
+~~~
+- Press `i` to launch in the **iOS Simulator** (macOS).
+- Press `a` to launch in the **Android Emulator**.
+- Scan the printed QR code using the **Expo Go** app on your physical iOS/Android device (ensure your phone and computer share the same Wi-Fi network).
+- For in-depth network troubleshooting, see the [Mobile Setup Guide](MOBILE_SETUP.md).
 
 ## Demo Accounts
 
