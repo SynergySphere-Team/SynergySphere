@@ -65,43 +65,6 @@ function confirmAction(title: string, message: string, confirmLabel: string, onC
   ]);
 }
 
-function ConversationDangerButton({
-  icon,
-  label,
-  accessibilityLabel,
-  onPress,
-  borderColor,
-  backgroundColor,
-  disabled = false,
-}: {
-  icon: ComponentProps<typeof Ionicons>['name'];
-  label: string;
-  accessibilityLabel: string;
-  onPress: () => void;
-  borderColor: string;
-  backgroundColor: string;
-  disabled?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      hitSlop={6}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled }}
-      style={({ pressed }) => [
-        styles.conversationDangerBtn,
-        { borderColor, backgroundColor },
-        disabled && { opacity: 0.45 },
-        pressed && styles.pressed,
-      ]}
-    >
-      <Ionicons name={icon} size={14} color="#EF4444" />
-      <Text style={styles.conversationDangerText}>{label}</Text>
-    </Pressable>
-  );
-}
 
 type Message = {
   role: 'user' | 'assistant';
@@ -1298,35 +1261,25 @@ export default function AIAssistantScreen() {
                   color={isHistoryExpanded ? primaryAccent : colors.muted}
                 />
               </Pressable>
-            </View>
-          </View>
 
-          {/* ── Clear / Delete controls (always visible, wraps on narrow screens) ── */}
-          <View style={styles.conversationDangerRow}>
-            <ConversationDangerButton
-              icon="trash-outline"
-              label="Clear Chat"
-              accessibilityLabel="Clear the live conversation"
-              onPress={clearConversation}
-              borderColor={colors.border}
-              backgroundColor={colors.surfaceElevated}
-            />
-            <ConversationDangerButton
-              icon="close-circle-outline"
-              label="Delete & Start New"
-              accessibilityLabel="Delete this conversation and start a new one"
-              onPress={deleteCurrentConversation}
-              borderColor={colors.border}
-              backgroundColor={colors.surfaceElevated}
-            />
-            <ConversationDangerButton
-              icon="flame-outline"
-              label="Clear All"
-              accessibilityLabel="Clear every conversation"
-              onPress={clearAllConversations}
-              borderColor={colors.border}
-              backgroundColor={colors.surfaceElevated}
-            />
+              <Pressable
+                onPress={clearAllConversations}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="Clear all conversations"
+                style={({ pressed }) => [
+                  styles.clearAllBtn,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons name="trash-outline" size={13} color="#EF4444" />
+                <Text style={styles.clearAllText}>Clear All</Text>
+              </Pressable>
+            </View>
           </View>
 
           {/* ── Multi-Thread Selector Chips ── */}
@@ -1728,32 +1681,7 @@ export default function AIAssistantScreen() {
               {messages.length} message{messages.length !== 1 ? 's' : ''}
             </Text>
           </View>
-          <View style={styles.conversationDangerRow}>
-            <ConversationDangerButton
-              icon="trash-outline"
-              label="Clear Conversation"
-              accessibilityLabel="Clear the live conversation"
-              onPress={clearConversation}
-              borderColor={colors.border}
-              backgroundColor={colors.surfaceElevated}
-            />
-            <ConversationDangerButton
-              icon="close-circle-outline"
-              label="Delete & New"
-              accessibilityLabel="Delete this conversation and start a new one"
-              onPress={deleteCurrentConversation}
-              borderColor={colors.border}
-              backgroundColor={colors.surfaceElevated}
-            />
-            <ConversationDangerButton
-              icon="flame-outline"
-              label="Clear All"
-              accessibilityLabel="Clear every conversation"
-              onPress={clearAllConversations}
-              borderColor={colors.border}
-              backgroundColor={colors.surfaceElevated}
-            />
-          </View>
+
 
           {messages.map((item, index) => (
             <Card key={index}>
@@ -1882,28 +1810,6 @@ export default function AIAssistantScreen() {
             </View>
           </View>
 
-          <View style={styles.conversationDangerRow}>
-            <ConversationDangerButton
-              icon="trash-outline"
-              label="Clear Code & Output"
-              accessibilityLabel="Clear the code editor, question and analysis output"
-              onPress={clearCodeContextWorkspace}
-              borderColor={colors.border}
-              backgroundColor={colors.surfaceElevated}
-              disabled={
-                context.trim().length === 0 && !codeActionResult && codeQuestion.trim().length === 0
-              }
-            />
-            <ConversationDangerButton
-              icon="flame-outline"
-              label="Clear All Conversations"
-              accessibilityLabel="Clear every conversation"
-              onPress={clearAllConversations}
-              borderColor={colors.border}
-              backgroundColor={colors.surfaceElevated}
-            />
-          </View>
-
           <Card>
             <View style={styles.editorHeaderInfo}>
               <View style={styles.editorBadge}>
@@ -1915,6 +1821,17 @@ export default function AIAssistantScreen() {
               <Text style={[styles.editorHintText, { color: colors.muted }]}>
                 {context.trim().length} characters • Auto-saved
               </Text>
+              {context.trim().length > 0 && (
+                <Pressable
+                  onPress={clearCodeContextWorkspace}
+                  hitSlop={6}
+                  style={({ pressed }) => [pressed && styles.pressed, { marginLeft: 'auto' }]}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#EF4444' }}>
+                    Clear
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
             <TextInput
@@ -2315,28 +2232,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  conversationDangerRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  conversationDangerBtn: {
+  clearAllBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 11,
+    gap: 4,
+    paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    minHeight: 34,
+    height: 34,
+    flexShrink: 0,
   },
-  conversationDangerText: {
+  clearAllText: {
     fontSize: 12,
     fontWeight: '700',
     color: '#EF4444',
   },
+
   historyTimestampText: {
     fontSize: 10.5,
     fontWeight: '500',

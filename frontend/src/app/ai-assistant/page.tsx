@@ -1031,26 +1031,12 @@ function AIAssistantInner() {
             <Wand2 className="h-3.5 w-3.5" />
             + New Thread
           </Button>
-          <Button variant="secondary" size="sm" onClick={clearChat} className="gap-1.5" title="Clear all messages in the live conversation">
-            <Trash2 className="h-3.5 w-3.5" />
-            Clear Chat
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={deleteCurrentThread}
-            className="gap-1.5 text-rose-300 hover:text-rose-200"
-            title="Delete this conversation and start a new one"
-          >
-            <X className="h-3.5 w-3.5" />
-            Delete &amp; Start New
-          </Button>
           <Button
             variant="secondary"
             size="sm"
             onClick={clearAllConversations}
             className="gap-1.5 text-rose-300 hover:text-rose-200"
-            title="Delete every conversation and the chat history"
+            title="Clear all conversations"
           >
             <Trash2 className="h-3.5 w-3.5" />
             Clear All
@@ -1364,38 +1350,9 @@ function AIAssistantInner() {
                 <Bot className="h-4 w-4 text-primary" />
                 Live Conversation
               </CardTitle>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearChat}
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-white gap-1.5"
-                  title="Clear all messages in the live conversation"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Clear Conversation
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={deleteCurrentThread}
-                  className="h-7 px-2 text-xs text-rose-300 hover:bg-rose-500/10 hover:text-rose-200 gap-1.5"
-                  title="Delete this conversation and start a new one"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Delete &amp; New
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearAllConversations}
-                  className="h-7 px-2 text-xs text-rose-300 hover:bg-rose-500/10 hover:text-rose-200 gap-1.5"
-                  title="Clear every conversation"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Clear All
-                </Button>
-              </div>
+              <span className="text-xs text-muted-foreground">
+                {messages.length} message{messages.length !== 1 ? 's' : ''}
+              </span>
             </CardHeader>
             <CardContent className="flex h-[560px] flex-col">
               {/* ── Collapsible Chat History ── */}
@@ -1584,16 +1541,7 @@ function AIAssistantInner() {
                   <Trash2 className="h-3.5 w-3.5" />
                   Clear Code
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearAllConversations}
-                  className="h-7 px-2 text-xs text-rose-300 hover:text-rose-200 hover:bg-rose-500/10 gap-1.5 transition"
-                  title="Clear every conversation across the AI Workspace"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Clear All Conversations
-                </Button>
+
                 <span className="rounded-lg border border-white/[0.08] bg-secondary/50 px-2 py-1 text-xs text-muted-foreground">
                   {lesson?.firstExampleLanguage
                     ? `${lesson.firstExampleLanguage} example from lesson`
