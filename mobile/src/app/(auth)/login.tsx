@@ -164,9 +164,6 @@ export default function LoginScreen() {
             </Text>
           </Pressable>
 
-          <Text style={[styles.demoHint, { color: colors.muted }]}>
-            Demo: student@synergysphere.com / student123
-          </Text>
         </View>
 
         <Text style={[styles.terms, { color: colors.muted }]}>
@@ -180,7 +177,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     minHeight: 640,
     paddingVertical: 30,
   },
