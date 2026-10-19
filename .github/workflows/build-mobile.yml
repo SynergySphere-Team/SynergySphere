@@ -1,0 +1,154 @@
+name: Build Mobile Releases (iOS IPA & Android APK)
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'Cloud Backend API URL (e.g. https://synergysphere-api.onrender.com/api)'
+        required: true
+        default: 'https://synergysphere-api.onrender.com/api'
+      platform:
+        description: 'Target mobile platform to build'
+        required: true
+        type: choice
+        default: 'both'
+        options:
+          - both
+          - ios
+          - android
+
+jobs:
+  build-ios-ipa:
+    name: Build Unsigned iOS .ipa (for Sideloadly)
+    if: ${{ inputs.platform == 'both' || inputs.platform == 'ios' || github.event.inputs.platform == '' }}
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Configure Production Cloud API URL
+        working-directory: ./mobile
+        run: |
+          echo "EXPO_PUBLIC_API_URL=${{ inputs.api_url }}" > .env
+          cat .env
+
+      - name: Prebuild native iOS project via Expo
+        working-directory: ./mobile
+        env:
+          EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
+          EXPO_NO_TELEMETRY: '1'
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Install CocoaPods
+        working-directory: ./mobile/ios
+        run: pod install
+
+      - name: Compile Release .app (Unsigned for Sideloadly)
+        working-directory: ./mobile/ios
+        env:
+          EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
+          NODE_ENV: production
+        run: |
+          WORKSPACE=$(ls -d *.xcworkspace | head -n 1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath /tmp/SynergySphereDerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            build
+
+      - name: Package .app into Unsigned SynergySphere.ipa
+        working-directory: ./mobile/ios
+        run: |
+          rm -rf Payload SynergySphere-unsigned.ipa
+          mkdir -p Payload
+          APP_PATH=$(find /tmp/SynergySphereDerivedData/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: Compiled .app bundle not found!"
+            exit 1
+          fi
+          cp -R "$APP_PATH" Payload/
+          zip -qry SynergySphere-unsigned.ipa Payload
+
+      - name: Upload SynergySphere-unsigned.ipa Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SynergySphere-iOS-IPA
+          path: mobile/ios/SynergySphere-unsigned.ipa
+          retention-days: 30
+
+  build-android-apk:
+    name: Build Standalone Android .apk
+    if: ${{ inputs.platform == 'both' || inputs.platform == 'android' || github.event.inputs.platform == '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Configure Production Cloud API URL
+        working-directory: ./mobile
+        run: |
+          echo "EXPO_PUBLIC_API_URL=${{ inputs.api_url }}" > .env
+          cat .env
+
+      - name: Prebuild native Android project via Expo
+        working-directory: ./mobile
+        env:
+          EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
+          EXPO_NO_TELEMETRY: '1'
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Assemble Release APK via Gradle
+        working-directory: ./mobile/android
+        env:
+          EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
+          NODE_ENV: production
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+          cp app/build/outputs/apk/release/app-release.apk ./SynergySphere.apk
+
+      - name: Upload SynergySphere.apk Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SynergySphere-Android-APK
+          path: mobile/android/SynergySphere.apk
+          retention-days: 30
