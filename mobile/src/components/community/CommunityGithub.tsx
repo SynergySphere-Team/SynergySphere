@@ -354,6 +354,53 @@ const visibleOpportunities = useMemo(
               {user?.role === 'ADMIN' ? 'New Project (Restricted)' : 'New Project'}
             </Text>
           </Pressable>
+
+          {connection?.connected ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Disconnect GitHub account"
+              style={({ pressed }) => [
+                styles.actionChip,
+                largerText && styles.actionChipLarge,
+                {
+                  backgroundColor: 'transparent',
+                  borderColor: theme === 'light' ? '#e2e8f0' : colors.border,
+                },
+                pressed && styles.pressed,
+              ]}
+              onPress={() => {
+                Alert.alert(
+                  'Disconnect GitHub',
+                  `Are you sure you want to disconnect @${connection.username || 'this account'}? You can reconnect your real GitHub account anytime.`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Disconnect',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await github.disconnect();
+                          await load();
+                        } catch {
+                          Alert.alert('Error', 'Could not disconnect GitHub account.');
+                        }
+                      },
+                    },
+                  ],
+                );
+              }}
+            >
+              <Ionicons name="log-out-outline" size={largerText ? 18 : 16} color={colors.muted} />
+              <Text
+                style={[
+                  styles.actionChipText,
+                  { color: colors.muted, fontWeight: '700', fontSize: fontSize(13) },
+                ]}
+              >
+                Disconnect
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
       {/* My Applications */}

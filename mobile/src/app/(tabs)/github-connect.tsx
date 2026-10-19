@@ -285,10 +285,25 @@ export default function GithubConnectScreen() {
         {/* Action Buttons */}
         <View style={styles.btnGroup}>
           {status === 'connected' ? (
-            <Button
-              title="Continue to Community"
-              onPress={navigateBackOrToReturn}
-            />
+            <>
+              <Button
+                title="Continue to Community"
+                onPress={navigateBackOrToReturn}
+              />
+              <Button
+                title="Disconnect & Connect Real GitHub"
+                secondary
+                onPress={async () => {
+                  clearTimer();
+                  try {
+                    await github.disconnect();
+                  } catch {}
+                  setAuthorization(null);
+                  setStatus('idle');
+                  start();
+                }}
+              />
+            </>
           ) : authorization ? (
             <Button
               title={status === 'checking' ? 'Checking...' : "I've Authorized on GitHub"}
