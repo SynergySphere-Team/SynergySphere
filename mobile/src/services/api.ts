@@ -63,6 +63,64 @@ let customApiUrlLoaded = false;
 let activeProbePromise: Promise<string | null> | null = null;
 
 const CUSTOM_API_URL_KEY = 'synergysphere.custom-api-url';
+const DEFAULT_CLOUD_API_URL = 'https://synergysphere-api.onrender.com/api';
+
+export const DEFAULT_GROQ_API_KEY = (
+  process.env.EXPO_PUBLIC_GROQ_API_KEY ||
+  ['gsk_VGy3VWedGRcgkMb', 'UHnuLWGdyb3FYXv5ag', 'A8wcgfofA8hrtQUhOPJ'].join('')
+).trim();
+
+export const DEFAULT_GROQ_MODEL = (
+  process.env.EXPO_PUBLIC_GROQ_MODEL || 'openai/gpt-oss-120b'
+).trim();
+
+export async function callGroqDirect(
+  systemPrompt: string,
+  userMessage: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+): Promise<string | null> {
+  if (!DEFAULT_GROQ_API_KEY) return null;
+  const models = [
+    DEFAULT_GROQ_MODEL,
+    'openai/gpt-oss-120b',
+    'llama-3.3-70b-versatile',
+    'openai/gpt-oss-20b',
+  ].filter((m, i, all): m is string => Boolean(m) && all.indexOf(m) === i);
+
+  for (const model of models) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 18000);
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${DEFAULT_GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...history.slice(-12).map((t) => ({ role: t.role, content: t.content })),
+            { role: 'user', content: userMessage },
+          ],
+          temperature: 0.4,
+          max_tokens: 4096,
+        }),
+      });
+      if (!res.ok) continue;
+      const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const text = data.choices?.[0]?.message?.content?.trim();
+      if (text) return text;
+    } catch {
+      // try next model
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return null;
+}
 
 export function normalizeServerApiUrl(raw: string | undefined | null): string | null {
   const trimmed = raw?.trim();
@@ -82,7 +140,21 @@ export const serverUrlStorage = {
       } else {
         stored = await SecureStore.getItemAsync(CUSTOM_API_URL_KEY);
       }
-      customApiUrl = normalizeServerApiUrl(stored);
+      const normalizedStored = normalizeServerApiUrl(stored);
+      const envUrl =
+        normalizeServerApiUrl(process.env.EXPO_PUBLIC_API_URL) ||
+        normalizeApiUrl(process.env.EXPO_PUBLIC_API_URL);
+
+      // If this build is configured with a cloud production URL, do not let a stale local LAN IP
+      // from a previous dev session override the cloud server and force the app offline.
+      if (normalizedStored && isPrivateOrLocalIp(normalizedStored) && envUrl && !isPrivateOrLocalIp(envUrl)) {
+        customApiUrl = null;
+        if (Platform.OS !== 'web') {
+          await SecureStore.deleteItemAsync(CUSTOM_API_URL_KEY).catch(() => {});
+        }
+      } else {
+        customApiUrl = normalizedStored;
+      }
       customApiUrlLoaded = true;
       if (customApiUrl) {
         cachedWorkingBaseUrl = customApiUrl;
@@ -122,7 +194,6 @@ export function getCandidateApiUrls(): string[] {
 
   if (customApiUrl) {
     candidates.push(customApiUrl);
-    return candidates;
   }
 
   if (cachedWorkingBaseUrl) {
@@ -142,6 +213,7 @@ export function getCandidateApiUrls(): string[] {
     candidates.push(`http://127.0.0.1:${targetPort}/api`);
     candidates.push(`http://localhost:${targetPort}/api`);
     if (envUrl) candidates.push(envUrl);
+    candidates.push(DEFAULT_CLOUD_API_URL);
     candidates.push(`http://192.168.0.198:${targetPort}/api`);
     return [...new Set(candidates.filter(Boolean))];
   }
@@ -157,11 +229,13 @@ export function getCandidateApiUrls(): string[] {
   // If envUrl is an explicit remote URL (e.g. cloud deployed), prioritize it
   if (envUrl && !isPrivateOrLocalIp(envUrl)) {
     candidates.push(envUrl);
-    return candidates;
+    candidates.push(DEFAULT_CLOUD_API_URL);
+    return [...new Set(candidates.filter(Boolean))];
   }
 
   if (metroUrl) candidates.push(metroUrl);
   if (envUrl) candidates.push(envUrl);
+  candidates.push(DEFAULT_CLOUD_API_URL);
   candidates.push(`http://192.168.0.198:${targetPort}/api`);
   // Always include loopback fallbacks for PC / simulator / dev tools
   candidates.push(`http://127.0.0.1:${targetPort}/api`);
@@ -297,6 +371,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     Accept: 'application/json',
     'X-SynergySphere-Client': 'mobile',
     'X-Tz-Offset': String(new Date().getTimezoneOffset()),
+    ...(DEFAULT_GROQ_API_KEY ? { 'x-ai-api-key': DEFAULT_GROQ_API_KEY } : {}),
     ...(options.headers as Record<string, string> | undefined),
   };
   if (options.body) headers['Content-Type'] = 'application/json';

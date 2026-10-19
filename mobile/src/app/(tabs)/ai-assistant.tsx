@@ -20,7 +20,7 @@ import { Screen, Notice } from '@/components/Screen';
 import { Button, Card } from '@/components/ui';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { useTheme } from '@/context/ThemeContext';
-import { api } from '@/services/api';
+import { api, DEFAULT_GROQ_API_KEY, callGroqDirect } from '@/services/api';
 import { MarkdownView } from '@/components/MarkdownView';
 import { analyzeCodeOffline } from '@/utils/offlineCodeAnalyzer';
 
@@ -252,9 +252,13 @@ export default function AIAssistantScreen() {
       try {
         const status = await api.get<{ hasEnvKey: boolean }>('/ai/key-status');
         if (!cancelled && status) {
-          setHasServerKey(Boolean(status.hasEnvKey));
+          setHasServerKey(Boolean(status.hasEnvKey || DEFAULT_GROQ_API_KEY));
         }
-      } catch {}
+      } catch {
+        if (!cancelled) {
+          setHasServerKey(Boolean(DEFAULT_GROQ_API_KEY));
+        }
+      }
     })();
     return () => {
       cancelled = true;
@@ -422,14 +426,44 @@ export default function AIAssistantScreen() {
 
     try {
       const contextToSend = forcedContext?.trim() || undefined;
+      const priorHistory = historyFromMessages(baseMessages).slice(-20);
 
-      const response = await api.post<{ response: string; grounding?: Grounding }>('/ai/chat', {
-        message: question,
-        ...(activeThreadId ? { threadId: activeThreadId } : {}),
-        ...(contextToSend ? { context: contextToSend } : {}),
-        ...(lesson ? { lessonId: lesson.id } : {}),
-        history: historyFromMessages(baseMessages).slice(-20),
-      });
+      let replyText = '';
+      let lessonTitle: string | undefined;
+
+      try {
+        const response = await api.post<{ response: string; grounding?: Grounding }>('/ai/chat', {
+          message: question,
+          ...(activeThreadId ? { threadId: activeThreadId } : {}),
+          ...(contextToSend ? { context: contextToSend } : {}),
+          ...(lesson ? { lessonId: lesson.id } : {}),
+          ...(DEFAULT_GROQ_API_KEY ? { apiKey: DEFAULT_GROQ_API_KEY } : {}),
+          history: priorHistory,
+        });
+        replyText = response.response;
+        lessonTitle = response.grounding?.lessonTitle || undefined;
+      } catch {
+        // Backend unreachable or waking up — try direct Groq Cloud inference
+      }
+
+      if (!replyText || replyText.startsWith('Based on: ') || replyText.includes('Full reference: https://www.w3schools.com')) {
+        const directPrompt = contextToSend
+          ? `Student code:\n\`\`\`\n${contextToSend}\n\`\`\`\n\nQuestion: ${question}`
+          : question;
+        const directAi = await callGroqDirect(
+          'You are SynergySphere AI Workspace, an expert software engineering assistant and tutor. Provide clear, practical, accurate explanations and idiomatic code examples.',
+          directPrompt,
+          priorHistory,
+        );
+        if (directAi) {
+          replyText = directAi;
+        }
+      }
+
+      if (!replyText) {
+        throw new Error('No AI response');
+      }
+
       if (activeThreadId) {
         setThreads((prev) =>
           prev.map((t) =>
@@ -443,13 +477,13 @@ export default function AIAssistantScreen() {
         ...current,
         {
           role: 'assistant',
-          content: response.response,
-          lessonTitle: response.grounding?.lessonTitle || undefined,
+          content: replyText,
+          lessonTitle,
         },
       ]);
 
       // Enrich history item with answer snippet preview
-      const snippet = response.response.slice(0, 95).replace(/[#*`\n]/g, ' ').trim();
+      const snippet = replyText.slice(0, 95).replace(/[#*`\n]/g, ' ').trim();
       setHistoryQueries((prev) => {
         const updated = prev.map((item) =>
           item.id === queryId ? { ...item, responseSnippet: snippet } : item
@@ -539,27 +573,50 @@ export default function AIAssistantScreen() {
     const offlineFallbackOutput = `### SynergySphere Code Review (${lang || 'Local Engine'})\n\n${explainOffline}\n\n---\n\n### Bug Discovery & Recommended Solution\n\n${debugOffline}`;
 
     try {
-      const res = await api.post<{
-        ok: boolean;
-        action: string;
-        output: string;
-        fromAi: boolean;
-        provider?: string;
-      }>('/ai/code-action', {
-        action: actionType,
-        code: cleanCode,
-        language: lang,
-        customPrompt: customQ,
-        challengeTitle: title,
-        challengeDescription: desc,
-        lessonId: lesson?.id,
-      });
+      let output = '';
+      let fromAi = false;
+
+      try {
+        const res = await api.post<{
+          ok: boolean;
+          action: string;
+          output: string;
+          fromAi: boolean;
+          provider?: string;
+        }>('/ai/code-action', {
+          action: actionType,
+          code: cleanCode,
+          language: lang,
+          customPrompt: customQ,
+          challengeTitle: title,
+          challengeDescription: desc,
+          lessonId: lesson?.id,
+          ...(DEFAULT_GROQ_API_KEY ? { apiKey: DEFAULT_GROQ_API_KEY } : {}),
+        });
+        output = res.output;
+        fromAi = Boolean(res.fromAi);
+      } catch {
+        // Fallback to direct Groq call below
+      }
+
+      if (!fromAi || !output) {
+        const directAi = await callGroqDirect(
+          'You are SynergySphere Staff Engineering Assistant and Coding Challenge Mentor. Review the code thoroughly: explain how it works, identify bugs or edge cases, and show the complete verified working solution.',
+          customQ
+            ? `Code (${lang || 'code'}):\n\`\`\`\n${cleanCode}\n\`\`\`\n\nQuestion:\n${customQ}`
+            : `Review and provide the solution for this ${lang || 'code'} snippet${title ? ` (Challenge: ${title})` : ''}:\n\`\`\`\n${cleanCode}\n\`\`\``,
+        );
+        if (directAi) {
+          output = directAi;
+          fromAi = true;
+        }
+      }
 
       setCodeActionResult({
         action: actionType,
         title: actionLabel,
-        output: res.output || offlineFallbackOutput,
-        fromAi: res.fromAi,
+        output: output || offlineFallbackOutput,
+        fromAi,
       });
       showToast('Answer ready under Code Context!');
     } catch {
@@ -622,24 +679,45 @@ export default function AIAssistantScreen() {
     const offlineResult = analyzeCodeOffline(actionKey, context, challengeLanguage);
 
     try {
-      const res = await api.post<{
-        ok: boolean;
-        action: string;
-        output: string;
-        fromAi: boolean;
-        provider?: string;
-      }>('/ai/code-action', {
-        action: actionKey,
-        code: context,
-        language: challengeLanguage,
-        lessonId: lesson?.id,
-      });
+      let output = '';
+      let fromAi = false;
+
+      try {
+        const res = await api.post<{
+          ok: boolean;
+          action: string;
+          output: string;
+          fromAi: boolean;
+          provider?: string;
+        }>('/ai/code-action', {
+          action: actionKey,
+          code: context,
+          language: challengeLanguage,
+          lessonId: lesson?.id,
+          ...(DEFAULT_GROQ_API_KEY ? { apiKey: DEFAULT_GROQ_API_KEY } : {}),
+        });
+        output = res.output;
+        fromAi = Boolean(res.fromAi);
+      } catch {
+        // Fallback to direct Groq call below
+      }
+
+      if (!fromAi || !output) {
+        const directAi = await callGroqDirect(
+          `You are SynergySphere Staff Engineering Assistant. Perform "${action}" on the provided code snippet with clear Markdown headings, explanations, and runnable code examples.`,
+          `Action: ${action}\nLanguage: ${challengeLanguage || 'code'}\n\n\`\`\`\n${context}\n\`\`\``,
+        );
+        if (directAi) {
+          output = directAi;
+          fromAi = true;
+        }
+      }
 
       setCodeActionResult({
         action: actionKey,
         title: action,
-        output: res.output || offlineResult.output,
-        fromAi: res.fromAi,
+        output: output || offlineResult.output,
+        fromAi,
       });
       showToast(`${action} completed!`);
     } catch {

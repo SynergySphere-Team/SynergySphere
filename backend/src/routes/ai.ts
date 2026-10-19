@@ -712,23 +712,24 @@ router.post('/code-action', validateBody(codeActionSchema), async (req: AuthRequ
 });
 
 // ── Check AI Key Status ──
-router.get('/key-status', async (_req: AuthRequest, res) => {
+router.get('/key-status', async (req: AuthRequest, res) => {
   refreshEnv();
+  const headerKey = (req.headers['x-ai-api-key'] as string | undefined)?.trim() || '';
   const envGemini = (process.env.GEMINI_API_KEY || '').trim();
-  const envGroq = (process.env.GROQ_API_KEY || '').trim();
-  const envOpenAi = (process.env.OPENAI_API_KEY || '').trim();
+  const envGroq = (process.env.GROQ_API_KEY || (headerKey.startsWith('gsk_') ? headerKey : '')).trim();
+  const envOpenAi = (process.env.OPENAI_API_KEY || (headerKey.startsWith('sk-') ? headerKey : '')).trim();
 
-  const hasValidGemini = Boolean(envGemini && envGemini !== 'your-gemini-api-key' && envGemini !== process.env.JWT_SECRET);
+  const hasValidGemini = Boolean(envGemini && envGemini.startsWith('AIza') && envGemini !== process.env.JWT_SECRET);
   const hasValidGroq = Boolean(envGroq && envGroq.startsWith('gsk_'));
   const hasValidOpenAi = Boolean(envOpenAi && envOpenAi.startsWith('sk-'));
 
   const hasEnvKey = hasValidGemini || hasValidGroq || hasValidOpenAi;
   const provider = hasValidGemini && hasValidGroq
     ? 'Google Gemini + Groq'
-    : hasValidGemini
-      ? 'Google Gemini'
-      : hasValidGroq
-        ? 'Groq Cloud'
+    : hasValidGroq
+      ? 'Groq Cloud'
+      : hasValidGemini
+        ? 'Google Gemini'
         : hasValidOpenAi
           ? 'OpenAI'
           : null;
@@ -743,7 +744,8 @@ router.get('/key-status', async (_req: AuthRequest, res) => {
 router.post('/test-key', async (req: AuthRequest, res) => {
   refreshEnv();
   const { apiKey } = req.body;
-  const keyToTest = (apiKey || process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY || '').trim();
+  const headerKey = (req.headers['x-ai-api-key'] as string | undefined)?.trim() || '';
+  const keyToTest = (apiKey || headerKey || process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '').trim();
 
   if (!keyToTest) {
     res.json({ valid: true, provider: 'SynergySphere Local Engine', message: 'SynergySphere Offline Engine is active.' });
@@ -1254,6 +1256,7 @@ function formatLectureUpload(row: any) {
 
 router.post('/lecture-to-life', validateBody(lectureSchema), async (req: AuthRequest, res) => {
   const { fileName, fileType, content } = req.body;
+  const customKey = req.headers['x-ai-api-key'] as string | undefined;
   const prompt = buildLecturePrompt(content, fileName);
 
   let raw = '';
@@ -1262,9 +1265,12 @@ router.post('/lecture-to-life', validateBody(lectureSchema), async (req: AuthReq
       generateAiResponse(
         'You are an educational content transformer. Return only valid JSON based on the lecture content provided.',
         prompt,
+        [],
+        undefined,
+        customKey,
       ),
       new Promise<string>((_, reject) =>
-        setTimeout(() => reject(new Error('AI generation timeout')), 3500)
+        setTimeout(() => reject(new Error('AI generation timeout')), 15000)
       ),
     ]);
   } catch (err) {
@@ -1327,6 +1333,7 @@ router.post('/lecture-to-life/:id/regenerate', async (req: AuthRequest, res) => 
     return;
   }
 
+  const customKey = req.headers['x-ai-api-key'] as string | undefined;
   const prompt = buildLecturePrompt(existing.content, existing.fileName);
   let raw = '';
   try {
@@ -1334,9 +1341,12 @@ router.post('/lecture-to-life/:id/regenerate', async (req: AuthRequest, res) => 
       generateAiResponse(
         'You are an educational content transformer. Return only valid JSON based on the lecture content provided.',
         prompt,
+        [],
+        undefined,
+        customKey,
       ),
       new Promise<string>((_, reject) =>
-        setTimeout(() => reject(new Error('AI generation timeout')), 3500)
+        setTimeout(() => reject(new Error('AI generation timeout')), 15000)
       ),
     ]);
   } catch (err) {
