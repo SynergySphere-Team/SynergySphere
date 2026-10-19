@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, authStorage, ApiError } from '@/services/api';
-import { registerCommunityPushNotifications } from '@/services/notifications';
 import { github } from '@/services/github';
 import type { AuthResponse, User } from '@/types/api';
 
@@ -34,7 +33,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   useEffect(() => { refresh().finally(() => setLoading(false)); }, [refresh]);
-  useEffect(() => { if (user) void registerCommunityPushNotifications(); }, [user]);
+  useEffect(() => {
+    if (!user) return;
+
+    // Notifications are optional at launch. Deferring their native module
+    // setup prevents a notification configuration issue from blocking the
+    // login screen on a freshly sideloaded iOS build.
+    void import('@/services/notifications')
+      .then(({ registerCommunityPushNotifications }) => registerCommunityPushNotifications())
+      .catch((error) => console.warn('Push notification setup was skipped:', error));
+  }, [user]);
   const establishSession = async (response: AuthResponse): Promise<User> => {
     await Promise.all([
       authStorage.setToken(response.token),

@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LogBox, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AppErrorBoundary from '@/components/AppErrorBoundary';
 import NotificationPopup from '@/components/NotificationPopup';
 import { AuthProvider } from '@/context/AuthContext';
 import {
@@ -23,13 +24,15 @@ LogBox.ignoreLogs([
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AccessibilityProvider>
-          <ThemeProvider>
-            <AppLayout />
-          </ThemeProvider>
-        </AccessibilityProvider>
-      </SafeAreaProvider>
+      <AppErrorBoundary>
+        <SafeAreaProvider>
+          <AccessibilityProvider>
+            <ThemeProvider>
+              <AppLayout />
+            </ThemeProvider>
+          </AccessibilityProvider>
+        </SafeAreaProvider>
+      </AppErrorBoundary>
     </GestureHandlerRootView>
   );
 }
