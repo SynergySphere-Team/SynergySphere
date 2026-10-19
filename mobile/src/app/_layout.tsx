@@ -17,8 +17,6 @@ import {
   useTheme,
 } from '@/context/ThemeContext';
 
-SplashScreen.hideAsync().catch(() => {});
-
 LogBox.ignoreLogs([
   'Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go',
   '`expo-notifications` functionality is not fully supported in Expo Go',

@@ -30,7 +30,8 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.synergysphere.app",
-      "versionCode": 1
+      "versionCode": 1,
+      "usesCleartextTraffic": true
     },
     "web": {
       "output": "static",
