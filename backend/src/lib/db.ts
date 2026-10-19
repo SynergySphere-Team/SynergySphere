@@ -46,6 +46,10 @@ function getDatabaseUrl(): string {
 
 const databaseUrl = getDatabaseUrl();
 const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+const sslDisabled = process.env.DB_SSL === 'false';
+const sslConfig = isLocalhost || sslDisabled
+  ? {}
+  : { ssl: { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true' } };
 
 export const pool = new Pool({
   connectionString: databaseUrl,
@@ -54,7 +58,7 @@ export const pool = new Pool({
   connectionTimeoutMillis: 5_000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10_000,
-  ...(isLocalhost ? {} : { ssl: { rejectUnauthorized: false } }),
+  ...sslConfig,
 } as PoolConfig & { keepAlive?: boolean; keepAliveInitialDelayMillis?: number });
 
 (pool as { on?: (event: string, listener: (err: Error) => void) => void }).on?.('error', (err: Error) => {

@@ -34,6 +34,9 @@ import settingsRoutes from './routes/settings.js';
 import { pool } from './lib/db.js';
 import { runMigrations } from './scripts/migrate.js';
 import { initRealtime } from './services/realtime.js';
+import { assertProductionConfig } from './lib/env.js';
+
+assertProductionConfig();
 
 export const app = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -161,7 +164,17 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((err: Error & { status?: number; statusCode?: number; type?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const status = err.status ?? err.statusCode;
+  if (typeof status === 'number' && status >= 400 && status < 500) {
+    const message = err.type === 'entity.parse.failed'
+      ? 'Invalid JSON in request body'
+      : err.type === 'entity.too.large'
+        ? 'Request body too large'
+        : 'Bad request';
+    res.status(status).json({ error: message });
+    return;
+  }
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });
@@ -279,10 +292,45 @@ server.on('error', (error: NodeJS.ErrnoException) => {
   console.error('Unable to start the SynergySphere API:', error.message);
 });
 
+let shuttingDown = false;
+
+async function shutdown(signal: string, exitCode = 0): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal} received, shutting down gracefully...`);
+
+  // Force exit if connections do not drain in time.
+  const forceTimer = setTimeout(() => {
+    console.error('Graceful shutdown timed out, forcing exit.');
+    process.exit(exitCode || 1);
+  }, 10_000);
+  forceTimer.unref();
+
+  try {
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+      (server as http.Server & { closeIdleConnections?: () => void }).closeIdleConnections?.();
+    });
+    await pool.end();
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+    exitCode = exitCode || 1;
+  }
+  process.exit(exitCode);
+}
+
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
+
 process.on('unhandledRejection', (reason: unknown) => {
   console.warn('Unhandled promise rejection captured:', reason);
 });
 
 process.on('uncaughtException', (error: Error) => {
   console.error('Uncaught exception captured:', error);
+  // In production the process state is undefined after an uncaught exception;
+  // exit so the process manager restarts a clean instance.
+  if (process.env.NODE_ENV === 'production') {
+    void shutdown('uncaughtException', 1);
+  }
 });
