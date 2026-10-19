@@ -86,6 +86,7 @@ jobs:
             exit 1
           fi
           cp -R "$APP_PATH" Payload/
+          codesign -s - --force --deep Payload/*.app
           zip -qry SynergySphere-unsigned.ipa Payload
 
       - name: Upload SynergySphere-unsigned.ipa Artifact
