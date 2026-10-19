@@ -11,9 +11,19 @@ services:
         value: production
       - key: HOST
         value: 0.0.0.0
+      - key: DB_SSL
+        value: "false"
       - key: DATABASE_URL
-        value: postgresql://postgres.iynlgsoaqtfvhoccaijd:M%40lawaubuydo12@aws-1-eu-central-1.pooler.supabase.com:5432/postgres
+        fromDatabase:
+          name: synergysphere-db
+          property: connectionString
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
         value: https://synergysphere.onrender.com
+
+databases:
+  - name: synergysphere-db
+    plan: free
+    databaseName: synergysphere
+    user: synergysphere

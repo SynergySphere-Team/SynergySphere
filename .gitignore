@@ -52,10 +52,8 @@ local.properties
 *.jks
 .gradle/
 android/.gradle/
-# Mobile Builds
-builds/
-*.apk
-*.ipa
-mobile/ios/
-mobile/android/
+android/build/
+android/app/build/
+
+mobile-builds/
 
