@@ -60,8 +60,23 @@ config.resolver.blockList = [
 // them correctly in the monorepo (fixes "react-native-screens/experimental" error)
 config.resolver.extraNodeModules = {
   ...config.resolver.extraNodeModules,
+  'expo-glass-effect': path.resolve(projectRoot, 'src/shims/expo-glass-effect.js'),
   'react-native-screens': rnScreensRoot,
   'react-native-screens/experimental': path.resolve(rnScreensRoot, 'experimental'),
+};
+
+const defaultResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === 'expo-glass-effect') {
+    return {
+      filePath: path.resolve(projectRoot, 'src/shims/expo-glass-effect.js'),
+      type: 'sourceFile',
+    };
+  }
+  if (defaultResolveRequest) {
+    return defaultResolveRequest(context, moduleName, platform);
+  }
+  return context.resolveRequest(context, moduleName, platform);
 };
 
 module.exports = config;

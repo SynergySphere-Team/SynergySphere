@@ -1,10 +1,5 @@
 import 'react-native-gesture-handler';
-import { registerRootComponent } from 'expo';
-import { ExpoRoot } from 'expo-router';
+import { App } from 'expo-router/build/qualified-entry';
+import { renderRootComponent } from 'expo-router/build/renderRootComponent';
 
-export function App() {
-  const context = require.context('./src/app');
-  return <ExpoRoot context={context} />;
-}
-
-registerRootComponent(App);
+renderRootComponent(App);

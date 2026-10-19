@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LogBox, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppErrorBoundary from '@/components/AppErrorBoundary';
+import * as SplashScreen from 'expo-splash-screen';
 import NotificationPopup from '@/components/NotificationPopup';
 import { AuthProvider } from '@/context/AuthContext';
 import {
@@ -15,6 +17,8 @@ import {
   useTheme,
 } from '@/context/ThemeContext';
 
+SplashScreen.hideAsync().catch(() => {});
+
 LogBox.ignoreLogs([
   'Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go',
   '`expo-notifications` functionality is not fully supported in Expo Go',
@@ -22,6 +26,14 @@ LogBox.ignoreLogs([
 ]);
 
 export default function RootLayout() {
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+    const timer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppErrorBoundary>

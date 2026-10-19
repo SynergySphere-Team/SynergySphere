@@ -6,6 +6,7 @@ import { Screen, Notice } from '@/components/Screen';
 import { Button, Field } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import * as SplashScreen from 'expo-splash-screen';
 import { onboardingStorage, serverUrlStorage, getApiUrl } from '@/services/api';
 
 export default function LoginScreen() {
@@ -22,6 +23,7 @@ export default function LoginScreen() {
   const [serverUrlSavedMsg, setServerUrlSavedMsg] = useState('');
 
   useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
     void serverUrlStorage.load().then((custom) => {
       setServerUrlInput(custom || getApiUrl());
     });

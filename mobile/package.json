@@ -53,8 +53,7 @@
   "expo": {
     "autolinking": {
       "exclude": [
-        "@expo/ui",
-        "expo-glass-effect"
+        "@expo/ui"
       ]
     }
   },

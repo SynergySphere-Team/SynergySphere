@@ -1,7 +1,8 @@
-import WebSocket, { WebSocketServer as WsServer } from 'ws';
+import WebSocket from 'ws';
 import type { Server, IncomingMessage } from 'node:http';
 import { verifyToken, AUTH_COOKIE_NAME, type AuthPayload } from '../middleware/auth.js';
 
+const WsServer = (WebSocket as any).Server || (WebSocket as any).WebSocketServer || WebSocket;
 export type WebSocketClient = WebSocket;
 export type WebSocketServer = InstanceType<typeof WsServer>;
 

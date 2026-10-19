@@ -32,7 +32,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
   }, []);
-  useEffect(() => { refresh().finally(() => setLoading(false)); }, [refresh]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1200);
+    refresh().finally(() => {
+      clearTimeout(timer);
+      setLoading(false);
+    });
+  }, [refresh]);
+
   useEffect(() => {
     if (!user) return;
 
