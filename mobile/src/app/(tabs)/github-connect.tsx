@@ -17,9 +17,11 @@ import { Button, Heading } from '@/components/ui';
 import { github } from '@/services/github';
 import type { GithubDeviceAuthorization } from '@/types/api';
 import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 
 export default function GithubConnectScreen() {
   const router = useRouter();
+  const { logout } = useAuth();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { colors, theme } = useTheme();
   const isDark = theme === 'dark';
@@ -145,7 +147,25 @@ export default function GithubConnectScreen() {
       // Start polling loop immediately (do NOT await browser open)
       poll(next);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not start GitHub connection.');
+      const msg = cause instanceof Error ? cause.message : 'Could not start GitHub connection.';
+      if (msg.includes('foreign key constraint') || msg.includes('earlier database') || msg.includes('log out')) {
+        Alert.alert(
+          'Session Out of Sync',
+          'Your active login session is from an earlier database version. Please log out and sign back in to link your real GitHub account.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Log Out Now',
+              style: 'destructive',
+              onPress: async () => {
+                await logout();
+                router.replace('/(auth)/login' as never);
+              },
+            },
+          ]
+        );
+      }
+      setError(msg);
       setStatus('idle');
     }
   }

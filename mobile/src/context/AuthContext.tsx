@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(freshUser);
       await authStorage.setUser(freshUser);
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 404)) {
         await authStorage.clearToken();
         setUser(null);
       }

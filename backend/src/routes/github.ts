@@ -92,6 +92,11 @@ const wizardSchema = z.object({
 
 bodyRouter.post('/device/start', authenticate, async (req: AuthRequest, res) => {
   try {
+    const user = await queryOne<{ id: string }>(`SELECT "id" FROM "User" WHERE "id" = $1`, [req.user!.userId]);
+    if (!user) {
+      res.status(401).json({ error: 'Your session has expired or your account was from an earlier database. Please log out and sign back in.' });
+      return;
+    }
     const device = await beginDeviceAuthorization();
     const id = newId();
     const expiresAt = new Date(Date.now() + (device.expires_in || 900) * 1000);

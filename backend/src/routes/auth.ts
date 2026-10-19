@@ -190,7 +190,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
     );
 
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
+      res.status(401).json({ error: 'Session expired or user deleted. Please log in again.' });
       return;
     }
 
