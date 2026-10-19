@@ -76,7 +76,7 @@ jobs:
             COMPILER_INDEX_STORE_ENABLE=NO \
             build
 
-      - name: Package unsigned .ipa for Sideloadly
+      - name: Package .app into SynergySphere.ipa (Ad-hoc signed for Sideloadly)
         working-directory: ./mobile/ios
         run: |
           rm -rf Payload SynergySphere-unsigned.ipa
@@ -87,12 +87,11 @@ jobs:
             exit 1
           fi
           cp -R "$APP_PATH" Payload/
+          # Ad-hoc codesign allocates the Mach-O LC_CODE_SIGNATURE command required by iOS installd
+          # and allows Sideloadly to re-sign with the user's free Apple ID developer certificate.
+          codesign -s - --force --deep Payload/*.app
           zip -qry SynergySphere-unsigned.ipa Payload
           unzip -t SynergySphere-unsigned.ipa
-          if unzip -l SynergySphere-unsigned.ipa | grep -q 'Payload/[^/]*/_CodeSignature/'; then
-            echo "Error: the IPA must be unsigned so Sideloadly can sign it for the target phone."
-            exit 1
-          fi
 
       - name: Upload SynergySphere-unsigned.ipa Artifact
         uses: actions/upload-artifact@v4
