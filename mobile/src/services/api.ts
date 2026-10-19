@@ -58,12 +58,72 @@ function isPrivateOrLocalIp(url: string): boolean {
 }
 
 let cachedWorkingBaseUrl: string | null = null;
+let customApiUrl: string | null = null;
+let customApiUrlLoaded = false;
 let activeProbePromise: Promise<string | null> | null = null;
 
+const CUSTOM_API_URL_KEY = 'synergysphere.custom-api-url';
+
+export function normalizeServerApiUrl(raw: string | undefined | null): string | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const normalized = normalizeApiUrl(withProtocol);
+  if (!normalized) return null;
+  return normalized.endsWith('/api') ? normalized : `${normalized}/api`;
+}
+
+export const serverUrlStorage = {
+  load: async (): Promise<string | null> => {
+    try {
+      let stored: string | null = null;
+      if (Platform.OS === 'web') {
+        stored = typeof localStorage !== 'undefined' ? localStorage.getItem(CUSTOM_API_URL_KEY) : customApiUrl;
+      } else {
+        stored = await SecureStore.getItemAsync(CUSTOM_API_URL_KEY);
+      }
+      customApiUrl = normalizeServerApiUrl(stored);
+      customApiUrlLoaded = true;
+      if (customApiUrl) {
+        cachedWorkingBaseUrl = customApiUrl;
+      }
+      return customApiUrl;
+    } catch {
+      customApiUrlLoaded = true;
+      return null;
+    }
+  },
+  get: (): string | null => customApiUrl,
+  set: async (url: string | null): Promise<string | null> => {
+    const normalized = normalizeServerApiUrl(url);
+    customApiUrl = normalized;
+    cachedWorkingBaseUrl = normalized;
+    try {
+      if (Platform.OS === 'web') {
+        if (typeof localStorage !== 'undefined') {
+          if (normalized) localStorage.setItem(CUSTOM_API_URL_KEY, normalized);
+          else localStorage.removeItem(CUSTOM_API_URL_KEY);
+        }
+      } else if (normalized) {
+        await SecureStore.setItemAsync(CUSTOM_API_URL_KEY, normalized);
+      } else {
+        await SecureStore.deleteItemAsync(CUSTOM_API_URL_KEY);
+      }
+    } catch {
+    }
+    return normalized;
+  },
+};
+
 export function getCandidateApiUrls(): string[] {
-  const envUrl = normalizeApiUrl(process.env.EXPO_PUBLIC_API_URL);
+  const envUrl = normalizeServerApiUrl(process.env.EXPO_PUBLIC_API_URL) || normalizeApiUrl(process.env.EXPO_PUBLIC_API_URL);
   const targetPort = getPortFromApiUrl(envUrl);
   const candidates: string[] = [];
+
+  if (customApiUrl) {
+    candidates.push(customApiUrl);
+    return candidates;
+  }
 
   if (cachedWorkingBaseUrl) {
     candidates.push(cachedWorkingBaseUrl);
@@ -216,6 +276,9 @@ const FALLBACK_TIMEOUT_MS = 3_500;
 let isFlushingQueue = false;
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (!customApiUrlLoaded) {
+    await serverUrlStorage.load();
+  }
   let candidateUrls = getCandidateApiUrls();
   if (candidateUrls.length === 0) {
     throw new ApiError('API URL is not configured. Set EXPO_PUBLIC_API_URL in mobile/.env.');
@@ -247,7 +310,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const baseUrl = candidateUrls[i];
     const fullUrl = `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
     const isAiRoute = path.startsWith('/ai/') || path === '/ai';
-    const timeoutMs = isAiRoute
+    const isRemoteCloudUrl = !isPrivateOrLocalIp(baseUrl);
+    const timeoutMs = isRemoteCloudUrl
+      ? 35_000
+      : isAiRoute
       ? (baseUrl === cachedWorkingBaseUrl || i === 0 ? 25_000 : 10_000)
       : (baseUrl === cachedWorkingBaseUrl ? 15_000 : (i === 0 ? REQUEST_TIMEOUT_MS : FALLBACK_TIMEOUT_MS));
     const controller = new AbortController();

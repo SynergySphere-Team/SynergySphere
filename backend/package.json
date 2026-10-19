@@ -7,7 +7,7 @@
     "dev": "node ../scripts/start-backend-keepalive.mjs",
     "dev:watch": "node --env-file=.env --watch --import tsx src/index.ts",
     "build": "tsc",
-    "start": "node --env-file=.env dist/index.js",
+    "start": "node dist/index.js",
     "db:migrate": "tsx src/scripts/migrate.ts",
     "db:seed": "tsx src/scripts/seed.ts",
     "curriculum:verify": "tsx src/scripts/verifyCurriculum.ts",

@@ -50,5 +50,13 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"
   },
+  "expo": {
+    "autolinking": {
+      "exclude": [
+        "@expo/ui",
+        "expo-glass-effect"
+      ]
+    }
+  },
   "private": true
 }

@@ -6,7 +6,7 @@ import { Screen, Notice } from '@/components/Screen';
 import { Button, Field } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
-import { onboardingStorage } from '@/services/api';
+import { onboardingStorage, serverUrlStorage, getApiUrl } from '@/services/api';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -17,6 +17,22 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showServerConfig, setShowServerConfig] = useState(false);
+  const [serverUrlInput, setServerUrlInput] = useState('');
+  const [serverUrlSavedMsg, setServerUrlSavedMsg] = useState('');
+
+  useEffect(() => {
+    void serverUrlStorage.load().then((custom) => {
+      setServerUrlInput(custom || getApiUrl());
+    });
+  }, []);
+
+  async function saveServerUrl() {
+    const saved = await serverUrlStorage.set(serverUrlInput.trim() || null);
+    setServerUrlInput(saved || getApiUrl());
+    setServerUrlSavedMsg(saved ? `Connected to ${saved}` : `Using default (${getApiUrl()})`);
+    setError('');
+  }
 
   function isValidEmail(val: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
@@ -169,6 +185,47 @@ export default function LoginScreen() {
         <Text style={[styles.terms, { color: colors.muted }]}>
           By signing in, you agree to use SynergySphere responsibly.
         </Text>
+
+        <View style={styles.serverSection}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setShowServerConfig((prev) => !prev)}
+            hitSlop={8}
+            style={styles.serverToggle}
+          >
+            <Ionicons name="cloud-outline" size={14} color={colors.muted} />
+            <Text style={[styles.serverToggleText, { color: colors.muted }]}>
+              {showServerConfig ? 'Hide Server Settings' : 'Server Settings'}
+            </Text>
+          </Pressable>
+
+          {showServerConfig ? (
+            <View
+              style={[
+                styles.serverCard,
+                { borderColor: colors.border, backgroundColor: colors.surfaceElevated },
+              ]}
+            >
+              <Field
+                label="Cloud API URL"
+                value={serverUrlInput}
+                onChangeText={(text) => {
+                  setServerUrlInput(text);
+                  if (serverUrlSavedMsg) setServerUrlSavedMsg('');
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="https://synergysphere-api.onrender.com/api"
+              />
+              {serverUrlSavedMsg ? (
+                <Text style={[styles.serverSavedText, { color: brandGreen }]}>
+                  {serverUrlSavedMsg}
+                </Text>
+              ) : null}
+              <Button title="Save Server URL" onPress={saveServerUrl} />
+            </View>
+          ) : null}
+        </View>
       </View>
     </Screen>
   );
@@ -251,6 +308,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     paddingHorizontal: 20,
+  },
+  serverSection: {
+    marginTop: 18,
+    alignItems: 'center',
+    gap: 10,
+  },
+  serverToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  serverToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  serverCard: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
+  },
+  serverSavedText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   demoHint: {
     textAlign: 'center',

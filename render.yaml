@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: synergysphere-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build --workspace=backend
+    startCommand: npm run start --workspace=backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: synergysphere-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: https://synergysphere.onrender.com
+
+databases:
+  - name: synergysphere-db
+    plan: free
+    databaseName: synergysphere
+    user: synergysphere
