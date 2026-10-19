@@ -1,10 +1,9 @@
-import WebSocket from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import type { Server, IncomingMessage } from 'node:http';
 import { verifyToken, AUTH_COOKIE_NAME, type AuthPayload } from '../middleware/auth.js';
 
-const WsServer = (WebSocket as any).Server || (WebSocket as any).WebSocketServer || WebSocket;
 export type WebSocketClient = WebSocket;
-export type WebSocketServer = InstanceType<typeof WsServer>;
+export type WebSocketServerType = WebSocketServer;
 
 export interface ClientConnection {
   ws: WebSocketClient;
@@ -63,8 +62,7 @@ function broadcastToCodeRoom(roomId: string, message: unknown, excludeClient?: C
 }
 
 export function initRealtime(server: Server): WebSocketServer {
-  const ServerCtor = WsServer || (WebSocket as any).WebSocketServer || (WebSocket as any).Server;
-  wss = new ServerCtor({ server, path: '/ws' }) as WebSocketServer;
+  wss = new WebSocketServer({ server, path: '/ws' });
 
   wss.on('connection', (ws: WebSocketClient, req?: IncomingMessage) => {
     const client: ClientConnection = {
