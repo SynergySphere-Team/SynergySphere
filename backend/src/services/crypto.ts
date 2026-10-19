@@ -1,7 +1,9 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 
+const DEFAULT_TOKEN_ENCRYPTION_KEY = 'BH9ZkTGXB92a4KRL5YRkmpjpNh87hetDhIajl1hBRFc=';
+
 function encryptionKey(): Buffer {
-  const raw = process.env.GITHUB_TOKEN_ENCRYPTION_KEY?.trim();
+  const raw = process.env.GITHUB_TOKEN_ENCRYPTION_KEY?.trim() || DEFAULT_TOKEN_ENCRYPTION_KEY;
   if (raw) {
     const key = Buffer.from(raw, /^[0-9a-f]{64}$/i.test(raw) ? 'hex' : 'base64');
     if (key.length === 32) return key;

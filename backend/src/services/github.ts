@@ -172,17 +172,27 @@ function handleMockGithubRequest<T>(path: string, init: RequestInit = {}): T {
   return {} as T;
 }
 
+export const DEFAULT_GITHUB_CLIENT_ID = 'Ov23liIshmCd4BQEPBdW';
+
+export function getGithubClientId(): string {
+  const envId = process.env.GITHUB_OAUTH_CLIENT_ID?.trim();
+  if (envId && envId !== 'demo') return envId;
+  if (process.env.GITHUB_SIMULATED === 'true' || envId === 'demo') {
+    return '';
+  }
+  return DEFAULT_GITHUB_CLIENT_ID;
+}
+
 export function isGithubConfigured(): boolean {
-  const clientId = process.env.GITHUB_OAUTH_CLIENT_ID?.trim();
-  return Boolean(clientId && clientId !== 'demo');
+  return Boolean(getGithubClientId());
 }
 
 export function assertGithubConfigured(): string {
-  const clientId = process.env.GITHUB_OAUTH_CLIENT_ID?.trim();
-  if (!clientId || clientId === 'demo') {
+  const id = getGithubClientId();
+  if (!id) {
     return 'demo-client-id';
   }
-  return clientId;
+  return id;
 }
 
 type DeviceCodeResponse = { device_code: string; user_code: string; verification_uri: string; verification_uri_complete?: string; expires_in: number; interval?: number; error?: string; error_description?: string };
@@ -203,11 +213,11 @@ function simulatedDeviceAuthorization(): DeviceCodeResponse {
 let githubClientRejected = false;
 
 export async function beginDeviceAuthorization(): Promise<DeviceCodeResponse> {
-  const allowSimulation = process.env.NODE_ENV !== 'production';
-  if (!isGithubConfigured() || (githubClientRejected && allowSimulation)) {
+  const clientId = getGithubClientId();
+  const allowSimulation = process.env.GITHUB_SIMULATED === 'true' || (!clientId && process.env.NODE_ENV !== 'production');
+  if (!clientId || (githubClientRejected && allowSimulation)) {
     return simulatedDeviceAuthorization();
   }
-  const clientId = process.env.GITHUB_OAUTH_CLIENT_ID!.trim();
   let response: Response;
   try {
     response = await fetch(`${GITHUB_LOGIN}/device/code`, {
@@ -236,6 +246,9 @@ export async function beginDeviceAuthorization(): Promise<DeviceCodeResponse> {
   }
   if (!response.ok || body.error || !body.device_code) {
     throw new GithubError(body.error_description || body.message || body.error || 'GitHub could not start device authorization.', response.status || 502, body.error);
+  }
+  if (!body.verification_uri_complete && body.verification_uri && body.user_code) {
+    body.verification_uri_complete = `${body.verification_uri}?user_code=${encodeURIComponent(body.user_code)}`;
   }
   return body as DeviceCodeResponse;
 }
