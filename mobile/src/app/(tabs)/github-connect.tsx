@@ -245,7 +245,7 @@ export default function GithubConnectScreen() {
                   { backgroundColor: colors.primary },
                   pressed && styles.pressed,
                 ]}
-                onPress={() => Linking.openURL(authorization.verificationUri)}
+                onPress={() => Linking.openURL(authorization.verificationUriComplete || authorization.verificationUri)}
               >
                 <Ionicons name="open-outline" size={16} color={colors.primaryText} />
                 <Text style={[styles.openVerificationText, { color: colors.primaryText }]}>

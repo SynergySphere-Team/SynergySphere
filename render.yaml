@@ -17,3 +17,23 @@ services:
         generateValue: true
       - key: FRONTEND_URL
         value: https://synergysphere.onrender.com
+      - key: GITHUB_OAUTH_CLIENT_ID
+        value: Ov23liIshmCd4BQEPBdW
+      - key: GITHUB_TOKEN_ENCRYPTION_KEY
+        value: BH9ZkTGXB92a4KRL5YRkmpjpNh87hetDhIajl1hBRFc=
+      - key: GITHUB_WEBHOOK_SECRET
+        value: synergysphere-dev-webhook-secret
+      - key: EMAIL_USER
+        value: synergysphere1@gmail.com
+      - key: SMTP_USER
+        value: synergysphere1@gmail.com
+      - key: APP_PASSWORD
+        value: pbuj yckq ogyr uifp
+      - key: EMAIL_APP_PASSWORD
+        value: pbuj yckq ogyr uifp
+      - key: SMTP_PASSWORD
+        value: pbuj yckq ogyr uifp
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
