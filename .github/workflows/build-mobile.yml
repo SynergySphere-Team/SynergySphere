@@ -19,7 +19,7 @@ on:
 
 jobs:
   build-ios-ipa:
-    name: Build Unsigned iOS .ipa (for Sideloadly)
+    name: Build iOS .ipa (sign with Sideloadly)
     if: ${{ inputs.platform == 'both' || inputs.platform == 'ios' || github.event.inputs.platform == '' }}
     runs-on: macos-latest
     timeout-minutes: 45
@@ -47,6 +47,7 @@ jobs:
         working-directory: ./mobile
         env:
           EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
+          IOS_BUILD_NUMBER: ${{ github.run_number }}
           EXPO_NO_TELEMETRY: '1'
         run: npx expo prebuild --platform ios --clean --no-install
 
@@ -54,7 +55,7 @@ jobs:
         working-directory: ./mobile/ios
         run: pod install
 
-      - name: Compile Release .app (Unsigned for Sideloadly)
+      - name: Compile Release .app for Sideloadly
         working-directory: ./mobile/ios
         env:
           EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
@@ -75,7 +76,7 @@ jobs:
             COMPILER_INDEX_STORE_ENABLE=NO \
             build
 
-      - name: Package .app into Unsigned SynergySphere.ipa
+      - name: Package unsigned .ipa for Sideloadly
         working-directory: ./mobile/ios
         run: |
           rm -rf Payload SynergySphere-unsigned.ipa
@@ -86,8 +87,12 @@ jobs:
             exit 1
           fi
           cp -R "$APP_PATH" Payload/
-          codesign -s - --force --deep Payload/*.app
           zip -qry SynergySphere-unsigned.ipa Payload
+          unzip -t SynergySphere-unsigned.ipa
+          if unzip -l SynergySphere-unsigned.ipa | grep -q 'Payload/[^/]*/_CodeSignature/'; then
+            echo "Error: the IPA must be unsigned so Sideloadly can sign it for the target phone."
+            exit 1
+          fi
 
       - name: Upload SynergySphere-unsigned.ipa Artifact
         uses: actions/upload-artifact@v4
@@ -131,18 +136,61 @@ jobs:
         working-directory: ./mobile
         env:
           EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
           EXPO_NO_TELEMETRY: '1'
         run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Load Android release signing key when configured
+        id: android-signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No Android release keystore is configured. This APK can be installed as a first-time install, but it cannot reliably update an existing SynergySphere installation."
+            exit 0
+          fi
+          KEYSTORE_PATH="$RUNNER_TEMP/synergysphere-release.keystore"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+          echo "keystore_path=$KEYSTORE_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Assemble Release APK via Gradle
         working-directory: ./mobile/android
         env:
           EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
           NODE_ENV: production
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+          if [ "${{ steps.android-signing.outputs.configured }}" = "true" ]; then
+            ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a \
+              -Pandroid.injected.signing.store.file="${{ steps.android-signing.outputs.keystore_path }}" \
+              -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
+              -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
+              -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD"
+          else
+            ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+          fi
           cp app/build/outputs/apk/release/app-release.apk ./SynergySphere.apk
+
+      - name: Verify Android APK signature
+        working-directory: ./mobile/android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "Error: apksigner was not found in the Android SDK."
+            exit 1
+          fi
+          "$APKSIGNER" verify --verbose --print-certs SynergySphere.apk
 
       - name: Upload SynergySphere.apk Artifact
         uses: actions/upload-artifact@v4
