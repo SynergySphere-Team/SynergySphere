@@ -149,6 +149,200 @@ export function computeConsecutiveStreak(dates: Array<Date | string>, timeZone =
 }
 
 export async function getProfileSignals(userId: string): Promise<ProfileSignalData> {
+  // Fetch completed lesson IDs first as they are needed for hubSkill calculations
+  const completedRowsPromise = query<{ lessonId: string }>(
+    `SELECT "lessonId" FROM "LectureLessonProgress" WHERE "userId" = $1`,
+    [userId],
+  ).catch(() => []);
+
+  // Independent queries that can be run in parallel
+  const manualSkillsPromise = query<ManualSkillSignal>(
+    `SELECT "id", "name", "level", "source", "category"
+     FROM "PortfolioSkill"
+     WHERE "userId" = $1
+     ORDER BY "level" DESC`,
+    [userId],
+  ).catch(() => []);
+
+  const profileRowPromise = queryOne<{
+    githubUrl: string | null;
+    linkedinUrl: string | null;
+    headline: string | null;
+    about: string | null;
+    location: string | null;
+    targetRole: string | null;
+  }>(
+    `SELECT "githubUrl", "linkedinUrl", "headline", "about", "location", "targetRole"
+     FROM "PortfolioProfile"
+     WHERE "userId" = $1`,
+    [userId],
+  ).catch(() => null);
+
+  const scoreRowsPromise = query<{ topic: string; bestScore: number; attempts: number }>(
+    `SELECT "topic", MAX("score") as "bestScore", COUNT("id")::int as "attempts"
+     FROM "Interview"
+     WHERE "userId" = $1 AND "score" IS NOT NULL
+     GROUP BY "topic"
+     ORDER BY "bestScore" DESC`,
+    [userId],
+  ).catch(() => []);
+
+  const joinedProjectsPromise = query<{
+    id: string;
+    title: string;
+    role: string;
+    status: string;
+    category?: string;
+  }>(
+    `SELECT p."id", p."title", 'Contributor' as "role", pa."status", p."category"
+     FROM "ProjectApplication" pa
+     JOIN "Project" p ON p."id" = pa."projectId"
+     WHERE pa."userId" = $1`,
+    [userId],
+  ).catch(() => []);
+
+  const featuredProjectsPromise = query<{
+    id: string;
+    title: string;
+    description: string;
+    projectLink?: string;
+    githubLink?: string;
+  }>(
+    `SELECT "id", "title", "description", "projectLink", "githubLink"
+     FROM "Portfolio"
+     WHERE "userId" = $1
+     ORDER BY "createdAt" DESC`,
+    [userId],
+  ).catch(() => []);
+
+  const passedChallengeRowsPromise = query<{
+    challengeId: string;
+    title: string;
+    language: string | null;
+    difficulty: string;
+  }>(
+    `SELECT DISTINCT ON (c."id") c."id" as "challengeId", c."title", c."language", c."difficulty"
+     FROM "ChallengeAttempt" ca
+     JOIN "Challenge" c ON c."id" = ca."challengeId"
+     WHERE ca."userId" = $1 AND ca."passed" = true
+     ORDER BY c."id", ca."createdAt" DESC`,
+    [userId],
+  ).catch(() => []);
+
+  const activityRowsPromise = query<{ day_num: number; cnt: number }>(
+    `SELECT EXTRACT(ISODOW FROM occurred)::int AS day_num, COUNT(*)::int AS cnt
+     FROM (
+       SELECT "createdAt" AS occurred FROM "ChallengeAttempt" WHERE "userId" = $1 AND "createdAt" >= CURRENT_DATE - INTERVAL '6 days'
+       UNION ALL
+       SELECT "updatedAt" AS occurred FROM "Task" WHERE "userId" = $1 AND "status" = 'DONE' AND "updatedAt" >= CURRENT_DATE - INTERVAL '6 days'
+       UNION ALL
+       SELECT "date" AS occurred FROM "Wellness" WHERE "userId" = $1 AND "date" >= CURRENT_DATE - INTERVAL '6 days'
+       UNION ALL
+       SELECT "createdAt" AS occurred FROM "InterviewAttempt" WHERE "userId" = $1 AND "createdAt" >= CURRENT_DATE - INTERVAL '6 days'
+     ) act
+     GROUP BY day_num`,
+    [userId],
+  ).catch(() => []);
+
+  const doneThisWeekPromise = queryOne<{ count: number }>(
+    `SELECT COUNT(*)::int AS "count"
+     FROM "Task"
+     WHERE "userId" = $1 AND "status" = 'DONE' AND "updatedAt" >= CURRENT_DATE - INTERVAL '7 days'`,
+    [userId],
+  ).catch(() => ({ count: 0 }));
+
+  const upcomingRowsPromise = query<{
+    id: string;
+    title: string;
+    description: string | null;
+    dueDate: Date | null;
+    status: string;
+  }>(
+    `SELECT "id", "title", "description", "dueDate", "status"
+     FROM "Task"
+     WHERE "userId" = $1 AND "status" != 'DONE'
+     ORDER BY "dueDate" ASC NULLS LAST, "createdAt" DESC
+     LIMIT 5`,
+    [userId],
+  ).catch(() => []);
+
+  const starBulletsPromise = query<{
+    id: string;
+    title: string;
+    bullet: string;
+    source: string;
+    createdAt: Date;
+  }>(
+    `SELECT "id", "title", "bullet", "source", "createdAt"
+     FROM "PortfolioBullet"
+     WHERE "userId" = $1
+     ORDER BY "createdAt" DESC`,
+    [userId],
+  ).catch(() => []);
+
+  // Await all promises
+  const [
+    completedRows,
+    manualSkills,
+    profileRow,
+    scoreRows,
+    joinedProjects,
+    featuredProjects,
+    passedChallengeRows,
+    activityRows,
+    doneThisWeek,
+    upcomingRows,
+    starBullets,
+  ] = await Promise.all([
+    completedRowsPromise,
+    manualSkillsPromise,
+    profileRowPromise,
+    scoreRowsPromise,
+    joinedProjectsPromise,
+    featuredProjectsPromise,
+    passedChallengeRowsPromise,
+    activityRowsPromise,
+    doneThisWeekPromise,
+    upcomingRowsPromise,
+    starBulletsPromise,
+  ]);
+
+  const completedSet = new Set(completedRows.map((r) => r.lessonId));
+  // Map every lessonId in curriculum to its subjectId
+  const lessonToSubjectMap = new Map<string, string>();
+  for (const subject of w3schoolsProgrammingDomain.subjects) {
+    for (const mod of subject.modules) {
+      for (const lesson of mod.lessons) {
+        lessonToSubjectMap.set(lesson.id, subject.id);
+      }
+    }
+  }
+
+  // Count completions per technology
+  const completionCounts: Record<string, number> = {};
+  for (const lessonId of completedSet) {
+    const subjectId = lessonToSubjectMap.get(lessonId);
+    if (subjectId) {
+      completionCounts[subjectId] = (completionCounts[subjectId] || 0) + 1;
+    }
+  }
+
+  const hubSkills: HubSkillSignal[] = technologiesCatalog.map((tech) => {
+    const completed = completionCounts[tech.id] || 0;
+    const percent = Math.min(100, Math.round((completed / Math.max(tech.totalLessons, 1)) * 100));
+    return {
+      id: tech.id,
+      name: tech.name,
+      category: tech.category,
+      icon: tech.icon,
+      completedLessons: completed,
+      totalLessons: tech.totalLessons,
+      percent,
+      unlocked: completed > 0,
+    };
+  });
+
+  // The rest of the function remains unchanged (use existing variables)
   const completedRows = await query<{ lessonId: string }>(
     `SELECT "lessonId" FROM "LectureLessonProgress" WHERE "userId" = $1`,
     [userId],
